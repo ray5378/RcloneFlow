@@ -179,3 +179,7 @@ export function listRuns() {
 export function getRunStatus(runId: number) {
   return api<Run>(`/api/runs/${runId}`)
 }
+
+export function clearRun(runId: number) {
+  return api(`/api/runs/${runId}`, { method: 'DELETE' })
+}

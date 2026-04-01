@@ -25,6 +25,8 @@ export interface Run {
   trigger: string
   summary?: Record<string, unknown>
   error?: string
+  startedAt?: string
+  finishedAt?: string
   createdAt: string
   updatedAt: string
 }

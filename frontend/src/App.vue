@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
-import RunView from './views/RunView.vue'
 import * as api from './api'
 
 const currentPage = ref('browser')
@@ -12,7 +11,6 @@ const isLight = ref(localStorage.getItem('theme') === 'light')
 const pages = {
   browser: '文件管理',
   tasks: '任务管理',
-  runs: '运行记录',
 }
 
 function switchPage(page: string) {
@@ -67,7 +65,6 @@ onMounted(async () => {
     <main class="main">
       <BrowserView v-if="currentPage === 'browser'" :version="version" />
       <TaskView v-if="currentPage === 'tasks'" />
-      <RunView v-if="currentPage === 'runs'" />
     </main>
   </div>
 </template>

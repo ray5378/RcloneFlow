@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import * as api from '../api'
-import type { Task, Schedule } from '../types'
+import type { Task, Schedule, Run } from '../types'
 
 const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
+const runs = ref<Run[]>([])
 const remotes = ref<string[]>([])
 const taskMenu = ref<string | number>('')
 const scheduleMenu = ref<string | number>('')
+const runMenu = ref<string | number>('')
 
 const taskForm = ref({
   name: '',
@@ -29,14 +31,16 @@ onMounted(async () => {
 
 async function loadData() {
   try {
-    const [taskData, remoteData, scheduleData] = await Promise.all([
+    const [taskData, remoteData, scheduleData, runData] = await Promise.all([
       api.listTasks(),
       api.listRemotes(),
       api.listSchedules(),
+      api.listRuns(),
     ])
-    tasks.value = taskData
-    remotes.value = remoteData.remotes || []
-    schedules.value = scheduleData
+    tasks.value = taskData || []
+    remotes.value = remoteData?.remotes || []
+    schedules.value = scheduleData || []
+    runs.value = runData || []
   } catch (e) {
     console.error(e)
   }
@@ -117,6 +121,29 @@ async function deleteSchedule(id: number) {
 function getTaskName(taskId: number) {
   const task = tasks.value.find(t => t.id === taskId)
   return task?.name || `任务 #${taskId}`
+}
+
+function formatTime(time: string) {
+  return new Date(time).toLocaleString('zh-CN')
+}
+
+function getStatusClass(status: string) {
+  switch (status) {
+    case 'running': return 'running'
+    case 'finished': return 'success'
+    case 'failed': return 'failed'
+    default: return ''
+  }
+}
+
+async function clearRun(id: number) {
+  if (!confirm('确定清除此记录？')) return
+  try {
+    await api.clearRun(id)
+    await loadData()
+  } catch (e) {
+    alert((e as Error).message)
+  }
 }
 </script>
 
@@ -260,6 +287,36 @@ function getTaskName(taskId: number) {
         </div>
       </div>
       <div v-if="!schedules.length" class="empty">暂无定时任务</div>
+    </div>
+  </div>
+
+  <!-- Run Records Section -->
+  <div class="card">
+    <div class="card-header">
+      <div class="title">运行记录</div>
+    </div>
+    <div class="list">
+      <div v-for="run in runs" :key="run.id" class="item">
+        <div class="name">
+          <strong>{{ getTaskName(run.taskId) }}</strong>
+          <div class="muted">
+            {{ run.startedAt ? formatTime(run.startedAt) : '' }}
+            <span v-if="run.finishedAt"> → {{ formatTime(run.finishedAt) }}</span>
+          </div>
+        </div>
+        <div class="actions" @click.stop>
+          <span :class="['status', getStatusClass(run.status)]">{{ run.status }}</span>
+          <div class="menu-area">
+            <button class="menu-btn" @click="runMenu = runMenu === run.id ? '' : run.id">
+              ⋮
+            </button>
+            <div v-if="runMenu === run.id" class="menu-pop">
+              <button class="danger" @click="clearRun(run.id); runMenu = ''">清除</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div v-if="!runs.length" class="empty">暂无运行记录</div>
     </div>
   </div>
 </template>
