@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
-import ScheduleView from './views/ScheduleView.vue'
 import RunView from './views/RunView.vue'
 import * as api from './api'
 
@@ -13,7 +12,6 @@ const isLight = ref(localStorage.getItem('theme') === 'light')
 const pages = {
   browser: '文件管理',
   tasks: '任务管理',
-  schedules: '定时任务',
   runs: '运行记录',
 }
 
@@ -69,7 +67,6 @@ onMounted(async () => {
     <main class="main">
       <BrowserView v-if="currentPage === 'browser'" :version="version" />
       <TaskView v-if="currentPage === 'tasks'" />
-      <ScheduleView v-if="currentPage === 'schedules'" />
       <RunView v-if="currentPage === 'runs'" />
     </main>
   </div>
