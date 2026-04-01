@@ -44,13 +44,13 @@ function formatTime(time: string) {
 function getStatusClass(status: string) {
   switch (status) {
     case 'running':
-      return { color: '#2563eb', bg: '#dbeafe' }
+      return 'running'
     case 'finished':
-      return { color: '#16a34a', bg: '#dcfce7' }
+      return 'success'
     case 'failed':
-      return { color: '#dc2626', bg: '#fee2e2' }
+      return 'error'
     default:
-      return { color: '#6b7280', bg: '#f3f4f6' }
+      return ''
   }
 }
 
@@ -67,46 +67,27 @@ function formatSummary(summary?: Record<string, unknown>) {
 
 <template>
   <div class="card">
-    <div class="topbar">
-      <div>
-        <div style="font-size: 18px; font-weight: 600">运行记录</div>
-        <div class="muted">查看任务执行状态</div>
-      </div>
-      <div class="actions">
-        <button class="ghost small" @click="loadData">刷新</button>
-      </div>
+    <div class="card-header yellow">
+      <div class="title">运行记录</div>
+      <div class="subtitle">查看任务执行状态</div>
     </div>
-  </div>
-
-  <div class="card">
     <div class="list">
       <div v-for="run in runs" :key="run.id" class="item">
-        <div class="manage-row">
-          <div>
-            <strong>{{ getTaskName(run.taskId) }}</strong>
-            <div class="muted">
-              {{ formatTime(run.createdAt) }} / {{ run.trigger }}
-            </div>
-            <div v-if="run.error" style="color: #dc2626; margin-top: 4px">
-              {{ run.error }}
-            </div>
-            <div v-if="run.summary" class="muted" style="margin-top: 4px">
-              {{ formatSummary(run.summary) }}
-            </div>
+        <div class="name">
+          <strong>{{ getTaskName(run.taskId) }}</strong>
+          <div class="muted">
+            {{ formatTime(run.createdAt) }} / {{ run.trigger }}
           </div>
-          <span
-            :style="{
-              color: getStatusClass(run.status).color,
-              background: getStatusClass(run.status).bg,
-              padding: '4px 8px',
-              borderRadius: '8px',
-              fontSize: '12px',
-              fontWeight: 500,
-            }"
-          >
-            {{ run.status }}
-          </span>
+          <div v-if="run.error" style="color: #ef5350; margin-top: 4px">
+            {{ run.error }}
+          </div>
+          <div v-if="run.summary" class="muted" style="margin-top: 4px">
+            {{ formatSummary(run.summary) }}
+          </div>
         </div>
+        <span :class="['badge', getStatusClass(run.status)]">
+          {{ run.status }}
+        </span>
       </div>
       <div v-if="!runs.length" class="empty">暂无运行记录</div>
     </div>

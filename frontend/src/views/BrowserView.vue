@@ -206,11 +206,11 @@ async function openEditRemote(name: string) {
 <template>
   <!-- Storage Panel -->
   <div class="card">
-    <div class="card-header" style="background: #eff6ff; border-color: #bfdbfe;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start">
+    <div class="card-header blue">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
         <div>
-          <div style="font-size: 18px; font-weight: 600">存储节点</div>
-          <div class="muted" style="margin-top: 4px">选择浏览存储文件</div>
+          <div class="title">存储节点</div>
+          <div class="subtitle">选择浏览存储文件</div>
         </div>
         <div class="actions">
           <button class="ghost small" @click="openManageStorage">管理存储</button>
@@ -218,8 +218,7 @@ async function openEditRemote(name: string) {
         </div>
       </div>
     </div>
-    <div class="card-content">
-    <div class="tile-grid" style="margin-top: 12px">
+    <div class="tile-grid">
       <div
         v-for="name in getOrderedRemotes()"
         :key="name"
@@ -232,101 +231,101 @@ async function openEditRemote(name: string) {
         @drop="onDrop($event, name)"
         @dragend="onDragEnd"
       >
-        <div class="manage-row">
-          <strong>{{ name }}</strong>
-          <span style="color: #9ca3af; cursor: grab; font-size: 12px">⋮⋮</span>
+        <div class="tile-header">
+          <span class="tile-name">{{ name }}</span>
+          <span class="tile-drag">⋮⋮</span>
         </div>
-        <div v-if="descriptions[name]" class="muted" style="margin-top: 6px">
+        <div v-if="descriptions[name]" class="tile-desc">
           {{ descriptions[name] }}
         </div>
       </div>
     </div>
   </div>
-  </div>
 
   <!-- Browser Panel -->
   <div v-if="subview === 'explorer'" class="card">
-    <div class="card-header" style="background: #f0fdf4; border-color: #bbf7d0;">
-      <div style="font-size: 18px; font-weight: 600">文件浏览</div>
-      <div class="muted" style="margin-top: 4px">点击查看文件</div>
-    </div>
-    <div class="card-content">
-      <div class="pathbar" style="margin-top: 12px">
-        <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
-          <span v-if="i > 0" style="color: #9ca3af"> / </span>
-          <button
-            class="crumb"
-            :class="{ current: i === breadcrumbs.length - 1 }"
-            @click="crumb.path !== browserPath && (browserPath = crumb.path, refreshBrowser())"
-          >
-            {{ crumb.name }}
-          </button>
-        </template>
+    <div class="card-header green">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
+        <div class="title">文件浏览</div>
+        <div class="actions">
+          <button class="ghost small" @click="openManageStorage">管理存储</button>
+          <button class="ghost small" @click="openAddRemote">添加存储</button>
+        </div>
       </div>
-      <div v-if="browserError" style="color: #dc2626; margin-top: 8px">{{ browserError }}</div>
-      <div class="list" style="margin-top: 12px; border-top: 1px solid #e5e7eb; padding-top: 12px">
-        <div
-          v-for="item in browserItems"
-          :key="item.Path"
-          class="item"
-          @click="enterItem(item)"
+    </div>
+    <div class="pathbar">
+      <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
+        <span v-if="i > 0" class="sep">/</span>
+        <button
+          class="crumb"
+          :class="{ current: i === breadcrumbs.length - 1 }"
+          @click="crumb.path !== browserPath && (browserPath = crumb.path, refreshBrowser())"
         >
-          <div class="manage-row">
-            <span>
-              {{ item.Name }}
-              <span v-if="item.IsDir" class="muted">/</span>
-            </span>
-            <span class="muted">{{ item.Size }}</span>
-          </div>
+          {{ crumb.name }}
+        </button>
+      </template>
+    </div>
+    <div class="list">
+      <div
+        v-for="item in browserItems"
+        :key="item.Path"
+        class="item"
+        @click="enterItem(item)"
+      >
+        <div class="name">
+          <span :class="item.IsDir ? 'folder' : 'icon'">{{ item.IsDir ? '📁' : '📄' }}</span>
+          <span>{{ item.Name }}</span>
         </div>
-        <div v-if="!browserItems.length && !browserError" class="empty">
-          空目录
+        <div class="meta">
+          <span class="size">{{ item.Size }}</span>
         </div>
+      </div>
+      <div v-if="browserError" class="item" style="color: #ef5350">
+        {{ browserError }}
+      </div>
+      <div v-if="!browserItems.length && !browserError" class="empty">
+        空目录
       </div>
     </div>
   </div>
 
   <!-- Manage Storage Subview -->
   <div v-if="subview === 'manage-storage'" class="card">
-    <div class="card-header" style="background: #fef3c7; border-color: #fcd34d;">
-      <div style="display: flex; justify-content: space-between; align-items: flex-start">
-        <div style="font-size: 18px; font-weight: 600">管理存储</div>
+    <div class="card-header yellow">
+      <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
+        <div class="title">管理存储</div>
         <div class="actions">
           <button class="ghost small" @click="subview = 'explorer'">返回</button>
           <button class="ghost small" @click="openAddRemote">添加存储</button>
         </div>
       </div>
     </div>
-    <div class="card-content">
-      <div class="list">
-        <div v-for="name in remotes" :key="name" class="item" @click="openRemote(name)">
-          <div class="manage-row">
-            <div>
-              <strong>{{ name }}</strong>
-            </div>
-            <div class="actions" @click.stop>
-              <button class="ghost small" @click="openEditRemote(name)">修改配置</button>
-              <button class="ghost small" @click="openEditDesc(name)">自定义介绍</button>
-              <button
-                class="ghost small"
-                @click="testRemote(name)"
-                :disabled="testState[name] === 'testing'"
-              >
-                {{ getTestText(name) }}
+    <div class="list">
+      <div v-for="name in remotes" :key="name" class="item" @click="openRemote(name)">
+        <div class="name">
+          <strong>{{ name }}</strong>
+        </div>
+        <div class="actions" @click.stop>
+          <button class="ghost small" @click="openEditRemote(name)">修改配置</button>
+          <button class="ghost small" @click="openEditDesc(name)">自定义介绍</button>
+          <button
+            class="ghost small"
+            @click="testRemote(name)"
+            :disabled="testState[name] === 'testing'"
+          >
+            {{ getTestText(name) }}
+          </button>
+          <div class="menu-area">
+            <button
+              class="menu-btn"
+              @click="remoteMenu = remoteMenu === name ? '' : name"
+            >
+              ⋮
+            </button>
+            <div v-if="remoteMenu === name" class="menu-pop">
+              <button class="danger" @click="deleteRemote(name); remoteMenu = ''">
+                删除
               </button>
-              <div class="menu-area">
-                <button
-                  class="menu-btn ghost small"
-                  @click="remoteMenu = remoteMenu === name ? '' : name"
-                >
-                  ⋮
-                </button>
-                <div v-if="remoteMenu === name" class="menu-pop">
-                  <button class="danger" @click="deleteRemote(name); remoteMenu = ''">
-                    删除
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
         </div>
