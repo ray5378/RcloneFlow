@@ -58,9 +58,8 @@ export function listPath(remote: string, path: string) {
   )
 }
 
+// 复制文件 (operations/copyfile)
 export function copyFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  // rclone operations/copyfile expects: srcFs, srcRemote, dstFs, dstRemote
-  // fs format should be like "drive:" or "/" for local
   return api('/api/fs/copy', {
     method: 'POST',
     body: JSON.stringify({ 
@@ -72,8 +71,8 @@ export function copyFile(srcRemote: string, srcPath: string, dstRemote: string, 
   })
 }
 
+// 移动文件 (operations/movefile)
 export function moveFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  // rclone operations/movefile expects: srcFs, srcRemote, dstFs, dstRemote
   return api('/api/fs/move', {
     method: 'POST',
     body: JSON.stringify({ 
@@ -85,8 +84,29 @@ export function moveFile(srcRemote: string, srcPath: string, dstRemote: string, 
   })
 }
 
+// 复制目录 (sync/copy) - srcFs和dstFs包含完整路径
+export function copyDir(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
+  return api('/api/fs/copy', {
+    method: 'POST',
+    body: JSON.stringify({ 
+      srcFs: srcRemote + ':' + srcPath, 
+      dstFs: dstRemote + ':' + dstPath 
+    }),
+  })
+}
+
+// 移动目录 (sync/move) - srcFs和dstFs包含完整路径
+export function moveDir(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
+  return api('/api/fs/move', {
+    method: 'POST',
+    body: JSON.stringify({ 
+      srcFs: srcRemote + ':' + srcPath, 
+      dstFs: dstRemote + ':' + dstPath 
+    }),
+  })
+}
+
 export function deleteFile(remote: string, path: string) {
-  // rclone operations/deletefile expects: fs, remote
   return api('/api/fs/delete', {
     method: 'POST',
     body: JSON.stringify({ fs: remote + ':', remote: path }),

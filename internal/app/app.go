@@ -46,6 +46,8 @@ func Run() error {
     mux.HandleFunc("/api/fs/purge", srv.handlePurge)
     mux.HandleFunc("/api/fs/move", srv.handleMove)
     mux.HandleFunc("/api/fs/copy", srv.handleCopy)
+    mux.HandleFunc("/api/fs/copyDir", srv.handleCopyDir)
+    mux.HandleFunc("/api/fs/moveDir", srv.handleMoveDir)
     mux.HandleFunc("/api/fs/publiclink", srv.handlePublicLink)
     mux.HandleFunc("/api/tasks", srv.handleTasks)
     mux.HandleFunc("/api/tasks/", srv.handleTaskActions)
@@ -462,6 +464,48 @@ func (s *Server) handleCopy(w http.ResponseWriter, r *http.Request) {
         return
     }
     if err := s.rc.CopyFile(r.Context(), req.SrcFs, req.SrcRemote, req.DstFs, req.DstRemote); err != nil {
+        writeJSON(w, 500, map[string]any{"error": err.Error()})
+        return
+    }
+    writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+// handleCopyDir 复制目录 (sync/copy)
+func (s *Server) handleCopyDir(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        w.WriteHeader(405)
+        return
+    }
+    var req struct {
+        SrcFs string `json:"srcFs"`
+        DstFs string `json:"dstFs"`
+    }
+    if err := decode(r, &req); err != nil {
+        writeJSON(w, 400, map[string]any{"error": err.Error()})
+        return
+    }
+    if err := s.rc.CopyDir(r.Context(), req.SrcFs, req.DstFs); err != nil {
+        writeJSON(w, 500, map[string]any{"error": err.Error()})
+        return
+    }
+    writeJSON(w, 200, map[string]any{"ok": true})
+}
+
+// handleMoveDir 移动目录 (sync/move)
+func (s *Server) handleMoveDir(w http.ResponseWriter, r *http.Request) {
+    if r.Method != http.MethodPost {
+        w.WriteHeader(405)
+        return
+    }
+    var req struct {
+        SrcFs string `json:"srcFs"`
+        DstFs string `json:"dstFs"`
+    }
+    if err := decode(r, &req); err != nil {
+        writeJSON(w, 400, map[string]any{"error": err.Error()})
+        return
+    }
+    if err := s.rc.MoveDir(r.Context(), req.SrcFs, req.DstFs); err != nil {
         writeJSON(w, 500, map[string]any{"error": err.Error()})
         return
     }

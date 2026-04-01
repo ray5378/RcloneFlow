@@ -226,22 +226,31 @@ async function pasteItem() {
     return
   }
   try {
-    // clipboardItem.Path is already the full path from remote root (no leading slash)
+    const isDir = clipboardItem.value.IsDir
     const srcPath = clipboardItem.value.Path
-    // dstPath is current directory + original filename (no leading slash)
+    // For directory paste, we use the original dir name; for file, use file name
     const dstPath = browserPath.value ? browserPath.value + '/' + clipboardItem.value.Name : clipboardItem.value.Name
     
     console.log('=== Paste Info ===')
     console.log('browserFs:', browserFs.value)
     console.log('browserPath:', browserPath.value)
-    console.log('srcPath (full):', srcPath)
+    console.log('srcPath:', srcPath)
     console.log('dstPath:', dstPath)
     console.log('clipboardAction:', clipboardAction.value)
+    console.log('IsDir:', isDir)
     
     if (clipboardAction.value === 'copy') {
-      await api.copyFile(browserFs.value, srcPath, browserFs.value, dstPath)
+      if (isDir) {
+        await api.copyDir(browserFs.value, srcPath, browserFs.value, dstPath)
+      } else {
+        await api.copyFile(browserFs.value, srcPath, browserFs.value, dstPath)
+      }
     } else if (clipboardAction.value === 'move') {
-      await api.moveFile(browserFs.value, srcPath, browserFs.value, dstPath)
+      if (isDir) {
+        await api.moveDir(browserFs.value, srcPath, browserFs.value, dstPath)
+      } else {
+        await api.moveFile(browserFs.value, srcPath, browserFs.value, dstPath)
+      }
     }
     
     clipboardItem.value = null
