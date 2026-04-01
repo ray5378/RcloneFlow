@@ -134,18 +134,27 @@ function editTask(task: Task) {
     targetRemote: task.targetRemote,
     targetPath: task.targetPath || '',
   }
-  // 加载源路径选项（不调用onSourceRemoteChange，因为它会重置path）
+  // 加载源路径选项 - 加载父目录以便显示文件
   if (task.sourceRemote) {
-    sourceCurrentPath.value = task.sourcePath || ''
-    loadSourcePath(task.sourceRemote, task.sourcePath || '')
+    const parentPath = getParentPath(task.sourcePath || '')
+    sourceCurrentPath.value = parentPath
+    loadSourcePath(task.sourceRemote, parentPath)
   }
   // 加载目标路径选项
   if (task.targetRemote) {
-    targetCurrentPath.value = task.targetPath || ''
-    loadTargetPath(task.targetRemote, task.targetPath || '')
+    const parentPath = getParentPath(task.targetPath || '')
+    targetCurrentPath.value = parentPath
+    loadTargetPath(task.targetRemote, parentPath)
   }
   currentModule.value = 'add'
   openMenuId.value = null
+}
+
+function getParentPath(path: string): string {
+  if (!path) return ''
+  const parts = path.split('/')
+  parts.pop()
+  return parts.join('/')
 }
 
 async function deleteTask(id: number) {
