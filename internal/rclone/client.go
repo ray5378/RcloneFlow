@@ -209,7 +209,7 @@ func (c *Client) Mkdir(ctx context.Context, fs, remote string) error {
 
 // DeleteFile 删除文件
 func (c *Client) DeleteFile(ctx context.Context, srcFs, srcRemote string) error {
-    return c.Call(ctx, "operations/deletefile", map[string]any{"srcFs": srcFs, "srcRemote": srcRemote}, nil)
+    return c.Call(ctx, "operations/deletefile", map[string]any{"fs": srcFs, "remote": srcRemote}, nil)
 }
 
 // Purge 删除目录

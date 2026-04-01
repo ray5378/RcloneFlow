@@ -213,10 +213,17 @@ async function moveItem() {
 }
 
 async function pasteItem() {
-  if (!clipboardItem.value || !clipboardAction.value) return
+  if (!clipboardItem.value || !clipboardAction.value) {
+    alert('剪贴板为空，请先复制或剪切文件')
+    return
+  }
   try {
     const srcPath = clipboardItem.value.Path
+    // For copy, destination is current path + filename
+    // If we're at root (empty path), just use filename
     const dstPath = browserPath.value ? browserPath.value + '/' + clipboardItem.value.Name : clipboardItem.value.Name
+    
+    console.log('Pasting:', clipboardAction.value, 'from', srcPath, 'to', dstPath, 'on', browserFs.value)
     
     if (clipboardAction.value === 'copy') {
       await api.copyFile(browserFs.value, srcPath, browserFs.value, dstPath)
@@ -228,7 +235,7 @@ async function pasteItem() {
     clipboardAction.value = null
     await refreshBrowser()
   } catch (e) {
-    alert((e as Error).message)
+    alert('粘贴失败: ' + (e as Error).message)
   }
 }
 

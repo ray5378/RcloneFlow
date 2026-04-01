@@ -62,6 +62,7 @@ export function copyFile(srcRemote: string, srcPath: string, dstRemote: string, 
   // Trim leading slash from paths as rclone expects paths without leading /
   const cleanSrcPath = srcPath.startsWith('/') ? srcPath.slice(1) : srcPath
   const cleanDstPath = dstPath.startsWith('/') ? dstPath.slice(1) : dstPath
+  console.log('API copyFile:', { srcFs: srcRemote + ':', srcRemote: cleanSrcPath, dstFs: dstRemote + ':', dstRemote: cleanDstPath })
   return api('/api/fs/copy', {
     method: 'POST',
     body: JSON.stringify({ srcFs: srcRemote + ':', srcRemote: cleanSrcPath, dstFs: dstRemote + ':', dstRemote: cleanDstPath }),
