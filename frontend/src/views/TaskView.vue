@@ -134,13 +134,15 @@ function editTask(task: Task) {
     targetRemote: task.targetRemote,
     targetPath: task.targetPath || '',
   }
-  // 加载源路径选项
+  // 加载源路径选项（不调用onSourceRemoteChange，因为它会重置path）
   if (task.sourceRemote) {
-    onSourceRemoteChange()
+    sourceCurrentPath.value = task.sourcePath || ''
+    loadSourcePath(task.sourceRemote, task.sourcePath || '')
   }
   // 加载目标路径选项
   if (task.targetRemote) {
-    onTargetRemoteChange()
+    targetCurrentPath.value = task.targetPath || ''
+    loadTargetPath(task.targetRemote, task.targetPath || '')
   }
   currentModule.value = 'add'
   openMenuId.value = null
