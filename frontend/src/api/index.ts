@@ -110,8 +110,17 @@ export function moveDir(srcRemote: string, srcPath: string, dstRemote: string, d
 }
 
 // 删除文件 (operations/deletefile)
+// 删除文件 (operations/deletefile)
 export function deleteFile(remote: string, path: string) {
   return api('/api/fs/delete', {
+    method: 'POST',
+    body: JSON.stringify({ fs: remote + ':', remote: path }),
+  })
+}
+
+// 删除目录及内容 (operations/purge)
+export function purgeDir(remote: string, path: string) {
+  return api('/api/fs/purge', {
     method: 'POST',
     body: JSON.stringify({ fs: remote + ':', remote: path }),
   })

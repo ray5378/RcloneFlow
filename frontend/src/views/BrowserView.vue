@@ -298,7 +298,15 @@ async function executeDelete() {
     console.log('=== Delete Info ===')
     console.log('browserFs:', browserFs.value)
     console.log('deletingItem.Path:', deletingItem.value.Path)
-    await api.deleteFile(browserFs.value, deletingItem.value.Path)
+    console.log('IsDir:', deletingItem.value.IsDir)
+    
+    if (deletingItem.value.IsDir) {
+      // 目录使用 purge
+      await api.purgeDir(browserFs.value, deletingItem.value.Path)
+    } else {
+      // 文件使用 deletefile
+      await api.deleteFile(browserFs.value, deletingItem.value.Path)
+    }
     showDeleteConfirm.value = false
     deletingItem.value = null
     await refreshBrowser()
