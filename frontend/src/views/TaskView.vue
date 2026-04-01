@@ -25,54 +25,8 @@ const sourcePathOptions = ref<any[]>([])
 const targetPathOptions = ref<any[]>([])
 const showSourcePathInput = ref(false)
 const showTargetPathInput = ref(false)
-
-// Watch for remote changes to load paths
-function onSourceRemoteChange() {
-  if (createForm.value.sourceRemote) {
-    loadPathOptions(createForm.value.sourceRemote, 'source')
-  } else {
-    sourcePathOptions.value = []
-  }
-  createForm.value.sourcePath = ''
-}
-
-function onTargetRemoteChange() {
-  if (createForm.value.targetRemote) {
-    loadPathOptions(createForm.value.targetRemote, 'target')
-  } else {
-    targetPathOptions.value = []
-  }
-  createForm.value.targetPath = ''
-}
-
-async function loadPathOptions(remote: string, type: 'source' | 'target') {
-  if (pathCache.value[remote]) {
-    const options = pathCache.value[remote]
-    if (type === 'source') {
-      sourcePathOptions.value = options
-    } else {
-      targetPathOptions.value = options
-    }
-    return
-  }
-  try {
-    const data = await api.listPath(remote, '')
-    const items = data.items || []
-    pathCache.value[remote] = items
-    if (type === 'source') {
-      sourcePathOptions.value = items
-    } else {
-      targetPathOptions.value = items
-    }
-  } catch (e) {
-    console.error('Failed to load paths:', e)
-    if (type === 'source') {
-      sourcePathOptions.value = []
-    } else {
-      targetPathOptions.value = []
-    }
-  }
-}
+const sourceCurrentPath = ref('')
+const targetCurrentPath = ref('')
 
 onMounted(async () => {
   await loadData()
@@ -170,6 +124,91 @@ async function clearRun(id: number) {
   } catch (e) {
     alert((e as Error).message)
   }
+}
+
+// Path selection functions
+function onSourceRemoteChange() {
+  sourceCurrentPath.value = ''
+  if (createForm.value.sourceRemote) {
+    loadPathOptions(createForm.value.sourceRemote, 'source', '')
+  } else {
+    sourcePathOptions.value = []
+  }
+  createForm.value.sourcePath = ''
+}
+
+function onTargetRemoteChange() {
+  targetCurrentPath.value = ''
+  if (createForm.value.targetRemote) {
+    loadPathOptions(createForm.value.targetRemote, 'target', '')
+  } else {
+    targetPathOptions.value = []
+  }
+  createForm.value.targetPath = ''
+}
+
+async function loadPathOptions(remote: string, type: 'source' | 'target', path: string) {
+  try {
+    const data = await api.listPath(remote, path)
+    const items = data.items || []
+    if (type === 'source') {
+      sourcePathOptions.value = items
+      sourceCurrentPath.value = path
+    } else {
+      targetPathOptions.value = items
+      targetCurrentPath.value = path
+    }
+  } catch (e) {
+    console.error('Failed to load paths:', e)
+  }
+}
+
+function onSourcePathClick(item: any) {
+  if (item.IsDir) {
+    const newPath = item.Path
+    loadPathOptions(createForm.value.sourceRemote, 'source', newPath)
+  } else {
+    createForm.value.sourcePath = item.Path
+    showSourcePathInput.value = false
+  }
+}
+
+function onTargetPathClick(item: any) {
+  if (item.IsDir) {
+    const newPath = item.Path
+    loadPathOptions(createForm.value.targetRemote, 'target', newPath)
+  } else {
+    createForm.value.targetPath = item.Path
+    showTargetPathInput.value = false
+  }
+}
+
+function goBackSource() {
+  const parts = sourceCurrentPath.value.split('/')
+  parts.pop()
+  const parentPath = parts.join('/')
+  loadPathOptions(createForm.value.sourceRemote, 'source', parentPath)
+}
+
+function goBackTarget() {
+  const parts = targetCurrentPath.value.split('/')
+  parts.pop()
+  const parentPath = parts.join('/')
+  loadPathOptions(createForm.value.targetRemote, 'target', parentPath)
+}
+
+function goBackSource() {
+  const parts = sourceCurrentPath.value.split('/')
+  parts.pop()
+  const parentPath = parts.join('/')
+  loadPathOptions(createForm.value.sourceRemote, 'source', parentPath)
+}
+
+function goBackTarget() {
+  const parts = targetCurrentPath.value.split('/')
+  parts.pop()
+  const parentPath = parts.join('/')
+  loadPathOptions(createForm.value.targetRemote, 'target', parentPath)
 }
 </script>
 
