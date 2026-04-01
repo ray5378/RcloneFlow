@@ -242,10 +242,22 @@ function openSourceDir(item: any) {
   }
 }
 
+function onPathItemClick(item: any) {
+  // 单击选中文件或文件夹
+  createForm.value.sourcePath = item.Path
+  showSourcePathInput.value = false
+}
+
 function openTargetDir(item: any) {
   if (item.IsDir) {
     loadTargetPath(createForm.value.targetRemote, item.Path)
   }
+}
+
+function onTargetPathItemClick(item: any) {
+  // 单击选中文件或文件夹
+  createForm.value.targetPath = item.Path
+  showTargetPathInput.value = false
 }
 
 function selectSourceDir(item: any) {
@@ -403,7 +415,7 @@ function goBackTarget() {
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="createForm.sourcePath = item.Path, showSourcePathInput = false" @dblclick="item.IsDir && openSourceDir(item)">
+              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onPathItemClick(item)">
                 <span v-if="item.IsDir" class="dir-arrow" @click.stop="openSourceDir(item)">▶</span>
                 <span v-else class="file-icon">📄</span>
                 <span class="item-name">{{ item.Name }}</span>
@@ -431,7 +443,7 @@ function goBackTarget() {
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="createForm.targetPath = item.Path, showTargetPathInput = false" @dblclick="item.IsDir && openTargetDir(item)">
+              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onTargetPathItemClick(item)">
                 <span v-if="item.IsDir" class="dir-arrow" @click.stop="openTargetDir(item)">▶</span>
                 <span v-else class="file-icon">📄</span>
                 <span class="item-name">{{ item.Name }}</span>
