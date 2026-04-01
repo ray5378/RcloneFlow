@@ -134,6 +134,11 @@ async function create() {
 }
 
 defineExpose({ loadConfig: async (name: string) => {
+  // Wait for providers to be loaded
+  while (!providers.value.length) {
+    await new Promise(resolve => setTimeout(resolve, 50))
+  }
+  
   const config = await api.getRemoteConfig(name)
   remoteName.value = name
   const type = config.type as string
@@ -141,12 +146,14 @@ defineExpose({ loadConfig: async (name: string) => {
   if (provider) {
     selectedProvider.value = provider
     selectedProviderName.value = type
+    remoteOptions.value = {}
     for (const key in config) {
       if (key !== 'type' && key !== 'name') {
         remoteOptions.value[key] = String(config[key])
       }
     }
-    step.value = 3
+    // Go to configuration step (step 1), not save step
+    step.value = 1
   }
 }})
 </script>
