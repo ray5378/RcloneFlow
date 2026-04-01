@@ -72,46 +72,91 @@ func Open(dir string) (*DB, error) {
 }
 
 func (db *DB) migrate() error {
-	schema := `
-	CREATE TABLE IF NOT EXISTS tasks (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		name TEXT NOT NULL,
-		mode TEXT NOT NULL,
-		source_remote TEXT NOT NULL,
-		source_path TEXT NOT NULL,
-		target_remote TEXT NOT NULL,
-		target_path TEXT NOT NULL,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-	);
-	
-	CREATE TABLE IF NOT EXISTS schedules (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		task_id INTEGER NOT NULL,
-		spec TEXT NOT NULL,
-		enabled BOOLEAN DEFAULT 1,
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-	);
-	
-	CREATE TABLE IF NOT EXISTS runs (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		task_id INTEGER NOT NULL,
-		rc_job_id INTEGER DEFAULT 0,
-		status TEXT NOT NULL,
-		trigger TEXT NOT NULL,
-		summary TEXT DEFAULT '{}',
-		error TEXT DEFAULT '',
-		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-		FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-	);
-	
-	CREATE INDEX IF NOT EXISTS idx_runs_task_id ON runs(task_id);
-	CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at);
-	CREATE INDEX IF NOT EXISTS idx_schedules_task_id ON schedules(task_id);
-	`
-	_, err := db.db.Exec(schema)
-	return err
+	// 创建版本表（如果不存在）
+	_, _ = db.db.Exec(`
+		CREATE TABLE IF NOT EXISTS schema_migrations (
+			version INTEGER PRIMARY KEY,
+			applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+
+	// 定义迁移
+	type migration struct {
+		version int
+		sql     string
+	}
+
+	migrations := []migration{
+		{
+			version: 1,
+			sql: `
+				CREATE TABLE IF NOT EXISTS tasks (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					name TEXT NOT NULL,
+					mode TEXT NOT NULL,
+					source_remote TEXT NOT NULL,
+					source_path TEXT NOT NULL,
+					target_remote TEXT NOT NULL,
+					target_path TEXT NOT NULL,
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+				);
+				
+				CREATE TABLE IF NOT EXISTS schedules (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					task_id INTEGER NOT NULL,
+					spec TEXT NOT NULL,
+					enabled BOOLEAN DEFAULT 1,
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+				);
+				
+				CREATE TABLE IF NOT EXISTS runs (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					task_id INTEGER NOT NULL,
+					rc_job_id INTEGER DEFAULT 0,
+					status TEXT NOT NULL,
+					trigger TEXT NOT NULL,
+					summary TEXT DEFAULT '{}',
+					error TEXT DEFAULT '',
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					finished_at DATETIME,
+					FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+				);
+				
+				CREATE INDEX IF NOT EXISTS idx_runs_task_id ON runs(task_id);
+				CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at);
+				CREATE INDEX IF NOT EXISTS idx_schedules_task_id ON schedules(task_id);
+			`,
+		},
+		// 未来迁移可以在这里添加
+		// {
+		//     version: 2,
+		//     sql: `ALTER TABLE tasks ADD COLUMN new_field TEXT`,
+		// },
+	}
+
+	// 获取当前版本
+	var currentVersion int
+	row := db.db.QueryRow("SELECT COALESCE(MAX(version), 0) FROM schema_migrations")
+	if err := row.Scan(&currentVersion); err != nil {
+		currentVersion = 0
+	}
+
+	// 应用待处理的迁移
+	for _, m := range migrations {
+		if m.version <= currentVersion {
+			continue
+		}
+		if _, err := db.db.Exec(m.sql); err != nil {
+			return fmt.Errorf("应用迁移 v%d 失败: %w", m.version, err)
+		}
+		if _, err := db.db.Exec("INSERT INTO schema_migrations (version) VALUES (?)", m.version); err != nil {
+			return fmt.Errorf("记录迁移版本 %d 失败: %w", m.version, err)
+		}
+	}
+
+	return nil
 }
 
 func (db *DB) Close() error {
@@ -179,6 +224,21 @@ func (db *DB) GetTask(id int64) (Task, bool) {
 		return Task{}, false
 	}
 	return t, true
+}
+
+func (db *DB) GetSchedule(id int64) (Schedule, bool) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	var s Schedule
+	err := db.db.QueryRow(`
+		SELECT id, task_id, spec, enabled, created_at 
+		FROM schedules WHERE id = ?`, id).Scan(
+		&s.ID, &s.TaskID, &s.Spec, &s.Enabled, &s.CreatedAt)
+	if err != nil {
+		return Schedule{}, false
+	}
+	return s, true
 }
 
 func (db *DB) UpdateTask(id int64, t Task) error {
@@ -386,4 +446,58 @@ func (db *DB) GetRun(id int64) (Run, error) {
 		r.Summary = make(map[string]any)
 	}
 	return r, nil
+}
+
+// ListRunningRuns 获取所有运行中的任务（供JobSyncService使用）
+func (db *DB) ListRunningRuns() ([]JobStatus, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	rows, err := db.db.Query(`
+		SELECT id, rc_job_id, status, summary, error 
+		FROM runs 
+		WHERE status = 'running' AND rc_job_id > 0
+		ORDER BY created_at ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var runs []JobStatus
+	for rows.Next() {
+		var r JobStatus
+		var summaryJSON string
+		if err := rows.Scan(&r.ID, &r.RcJobID, &r.Status, &summaryJSON, &r.Error); err != nil {
+			continue
+		}
+		if summaryJSON != "" && summaryJSON != "{}" {
+			json.Unmarshal([]byte(summaryJSON), &r.Summary)
+		}
+		runs = append(runs, r)
+	}
+	return runs, nil
+}
+
+// JobStatus 运行记录结构（用于JobSyncService）
+type JobStatus struct {
+	ID      int64
+	RcJobID int64
+	Status  string
+	Summary map[string]any
+	Error   string
+}
+
+// UpdateRunStatus 更新运行状态（供JobSyncService使用）
+func (db *DB) UpdateRunStatus(id int64, status, errorMsg string, summary map[string]any) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	summaryBytes, _ := json.Marshal(summary)
+	finishedAt := time.Now()
+	
+	_, err := db.db.Exec(`
+		UPDATE runs SET status = ?, summary = ?, error = ?, updated_at = ?, finished_at = ?
+		WHERE id = ?`,
+		status, string(summaryBytes), errorMsg, finishedAt, finishedAt, id)
+	return err
 }

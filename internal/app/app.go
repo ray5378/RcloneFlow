@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"net/http"
 
 	"rcloneflow/internal/config"
@@ -61,6 +62,12 @@ func Run(cfg *config.Config) error {
 		logger.Error("调度器初始化失败", zap.Error(err))
 		return err
 	}
+
+	// 启动任务状态同步服务
+	jobSync := service.NewJobSyncService(db, rc)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go jobSync.Start(ctx)
 
 	// 设置路由
 	mux := http.NewServeMux()

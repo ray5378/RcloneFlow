@@ -254,3 +254,204 @@ func TestRunOperations(t *testing.T) {
 		t.Errorf("expected Status finished, got %s", runs[0].Status)
 	}
 }
+
+func TestGetTask(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+	
+	// 获取不存在的任务
+	_, ok := db.GetTask(999)
+	if ok {
+		t.Error("expected GetTask(999) to return false")
+	}
+	
+	// 添加并获取任务
+	task := Task{
+		Name:        "get-test-task",
+		Mode:        "sync",
+		SourceRemote: "src",
+		TargetRemote: "dst",
+	}
+	created, _ := db.AddTask(task)
+	
+	got, ok := db.GetTask(created.ID)
+	if !ok {
+		t.Error("expected GetTask to return true for existing task")
+	}
+	
+	if got.Name != "get-test-task" {
+		t.Errorf("expected Name get-test-task, got %s", got.Name)
+	}
+}
+
+func TestGetSchedule(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+	
+	// 获取不存在的定时任务
+	_, ok := db.GetSchedule(999)
+	if ok {
+		t.Error("expected GetSchedule(999) to return false")
+	}
+	
+	// 添加并获取定时任务
+	task := Task{
+		Name:        "schedule-get-test",
+		Mode:        "copy",
+		SourceRemote: "src",
+		TargetRemote: "dst",
+	}
+	createdTask, _ := db.AddTask(task)
+	
+	schedule, _ := db.AddSchedule(Schedule{
+		TaskID: createdTask.ID,
+		Spec:   "@every 10m",
+	})
+	
+	got, ok := db.GetSchedule(schedule.ID)
+	if !ok {
+		t.Error("expected GetSchedule to return true for existing schedule")
+	}
+	
+	if got.Spec != "@every 10m" {
+		t.Errorf("expected Spec @every 10m, got %s", got.Spec)
+	}
+}
+
+func TestListRunningRuns(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+	
+	// 添加任务和运行记录
+	task := Task{
+		Name:        "running-test",
+		Mode:        "copy",
+		SourceRemote: "src",
+		TargetRemote: "dst",
+	}
+	createdTask, _ := db.AddTask(task)
+	
+	// 添加一个running状态的运行
+	db.AddRun(Run{
+		TaskID:  createdTask.ID,
+		RcJobID: 100,
+		Status:  "running",
+		Trigger: "manual",
+	})
+	
+	// 添加一个finished状态的运行
+	db.AddRun(Run{
+		TaskID:  createdTask.ID,
+		RcJobID: 200,
+		Status:  "finished",
+		Trigger: "manual",
+	})
+	
+	// 获取running运行
+	runs, err := db.ListRunningRuns()
+	if err != nil {
+		t.Fatalf("ListRunningRuns() error = %v", err)
+	}
+	
+	if len(runs) != 1 {
+		t.Errorf("expected 1 running run, got %d", len(runs))
+	}
+	
+	if runs[0].Status != "running" {
+		t.Errorf("expected status running, got %s", runs[0].Status)
+	}
+}
+
+func TestUpdateRunStatus(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+	
+	task := Task{
+		Name:        "update-status-test",
+		Mode:        "move",
+		SourceRemote: "src",
+		TargetRemote: "dst",
+	}
+	createdTask, _ := db.AddTask(task)
+	
+	run, _ := db.AddRun(Run{
+		TaskID:  createdTask.ID,
+		RcJobID: 300,
+		Status:  "running",
+		Trigger: "schedule",
+	})
+	
+	// 更新状态
+	summary := map[string]any{"files_copied": 50, "bytes_transferred": 1024000}
+	err = db.UpdateRunStatus(run.ID, "finished", "", summary)
+	if err != nil {
+		t.Fatalf("UpdateRunStatus() error = %v", err)
+	}
+	
+	// 验证更新
+	runs, _ := db.ListRuns()
+	if runs[0].Status != "finished" {
+		t.Errorf("expected status finished, got %s", runs[0].Status)
+	}
+}
+
+func TestMigrationCreatesVersionTable(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+	
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+	
+	// 验证迁移版本表存在且有记录
+	var version int
+	err = db.db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version)
+	if err != nil {
+		t.Fatalf("failed to get migration version: %v", err)
+	}
+	
+	if version < 1 {
+		t.Errorf("expected migration version >= 1, got %d", version)
+	}
+}
