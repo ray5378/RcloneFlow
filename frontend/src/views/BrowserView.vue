@@ -718,4 +718,8 @@ body.light .modal-footer {
 .danger-btn:hover {
   background: #b71c1c;
 }
+
+.menu-area {
+  position: relative;
+}
 </style>

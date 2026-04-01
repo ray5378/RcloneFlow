@@ -653,17 +653,18 @@ body.light button.menu-btn:hover {
 /* Menu popup */
 .menu-area {
   position: relative;
+  overflow: visible;
 }
 
 .menu-pop {
   position: absolute;
   right: 0;
-  top: 40px;
+  top: 100%;
   background: #252525;
   border: 1px solid #333;
   border-radius: 10px;
   min-width: 140px;
-  overflow: hidden;
+  overflow: visible;
   z-index: 100;
   box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
