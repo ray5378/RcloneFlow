@@ -341,6 +341,10 @@ async function deleteRemote(name: string) {
   if (!confirm(`确定删除存储 "${name}"？`)) return
   try {
     await api.deleteRemote(name)
+    // 删除本地存储的介绍
+    const descs = JSON.parse(localStorage.getItem('remoteDescriptions') || '{}')
+    delete descs[name]
+    localStorage.setItem('remoteDescriptions', JSON.stringify(descs))
     await loadRemotes()
   } catch (e) {
     alert((e as Error).message)
