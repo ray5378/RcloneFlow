@@ -126,7 +126,6 @@ async function clearRun(id: number) {
   }
 }
 
-// Path selection functions
 function onSourceRemoteChange() {
   sourceCurrentPath.value = ''
   if (createForm.value.sourceRemote) {
@@ -165,8 +164,7 @@ async function loadPathOptions(remote: string, type: 'source' | 'target', path: 
 
 function onSourcePathClick(item: any) {
   if (item.IsDir) {
-    const newPath = item.Path
-    loadPathOptions(createForm.value.sourceRemote, 'source', newPath)
+    loadPathOptions(createForm.value.sourceRemote, 'source', item.Path)
   } else {
     createForm.value.sourcePath = item.Path
     showSourcePathInput.value = false
@@ -175,8 +173,7 @@ function onSourcePathClick(item: any) {
 
 function onTargetPathClick(item: any) {
   if (item.IsDir) {
-    const newPath = item.Path
-    loadPathOptions(createForm.value.targetRemote, 'target', newPath)
+    loadPathOptions(createForm.value.targetRemote, 'target', item.Path)
   } else {
     createForm.value.targetPath = item.Path
     showTargetPathInput.value = false
@@ -196,90 +193,42 @@ function goBackTarget() {
   const parentPath = parts.join('/')
   loadPathOptions(createForm.value.targetRemote, 'target', parentPath)
 }
-
-function goBackSource() {
-  const parts = sourceCurrentPath.value.split('/')
-  parts.pop()
-  const parentPath = parts.join('/')
-  loadPathOptions(createForm.value.sourceRemote, 'source', parentPath)
-}
-
-function goBackTarget() {
-  const parts = targetCurrentPath.value.split('/')
-  parts.pop()
-  const parentPath = parts.join('/')
-  loadPathOptions(createForm.value.targetRemote, 'target', parentPath)
-}
 </script>
 
 <template>
-  <!-- Header -->
   <div class="card">
     <div class="card-header">
       <div class="title">功能模块</div>
     </div>
-    <!-- Module Tabs -->
     <div class="module-tabs">
-      <button
-        class="tab-btn"
-        :class="{ active: currentModule === 'tasks' }"
-        @click="currentModule = 'tasks'"
-      >
+      <button class="tab-btn" :class="{ active: currentModule === 'tasks' }" @click="currentModule = 'tasks'">
         任务列表
       </button>
-      <button
-        class="tab-btn"
-        :class="{ active: currentModule === 'history' }"
-        @click="currentModule = 'history'"
-      >
+      <button class="tab-btn" :class="{ active: currentModule === 'history' }" @click="currentModule = 'history'">
         历史记录
       </button>
-      <button
-        class="tab-btn"
-        :class="{ active: currentModule === 'schedule' }"
-        @click="currentModule = 'schedule'"
-      >
+      <button class="tab-btn" :class="{ active: currentModule === 'schedule' }" @click="currentModule = 'schedule'">
         定时任务
       </button>
-      <button
-        class="tab-btn"
-        :class="{ active: currentModule === 'add' }"
-        @click="currentModule = 'add'"
-      >
+      <button class="tab-btn" :class="{ active: currentModule === 'add' }" @click="currentModule = 'add'">
         添加任务
       </button>
     </div>
   </div>
 
-  <!-- Task List Module -->
   <div v-if="currentModule === 'tasks'" class="card">
-    <div class="card-header">
-      <div class="title">任务列表</div>
-    </div>
+    <div class="card-header"><div class="title">任务列表</div></div>
     <div class="tile-grid">
-      <div
-        v-for="task in tasks"
-        :key="task.id"
-        class="tile"
-      >
-        <div class="tile-header">
-          <span class="tile-name">{{ task.name }}</span>
-        </div>
-        <div class="tile-desc">
-          {{ task.mode }}: {{ task.sourceRemote }} → {{ task.targetRemote }}
-        </div>
+      <div v-for="task in tasks" :key="task.id" class="tile">
+        <div class="tile-header"><span class="tile-name">{{ task.name }}</span></div>
+        <div class="tile-desc">{{ task.mode }}: {{ task.sourceRemote }} → {{ task.targetRemote }}</div>
       </div>
-      <div v-if="!tasks.length" style="padding: 20px; color: #888; text-align: center; width: 100%">
-        暂无任务
-      </div>
+      <div v-if="!tasks.length" style="padding: 20px; color: #888; text-align: center; width: 100%">暂无任务</div>
     </div>
   </div>
 
-  <!-- History Module -->
   <div v-if="currentModule === 'history'" class="card">
-    <div class="card-header">
-      <div class="title">历史记录</div>
-    </div>
+    <div class="card-header"><div class="title">历史记录</div></div>
     <div class="list-header">
       <span class="col-name">任务</span>
       <span class="col-status">状态</span>
@@ -289,9 +238,7 @@ function goBackTarget() {
     </div>
     <div class="list">
       <div v-for="run in runs" :key="run.id" class="item">
-        <div class="name">
-          <strong>{{ tasks.find(t => t.id === run.taskId)?.name || `任务 #${run.taskId}` }}</strong>
-        </div>
+        <div class="name"><strong>{{ tasks.find(t => t.id === run.taskId)?.name || `任务 #${run.taskId}` }}</strong></div>
         <span :class="['status', getStatusClass(run.status)]">{{ run.status }}</span>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
         <span class="time">{{ formatTime(run.finishedAt) }}</span>
@@ -301,11 +248,8 @@ function goBackTarget() {
     </div>
   </div>
 
-  <!-- Schedule Module -->
   <div v-if="currentModule === 'schedule'" class="card">
-    <div class="card-header">
-      <div class="title">定时任务</div>
-    </div>
+    <div class="card-header"><div class="title">定时任务</div></div>
     <div class="list-header">
       <span class="col-name">任务</span>
       <span class="col-info">周期</span>
@@ -313,9 +257,7 @@ function goBackTarget() {
     </div>
     <div class="list">
       <div v-for="s in schedules" :key="s.id" class="item">
-        <div class="name">
-          <strong>{{ tasks.find(t => t.id === s.taskId)?.name || `任务 #${s.taskId}` }}</strong>
-        </div>
+        <div class="name"><strong>{{ tasks.find(t => t.id === s.taskId)?.name || `任务 #${s.taskId}` }}</strong></div>
         <span class="info">{{ s.spec }}</span>
         <div class="item-actions">
           <button class="ghost small" @click="runTask(s.taskId)">运行</button>
@@ -326,11 +268,8 @@ function goBackTarget() {
     </div>
   </div>
 
-  <!-- Add Task Module -->
   <div v-if="currentModule === 'add'" class="card">
-    <div class="card-header">
-      <div class="title">添加任务</div>
-    </div>
+    <div class="card-header"><div class="title">添加任务</div></div>
     <div class="form-content">
       <div class="field-item">
         <label>任务名称 <span style="color: #dc2626">*</span></label>
@@ -360,21 +299,13 @@ function goBackTarget() {
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
-              <div
-                v-for="item in sourcePathOptions"
-                :key="item.Path"
-                class="path-item"
-                :class="{ 'is-dir': item.IsDir }"
-                @click="onSourcePathClick(item)"
-              >
+              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onSourcePathClick(item)">
                 {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
               </div>
               <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
             </div>
           </div>
-          <button type="button" class="ghost small" @click="showSourcePathInput = !showSourcePathInput">
-            手动输入
-          </button>
+          <button type="button" class="ghost small" @click="showSourcePathInput = !showSourcePathInput">手动输入</button>
         </div>
         <input v-if="showSourcePathInput" v-model="createForm.sourcePath" type="text" placeholder="手动输入路径" style="margin-top: 8px" />
       </div>
@@ -394,21 +325,13 @@ function goBackTarget() {
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
-              <div
-                v-for="item in targetPathOptions"
-                :key="item.Path"
-                class="path-item"
-                :class="{ 'is-dir': item.IsDir }"
-                @click="onTargetPathClick(item)"
-              >
+              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onTargetPathClick(item)">
                 {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
               </div>
               <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
             </div>
           </div>
-          <button type="button" class="ghost small" @click="showTargetPathInput = !showTargetPathInput">
-            手动输入
-          </button>
+          <button type="button" class="ghost small" @click="showTargetPathInput = !showTargetPathInput">手动输入</button>
         </div>
         <input v-if="showTargetPathInput" v-model="createForm.targetPath" type="text" placeholder="手动输入路径" style="margin-top: 8px" />
       </div>
@@ -425,7 +348,6 @@ function goBackTarget() {
   gap: 8px;
   padding: 0 20px 16px;
 }
-
 .tab-btn {
   padding: 10px 24px;
   border-radius: 10px;
@@ -437,35 +359,11 @@ function goBackTarget() {
   font-weight: 500;
   transition: all 0.2s;
 }
-
-.tab-btn:hover {
-  background: #2a2a2a;
-  color: #e0e0e0;
-}
-
-.tab-btn.active {
-  background: #1e3a5f;
-  color: #64b5f6;
-  border-color: #2563a0;
-}
-
-body.light .tab-btn {
-  background: #f5f5f5;
-  border-color: #ddd;
-  color: #666;
-}
-
-body.light .tab-btn:hover {
-  background: #e8e8e8;
-  color: #1a1a1a;
-}
-
-body.light .tab-btn.active {
-  background: #e3f2fd;
-  color: #1976d2;
-  border-color: #bbdefb;
-}
-
+.tab-btn:hover { background: #2a2a2a; color: #e0e0e0; }
+.tab-btn.active { background: #1e3a5f; color: #64b5f6; border-color: #2563a0; }
+body.light .tab-btn { background: #f5f5f5; border-color: #ddd; color: #666; }
+body.light .tab-btn:hover { background: #e8e8e8; color: #1a1a1a; }
+body.light .tab-btn.active { background: #e3f2fd; color: #1976d2; border-color: #bbdefb; }
 .list-header {
   display: flex;
   justify-content: space-between;
@@ -475,19 +373,12 @@ body.light .tab-btn.active {
   color: #888;
   border-bottom: 1px solid #333;
 }
-
-body.light .list-header {
-  background: #f5f5f5;
-  color: #666;
-  border-bottom: 1px solid #e0e0e0;
-}
-
+body.light .list-header { background: #f5f5f5; color: #666; border-bottom: 1px solid #e0e0e0; }
 .col-name { flex: 1; }
 .col-status { width: 80px; text-align: center; }
 .col-time { width: 150px; text-align: right; }
 .col-action { width: 80px; text-align: right; }
 .col-info { width: 120px; }
-
 .item {
   display: flex;
   align-items: center;
@@ -495,18 +386,8 @@ body.light .list-header {
   border-bottom: 1px solid #252525;
   gap: 12px;
 }
-
-body.light .item {
-  border-color: #f0f0f0;
-}
-
-.item .name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
+body.light .item { border-color: #f0f0f0; }
+.item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .status {
   width: 80px;
   padding: 4px 8px;
@@ -514,48 +395,16 @@ body.light .item {
   font-size: 12px;
   text-align: center;
 }
-
 .status.running { background: #1976d2; color: #fff; }
 .status.success { background: #388e3c; color: #fff; }
 .status.failed { background: #d32f2f; color: #fff; }
-
-.time {
-  width: 150px;
-  text-align: right;
-  color: #888;
-  font-size: 13px;
-}
-
-.info {
-  width: 120px;
-  color: #888;
-  font-size: 13px;
-}
-
-.item-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.danger-text {
-  color: #ef5350 !important;
-}
-
-.form-content {
-  padding: 20px;
-}
-
-.form-content .field-item {
-  margin-bottom: 16px;
-}
-
-.form-content label {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 13px;
-  color: #888;
-}
-
+.time { width: 150px; text-align: right; color: #888; font-size: 13px; }
+.info { width: 120px; color: #888; font-size: 13px; }
+.item-actions { display: flex; gap: 8px; }
+.danger-text { color: #ef5350 !important; }
+.form-content { padding: 20px; }
+.form-content .field-item { margin-bottom: 16px; }
+.form-content label { display: block; margin-bottom: 6px; font-size: 13px; color: #888; }
 .form-content input,
 .form-content select {
   width: 100%;
@@ -567,20 +416,9 @@ body.light .item {
   font-size: 14px;
   box-sizing: border-box;
 }
-
 body.light .form-content input,
-body.light .form-content select {
-  background: #fff;
-  border-color: #ddd;
-  color: #333;
-}
-
-.path-selector {
-  display: flex;
-  gap: 8px;
-  align-items: flex-start;
-}
-
+body.light .form-content select { background: #fff; border-color: #ddd; color: #333; }
+.path-selector { display: flex; gap: 8px; align-items: flex-start; }
 .path-browse {
   flex: 1;
   border: 1px solid #333;
@@ -588,12 +426,7 @@ body.light .form-content select {
   background: #252525;
   overflow: hidden;
 }
-
-body.light .path-browse {
-  border-color: #ddd;
-  background: #fff;
-}
-
+body.light .path-browse { border-color: #ddd; background: #fff; }
 .path-bar {
   display: flex;
   justify-content: space-between;
@@ -602,23 +435,9 @@ body.light .path-browse {
   background: #1a1a1a;
   border-bottom: 1px solid #333;
 }
-
-body.light .path-bar {
-  background: #f5f5f5;
-  border-color: #ddd;
-}
-
-.path-label {
-  font-size: 12px;
-  color: #888;
-}
-
-.path-list {
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 8px;
-}
-
+body.light .path-bar { background: #f5f5f5; border-color: #ddd; }
+.path-label { font-size: 12px; color: #888; }
+.path-list { max-height: 200px; overflow-y: auto; padding: 8px; }
 .path-item {
   padding: 8px 12px;
   border-radius: 6px;
@@ -626,42 +445,18 @@ body.light .path-bar {
   font-size: 13px;
   color: #e0e0e0;
 }
-
-body.light .path-item {
-  color: #333;
-}
-
-.path-item:hover {
-  background: #333;
-}
-
-body.light .path-item:hover {
-  background: #f0f0f0;
-}
-
-.path-item.is-dir {
-  color: #64b5f6;
-  font-weight: 500;
-}
-
-.path-empty {
-  padding: 20px;
-  text-align: center;
-  color: #666;
-  font-size: 13px;
-}
-
-.form-actions {
-  margin-top: 20px;
-}
-
+body.light .path-item { color: #333; }
+.path-item:hover { background: #333; }
+body.light .path-item:hover { background: #f0f0f0; }
+.path-item.is-dir { color: #64b5f6; font-weight: 500; }
+.path-empty { padding: 20px; text-align: center; color: #666; font-size: 13px; }
+.form-actions { margin-top: 20px; }
 .tile-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   padding: 16px 20px;
 }
-
 .tile {
   min-width: 180px;
   padding: 14px 16px;
@@ -672,41 +467,11 @@ body.light .path-item:hover {
   flex: 1 1 calc(25% - 12px);
   max-width: calc(25% - 12px);
 }
-
-.tile:hover {
-  background: #2a2a2a;
-}
-
-body.light .tile {
-  background: #f5f5f5;
-}
-
-body.light .tile:hover {
-  background: #e8e8e8;
-}
-
-.tile-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 6px;
-}
-
-.tile-name {
-  font-weight: 600;
-  font-size: 14px;
-  color: #fff;
-}
-
-body.light .tile-name {
-  color: #1a1a1a;
-}
-
-.tile-desc {
-  font-size: 12px;
-  color: #888;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
+.tile:hover { background: #2a2a2a; }
+body.light .tile { background: #f5f5f5; }
+body.light .tile:hover { background: #e8e8e8; }
+.tile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.tile-name { font-weight: 600; font-size: 14px; color: #fff; }
+body.light .tile-name { color: #1a1a1a; }
+.tile-desc { font-size: 12px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>
