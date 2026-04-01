@@ -199,15 +199,23 @@ function closeContextMenu() {
 
 async function copyItem() {
   if (!contextMenu.value.item) return
-  clipboardItem.value = contextMenu.value.item
+  // item.Path is already the full path from remote root (e.g., "备份/file.txt")
+  // NO need to add browserPath
+  clipboardItem.value = {
+    ...contextMenu.value.item,
+    Path: contextMenu.value.item.Path
+  }
   clipboardAction.value = 'copy'
   closeContextMenu()
 }
 
 async function moveItem() {
   if (!contextMenu.value.item) return
-  // Move (cut): store item in clipboard, paste will move it
-  clipboardItem.value = contextMenu.value.item
+  // item.Path is already the full path from remote root
+  clipboardItem.value = {
+    ...contextMenu.value.item,
+    Path: contextMenu.value.item.Path
+  }
   clipboardAction.value = 'move'
   closeContextMenu()
 }
@@ -218,12 +226,17 @@ async function pasteItem() {
     return
   }
   try {
+    // clipboardItem.Path is already the full path from remote root (no leading slash)
     const srcPath = clipboardItem.value.Path
-    // For copy, destination is current path + filename
-    // If we're at root (empty path), just use filename
+    // dstPath is current directory + original filename (no leading slash)
     const dstPath = browserPath.value ? browserPath.value + '/' + clipboardItem.value.Name : clipboardItem.value.Name
     
-    console.log('Pasting:', clipboardAction.value, 'from', srcPath, 'to', dstPath, 'on', browserFs.value)
+    console.log('=== Paste Info ===')
+    console.log('browserFs:', browserFs.value)
+    console.log('browserPath:', browserPath.value)
+    console.log('srcPath (full):', srcPath)
+    console.log('dstPath:', dstPath)
+    console.log('clipboardAction:', clipboardAction.value)
     
     if (clipboardAction.value === 'copy') {
       await api.copyFile(browserFs.value, srcPath, browserFs.value, dstPath)
@@ -271,6 +284,9 @@ function confirmDelete() {
 async function executeDelete() {
   if (!deletingItem.value) return
   try {
+    console.log('=== Delete Info ===')
+    console.log('browserFs:', browserFs.value)
+    console.log('deletingItem.Path:', deletingItem.value.Path)
     await api.deleteFile(browserFs.value, deletingItem.value.Path)
     showDeleteConfirm.value = false
     deletingItem.value = null

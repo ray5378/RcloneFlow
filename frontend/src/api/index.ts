@@ -59,32 +59,37 @@ export function listPath(remote: string, path: string) {
 }
 
 export function copyFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  // Trim leading slash from paths as rclone expects paths without leading /
-  const cleanSrcPath = srcPath.startsWith('/') ? srcPath.slice(1) : srcPath
-  const cleanDstPath = dstPath.startsWith('/') ? dstPath.slice(1) : dstPath
-  console.log('API copyFile:', { srcFs: srcRemote + ':', srcRemote: cleanSrcPath, dstFs: dstRemote + ':', dstRemote: cleanDstPath })
+  // rclone operations/copyfile expects: srcFs, srcRemote, dstFs, dstRemote
+  // fs format should be like "drive:" or "/" for local
   return api('/api/fs/copy', {
     method: 'POST',
-    body: JSON.stringify({ srcFs: srcRemote + ':', srcRemote: cleanSrcPath, dstFs: dstRemote + ':', dstRemote: cleanDstPath }),
+    body: JSON.stringify({ 
+      srcFs: srcRemote + ':', 
+      srcRemote: srcPath, 
+      dstFs: dstRemote + ':', 
+      dstRemote: dstPath 
+    }),
   })
 }
 
 export function moveFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  // Trim leading slash from paths as rclone expects paths without leading /
-  const cleanSrcPath = srcPath.startsWith('/') ? srcPath.slice(1) : srcPath
-  const cleanDstPath = dstPath.startsWith('/') ? dstPath.slice(1) : dstPath
+  // rclone operations/movefile expects: srcFs, srcRemote, dstFs, dstRemote
   return api('/api/fs/move', {
     method: 'POST',
-    body: JSON.stringify({ srcFs: srcRemote + ':', srcRemote: cleanSrcPath, dstFs: dstRemote + ':', dstRemote: cleanDstPath }),
+    body: JSON.stringify({ 
+      srcFs: srcRemote + ':', 
+      srcRemote: srcPath, 
+      dstFs: dstRemote + ':', 
+      dstRemote: dstPath 
+    }),
   })
 }
 
 export function deleteFile(remote: string, path: string) {
-  // Trim leading slash from path as rclone expects paths without leading /
-  const cleanPath = path.startsWith('/') ? path.slice(1) : path
+  // rclone operations/deletefile expects: fs, remote
   return api('/api/fs/delete', {
     method: 'POST',
-    body: JSON.stringify({ fs: remote + ':', remote: cleanPath }),
+    body: JSON.stringify({ fs: remote + ':', remote: path }),
   })
 }
 
