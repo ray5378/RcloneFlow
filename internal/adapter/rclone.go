@@ -70,6 +70,9 @@ func (c *RcloneClient) Call(ctx context.Context, endpoint string, req, resp inte
 		if err != nil {
 			return fmt.Errorf("marshal request failed: %w", err)
 		}
+	} else {
+		// 空请求也发送空JSON对象，避免 rclone EOF 错误
+		body = []byte("{}")
 	}
 	
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, 
