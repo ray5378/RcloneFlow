@@ -84,28 +84,32 @@ export function moveFile(srcRemote: string, srcPath: string, dstRemote: string, 
   })
 }
 
-// 复制目录 (sync/copy) - srcFs和dstFs包含完整路径
+// 复制目录 (sync/copy) - srcFs和dstFs包含:和完整路径
 export function copyDir(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  return api('/api/fs/copy', {
+  return api('/api/fs/copyDir', {
     method: 'POST',
     body: JSON.stringify({ 
       srcFs: srcRemote + ':' + srcPath, 
-      dstFs: dstRemote + ':' + dstPath 
+      dstFs: dstRemote + ':' + dstPath,
+      createEmptySrcDirs: true 
     }),
   })
 }
 
-// 移动目录 (sync/move) - srcFs和dstFs包含完整路径
+// 移动目录 (sync/move) - srcFs和dstFs包含:和完整路径
 export function moveDir(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  return api('/api/fs/move', {
+  return api('/api/fs/moveDir', {
     method: 'POST',
     body: JSON.stringify({ 
       srcFs: srcRemote + ':' + srcPath, 
-      dstFs: dstRemote + ':' + dstPath 
+      dstFs: dstRemote + ':' + dstPath,
+      createEmptySrcDirs: true,
+      deleteEmptySrcDirs: true 
     }),
   })
 }
 
+// 删除文件 (operations/deletefile)
 export function deleteFile(remote: string, path: string) {
   return api('/api/fs/delete', {
     method: 'POST',

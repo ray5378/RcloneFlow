@@ -236,14 +236,14 @@ func (c *Client) CopyFile(ctx context.Context, srcFs, srcRemote, dstFs, dstRemot
 // CopyDir 复制目录 (使用 sync/copy)
 func (c *Client) CopyDir(ctx context.Context, srcFs, dstFs string) error {
     return c.Call(ctx, "sync/copy", map[string]any{
-        "srcFs": srcFs, "dstFs": dstFs,
+        "srcFs": srcFs, "dstFs": dstFs, "createEmptySrcDirs": true,
     }, nil)
 }
 
 // MoveDir 移动目录 (使用 sync/move)
 func (c *Client) MoveDir(ctx context.Context, srcFs, dstFs string) error {
     return c.Call(ctx, "sync/move", map[string]any{
-        "srcFs": srcFs, "dstFs": dstFs,
+        "srcFs": srcFs, "dstFs": dstFs, "createEmptySrcDirs": true, "deleteEmptySrcDirs": true,
     }, nil)
 }
 
