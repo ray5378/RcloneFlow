@@ -19,6 +19,9 @@ const createForm = ref({
   targetPath: '',
 })
 
+const openMenuId = ref<number | null>(null)
+const editingTask = ref<Task | null>(null)
+
 const sourcePathOptions = ref<any[]>([])
 const targetPathOptions = ref<any[]>([])
 const showSourcePathInput = ref(false)
@@ -102,6 +105,39 @@ async function runTask(taskId: number) {
   } catch (e) {
     alert((e as Error).message)
   }
+}
+
+function editTask(task: Task) {
+  editingTask.value = task
+  createForm.value = {
+    name: task.name,
+    mode: task.mode,
+    sourceRemote: task.sourceRemote,
+    sourcePath: task.sourcePath || '',
+    targetRemote: task.targetRemote,
+    targetPath: task.targetPath || '',
+  }
+  currentModule.value = 'add'
+  openMenuId.value = null
+}
+
+async function deleteTask(id: number) {
+  if (!confirm('确定删除此任务？')) return
+  try {
+    await api.deleteTask(id)
+    openMenuId.value = null
+    await loadData()
+  } catch (e) {
+    alert((e as Error).message)
+  }
+}
+
+function toggleMenu(id: number) {
+  openMenuId.value = openMenuId.value === id ? null : id
+}
+
+function closeMenus() {
+  openMenuId.value = null
 }
 
 async function deleteSchedule(id: number) {
@@ -241,9 +277,19 @@ function goBackTarget() {
   <div v-if="currentModule === 'tasks'" class="card">
     <div class="card-header"><div class="title">任务列表</div></div>
     <div class="tile-grid">
-      <div v-for="task in tasks" :key="task.id" class="tile">
-        <div class="tile-header"><span class="tile-name">{{ task.name }}</span></div>
-        <div class="tile-desc">{{ task.mode }}: {{ task.sourceRemote }} → {{ task.targetRemote }}</div>
+      <div v-for="task in tasks" :key="task.id" class="tile" @click="closeMenus">
+        <div class="tile-info">
+          <div class="tile-header"><span class="tile-name">{{ task.name }}</span></div>
+          <div class="tile-desc">{{ task.mode }}: {{ task.sourceRemote }} → {{ task.targetRemote }}</div>
+        </div>
+        <div class="tile-actions">
+          <button class="ghost small" @click.stop="runTask(task.id)">▶ 执行</button>
+          <button class="ghost small" @click.stop="editTask(task)">✏️ 修改</button>
+          <button class="ghost small menu-btn" @click.stop="toggleMenu(task.id)">⋮</button>
+          <div v-if="openMenuId === task.id" class="tile-menu">
+            <button class="danger-text" @click.stop="deleteTask(task.id)">🗑️ 删除</button>
+          </div>
+        </div>
       </div>
       <div v-if="!tasks.length" style="padding: 20px; color: #888; text-align: center; width: 100%">暂无任务</div>
     </div>
@@ -475,13 +521,35 @@ body.light .path-item:hover { background: #f0f0f0; }
   transition: all 0.2s;
   flex: 1 1 calc(25% - 12px);
   max-width: calc(25% - 12px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 .tile:hover { background: #2a2a2a; }
 body.light .tile { background: #f5f5f5; }
 body.light .tile:hover { background: #e8e8e8; }
+.tile-info { flex: 1; overflow: hidden; }
 .tile-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 .tile-name { font-weight: 600; font-size: 14px; color: #fff; }
 body.light .tile-name { color: #1a1a1a; }
 .tile-desc { font-size: 12px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-</style>XXX
-// test comment 2026年 04月 01日 星期三 21:10:19 CST
+.tile-actions { display: flex; align-items: center; gap: 4px; position: relative; }
+.tile-actions .ghost.small { padding: 4px 8px; font-size: 12px; }
+.menu-btn { font-size: 16px !important; padding: 4px 8px !important; }
+.tile-menu {
+  position: absolute;
+  right: 0;
+  top: 100%;
+  background: #333;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 4px;
+  z-index: 100;
+  min-width: 100px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+body.light .tile-menu { background: #fff; border-color: #ddd; }
+.tile-menu button { width: 100%; text-align: left; padding: 8px 12px; }
+.tile-menu button:hover { background: #444; }
+body.light .tile-menu button:hover { background: #f0f0f0; }
+</style>
