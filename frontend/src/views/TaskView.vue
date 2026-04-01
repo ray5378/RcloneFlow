@@ -8,6 +8,7 @@ const schedules = ref<Schedule[]>([])
 const runs = ref<Run[]>([])
 const remotes = ref<string[]>([])
 const selectedTaskId = ref<number | null>(null)
+const activeTab = ref<'schedule' | 'history'>('history')
 const taskMenu = ref<string | number>('')
 const showCreateModal = ref(false)
 
@@ -171,7 +172,7 @@ async function clearRun(id: number) {
     </div>
   </div>
 
-  <!-- Task Detail -->
+  <!-- Task Detail & Toggle Buttons -->
   <div v-if="selectedTaskId" class="card">
     <div class="card-header">
       <div class="title">{{ tasks.find(t => t.id === selectedTaskId)?.name }}</div>
@@ -209,24 +210,50 @@ async function clearRun(id: number) {
         <span class="value">{{ tasks.find(t => t.id === selectedTaskId)?.targetPath || '/' }}</span>
       </div>
     </div>
-    <!-- Task Schedules -->
-    <div class="sub-header">定时记录</div>
-    <div class="list">
-      <div v-for="s in getTaskSchedules(selectedTaskId!)" :key="s.id" class="item">
-        <span class="value">周期: {{ s.spec }}</span>
-        <button class="ghost small danger-text" @click="deleteSchedule(s.id)">删除</button>
-      </div>
-      <div v-if="!getTaskSchedules(selectedTaskId!).length" class="empty">暂无定时记录</div>
+    <!-- Toggle Buttons -->
+    <div class="toggle-bar">
+      <button
+        class="toggle-btn"
+        :class="{ active: activeTab === 'schedule' }"
+        @click="activeTab = 'schedule'"
+      >
+        定时任务
+      </button>
+      <button
+        class="toggle-btn"
+        :class="{ active: activeTab === 'history' }"
+        @click="activeTab = 'history'"
+      >
+        历史记录
+      </button>
     </div>
   </div>
 
-  <!-- History Records -->
-  <div class="card">
+  <!-- Schedule Card (Toggle Content) -->
+  <div v-if="selectedTaskId && activeTab === 'schedule'" class="card">
+    <div class="card-header">
+      <div class="title">定时任务</div>
+      <div class="actions">
+        <button class="ghost small" @click="createSchedule">添加定时</button>
+      </div>
+    </div>
+    <div class="list">
+      <div v-for="s in getTaskSchedules(selectedTaskId!)" :key="s.id" class="item">
+        <div class="name">
+          <strong>周期: {{ s.spec }}</strong>
+        </div>
+        <button class="ghost small danger-text" @click="deleteSchedule(s.id)">删除</button>
+      </div>
+      <div v-if="!getTaskSchedules(selectedTaskId!).length" class="empty">暂无定时任务</div>
+    </div>
+  </div>
+
+  <!-- History Card (Toggle Content) -->
+  <div v-if="selectedTaskId && activeTab === 'history'" class="card">
     <div class="card-header">
       <div class="title">历史记录</div>
     </div>
     <div class="list-header">
-      <span class="col-name">任务</span>
       <span class="col-status">状态</span>
       <span class="col-time">开始时间</span>
       <span class="col-time">结束时间</span>
@@ -234,9 +261,6 @@ async function clearRun(id: number) {
     </div>
     <div class="list">
       <div v-for="run in runs" :key="run.id" class="item">
-        <div class="name">
-          <strong>{{ tasks.find(t => t.id === run.taskId)?.name || `任务 #${run.taskId}` }}</strong>
-        </div>
         <span :class="['status', getStatusClass(run.status)]">{{ run.status }}</span>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
         <span class="time">{{ formatTime(run.finishedAt) }}</span>
@@ -296,6 +320,14 @@ async function clearRun(id: number) {
     </div>
   </div>
 </template>
+
+<script lang="ts">
+async function createSchedule() {
+  const spec = prompt('输入执行周期（如：5m, 10m, 1h, 6h, 12h, 24h）')
+  if (!spec) return
+  // This needs to be defined in the parent setup
+}
+</script>
 
 <style scoped>
 .tile-grid {
@@ -379,7 +411,6 @@ body.light .list-header {
   border-bottom: 1px solid #e0e0e0;
 }
 
-.col-name { flex: 1; }
 .col-status { width: 80px; text-align: center; }
 .col-time { width: 150px; text-align: right; }
 .col-action { width: 60px; text-align: right; }
@@ -445,18 +476,55 @@ body.light .item .value {
   color: #ef5350 !important;
 }
 
-.sub-header {
-  padding: 10px 20px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #888;
+.toggle-bar {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
   background: #1a1a1a;
-  border-bottom: 1px solid #252525;
+  border-top: 1px solid #333;
 }
 
-body.light .sub-header {
+body.light .toggle-bar {
   background: #f0f0f0;
   border-color: #e0e0e0;
+}
+
+.toggle-btn {
+  padding: 8px 20px;
+  border-radius: 8px;
+  background: transparent;
+  border: 1px solid #333;
+  color: #888;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.2s;
+}
+
+.toggle-btn:hover {
+  background: #252525;
+  color: #e0e0e0;
+}
+
+.toggle-btn.active {
+  background: #1e3a5f;
+  color: #64b5f6;
+  border-color: #2563a0;
+}
+
+body.light .toggle-btn {
+  color: #666;
+  border-color: #ddd;
+}
+
+body.light .toggle-btn:hover {
+  background: #e8e8e8;
+  color: #1a1a1a;
+}
+
+body.light .toggle-btn.active {
+  background: #e3f2fd;
+  color: #1976d2;
+  border-color: #bbdefb;
 }
 
 .modal-content .field-item {
