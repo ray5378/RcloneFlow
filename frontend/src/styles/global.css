@@ -174,9 +174,24 @@ button:disabled {
 }
 
 .tile-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px;
+}
+
+.tile-grid .tile {
+  min-width: 140px;
+  flex: 0 1 auto;
+}
+
+.storage-panel {
+  flex: 0 0 auto;
+}
+
+.browser-layout {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .tile {

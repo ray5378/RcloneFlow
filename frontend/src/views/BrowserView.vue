@@ -51,6 +51,12 @@ async function loadRemotes() {
   try {
     const data = await api.listRemotes()
     remotes.value = data.remotes || []
+    
+    // Auto-open first remote if none selected
+    if (!browserFs.value && remotes.value.length > 0) {
+      await openRemote(remotes.value[0])
+    }
+    
     emit('navigate', 'explorer')
   } catch (e) {
     browserError.value = (e as Error).message

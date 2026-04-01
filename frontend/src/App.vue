@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
 import ScheduleView from './views/ScheduleView.vue'
 import RunView from './views/RunView.vue'
+import * as api from './api'
 
 const currentPage = ref('browser')
 const version = ref('加载中...')
@@ -18,6 +19,16 @@ const pages = {
 function switchPage(page: string) {
   currentPage.value = page
 }
+
+onMounted(async () => {
+  // Fetch rclone version
+  try {
+    const data = await api.listRemotes()
+    version.value = data.version || '未知版本'
+  } catch {
+    version.value = '未连接'
+  }
+})
 </script>
 
 <template>
