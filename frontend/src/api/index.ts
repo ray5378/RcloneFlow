@@ -84,7 +84,7 @@ export function moveFile(srcRemote: string, srcPath: string, dstRemote: string, 
   })
 }
 
-// 复制目录 (sync/copy) - srcFs和dstFs包含:和完整路径
+// 复制目录 (sync/copy) - srcFs和dstFs格式为 remote:完整路径
 export function copyDir(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
   return api('/api/fs/copyDir', {
     method: 'POST',
@@ -96,7 +96,7 @@ export function copyDir(srcRemote: string, srcPath: string, dstRemote: string, d
   })
 }
 
-// 移动目录 (sync/move) - srcFs和dstFs包含:和完整路径
+// 移动目录 (sync/move) - srcFs和dstFs格式为 remote:完整路径
 export function moveDir(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
   return api('/api/fs/moveDir', {
     method: 'POST',
