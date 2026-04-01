@@ -60,7 +60,7 @@ export function showInfoToast(message: string, duration = 3000) {
 }
 
 // HTTP状态码对应的错误信息
-const HTTP_ERROR_MESSAGES: Record<number, string> = {
+export const HTTP_ERROR_MESSAGES: Record<number, string> = {
   400: '请求参数错误',
   401: '未授权，请重新登录',
   403: '没有权限执行此操作',
