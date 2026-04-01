@@ -117,6 +117,16 @@ function editTask(task: Task) {
     targetRemote: task.targetRemote,
     targetPath: task.targetPath || '',
   }
+  // 加载源路径选项
+  if (task.sourceRemote) {
+    sourceCurrentPath.value = task.sourcePath || ''
+    loadSourcePath(task.sourceRemote, task.sourcePath || '')
+  }
+  // 加载目标路径选项
+  if (task.targetRemote) {
+    targetCurrentPath.value = task.targetPath || ''
+    loadTargetPath(task.targetRemote, task.targetPath || '')
+  }
   currentModule.value = 'add'
   openMenuId.value = null
 }
