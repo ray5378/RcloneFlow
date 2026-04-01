@@ -19,6 +19,61 @@ const createForm = ref({
   targetPath: '',
 })
 
+// Path cache for each remote
+const pathCache = ref<Record<string, any[]>>({})
+const sourcePathOptions = ref<any[]>([])
+const targetPathOptions = ref<any[]>([])
+const showSourcePathInput = ref(false)
+const showTargetPathInput = ref(false)
+
+// Watch for remote changes to load paths
+function onSourceRemoteChange() {
+  if (createForm.value.sourceRemote) {
+    loadPathOptions(createForm.value.sourceRemote, 'source')
+  } else {
+    sourcePathOptions.value = []
+  }
+  createForm.value.sourcePath = ''
+}
+
+function onTargetRemoteChange() {
+  if (createForm.value.targetRemote) {
+    loadPathOptions(createForm.value.targetRemote, 'target')
+  } else {
+    targetPathOptions.value = []
+  }
+  createForm.value.targetPath = ''
+}
+
+async function loadPathOptions(remote: string, type: 'source' | 'target') {
+  if (pathCache.value[remote]) {
+    const options = pathCache.value[remote]
+    if (type === 'source') {
+      sourcePathOptions.value = options
+    } else {
+      targetPathOptions.value = options
+    }
+    return
+  }
+  try {
+    const data = await api.listPath(remote, '')
+    const items = data.items || []
+    pathCache.value[remote] = items
+    if (type === 'source') {
+      sourcePathOptions.value = items
+    } else {
+      targetPathOptions.value = items
+    }
+  } catch (e) {
+    console.error('Failed to load paths:', e)
+    if (type === 'source') {
+      sourcePathOptions.value = []
+    } else {
+      targetPathOptions.value = []
+    }
+  }
+}
+
 onMounted(async () => {
   await loadData()
 })
@@ -252,25 +307,47 @@ async function clearRun(id: number) {
       </div>
       <div class="field-item">
         <label>源存储 <span style="color: #dc2626">*</span></label>
-        <select v-model="createForm.sourceRemote">
+        <select v-model="createForm.sourceRemote" @change="onSourceRemoteChange">
           <option value="">选择源存储</option>
           <option v-for="r in remotes" :key="r" :value="r">{{ r }}</option>
         </select>
       </div>
       <div class="field-item">
         <label>源路径</label>
-        <input v-model="createForm.sourcePath" type="text" placeholder="/路径，留空表示根目录" />
+        <div class="path-selector">
+          <select v-model="createForm.sourcePath">
+            <option value="">根目录</option>
+            <option v-for="item in sourcePathOptions" :key="item.Path" :value="item.Path">
+              {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
+            </option>
+          </select>
+          <button type="button" class="ghost small" @click="showSourcePathInput = !showSourcePathInput">
+            手动输入
+          </button>
+        </div>
+        <input v-if="showSourcePathInput" v-model="createForm.sourcePath" type="text" placeholder="手动输入路径" style="margin-top: 8px" />
       </div>
       <div class="field-item">
         <label>目标存储 <span style="color: #dc2626">*</span></label>
-        <select v-model="createForm.targetRemote">
+        <select v-model="createForm.targetRemote" @change="onTargetRemoteChange">
           <option value="">选择目标存储</option>
           <option v-for="r in remotes" :key="r" :value="r">{{ r }}</option>
         </select>
       </div>
       <div class="field-item">
         <label>目标路径</label>
-        <input v-model="createForm.targetPath" type="text" placeholder="/路径，留空表示根目录" />
+        <div class="path-selector">
+          <select v-model="createForm.targetPath">
+            <option value="">根目录</option>
+            <option v-for="item in targetPathOptions" :key="item.Path" :value="item.Path">
+              {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
+            </option>
+          </select>
+          <button type="button" class="ghost small" @click="showTargetPathInput = !showTargetPathInput">
+            手动输入
+          </button>
+        </div>
+        <input v-if="showTargetPathInput" v-model="createForm.targetPath" type="text" placeholder="手动输入路径" style="margin-top: 8px" />
       </div>
       <div class="form-actions">
         <button class="primary" @click="createTask">创建任务</button>
@@ -433,6 +510,16 @@ body.light .form-content select {
   background: #fff;
   border-color: #ddd;
   color: #333;
+}
+
+.path-selector {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.path-selector select {
+  flex: 1;
 }
 
 .form-actions {
