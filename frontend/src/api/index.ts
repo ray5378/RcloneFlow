@@ -59,23 +59,31 @@ export function listPath(remote: string, path: string) {
 }
 
 export function copyFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
+  // Trim leading slash from paths as rclone expects paths without leading /
+  const cleanSrcPath = srcPath.startsWith('/') ? srcPath.slice(1) : srcPath
+  const cleanDstPath = dstPath.startsWith('/') ? dstPath.slice(1) : dstPath
   return api('/api/fs/copy', {
     method: 'POST',
-    body: JSON.stringify({ srcFs: srcRemote + ':', srcRemote: srcPath, dstFs: dstRemote + ':', dstRemote: dstPath }),
+    body: JSON.stringify({ srcFs: srcRemote + ':', srcRemote: cleanSrcPath, dstFs: dstRemote + ':', dstRemote: cleanDstPath }),
   })
 }
 
 export function moveFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
+  // Trim leading slash from paths as rclone expects paths without leading /
+  const cleanSrcPath = srcPath.startsWith('/') ? srcPath.slice(1) : srcPath
+  const cleanDstPath = dstPath.startsWith('/') ? dstPath.slice(1) : dstPath
   return api('/api/fs/move', {
     method: 'POST',
-    body: JSON.stringify({ srcFs: srcRemote + ':', srcRemote: srcPath, dstFs: dstRemote + ':', dstRemote: dstPath }),
+    body: JSON.stringify({ srcFs: srcRemote + ':', srcRemote: cleanSrcPath, dstFs: dstRemote + ':', dstRemote: cleanDstPath }),
   })
 }
 
 export function deleteFile(remote: string, path: string) {
+  // Trim leading slash from path as rclone expects paths without leading /
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path
   return api('/api/fs/delete', {
     method: 'POST',
-    body: JSON.stringify({ srcFs: remote + ':', srcRemote: path }),
+    body: JSON.stringify({ srcFs: remote + ':', srcRemote: cleanPath }),
   })
 }
 
