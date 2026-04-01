@@ -7,8 +7,7 @@ const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
 const runs = ref<Run[]>([])
 const remotes = ref<string[]>([])
-const selectedTaskId = ref<number | null>(null)
-const currentModule = ref<'history' | 'schedule' | 'add'>('history')
+const currentModule = ref<'history' | 'schedule' | 'add' | 'tasks'>('tasks')
 const showCreateModal = ref(false)
 
 const createForm = ref({
@@ -129,6 +128,13 @@ async function clearRun(id: number) {
     <div class="module-tabs">
       <button
         class="tab-btn"
+        :class="{ active: currentModule === 'tasks' }"
+        @click="currentModule = 'tasks'"
+      >
+        任务列表
+      </button>
+      <button
+        class="tab-btn"
         :class="{ active: currentModule === 'history' }"
         @click="currentModule = 'history'"
       >
@@ -148,6 +154,30 @@ async function clearRun(id: number) {
       >
         添加任务
       </button>
+    </div>
+  </div>
+
+  <!-- Task List Module -->
+  <div v-if="currentModule === 'tasks'" class="card">
+    <div class="card-header">
+      <div class="title">任务列表</div>
+    </div>
+    <div class="tile-grid">
+      <div
+        v-for="task in tasks"
+        :key="task.id"
+        class="tile"
+      >
+        <div class="tile-header">
+          <span class="tile-name">{{ task.name }}</span>
+        </div>
+        <div class="tile-desc">
+          {{ task.mode }}: {{ task.sourceRemote }} → {{ task.targetRemote }}
+        </div>
+      </div>
+      <div v-if="!tasks.length" style="padding: 20px; color: #888; text-align: center; width: 100%">
+        暂无任务
+      </div>
     </div>
   </div>
 
@@ -244,31 +274,6 @@ async function clearRun(id: number) {
       </div>
       <div class="form-actions">
         <button class="primary" @click="createTask">创建任务</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Task List (always visible as reference) -->
-  <div class="card">
-    <div class="card-header">
-      <div class="title">已有任务</div>
-    </div>
-    <div class="tile-grid">
-      <div
-        v-for="task in tasks"
-        :key="task.id"
-        class="tile"
-        @click="selectedTaskId = task.id"
-      >
-        <div class="tile-header">
-          <span class="tile-name">{{ task.name }}</span>
-        </div>
-        <div class="tile-desc">
-          {{ task.mode }}: {{ task.sourceRemote }} → {{ task.targetRemote }}
-        </div>
-      </div>
-      <div v-if="!tasks.length" style="padding: 20px; color: #888; text-align: center; width: 100%">
-        暂无任务
       </div>
     </div>
   </div>
