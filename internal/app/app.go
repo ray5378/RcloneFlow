@@ -50,6 +50,7 @@ func Run() error {
     mux.HandleFunc("/api/tasks", srv.handleTasks)
     mux.HandleFunc("/api/tasks/", srv.handleTaskActions)
     mux.HandleFunc("/api/schedules", srv.handleSchedules)
+    mux.HandleFunc("/api/schedules/", srv.handleSchedules)
     mux.HandleFunc("/api/runs", srv.handleRuns)
     mux.HandleFunc("/api/runs/", srv.handleRunStatus)
 
@@ -188,6 +189,19 @@ func (s *Server) RunTask(ctx context.Context, taskID int64, trigger string) erro
 
 func (s *Server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
     p := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
+    
+    // DELETE /api/tasks/{id}
+    if r.Method == http.MethodDelete {
+        id, err := strconv.ParseInt(p, 10, 64)
+        if err != nil { writeJSON(w, 400, map[string]any{"error": "invalid task id"}); return }
+        if err := s.db.DeleteTask(id); err != nil {
+            writeJSON(w, 500, map[string]any{"error": err.Error()}); return
+        }
+        writeJSON(w, 200, map[string]any{"deleted": true})
+        return
+    }
+    
+    // POST /api/tasks/{id}/run
     if !strings.HasSuffix(p, "/run") { w.WriteHeader(404); return }
     idStr := strings.TrimSuffix(p, "/run")
     id, _ := strconv.ParseInt(strings.Trim(idStr, "/"), 10, 64)
@@ -209,6 +223,14 @@ func (s *Server) handleSchedules(w http.ResponseWriter, r *http.Request) {
         item, err := s.db.AddSchedule(req)
         if err != nil { writeJSON(w, 500, map[string]any{"error": err.Error()}); return }
         writeJSON(w, 200, item)
+    case http.MethodDelete:
+        p := strings.TrimPrefix(r.URL.Path, "/api/schedules/")
+        id, err := strconv.ParseInt(p, 10, 64)
+        if err != nil { writeJSON(w, 400, map[string]any{"error": "invalid schedule id"}); return }
+        if err := s.db.DeleteSchedule(id); err != nil {
+            writeJSON(w, 500, map[string]any{"error": err.Error()}); return
+        }
+        writeJSON(w, 200, map[string]any{"deleted": true})
     default:
         w.WriteHeader(405)
     }
