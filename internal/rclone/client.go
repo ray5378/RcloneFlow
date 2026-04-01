@@ -225,12 +225,43 @@ func (c *Client) MoveFile(ctx context.Context, srcFs, srcRemote, dstFs, dstRemot
     }, nil)
 }
 
-// CopyFile 复制文件
+// CopyFile 复制文件 (使用 async 模式避免超时)
 func (c *Client) CopyFile(ctx context.Context, srcFs, srcRemote, dstFs, dstRemote string) error {
-    return c.Call(ctx, "operations/copyfile", map[string]any{
+    var result struct {
+        JobID int64 `json:"jobid"`
+    }
+    // 使用 _async 模式避免超时
+    if err := c.Call(ctx, "operations/copyfile", map[string]any{
         "srcFs": srcFs, "srcRemote": srcRemote,
         "dstFs": dstFs, "dstRemote": dstRemote,
-    }, nil)
+        "_async": true,
+    }, &result); err != nil {
+        return err
+    }
+    // 等待 job 完成
+    return c.waitForJob(ctx, result.JobID)
+}
+
+// waitForJob 等待异步任务完成
+func (c *Client) waitForJob(ctx context.Context, jobID int64) error {
+    for {
+        var status struct {
+            Finished bool   `json:"finished"`
+            Success  bool   `json:"success"`
+            Error    string `json:"error"`
+        }
+        if err := c.Call(ctx, "job/status", map[string]any{"jobid": jobID}, &status); err != nil {
+            return err
+        }
+        if status.Finished {
+            if !status.Success && status.Error != "" {
+                return fmt.Errorf("job failed: %s", status.Error)
+            }
+            return nil
+        }
+        // 等待 1 秒
+        time.Sleep(time.Second)
+    }
 }
 
 // CopyDir 复制目录 (使用 sync/copy)
