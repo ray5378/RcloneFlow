@@ -65,7 +65,7 @@ async function deleteSchedule(id: number) {
 
 <template>
   <div class="card">
-    <div class="card-header green">
+    <div class="card-header">
       <div class="title">定时任务</div>
       <div class="subtitle">配置多个周期任务</div>
     </div>
@@ -101,7 +101,7 @@ async function deleteSchedule(id: number) {
 
   <!-- Schedule List -->
   <div class="card">
-    <div class="card-header" style="background: #2d2d2d;">
+    <div class="card-header">
       <div class="title">定时任务列表</div>
     </div>
     <div class="list">

@@ -206,7 +206,7 @@ async function openEditRemote(name: string) {
 <template>
   <!-- Storage Panel -->
   <div class="card">
-    <div class="card-header blue">
+    <div class="card-header">
       <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
         <div>
           <div class="title">存储节点</div>
@@ -244,7 +244,7 @@ async function openEditRemote(name: string) {
 
   <!-- Browser Panel -->
   <div v-if="subview === 'explorer'" class="card">
-    <div class="card-header green">
+    <div class="card-header">
       <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
         <div class="title">文件浏览</div>
         <div class="actions">
@@ -291,7 +291,7 @@ async function openEditRemote(name: string) {
 
   <!-- Manage Storage Subview -->
   <div v-if="subview === 'manage-storage'" class="card">
-    <div class="card-header yellow">
+    <div class="card-header">
       <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
         <div class="title">管理存储</div>
         <div class="actions">

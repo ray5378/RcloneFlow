@@ -80,7 +80,7 @@ async function deleteTask(taskId: number) {
 
 <template>
   <div class="card">
-    <div class="card-header blue">
+    <div class="card-header">
       <div class="title">任务管理</div>
       <div class="subtitle">创建复制 / 同步 / 移动任务</div>
     </div>
@@ -129,7 +129,7 @@ async function deleteTask(taskId: number) {
 
   <!-- Task List -->
   <div class="card">
-    <div class="card-header" style="background: #2d2d2d;">
+    <div class="card-header">
       <div class="title">任务列表</div>
     </div>
     <div class="list">

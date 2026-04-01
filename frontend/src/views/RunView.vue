@@ -67,7 +67,7 @@ function formatSummary(summary?: Record<string, unknown>) {
 
 <template>
   <div class="card">
-    <div class="card-header yellow">
+    <div class="card-header">
       <div class="title">运行记录</div>
       <div class="subtitle">查看任务执行状态</div>
     </div>

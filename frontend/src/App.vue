@@ -8,6 +8,7 @@ import * as api from './api'
 
 const currentPage = ref('browser')
 const version = ref('加载中...')
+const isLight = ref(localStorage.getItem('theme') === 'light')
 
 const pages = {
   browser: ['文件管理', '浏览存储和目录。'],
@@ -20,7 +21,23 @@ function switchPage(page: string) {
   currentPage.value = page
 }
 
+function toggleTheme() {
+  isLight.value = !isLight.value
+  if (isLight.value) {
+    document.body.classList.add('light')
+    localStorage.setItem('theme', 'light')
+  } else {
+    document.body.classList.remove('light')
+    localStorage.setItem('theme', 'dark')
+  }
+}
+
 onMounted(async () => {
+  // Apply saved theme
+  if (isLight.value) {
+    document.body.classList.add('light')
+  }
+  
   // Fetch rclone version
   try {
     const data = await api.listRemotes()
@@ -58,5 +75,12 @@ onMounted(async () => {
       <ScheduleView v-if="currentPage === 'schedules'" />
       <RunView v-if="currentPage === 'runs'" />
     </main>
+
+    <!-- Theme Toggle -->
+    <div class="theme-toggle">
+      <button @click="toggleTheme" :title="isLight ? '切换深色模式' : '切换浅色模式'">
+        {{ isLight ? '🌙' : '☀️' }}
+      </button>
+    </div>
   </div>
 </template>
