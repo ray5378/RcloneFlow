@@ -66,6 +66,12 @@ export interface ProviderOption {
   Password: boolean
   Hide: number
   Advanced: boolean
+  Examples?: ProviderExample[]
+}
+
+export interface ProviderExample {
+  Value: string
+  Help: string
 }
 
 export type RemoteTestState = 'idle' | 'testing' | 'success' | 'failed'

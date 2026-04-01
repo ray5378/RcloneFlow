@@ -2,7 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import Modal from './Modal.vue'
 import * as api from '../api'
-import type { Provider } from '../types'
+import type { Provider, ProviderOption } from '../types'
 
 const props = defineProps<{
   show: boolean
@@ -35,13 +35,32 @@ const filteredProviders = computed(() => {
     .sort((a, b) => a.Name.localeCompare(b.Name))
 })
 
+// Show all options except those tied to a specific provider
 const providerOptions = computed(() => {
   if (!selectedProvider.value) return []
-  return (selectedProvider.value.Options || []).filter((opt: { Provider?: unknown; Advanced?: boolean }) => {
+  return (selectedProvider.value.Options || []).filter((opt: ProviderOption) => {
     if (opt.Provider) return false
-    if (opt.Advanced) return false
     return true
   })
+})
+
+// Group options: required first, then optional, then advanced
+const groupedOptions = computed(() => {
+  const required: ProviderOption[] = []
+  const optional: ProviderOption[] = []
+  const advanced: ProviderOption[] = []
+  
+  for (const opt of providerOptions.value) {
+    if (opt.Required) {
+      required.push(opt)
+    } else if (opt.Advanced) {
+      advanced.push(opt)
+    } else {
+      optional.push(opt)
+    }
+  }
+  
+  return { required, optional, advanced }
 })
 
 watch(() => props.show, async (val) => {
@@ -66,6 +85,13 @@ function selectProvider(provider: Provider) {
   selectedProviderName.value = provider.Name
   step.value = 1
   remoteOptions.value = {}
+  
+  // Set default values
+  for (const opt of providerOptions.value) {
+    if (opt.Default !== undefined && opt.Default !== null) {
+      remoteOptions.value[opt.Name] = String(opt.Default)
+    }
+  }
 }
 
 function nextStep() {
@@ -85,7 +111,9 @@ async function create() {
   try {
     const params: Record<string, unknown> = {}
     for (const key in remoteOptions.value) {
-      params[key] = remoteOptions.value[key]
+      if (remoteOptions.value[key] !== '') {
+        params[key] = remoteOptions.value[key]
+      }
     }
     
     if (props.editMode && props.editName) {
@@ -160,23 +188,86 @@ defineExpose({ loadConfig: async (name: string) => {
 
     <!-- Step 1: Configure Options -->
     <div v-if="step === 1">
-      <div class="field-grid">
-        <div v-for="opt in providerOptions" :key="opt.Name" class="field-item">
-          <label>{{ opt.Name }}</label>
+      <!-- Required options -->
+      <div v-if="groupedOptions.required.length" class="field-grid">
+        <div v-for="opt in groupedOptions.required" :key="opt.Name" class="field-item">
+          <label>{{ opt.Name }} <span style="color: #dc2626">*</span></label>
+          <select v-if="opt.Examples && opt.Examples.length" v-model="remoteOptions[opt.Name]">
+            <option value="">选择...</option>
+            <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">
+              {{ ex.Help }}
+            </option>
+          </select>
           <input
-            v-if="!opt.Password"
+            v-else-if="opt.Password"
             v-model="remoteOptions[opt.Name]"
-            type="text"
+            type="password"
             :placeholder="opt.Help"
           />
           <input
             v-else
             v-model="remoteOptions[opt.Name]"
-            type="password"
+            type="text"
             :placeholder="opt.Help"
           />
         </div>
       </div>
+
+      <!-- Optional options -->
+      <div v-if="groupedOptions.optional.length" class="field-grid" style="margin-top: 16px">
+        <div v-for="opt in groupedOptions.optional" :key="opt.Name" class="field-item">
+          <label>{{ opt.Name }}</label>
+          <select v-if="opt.Examples && opt.Examples.length" v-model="remoteOptions[opt.Name]">
+            <option value="">选择...</option>
+            <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">
+              {{ ex.Help }}
+            </option>
+          </select>
+          <input
+            v-else-if="opt.Password"
+            v-model="remoteOptions[opt.Name]"
+            type="password"
+            :placeholder="opt.Help"
+          />
+          <input
+            v-else
+            v-model="remoteOptions[opt.Name]"
+            type="text"
+            :placeholder="opt.Help"
+          />
+        </div>
+      </div>
+
+      <!-- Advanced options -->
+      <details v-if="groupedOptions.advanced.length" style="margin-top: 16px">
+        <summary style="cursor: pointer; color: #6b7280; font-size: 14px">
+          高级选项 ({{ groupedOptions.advanced.length }})
+        </summary>
+        <div class="field-grid" style="margin-top: 12px">
+          <div v-for="opt in groupedOptions.advanced" :key="opt.Name" class="field-item">
+            <label>{{ opt.Name }}</label>
+            <select v-if="opt.Examples && opt.Examples.length" v-model="remoteOptions[opt.Name]">
+              <option value="">选择...</option>
+              <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">
+                {{ ex.Help }}
+              </option>
+            </select>
+            <input
+              v-else-if="opt.Password"
+              v-model="remoteOptions[opt.Name]"
+              type="password"
+              :placeholder="opt.Help"
+            />
+            <input
+              v-else
+              v-model="remoteOptions[opt.Name]"
+              type="text"
+              :placeholder="opt.Help"
+            />
+          </div>
+        </div>
+      </details>
+
       <div class="actions" style="margin-top: 16px; justify-content: space-between">
         <button class="ghost" @click="prevStep">上一步</button>
         <button @click="nextStep">下一步</button>

@@ -66,8 +66,10 @@ body {
 
 .main {
   padding: 24px;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .page {
