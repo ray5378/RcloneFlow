@@ -11,10 +11,10 @@ const version = ref('加载中...')
 const isLight = ref(localStorage.getItem('theme') === 'light')
 
 const pages = {
-  browser: ['文件管理', '浏览存储和目录。'],
-  tasks: ['任务管理', '创建复制 / 同步 / 移动任务。'],
-  schedules: ['定时任务', '配置多个周期任务。'],
-  runs: ['运行记录', '查看任务执行状态。'],
+  browser: '文件管理',
+  tasks: '任务管理',
+  schedules: '定时任务',
+  runs: '运行记录',
 }
 
 function switchPage(page: string) {
@@ -33,12 +33,9 @@ function toggleTheme() {
 }
 
 onMounted(async () => {
-  // Apply saved theme
   if (isLight.value) {
     document.body.classList.add('light')
   }
-  
-  // Fetch rclone version
   try {
     const data = await api.listRemotes()
     version.value = data.version || '未知版本'
@@ -50,23 +47,23 @@ onMounted(async () => {
 
 <template>
   <div class="app">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="brand">
-        RcloneFlow
-        <small>{{ version }}</small>
-      </div>
-      <nav class="nav">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-brand">RcloneFlow <small>{{ version }}</small></div>
+      <nav class="header-nav">
         <button
-          v-for="(info, key) in pages"
+          v-for="(name, key) in pages"
           :key="key"
           :class="{ active: currentPage === key }"
           @click="switchPage(key)"
         >
-          {{ info[0] }}
+          {{ name }}
         </button>
       </nav>
-    </aside>
+      <button class="theme-btn" @click="toggleTheme">
+        {{ isLight ? '🌙 深色模式' : '☀️ 浅色模式' }}
+      </button>
+    </header>
 
     <!-- Main Content -->
     <main class="main">
@@ -75,12 +72,5 @@ onMounted(async () => {
       <ScheduleView v-if="currentPage === 'schedules'" />
       <RunView v-if="currentPage === 'runs'" />
     </main>
-
-    <!-- Theme Toggle -->
-    <div class="theme-toggle">
-      <button @click="toggleTheme" :title="isLight ? '切换深色模式' : '切换浅色模式'">
-        {{ isLight ? '🌙' : '☀️' }}
-      </button>
-    </div>
   </div>
 </template>
