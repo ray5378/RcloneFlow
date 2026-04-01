@@ -238,6 +238,7 @@ async function loadTargetPath(remote: string, path: string) {
 
 function openSourceDir(item: any) {
   if (item.IsDir) {
+    createForm.value.sourcePath = item.Path
     loadSourcePath(createForm.value.sourceRemote, item.Path)
   }
 }
@@ -250,6 +251,7 @@ function onPathItemClick(item: any) {
 
 function openTargetDir(item: any) {
   if (item.IsDir) {
+    createForm.value.targetPath = item.Path
     loadTargetPath(createForm.value.targetRemote, item.Path)
   }
 }
@@ -412,6 +414,7 @@ function goBackTarget() {
           <div class="path-browse">
             <div class="path-bar">
               <span class="path-label">当前: /{{ sourceCurrentPath || '根目录' }}</span>
+              <span v-if="createForm.sourcePath" class="path-selected">已选: /{{ createForm.sourcePath }}</span>
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
@@ -440,6 +443,7 @@ function goBackTarget() {
           <div class="path-browse">
             <div class="path-bar">
               <span class="path-label">当前: /{{ targetCurrentPath || '根目录' }}</span>
+              <span v-if="createForm.targetPath" class="path-selected">已选: /{{ createForm.targetPath }}</span>
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
@@ -538,6 +542,7 @@ body.light .path-browse { border-color: #ddd; background: #fff; }
 .path-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #1a1a1a; border-bottom: 1px solid #333; }
 body.light .path-bar { background: #f5f5f5; border-color: #ddd; }
 .path-label { font-size: 12px; color: #888; }
+.path-selected { font-size: 12px; color: #4caf50; margin-left: 12px; font-weight: 600; }
 .path-list { max-height: 200px; overflow-y: auto; padding: 8px; }
 .path-item {
   padding: 6px 12px;
