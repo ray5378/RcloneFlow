@@ -58,6 +58,27 @@ export function listPath(remote: string, path: string) {
   )
 }
 
+export function copyFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
+  return api('/api/fs/copy', {
+    method: 'POST',
+    body: JSON.stringify({ srcRemote, srcPath, dstRemote, dstPath }),
+  })
+}
+
+export function moveFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
+  return api('/api/fs/move', {
+    method: 'POST',
+    body: JSON.stringify({ srcRemote, srcPath, dstRemote, dstPath }),
+  })
+}
+
+export function deleteFile(remote: string, path: string) {
+  return api('/api/fs/delete', {
+    method: 'POST',
+    body: JSON.stringify({ remote, path }),
+  })
+}
+
 export interface FileItem {
   Path: string
   Name: string
