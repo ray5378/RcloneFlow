@@ -315,12 +315,24 @@ async function clearRun(id: number) {
       <div class="field-item">
         <label>源路径</label>
         <div class="path-selector">
-          <select v-model="createForm.sourcePath">
-            <option value="">根目录</option>
-            <option v-for="item in sourcePathOptions" :key="item.Path" :value="item.Path">
-              {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
-            </option>
-          </select>
+          <div class="path-browse">
+            <div class="path-bar">
+              <span class="path-label">当前: /{{ sourceCurrentPath || '根目录' }}</span>
+              <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
+            </div>
+            <div class="path-list">
+              <div
+                v-for="item in sourcePathOptions"
+                :key="item.Path"
+                class="path-item"
+                :class="{ 'is-dir': item.IsDir }"
+                @click="item.IsDir ? navigateSourcePath(item) : selectSourcePath(item)"
+              >
+                {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
+              </div>
+              <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
+            </div>
+          </div>
           <button type="button" class="ghost small" @click="showSourcePathInput = !showSourcePathInput">
             手动输入
           </button>
@@ -337,12 +349,24 @@ async function clearRun(id: number) {
       <div class="field-item">
         <label>目标路径</label>
         <div class="path-selector">
-          <select v-model="createForm.targetPath">
-            <option value="">根目录</option>
-            <option v-for="item in targetPathOptions" :key="item.Path" :value="item.Path">
-              {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
-            </option>
-          </select>
+          <div class="path-browse">
+            <div class="path-bar">
+              <span class="path-label">当前: /{{ targetCurrentPath || '根目录' }}</span>
+              <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
+            </div>
+            <div class="path-list">
+              <div
+                v-for="item in targetPathOptions"
+                :key="item.Path"
+                class="path-item"
+                :class="{ 'is-dir': item.IsDir }"
+                @click="item.IsDir ? navigateTargetPath(item) : selectTargetPath(item)"
+              >
+                {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
+              </div>
+              <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
+            </div>
+          </div>
           <button type="button" class="ghost small" @click="showTargetPathInput = !showTargetPathInput">
             手动输入
           </button>
@@ -515,11 +539,77 @@ body.light .form-content select {
 .path-selector {
   display: flex;
   gap: 8px;
-  align-items: center;
+  align-items: flex-start;
 }
 
-.path-selector select {
+.path-browse {
   flex: 1;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #252525;
+  overflow: hidden;
+}
+
+body.light .path-browse {
+  border-color: #ddd;
+  background: #fff;
+}
+
+.path-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #1a1a1a;
+  border-bottom: 1px solid #333;
+}
+
+body.light .path-bar {
+  background: #f5f5f5;
+  border-color: #ddd;
+}
+
+.path-label {
+  font-size: 12px;
+  color: #888;
+}
+
+.path-list {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.path-item {
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+body.light .path-item {
+  color: #333;
+}
+
+.path-item:hover {
+  background: #333;
+}
+
+body.light .path-item:hover {
+  background: #f0f0f0;
+}
+
+.path-item.is-dir {
+  color: #64b5f6;
+  font-weight: 500;
+}
+
+.path-empty {
+  padding: 20px;
+  text-align: center;
+  color: #666;
+  font-size: 13px;
 }
 
 .form-actions {
