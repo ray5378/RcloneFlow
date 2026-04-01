@@ -469,11 +469,14 @@ body.light .path-item { color: #333; }
 body.light .path-item:hover { background: #f0f0f0; }
 .dir-arrow {
   color: #64b5f6;
-  font-size: 10px;
+  font-size: 14px;
   cursor: pointer;
-  padding: 4px;
+  padding: 4px 8px;
+  background: #333;
+  border-radius: 4px;
+  margin-right: 4px;
 }
-.dir-arrow:hover { color: #90caf9; }
+.dir-arrow:hover { color: #90caf9; background: #444; }
 .file-icon { font-size: 12px; }
 .item-name { flex: 1; }
 .path-item.is-dir .item-name { color: #64b5f6; font-weight: 500; }
