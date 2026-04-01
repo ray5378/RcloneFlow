@@ -1,82 +1,82 @@
 # RcloneFlow
 
-A powerful web-based Rclone management interface for multi-storage copy/sync/move task management.
+基于 Web 的 Rclone 管理界面，用于多存储复制/同步/移动任务管理。
 
-[中文文档](README_ZH.md)
+[English](README_EN.md)
 
-## Features
+## 功能特点
 
-- **Multi-Storage Management** - Add, edit, and manage multiple Rclone remotes
-- **File Browser** - Browse and navigate remote storage files
-- **Task Management** - Create and manage copy/sync tasks between remotes
-- **Scheduled Tasks** - Set up automated sync with cron-like scheduling
-- **Run History** - Track task execution history and status
-- **Modern UI** - Clean, responsive web interface
+- **多存储管理** - 添加、编辑和管理多个 Rclone 存储
+- **文件浏览器** - 浏览和导航远程存储文件
+- **任务管理** - 创建和管理存储间的复制/同步任务
+- **定时任务** - 使用 cron 风格的调度设置自动化同步
+- **运行记录** - 跟踪任务执行历史和状态
+- **现代化界面** - 简洁、响应式的 Web 界面
 
-## Requirements
+## 系统要求
 
 - Go 1.22+
-- Rclone (with RC mode enabled)
+- Rclone (需要开启 RC 模式)
 - Git
 
-## Quick Start
+## 快速开始
 
-### 1. Clone the Repository
+### 1. 克隆仓库
 
 ```bash
 git clone https://github.com/ray5378/RcloneFlow.git
 cd RcloneFlow
 ```
 
-### 2. Configure Rclone
+### 2. 配置 Rclone
 
-Make sure Rclone is installed and configured with your remotes. You can configure it at `~/.config/rclone/rclone.conf` or set the `RCLONE_CONFIG` environment variable.
+确保已安装 Rclone 并配置好存储。配置文件通常在 `~/.config/rclone/rclone.conf`，或通过 `RCLONE_CONFIG` 环境变量指定。
 
-### 3. Start Rclone RC Server
+### 3. 启动 Rclone RC 服务器
 
 ```bash
 rclone rcd --rc-user=your_user --rc-pass=your_pass --rc-addr=localhost:5572
 ```
 
-Or use environment variables:
+或使用环境变量：
 ```bash
 export RCLONE_RC_URL=http://localhost:5572
 export RCLONE_RC_USER=your_user
 export RCLONE_RC_PASS=your_pass
 ```
 
-### 4. Build and Run
+### 4. 构建并运行
 
 ```bash
-# Build
+# 构建
 go build -o server ./cmd/server
 
-# Run
+# 运行
 ./server
 ```
 
-The server will start on port 17870 by default. Access it at http://localhost:17870
+服务器默认在 17870 端口启动，访问 http://localhost:17870
 
-### 5. Environment Variables
+### 5. 环境变量
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `APP_ADDR` | Server address | `:17870` |
-| `APP_DATA_DIR` | Data directory | `./data` |
-| `RCLONE_RC_URL` | Rclone RC URL | `http://127.0.0.1:5572` |
-| `RCLONE_RC_USER` | Rclone RC username | - |
-| `RCLONE_RC_PASS` | Rclone RC password | - |
-| `RCLONE_RC_TIMEOUT` | RC timeout | `120s` |
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `APP_ADDR` | 服务器地址 | `:17870` |
+| `APP_DATA_DIR` | 数据目录 | `./data` |
+| `RCLONE_RC_URL` | Rclone RC 地址 | `http://127.0.0.1:5572` |
+| `RCLONE_RC_USER` | Rclone RC 用户名 | - |
+| `RCLONE_RC_PASS` | Rclone RC 密码 | - |
+| `RCLONE_RC_TIMEOUT` | RC 超时时间 | `120s` |
 
-## Docker
+## Docker 部署
 
-### Build Image
+### 构建镜像
 
 ```bash
 docker build -t rcloneflow .
 ```
 
-### Run Container
+### 运行容器
 
 ```bash
 docker run -d \
@@ -117,69 +117,69 @@ services:
     command: rcd --rc-user=your_user --rc-pass=your_pass --rc-addr=0.0.0.0:5572
 ```
 
-## Project Structure
+## 项目结构
 
 ```
 RcloneFlow/
 ├── cmd/
-│   └── server/          # Main application entry point
+│   └── server/          # 主应用程序入口
 ├── internal/
-│   ├── app/            # HTTP server and API handlers
-│   ├── rclone/         # Rclone RC client wrapper
-│   ├── scheduler/      # Task scheduling logic
-│   └── store/          # Data persistence (SQLite)
+│   ├── app/             # HTTP 服务器和 API 处理器
+│   ├── rclone/          # Rclone RC 客户端封装
+│   ├── scheduler/       # 任务调度逻辑
+│   └── store/           # 数据持久化 (SQLite)
 ├── web/
-│   ├── index.html      # Frontend SPA (Vue.js)
-│   └── vendor/         # Vue.js CDN bundle
-├── data/               # Application data directory
+│   ├── index.html       # 前端单页应用 (Vue.js)
+│   └── vendor/          # Vue.js CDN 包
+├── data/                # 应用数据目录
 ├── Dockerfile
 ├── docker-compose.yml
 ├── go.mod
 └── README.md
 ```
 
-## API Endpoints
+## API 接口
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/remotes` | List all remotes |
-| POST | `/api/remotes` | Create new remote |
-| PUT | `/api/remotes` | Update remote config |
-| GET | `/api/remotes/config/{name}` | Get remote config |
-| POST | `/api/remotes/test` | Test remote connection |
-| GET | `/api/providers` | List supported providers |
-| GET | `/api/browser/list` | List directory contents |
-| GET/POST | `/api/tasks` | List/Create tasks |
-| POST | `/api/tasks/{id}/run` | Run a task |
-| GET/POST | `/api/schedules` | List/Create schedules |
-| GET | `/api/runs` | List run history |
+| 方法 | 端点 | 说明 |
+|------|------|------|
+| GET | `/api/remotes` | 列出所有存储 |
+| POST | `/api/remotes` | 创建新存储 |
+| PUT | `/api/remotes` | 更新存储配置 |
+| GET | `/api/remotes/config/{name}` | 获取存储配置 |
+| POST | `/api/remotes/test` | 测试存储连接 |
+| GET | `/api/providers` | 获取支持的存储类型 |
+| GET | `/api/browser/list` | 列出目录内容 |
+| GET/POST | `/api/tasks` | 列出/创建任务 |
+| POST | `/api/tasks/{id}/run` | 运行任务 |
+| GET/POST | `/api/schedules` | 列出/创建定时任务 |
+| GET | `/api/runs` | 列出运行历史 |
 
-## Development
+## 开发
 
-### Build Frontend (Optional)
+### 构建前端（可选）
 
-The frontend is bundled as a single HTML file with embedded Vue.js. For development:
+前端作为单 HTML 文件打包，内嵌 Vue.js。开发时：
 
 ```bash
-# Frontend is served directly from web/index.html
-# No build step required for basic development
+# 前端直接从 web/index.html 提供服务
+# 基础开发无需构建步骤
 ```
 
-### Run Tests
+### 运行测试
 
 ```bash
 go test ./...
 ```
 
-## Contributing
+## 贡献
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+欢迎提交 Pull Request！
 
-## License
+## 开源协议
 
-MIT License - see LICENSE file for details.
+MIT License - 详见 LICENSE 文件。
 
-## Acknowledgments
+## 致谢
 
-- [Rclone](https://rclone.org/) - The powerful cloud storage sync tool
-- [Vue.js](https://vuejs.org/) - The progressive JavaScript framework
+- [Rclone](https://rclone.org/) - 强大的云存储同步工具
+- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架

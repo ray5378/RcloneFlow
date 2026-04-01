@@ -205,8 +205,8 @@ async function openEditRemote(name: string) {
 
 <template>
   <!-- Storage Panel -->
-  <div class="card storage-panel">
-    <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 12px">
+  <div class="card">
+    <div class="card-header" style="background: #eff6ff; border-color: #bfdbfe;">
       <div style="display: flex; justify-content: space-between; align-items: flex-start">
         <div>
           <div style="font-size: 18px; font-weight: 600">存储节点</div>
@@ -218,6 +218,7 @@ async function openEditRemote(name: string) {
         </div>
       </div>
     </div>
+    <div class="card-content">
     <div class="tile-grid" style="margin-top: 12px">
       <div
         v-for="name in getOrderedRemotes()"
@@ -241,59 +242,62 @@ async function openEditRemote(name: string) {
       </div>
     </div>
   </div>
+  </div>
 
   <!-- Browser Panel -->
-  <div v-if="subview === 'explorer'" class="card browser-layout">
-    <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 12px">
+  <div v-if="subview === 'explorer'" class="card">
+    <div class="card-header" style="background: #f0fdf4; border-color: #bbf7d0;">
       <div style="font-size: 18px; font-weight: 600">文件浏览</div>
       <div class="muted" style="margin-top: 4px">点击查看文件</div>
     </div>
-    <div class="pathbar" style="margin-top: 12px">
-      <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
-        <span v-if="i > 0" style="color: #9ca3af"> / </span>
-        <button
-          class="crumb"
-          :class="{ current: i === breadcrumbs.length - 1 }"
-          @click="crumb.path !== browserPath && (browserPath = crumb.path, refreshBrowser())"
-        >
-          {{ crumb.name }}
-        </button>
-      </template>
-    </div>
-
-    <div v-if="browserError" class="card" style="color: #dc2626">{{ browserError }}</div>
-
-    <div class="list" style="margin-top: 12px; border-top: 1px solid #e5e7eb; padding-top: 12px">
-      <div
-        v-for="item in browserItems"
-        :key="item.Path"
-        class="item"
-        @click="enterItem(item)"
-      >
-        <div class="manage-row">
-          <span>
-            {{ item.Name }}
-            <span v-if="item.IsDir" class="muted">/</span>
-          </span>
-          <span class="muted">{{ item.Size }}</span>
-        </div>
+    <div class="card-content">
+      <div class="pathbar" style="margin-top: 12px">
+        <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
+          <span v-if="i > 0" style="color: #9ca3af"> / </span>
+          <button
+            class="crumb"
+            :class="{ current: i === breadcrumbs.length - 1 }"
+            @click="crumb.path !== browserPath && (browserPath = crumb.path, refreshBrowser())"
+          >
+            {{ crumb.name }}
+          </button>
+        </template>
       </div>
-      <div v-if="!browserItems.length && !browserError" class="empty">
-        空目录
+      <div v-if="browserError" style="color: #dc2626; margin-top: 8px">{{ browserError }}</div>
+      <div class="list" style="margin-top: 12px; border-top: 1px solid #e5e7eb; padding-top: 12px">
+        <div
+          v-for="item in browserItems"
+          :key="item.Path"
+          class="item"
+          @click="enterItem(item)"
+        >
+          <div class="manage-row">
+            <span>
+              {{ item.Name }}
+              <span v-if="item.IsDir" class="muted">/</span>
+            </span>
+            <span class="muted">{{ item.Size }}</span>
+          </div>
+        </div>
+        <div v-if="!browserItems.length && !browserError" class="empty">
+          空目录
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Manage Storage Subview -->
   <div v-if="subview === 'manage-storage'" class="card">
-    <div class="manage-row" style="margin-bottom: 12px">
-      <div style="font-size: 18px; font-weight: 600">管理存储</div>
-      <div class="actions">
-        <button class="ghost small" @click="subview = 'explorer'">返回</button>
-        <button class="ghost small" @click="openAddRemote">添加存储</button>
+    <div class="card-header" style="background: #fef3c7; border-color: #fcd34d;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start">
+        <div style="font-size: 18px; font-weight: 600">管理存储</div>
+        <div class="actions">
+          <button class="ghost small" @click="subview = 'explorer'">返回</button>
+          <button class="ghost small" @click="openAddRemote">添加存储</button>
+        </div>
       </div>
     </div>
-    <div style="border-top: 1px solid #e5e7eb; padding-top: 12px">
+    <div class="card-content">
       <div class="list">
         <div v-for="name in remotes" :key="name" class="item" @click="openRemote(name)">
           <div class="manage-row">
