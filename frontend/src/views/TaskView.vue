@@ -280,7 +280,7 @@ function goBackTarget() {
       <div v-for="task in tasks" :key="task.id" class="tile" @click="closeMenus">
         <div class="tile-info">
           <div class="tile-header"><span class="tile-name">{{ task.name }}</span></div>
-          <div class="tile-desc">{{ task.mode }}: {{ task.sourceRemote }} → {{ task.targetRemote }}</div>
+          <div class="tile-desc">{{ task.mode }} {{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }} → {{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</div>
         </div>
         <div class="tile-actions">
           <button class="ghost small" @click.stop="runTask(task.id)">▶ 执行</button>
