@@ -163,20 +163,32 @@ async function loadPathOptions(remote: string, type: 'source' | 'target', path: 
 }
 
 function onSourcePathClick(item: any) {
-  if (item.IsDir) {
-    loadPathOptions(createForm.value.sourceRemote, 'source', item.Path)
-  } else {
+  // Single click selects
+  if (!item.IsDir) {
     createForm.value.sourcePath = item.Path
     showSourcePathInput.value = false
   }
 }
 
-function onTargetPathClick(item: any) {
+function onSourcePathDblClick(item: any) {
+  // Double click navigates into directory
   if (item.IsDir) {
-    loadPathOptions(createForm.value.targetRemote, 'target', item.Path)
-  } else {
+    loadPathOptions(createForm.value.sourceRemote, 'source', item.Path)
+  }
+}
+
+function onTargetPathClick(item: any) {
+  // Single click selects
+  if (!item.IsDir) {
     createForm.value.targetPath = item.Path
     showTargetPathInput.value = false
+  }
+}
+
+function onTargetPathDblClick(item: any) {
+  // Double click navigates into directory
+  if (item.IsDir) {
+    loadPathOptions(createForm.value.targetRemote, 'target', item.Path)
   }
 }
 
@@ -299,7 +311,7 @@ function goBackTarget() {
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onSourcePathClick(item)">
+              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onSourcePathClick(item)" @dblclick="onSourcePathDblClick(item)">
                 {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
               </div>
               <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
@@ -325,7 +337,7 @@ function goBackTarget() {
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onTargetPathClick(item)">
+              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onTargetPathClick(item)" @dblclick="onTargetPathDblClick(item)">
                 {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
               </div>
               <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
