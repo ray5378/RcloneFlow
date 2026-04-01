@@ -95,7 +95,9 @@ function selectProvider(provider: Provider) {
 }
 
 function nextStep() {
-  if (step.value === 1) {
+  if (step.value === 0) {
+    step.value = 1
+  } else if (step.value === 1) {
     step.value = 3
   }
 }
@@ -103,6 +105,8 @@ function nextStep() {
 function prevStep() {
   if (step.value === 3) {
     step.value = 1
+  } else if (step.value === 1) {
+    step.value = 0
   }
 }
 
@@ -276,8 +280,8 @@ defineExpose({ loadConfig: async (name: string) => {
       </details>
 
       <div class="actions" style="margin-top: 16px; justify-content: space-between">
-        <button class="ghost" @click="prevStep">上一步</button>
-        <button @click="nextStep">下一步</button>
+        <button v-if="!editMode" class="ghost" @click="prevStep">上一步</button>
+        <button @click="nextStep">{{ editMode ? '下一步' : '下一步' }}</button>
       </div>
     </div>
 

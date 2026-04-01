@@ -195,16 +195,20 @@ async function openEditRemote(name: string) {
   <!-- Browser Panel -->
   <div v-if="subview === 'explorer'" class="card browser-layout">
     <div class="topbar">
+      <div style="font-size: 18px; font-weight: 600">文件浏览</div>
+    </div>
+    <div class="topbar" style="margin-top: 8px">
       <div class="pathbar">
-        <button
-          v-for="(crumb, i) in breadcrumbs"
-          :key="crumb.path"
-          class="crumb"
-          :class="{ current: i === breadcrumbs.length - 1 }"
-          @click="crumb.path !== browserPath && (browserPath = crumb.path, refreshBrowser())"
-        >
-          {{ crumb.name }}
-        </button>
+        <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
+          <span v-if="i > 0" style="color: #9ca3af"> / </span>
+          <button
+            class="crumb"
+            :class="{ current: i === breadcrumbs.length - 1 }"
+            @click="crumb.path !== browserPath && (browserPath = crumb.path, refreshBrowser())"
+          >
+            {{ crumb.name }}
+          </button>
+        </template>
       </div>
       <div class="actions">
         <button class="ghost small" @click="refreshBrowser">刷新</button>
