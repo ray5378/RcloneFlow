@@ -25,6 +25,55 @@ const descriptions = ref<Record<string, string>>(
   JSON.parse(localStorage.getItem('remoteDescriptions') || '{}')
 )
 
+// Drag and drop for storage order
+const remoteOrder = ref<string[]>(JSON.parse(localStorage.getItem('remoteOrder') || '[]'))
+const draggedRemote = ref('')
+
+function getOrderedRemotes() {
+  const remotesList = remotes.value
+  const order = remoteOrder.value
+  if (!order.length) return remotesList
+  // Return ordered remotes, then any new remotes not in order
+  const ordered = order.filter(r => remotesList.includes(r))
+  const newOnes = remotesList.filter(r => !order.includes(r))
+  return [...ordered, ...newOnes]
+}
+
+function saveRemoteOrder() {
+  remoteOrder.value = remotes.value
+  localStorage.setItem('remoteOrder', JSON.stringify(remoteOrder.value))
+}
+
+function onDragStart(name: string) {
+  draggedRemote.value = name
+}
+
+function onDragOver(e: DragEvent, _name: string) {
+  e.preventDefault()
+}
+
+function onDrop(e: DragEvent, targetName: string) {
+  e.preventDefault()
+  if (draggedRemote.value === targetName) return
+  
+  const list = [...remotes.value]
+  const fromIndex = list.indexOf(draggedRemote.value)
+  const toIndex = list.indexOf(targetName)
+  
+  if (fromIndex !== -1 && toIndex !== -1) {
+    list.splice(fromIndex, 1)
+    list.splice(toIndex, 0, draggedRemote.value)
+    remotes.value = list
+    saveRemoteOrder()
+  }
+  
+  draggedRemote.value = ''
+}
+
+function onDragEnd() {
+  draggedRemote.value = ''
+}
+
 const showAddRemote = ref(false)
 const isEditMode = ref(false)
 const editRemoteName = ref('')
@@ -86,13 +135,6 @@ async function refreshBrowser() {
 function enterItem(item: FileItem) {
   if (!item.IsDir) return
   browserPath.value = item.Path
-  refreshBrowser()
-}
-
-function goParent() {
-  const parts = browserPath.value.split('/').filter(Boolean)
-  parts.pop()
-  browserPath.value = parts.join('/')
   refreshBrowser()
 }
 
@@ -178,14 +220,20 @@ async function openEditRemote(name: string) {
     </div>
     <div class="tile-grid" style="margin-top: 12px">
       <div
-        v-for="name in remotes"
+        v-for="name in getOrderedRemotes()"
         :key="name"
         class="tile"
         :class="{ active: browserFs === name }"
+        draggable="true"
         @click="openRemote(name)"
+        @dragstart="onDragStart(name)"
+        @dragover="onDragOver($event, name)"
+        @drop="onDrop($event, name)"
+        @dragend="onDragEnd"
       >
         <div class="manage-row">
           <strong>{{ name }}</strong>
+          <span style="color: #9ca3af; cursor: grab; font-size: 12px">⋮⋮</span>
         </div>
         <div v-if="descriptions[name]" class="muted" style="margin-top: 6px">
           {{ descriptions[name] }}
@@ -215,13 +263,7 @@ async function openEditRemote(name: string) {
 
     <div v-if="browserError" class="card" style="color: #dc2626">{{ browserError }}</div>
 
-    <div class="list">
-      <div v-if="browserPath" class="item" @click="goParent">
-        <div class="manage-row">
-          <span>..</span>
-          <span class="muted">返回上级</span>
-        </div>
-      </div>
+    <div class="list" style="margin-top: 12px; border-top: 1px solid #e5e7eb; padding-top: 12px">
       <div
         v-for="item in browserItems"
         :key="item.Path"
