@@ -48,6 +48,11 @@ type DB struct {
 	mu sync.Mutex
 }
 
+// NewDB 创建数据库实例
+func NewDB(db *sql.DB) *DB {
+	return &DB{db: db}
+}
+
 func Open(dir string) (*DB, error) {
 	_ = os.MkdirAll(dir, 0o755)
 	path := filepath.Join(dir, "rcloneflow.db")
@@ -359,6 +364,21 @@ func (db *DB) ListRunsByTask(taskID int64) ([]Run, error) {
 	rows, err := db.db.Query(`
 		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
 		FROM runs WHERE task_id = ? ORDER BY id DESC LIMIT 100`, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	return db.scanRuns(rows)
+}
+
+func (db *DB) ListActiveRuns() ([]Run, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	rows, err := db.db.Query(`
+		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
+		FROM runs WHERE status = 'running' ORDER BY id DESC`)
 	if err != nil {
 		return nil, err
 	}

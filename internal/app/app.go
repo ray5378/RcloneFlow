@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"net/http"
 
 	"rcloneflow/internal/config"
@@ -41,8 +40,7 @@ func Run(cfg *config.Config) error {
 	rc := rclone.NewFromEnv()
 
 	// 初始化服务层
-	taskRunner := adapter.NewTaskRunner(rc)
-	taskSvc := service.NewTaskService(db, taskRunner)
+	taskSvc := service.NewTaskService(db, rc)
 	scheduleSvc := service.NewScheduleService(db)
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
 
@@ -58,17 +56,11 @@ func Run(cfg *config.Config) error {
 	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl)
 
 	// 初始化调度器
-	sched := scheduler.New(db, taskRunner)
+	sched := scheduler.New(db, rc)
 	if err := sched.Start(); err != nil {
 		logger.Error("调度器初始化失败", zap.Error(err))
 		return err
 	}
-
-	// 启动任务状态同步服务（定期从rclone job API同步状态到数据库）
-	jobSync := service.NewJobSyncService(db, rc, cfg.GetPoolInterval())
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go jobSync.Start(ctx)
 
 	// 设置路由
 	mux := http.NewServeMux()

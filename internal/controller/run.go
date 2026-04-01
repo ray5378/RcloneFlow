@@ -59,3 +59,36 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 	}
 	WriteJSON(w, 404, map[string]any{"error": "run not found"})
 }
+
+// HandleActiveRuns 处理获取所有运行中的任务及其实时状态
+func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request) {
+	runs, err := c.runSvc.ListActiveRuns()
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+
+	// 同步每个运行中任务的实时状态
+	type ActiveRun struct {
+		RunRecord service.RunRecord `json:"runRecord"`
+		RealTimeStatus map[string]any `json:"realtimeStatus,omitempty"`
+	}
+
+	activeRuns := make([]ActiveRun, 0, len(runs))
+	for _, run := range runs {
+		active := ActiveRun{RunRecord: run}
+
+		// 如果有rcJobID，获取实时状态
+		if run.RcJobID > 0 {
+			st, err := c.rc.JobStatus(r.Context(), run.RcJobID)
+			if err == nil {
+				active.RealTimeStatus = st
+				// 更新数据库状态
+				c.runSvc.UpdateRunStatus(run.ID, st)
+			}
+		}
+		activeRuns = append(activeRuns, active)
+	}
+
+	WriteJSON(w, 200, activeRuns)
+}

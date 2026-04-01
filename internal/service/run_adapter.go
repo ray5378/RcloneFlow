@@ -43,6 +43,33 @@ func (a *storeRunAdapter) ListRuns() ([]RunRecord, error) {
 	return result, nil
 }
 
+// ListActiveRuns 获取所有运行中的任务
+func (a *storeRunAdapter) ListActiveRuns() ([]RunRecord, error) {
+	runs, err := a.db.ListActiveRuns()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]RunRecord, len(runs))
+	for i, r := range runs {
+		summaryStr := ""
+		if r.Summary != nil {
+			bs, _ := json.Marshal(r.Summary)
+			summaryStr = string(bs)
+		}
+		result[i] = RunRecord{
+			ID:         r.ID,
+			TaskID:     r.TaskID,
+			RcJobID:    r.RcJobID,
+			Status:     r.Status,
+			Trigger:    r.Trigger,
+			StartedAt:  r.CreatedAt.Format("2006-01-02T15:04:05Z"),
+			Summary:    summaryStr,
+			Error:      r.Error,
+		}
+	}
+	return result, nil
+}
+
 // UpdateRun 更新运行记录
 func (a *storeRunAdapter) UpdateRun(id int64, updateFn func(*RunRecord)) {
 	a.db.UpdateRun(id, func(r *store.Run) {

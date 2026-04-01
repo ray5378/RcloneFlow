@@ -35,7 +35,9 @@ export {
   getRun,
   clearRun,
   getJobStatus,
+  getActiveRuns,
 } from './run'
+export type { ActiveRun } from './run'
 
 // 兼容性别名
 export const listRuns = getRuns

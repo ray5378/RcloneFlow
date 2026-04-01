@@ -35,3 +35,36 @@ export async function clearRun(runId: number): Promise<void> {
 export async function getJobStatus(jobId: number): Promise<Record<string, unknown>> {
   return api<Record<string, unknown>>(`/fs/jobStatus?jobId=${jobId}`)
 }
+
+/** 获取所有运行中的任务及其实时状态 */
+export async function getActiveRuns(): Promise<ActiveRun[]> {
+  return api<ActiveRun[]>('/runs/active')
+}
+
+/** 运行中任务的实时状态 */
+export interface ActiveRun {
+  runRecord: {
+    id: number
+    taskId: number
+    rcJobId: number
+    status: string
+    trigger: string
+    startedAt: string
+    summary: string
+    error: string
+  }
+  realtimeStatus?: {
+    id: number
+    status: string
+    success?: boolean
+    error?: string
+    finished?: boolean
+    // 进度信息
+    bytes?: number
+    size?: number
+    speed?: number
+    speedAvg?: number
+    eta?: number
+    percentage?: number
+  }
+}

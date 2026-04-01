@@ -66,6 +66,7 @@ func (r *Router) Setup(mux *http.ServeMux) {
 
 	// 运行记录
 	mux.HandleFunc("/api/runs", r.runCtrl.HandleRuns)
+	mux.HandleFunc("/api/runs/active", r.runCtrl.HandleActiveRuns)
 	mux.HandleFunc("/api/runs/", r.runCtrl.HandleRunStatus)
 
 	// 静态文件
