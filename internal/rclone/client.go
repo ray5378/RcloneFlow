@@ -1,322 +1,200 @@
 package rclone
 
 import (
-    "bytes"
-    "context"
-    "encoding/json"
-    "fmt"
-    "io"
-    "net/http"
-    "os"
-    "strings"
-    "time"
+	"context"
+	"strings"
+
+	"rcloneflow/internal/adapter"
 )
 
+// Client rclone API客户端
 type Client struct {
-    BaseURL string
-    User    string
-    Pass    string
-    Client  *http.Client
+	cli *adapter.RcloneClient
 }
 
+// NewFromEnv 创建客户端（从环境变量读取配置）
 func NewFromEnv() *Client {
-    base := os.Getenv("RCLONE_RC_URL")
-    if base == "" {
-        base = "http://127.0.0.1:5572"
-    }
-    timeout := 120 * time.Second
-    if v := strings.TrimSpace(os.Getenv("RCLONE_RC_TIMEOUT")); v != "" {
-        if d, err := time.ParseDuration(v); err == nil && d > 0 {
-            timeout = d
-        }
-    }
-    return &Client{
-        BaseURL: strings.TrimRight(base, "/"),
-        User:    os.Getenv("RCLONE_RC_USER"),
-        Pass:    os.Getenv("RCLONE_RC_PASS"),
-        Client:  &http.Client{Timeout: timeout},
-    }
+	return &Client{
+		cli: adapter.NewRcloneClient(nil),
+	}
 }
 
-func (c *Client) Call(ctx context.Context, endpoint string, req any, out any) error {
-    if req == nil {
-        req = map[string]any{}
-    }
-    bs, err := json.Marshal(req)
-    if err != nil {
-        return err
-    }
-    httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/"+strings.TrimLeft(endpoint, "/"), bytes.NewReader(bs))
-    if err != nil {
-        return err
-    }
-    httpReq.Header.Set("Content-Type", "application/json")
-    if c.User != "" || c.Pass != "" {
-        httpReq.SetBasicAuth(c.User, c.Pass)
-    }
-    resp, err := c.Client.Do(httpReq)
-    if err != nil {
-        return err
-    }
-    defer resp.Body.Close()
-    body, _ := io.ReadAll(resp.Body)
-    if resp.StatusCode >= 300 {
-        return fmt.Errorf("rclone rc %s failed: %s", endpoint, strings.TrimSpace(string(body)))
-    }
-    if out != nil {
-        if len(body) == 0 {
-            return nil
-        }
-        return json.Unmarshal(body, out)
-    }
-    return nil
+// NewWithConfig 使用指定配置创建客户端
+func NewWithConfig(cfg *adapter.RcloneConfig) *Client {
+	return &Client{
+		cli: adapter.NewRcloneClient(cfg),
+	}
 }
 
-func (c *Client) Version(ctx context.Context) (string, error) {
-    var out map[string]any
-    if err := c.Call(ctx, "core/version", nil, &out); err != nil {
-        return "", err
-    }
-    if v, ok := out["version"].(string); ok {
-        return v, nil
-    }
-    return "unknown", nil
-}
-
-func (c *Client) ListRemotes(ctx context.Context) ([]string, error) {
-    var out struct {
-        Remotes []string `json:"remotes"`
-    }
-    if err := c.Call(ctx, "config/listremotes", nil, &out); err != nil {
-        return nil, err
-    }
-    return out.Remotes, nil
-}
-
-func (c *Client) CreateRemote(ctx context.Context, name, typ string, params map[string]any) error {
-    // 过滤可能导致问题的参数
-    cleanParams := map[string]any{}
-    for k, v := range params {
-        // 跳过空数组和空字符串
-        if v == nil { continue }
-        if s, ok := v.(string); ok && s == "" { continue }
-        if arr, ok := v.([]any); ok && len(arr) == 0 { continue }
-        
-        // encoding 字段使用 API 返回的正确值
-        if k == "encoding" {
-            if s, ok := v.(string); ok && s != "" {
-                cleanParams[k] = s
-            } else {
-                cleanParams[k] = "Slash,LtGt,DoubleQuote,Colon,Question,Asterisk,Pipe,BackSlash,Ctl,RightSpace,RightPeriod,InvalidUtf8,Dot"
-            }
-            continue
-        }
-        
-        // headers 字段不传
-        if k == "headers" { continue }
-        
-        cleanParams[k] = v
-    }
-    
-    req := map[string]any{"name": name, "type": typ, "parameters": cleanParams, "opt": map[string]any{"obscure": false, "noOutput": false}}
-    return c.Call(ctx, "config/create", req, nil)
-}
-
+// ListPath 列出路径
 func (c *Client) ListPath(ctx context.Context, fs, remote string) ([]map[string]any, error) {
-    var out struct {
-        List []map[string]any `json:"list"`
-    }
-    if err := c.Call(ctx, "operations/list", map[string]any{"fs": fs, "remote": strings.TrimPrefix(remote, "/")}, &out); err != nil {
-        return nil, err
-    }
-    return out.List, nil
+	items, err := c.cli.ListPath(ctx, fs, remote)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]map[string]any, len(items))
+	for i, item := range items {
+		result[i] = map[string]any{
+			"Name":    item.Name,
+			"Path":    item.Path,
+			"IsDir":   item.IsDir,
+			"MimeType": item.MimeType,
+			"ModTime": item.ModTime,
+			"Size":    item.Size,
+		}
+	}
+	return result, nil
 }
 
-func (c *Client) StartJob(ctx context.Context, mode, srcFs, dstFs string) (int64, error) {
-    ep := "sync/copy"
-    if strings.ToLower(mode) == "sync" {
-        ep = "sync/sync"
-    }
-    var out struct {
-        JobID int64 `json:"jobid"`
-    }
-    err := c.Call(ctx, ep, map[string]any{"srcFs": srcFs, "dstFs": dstFs, "_async": true}, &out)
-    return out.JobID, err
+// Version 获取版本
+func (c *Client) Version(ctx context.Context) (string, error) {
+	v, err := c.cli.Version(ctx)
+	if err != nil {
+		return "", err
+	}
+	return v.Version, nil
 }
 
-func (c *Client) JobStatus(ctx context.Context, jobID int64) (map[string]any, error) {
-    var out map[string]any
-    err := c.Call(ctx, "job/status", map[string]any{"jobid": jobID}, &out)
-    return out, err
+// ListRemotes 获取远程存储列表
+func (c *Client) ListRemotes(ctx context.Context) ([]string, error) {
+	return c.cli.ListRemotes(ctx)
 }
 
-// GetProviders 获取所有支持的存储类型及其配置选项
-func (c *Client) GetProviders(ctx context.Context) ([]map[string]any, error) {
-    var out struct {
-        Providers []map[string]any `json:"providers"`
-    }
-    if err := c.Call(ctx, "config/providers", nil, &out); err != nil {
-        return nil, err
-    }
-    return out.Providers, nil
+// CreateRemote 创建远程存储
+func (c *Client) CreateRemote(ctx context.Context, name, typ string, params map[string]any) error {
+	return c.cli.CreateRemote(ctx, &adapter.CreateRemoteRequest{
+		Name:       name,
+		Type:       typ,
+		Parameters: params,
+	})
 }
 
-// DumpConfig 获取所有存储配置
-func (c *Client) DumpConfig(ctx context.Context) (map[string]map[string]any, error) {
-    var out map[string]map[string]any
-    if err := c.Call(ctx, "config/dump", nil, &out); err != nil {
-        return nil, err
-    }
-    return out, nil
-}
-
-// GetConfig 获取单个存储配置
+// GetConfig 获取配置
 func (c *Client) GetConfig(ctx context.Context, name string) (map[string]any, error) {
-    var out map[string]any
-    if err := c.Call(ctx, "config/get", map[string]any{"name": name}, &out); err != nil {
-        return nil, err
-    }
-    return out, nil
+	return c.cli.GetConfig(ctx, name)
 }
 
-// DeleteRemote 删除存储
+// DeleteRemote 删除远程存储
 func (c *Client) DeleteRemote(ctx context.Context, name string) error {
-    return c.Call(ctx, "config/delete", map[string]any{"name": name}, nil)
+	return c.cli.DeleteRemote(ctx, name)
 }
 
-// GetUsage 获取存储使用量
+// DumpConfig 导出配置
+func (c *Client) DumpConfig(ctx context.Context) (map[string]map[string]any, error) {
+	return c.cli.DumpConfig(ctx)
+}
+
+// GetProviders 获取提供商
+func (c *Client) GetProviders(ctx context.Context) ([]map[string]any, error) {
+	providers, err := c.cli.GetProviders(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]map[string]any, len(providers))
+	for i, p := range providers {
+		result[i] = map[string]any{
+			"Name":      p.Name,
+			"Hangul":    p.Hangul,
+			"Prefix":    p.Prefix,
+			"OpenURL":   p.OpenURL,
+			"HashTypes": p.HashTypes,
+			"Options":   p.Options,
+		}
+	}
+	return result, nil
+}
+
+// GetUsage 获取使用量
 func (c *Client) GetUsage(ctx context.Context, fs string) (map[string]any, error) {
-    var out map[string]any
-    if err := c.Call(ctx, "operations/about", map[string]any{"fs": fs}, &out); err != nil {
-        return nil, err
-    }
-    return out, nil
+	about, err := c.cli.GetUsage(ctx, fs)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"used":  about.Used,
+		"free":  about.Free,
+		"total": about.Used + about.Free,
+	}, nil
 }
 
 // GetFsInfo 获取文件系统信息
 func (c *Client) GetFsInfo(ctx context.Context, fs string) (map[string]any, error) {
-    var out map[string]any
-    if err := c.Call(ctx, "operations/fsinfo", map[string]any{"fs": fs}, &out); err != nil {
-        return nil, err
-    }
-    return out, nil
+	info, err := c.cli.GetFsInfo(ctx, fs)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]any{
+		"name":      info.Name,
+		"precision": info.Precision,
+		"root":      info.Root,
+	}
+	if info.Features != nil {
+		result["features"] = info.Features
+	}
+	return result, nil
 }
 
 // Mkdir 创建目录
 func (c *Client) Mkdir(ctx context.Context, fs, remote string) error {
-    return c.Call(ctx, "operations/mkdir", map[string]any{"fs": fs, "remote": remote}, nil)
+	return c.cli.Mkdir(ctx, fs, remote)
 }
 
 // DeleteFile 删除文件
-func (c *Client) DeleteFile(ctx context.Context, srcFs, srcRemote string) error {
-    return c.Call(ctx, "operations/deletefile", map[string]any{"fs": srcFs, "remote": srcRemote}, nil)
+func (c *Client) DeleteFile(ctx context.Context, fs, remote string) error {
+	return c.cli.DeleteFile(ctx, fs, remote)
 }
 
 // Purge 删除目录
 func (c *Client) Purge(ctx context.Context, fs, remote string) error {
-    return c.Call(ctx, "operations/purge", map[string]any{"fs": fs, "remote": remote}, nil)
+	return c.cli.Purge(ctx, fs, remote)
 }
 
-// MoveFile 移动/重命名文件
+// MoveFile 移动文件
 func (c *Client) MoveFile(ctx context.Context, srcFs, srcRemote, dstFs, dstRemote string) error {
-    return c.Call(ctx, "operations/movefile", map[string]any{
-        "srcFs": srcFs, "srcRemote": srcRemote,
-        "dstFs": dstFs, "dstRemote": dstRemote,
-    }, nil)
+	return c.cli.MoveFile(ctx, srcFs, srcRemote, dstFs, dstRemote)
 }
 
-// CopyFile 复制文件 (使用 async 模式避免超时)
+// CopyFile 复制文件
 func (c *Client) CopyFile(ctx context.Context, srcFs, srcRemote, dstFs, dstRemote string) error {
-    var result struct {
-        JobID int64 `json:"jobid"`
-    }
-    // 使用 _async 模式避免超时
-    if err := c.Call(ctx, "operations/copyfile", map[string]any{
-        "srcFs": srcFs, "srcRemote": srcRemote,
-        "dstFs": dstFs, "dstRemote": dstRemote,
-        "_async": true,
-    }, &result); err != nil {
-        return err
-    }
-    // 等待 job 完成
-    return c.waitForJob(ctx, result.JobID)
+	return c.cli.CopyFile(ctx, srcFs, srcRemote, dstFs, dstRemote)
 }
 
-// waitForJob 等待异步任务完成
-func (c *Client) waitForJob(ctx context.Context, jobID int64) error {
-    for {
-        var status struct {
-            Finished bool   `json:"finished"`
-            Success  bool   `json:"success"`
-            Error    string `json:"error"`
-        }
-        if err := c.Call(ctx, "job/status", map[string]any{"jobid": jobID}, &status); err != nil {
-            return err
-        }
-        if status.Finished {
-            if !status.Success && status.Error != "" {
-                return fmt.Errorf("job failed: %s", status.Error)
-            }
-            return nil
-        }
-        // 等待 1 秒
-        time.Sleep(time.Second)
-    }
-}
-
-// CopyDir 复制目录 (使用 sync/copy)
+// CopyDir 复制目录
 func (c *Client) CopyDir(ctx context.Context, srcFs, dstFs string) error {
-    return c.Call(ctx, "sync/copy", map[string]any{
-        "srcFs": srcFs, "dstFs": dstFs, "createEmptySrcDirs": true,
-    }, nil)
+	return c.cli.CopyDir(ctx, srcFs, dstFs)
 }
 
-// MoveDir 移动目录 (使用 sync/move)
+// MoveDir 移动目录
 func (c *Client) MoveDir(ctx context.Context, srcFs, dstFs string) error {
-    return c.Call(ctx, "sync/move", map[string]any{
-        "srcFs": srcFs, "dstFs": dstFs, "createEmptySrcDirs": true, "deleteEmptySrcDirs": true,
-    }, nil)
+	return c.cli.MoveDir(ctx, srcFs, dstFs)
 }
 
 // PublicLink 生成分享链接
 func (c *Client) PublicLink(ctx context.Context, fs, remote string) (string, error) {
-    var out struct {
-        URL string `json:"url"`
-    }
-    if err := c.Call(ctx, "operations/publiclink", map[string]any{"fs": fs, "remote": remote}, &out); err != nil {
-        return "", err
-    }
-    return out.URL, nil
+	return c.cli.PublicLink(ctx, fs, remote)
 }
 
-// RunTask 运行任务并返回JobID
+// StartJob 启动任务
+func (c *Client) StartJob(ctx context.Context, mode, srcFs, dstFs string) (int64, error) {
+	return c.cli.StartJob(ctx, mode, srcFs, dstFs)
+}
+
+// JobStatus 获取任务状态
+func (c *Client) JobStatus(ctx context.Context, jobID int64) (map[string]any, error) {
+	status, err := c.cli.JobStatus(ctx, jobID)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"finished": status.Finished,
+		"success": status.Success,
+		"error":   status.Error,
+	}, nil
+}
+
+// RunTask 运行任务
 func (c *Client) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string) (int64, error) {
-    src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
-    dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
-
-    ep := "sync/copy"
-    if strings.ToLower(mode) == "sync" {
-        ep = "sync/sync"
-    } else if strings.ToLower(mode) == "move" {
-        ep = "sync/move"
-    }
-
-    var out struct {
-        JobID int64 `json:"jobid"`
-    }
-    req := map[string]any{
-        "srcFs": src,
-        "dstFs": dst,
-    }
-    // sync 操作使用 createEmptySrcDirs
-    if strings.HasPrefix(ep, "sync/") {
-        req["createEmptySrcDirs"] = true
-        if ep == "sync/move" {
-            req["deleteEmptySrcDirs"] = true
-        }
-    }
-    req["_async"] = true
-
-    err := c.Call(ctx, ep, req, &out)
-    return out.JobID, err
+	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
+	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
+	return c.cli.StartJob(ctx, mode, src, dst)
 }
