@@ -176,6 +176,18 @@ function openTargetDir(item: any) {
   }
 }
 
+function selectSourceDir(item: any) {
+  // 单击选中文件夹（填充路径但不进入）
+  createForm.value.sourcePath = item.Path
+  showSourcePathInput.value = false
+}
+
+function selectTargetDir(item: any) {
+  // 单击选中文件夹（填充路径但不进入）
+  createForm.value.targetPath = item.Path
+  showTargetPathInput.value = false
+}
+
 function selectSourceFile(item: any) {
   if (!item.IsDir) {
     createForm.value.sourcePath = item.Path
@@ -309,10 +321,10 @@ function goBackTarget() {
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }">
-                <span v-if="item.IsDir" class="dir-arrow" @click="openSourceDir(item)">▶</span>
+              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="item.IsDir ? selectSourceDir(item) : selectSourceFile(item)" @dblclick="item.IsDir && openSourceDir(item)">
+                <span v-if="item.IsDir" class="dir-arrow" @click.stop="openSourceDir(item)">▶</span>
                 <span v-else class="file-icon">📄</span>
-                <span class="item-name" @click="selectSourceFile(item)">{{ item.Name }}</span>
+                <span class="item-name">{{ item.Name }}</span>
               </div>
               <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
             </div>
@@ -337,10 +349,10 @@ function goBackTarget() {
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }">
-                <span v-if="item.IsDir" class="dir-arrow" @click="openTargetDir(item)">▶</span>
+              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="item.IsDir ? selectTargetDir(item) : selectTargetFile(item)" @dblclick="item.IsDir && openTargetDir(item)">
+                <span v-if="item.IsDir" class="dir-arrow" @click.stop="openTargetDir(item)">▶</span>
                 <span v-else class="file-icon">📄</span>
-                <span class="item-name" @click="selectTargetFile(item)">{{ item.Name }}</span>
+                <span class="item-name">{{ item.Name }}</span>
               </div>
               <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
             </div>
@@ -446,7 +458,7 @@ body.light .path-bar { background: #f5f5f5; border-color: #ddd; }
 body.light .path-item { color: #333; }
 .path-item:hover { background: #333; }
 body.light .path-item:hover { background: #f0f0f0; }
-.dir-arrow { color: #64b5f6; font-size: 14px; cursor: pointer; padding: 4px 8px; background: #333; border-radius: 4px; }
+.dir-arrow { color: #64b5f6; font-size: 10px; cursor: pointer; padding: 2px 4px; background: #333; border-radius: 3px; margin-right: 4px; }
 .dir-arrow:hover { color: #90caf9; background: #444; }
 .file-icon { font-size: 12px; }
 .item-name { flex: 1; }
@@ -471,4 +483,4 @@ body.light .tile:hover { background: #e8e8e8; }
 .tile-name { font-weight: 600; font-size: 14px; color: #fff; }
 body.light .tile-name { color: #1a1a1a; }
 .tile-desc { font-size: 12px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-</style>
+</style>XXX
