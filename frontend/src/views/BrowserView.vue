@@ -46,12 +46,6 @@ const showRenameInput = ref(false)
 const renamingItem = ref<FileItem | null>(null)
 const renameInput = ref('')
 
-// Copy/Move target modal
-const showTargetPicker = ref(false)
-const targetRemote = ref('')
-const targetPath = ref('')
-const pendingAction = ref<'copy' | 'move' | null>(null)
-
 const remoteOrder = ref<string[]>(JSON.parse(localStorage.getItem('remoteOrder') || '[]'))
 const draggedRemote = ref('')
 
@@ -145,8 +139,6 @@ async function loadRemotes() {
 async function openRemote(name: string) {
   browserFs.value = name
   browserPath.value = ''
-  targetRemote.value = name
-  targetPath.value = ''
   await refreshBrowser()
   subview.value = 'explorer'
 }
@@ -214,46 +206,26 @@ async function copyItem() {
 
 async function moveItem() {
   if (!contextMenu.value.item) return
-  // Move (cut-paste): directly move to current directory
-  try {
-    const srcPath = contextMenu.value.item.Path
-    const dstPath = browserPath.value ? browserPath.value + '/' + contextMenu.value.item.Name : contextMenu.value.item.Name
-    await api.moveFile(browserFs.value, srcPath, browserFs.value, dstPath)
-    closeContextMenu()
-    await refreshBrowser()
-  } catch (e) {
-    alert((e as Error).message)
-  }
+  // Move (cut): store item in clipboard, paste will move it
+  clipboardItem.value = contextMenu.value.item
+  clipboardAction.value = 'move'
+  closeContextMenu()
 }
 
-function pasteItem() {
+async function pasteItem() {
   if (!clipboardItem.value || !clipboardAction.value) return
-  if (clipboardAction.value === 'copy') {
-    pendingAction.value = 'copy'
-  } else {
-    pendingAction.value = 'move'
-  }
-  targetRemote.value = browserFs.value
-  targetPath.value = browserPath.value
-  showTargetPicker.value = true
-}
-
-async function executePaste() {
-  if (!clipboardItem.value || !pendingAction.value) return
   try {
     const srcPath = clipboardItem.value.Path
-    const dstPath = targetPath.value ? targetPath.value + '/' + clipboardItem.value.Name : clipboardItem.value.Name
+    const dstPath = browserPath.value ? browserPath.value + '/' + clipboardItem.value.Name : clipboardItem.value.Name
     
-    if (pendingAction.value === 'copy') {
-      await api.copyFile(browserFs.value, srcPath, targetRemote.value, dstPath)
-    } else if (pendingAction.value === 'move') {
-      await api.moveFile(browserFs.value, srcPath, targetRemote.value, dstPath)
+    if (clipboardAction.value === 'copy') {
+      await api.copyFile(browserFs.value, srcPath, browserFs.value, dstPath)
+    } else if (clipboardAction.value === 'move') {
+      await api.moveFile(browserFs.value, srcPath, browserFs.value, dstPath)
     }
     
-    showTargetPicker.value = false
     clipboardItem.value = null
     clipboardAction.value = null
-    pendingAction.value = null
     await refreshBrowser()
   } catch (e) {
     alert((e as Error).message)
@@ -499,32 +471,6 @@ async function openEditRemote(name: string) {
       <div class="modal-footer">
         <button class="ghost" @click="showRenameInput = false">取消</button>
         <button class="primary" @click="confirmRename">确定</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Target Picker Modal (Copy/Move) -->
-  <div v-if="showTargetPicker" class="modal-overlay" @click.self="showTargetPicker = false">
-    <div class="modal">
-      <div class="modal-header">
-        <h2>{{ pendingAction === 'copy' ? '复制到' : '移动到' }}</h2>
-        <button class="modal-close" @click="showTargetPicker = false">&times;</button>
-      </div>
-      <div class="modal-content">
-        <div class="field-item">
-          <label>目标存储</label>
-          <select v-model="targetRemote">
-            <option v-for="r in remotes" :key="r" :value="r">{{ r }}</option>
-          </select>
-        </div>
-        <div class="field-item">
-          <label>目标路径</label>
-          <input v-model="targetPath" placeholder="留空表示根目录" />
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="ghost" @click="showTargetPicker = false">取消</button>
-        <button class="primary" @click="executePaste">确定</button>
       </div>
     </div>
   </div>
