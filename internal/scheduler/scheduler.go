@@ -33,7 +33,11 @@ func parseSpec(spec string) (time.Duration, bool) {
 }
 
 func (s *Scheduler) Start() error {
-    for _, item := range s.db.ListSchedules() {
+    schedules, err := s.db.ListSchedules()
+    if err != nil {
+        return err
+    }
+    for _, item := range schedules {
         if !item.Enabled {
             continue
         }

@@ -156,7 +156,9 @@ func (s *Server) handleBrowser(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
     switch r.Method {
     case http.MethodGet:
-        writeJSON(w, 200, s.db.ListTasks())
+        tasks, err := s.db.ListTasks()
+        if err != nil { writeJSON(w, 500, map[string]any{"error": err.Error()}); return }
+        writeJSON(w, 200, tasks)
     case http.MethodPost:
         var req store.Task
         if err := decode(r, &req); err != nil { writeJSON(w, 400, map[string]any{"error": err.Error()}); return }
@@ -174,9 +176,11 @@ func (s *Server) RunTask(ctx context.Context, taskID int64, trigger string) erro
     src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
     dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
     jobID, err := s.rc.StartJob(ctx, t.Mode, src, dst)
-    run, _ := s.db.AddRun(store.Run{TaskID: taskID, RcJobID: jobID, Status: "running", Trigger: trigger})
+    run, err := s.db.AddRun(store.Run{TaskID: taskID, RcJobID: jobID, Status: "running", Trigger: trigger})
     if err != nil {
-        _ = s.db.UpdateRun(run.ID, func(r *store.Run) { r.Status = "failed"; r.Error = err.Error() })
+        if run.ID > 0 {
+            _ = s.db.UpdateRun(run.ID, func(r *store.Run) { r.Status = "failed"; r.Error = err.Error() })
+        }
         return err
     }
     return nil
@@ -196,7 +200,9 @@ func (s *Server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleSchedules(w http.ResponseWriter, r *http.Request) {
     switch r.Method {
     case http.MethodGet:
-        writeJSON(w, 200, s.db.ListSchedules())
+        schedules, err := s.db.ListSchedules()
+        if err != nil { writeJSON(w, 500, map[string]any{"error": err.Error()}); return }
+        writeJSON(w, 200, schedules)
     case http.MethodPost:
         var req store.Schedule
         if err := decode(r, &req); err != nil { writeJSON(w, 400, map[string]any{"error": err.Error()}); return }
@@ -209,12 +215,16 @@ func (s *Server) handleSchedules(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRuns(w http.ResponseWriter, r *http.Request) {
-    writeJSON(w, 200, s.db.ListRuns())
+    runs, err := s.db.ListRuns()
+    if err != nil { writeJSON(w, 500, map[string]any{"error": err.Error()}); return }
+    writeJSON(w, 200, runs)
 }
 
 func (s *Server) handleRunStatus(w http.ResponseWriter, r *http.Request) {
     id, _ := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/api/runs/"), 10, 64)
-    for _, run := range s.db.ListRuns() {
+    runs, err := s.db.ListRuns()
+    if err != nil { writeJSON(w, 500, map[string]any{"error": err.Error()}); return }
+    for _, run := range runs {
         if run.ID != id { continue }
         if run.RcJobID > 0 {
             st, err := s.rc.JobStatus(r.Context(), run.RcJobID)

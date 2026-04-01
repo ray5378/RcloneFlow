@@ -1,113 +1,379 @@
 package store
 
 import (
-    "encoding/json"
-    "os"
-    "path/filepath"
-    "sync"
-    "time"
+	"database/sql"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Task struct {
-    ID           int64     `json:"id"`
-    Name         string    `json:"name"`
-    Mode         string    `json:"mode"`
-    SourceRemote string    `json:"sourceRemote"`
-    SourcePath   string    `json:"sourcePath"`
-    TargetRemote string    `json:"targetRemote"`
-    TargetPath   string    `json:"targetPath"`
-    CreatedAt    time.Time `json:"createdAt"`
+	ID           int64     `json:"id"`
+	Name         string    `json:"name"`
+	Mode         string    `json:"mode"`
+	SourceRemote string    `json:"sourceRemote"`
+	SourcePath   string    `json:"sourcePath"`
+	TargetRemote string    `json:"targetRemote"`
+	TargetPath   string    `json:"targetPath"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 type Schedule struct {
-    ID        int64     `json:"id"`
-    TaskID    int64     `json:"taskId"`
-    Spec      string    `json:"spec"`
-    Enabled   bool      `json:"enabled"`
-    CreatedAt time.Time `json:"createdAt"`
+	ID        int64     `json:"id"`
+	TaskID    int64     `json:"taskId"`
+	Spec      string    `json:"spec"`
+	Enabled   bool      `json:"enabled"`
+	CreatedAt time.Time `json:"createdAt"`
 }
 
 type Run struct {
-    ID        int64                  `json:"id"`
-    TaskID     int64                 `json:"taskId"`
-    RcJobID   int64                  `json:"rcJobId"`
-    Status    string                 `json:"status"`
-    Trigger   string                 `json:"trigger"`
-    Summary   map[string]any         `json:"summary,omitempty"`
-    Error     string                 `json:"error,omitempty"`
-    CreatedAt time.Time              `json:"createdAt"`
-    UpdatedAt time.Time              `json:"updatedAt"`
+	ID        int64             `json:"id"`
+	TaskID    int64             `json:"taskId"`
+	RcJobID   int64             `json:"rcJobId"`
+	Status    string            `json:"status"`
+	Trigger   string            `json:"trigger"`
+	Summary   map[string]any   `json:"summary,omitempty"`
+	Error     string            `json:"error,omitempty"`
+	CreatedAt time.Time        `json:"createdAt"`
+	UpdatedAt time.Time        `json:"updatedAt"`
 }
 
 type DB struct {
-    mu        sync.Mutex
-    dir       string
-    Tasks     []Task     `json:"tasks"`
-    Schedules []Schedule `json:"schedules"`
-    Runs      []Run      `json:"runs"`
-    NextTaskID int64     `json:"nextTaskId"`
-    NextScheduleID int64 `json:"nextScheduleId"`
-    NextRunID int64      `json:"nextRunId"`
+	db *sql.DB
+	mu sync.Mutex
 }
 
 func Open(dir string) (*DB, error) {
-    _ = os.MkdirAll(dir, 0o755)
-    db := &DB{dir: dir, NextTaskID: 1, NextScheduleID: 1, NextRunID: 1}
-    path := filepath.Join(dir, "app.json")
-    bs, err := os.ReadFile(path)
-    if err == nil && len(bs) > 0 {
-        if err := json.Unmarshal(bs, db); err != nil {
-            return nil, err
-        }
-    }
-    return db, nil
+	_ = os.MkdirAll(dir, 0o755)
+	path := filepath.Join(dir, "rcloneflow.db")
+	
+	db, err := sql.Open("sqlite3", path+"?_journal_mode=WAL&_busy_timeout=5000")
+	if err != nil {
+		return nil, fmt.Errorf("open db: %w", err)
+	}
+	
+	// Enable foreign keys
+	_, err = db.Exec("PRAGMA foreign_keys = ON")
+	if err != nil {
+		return nil, fmt.Errorf("enable foreign keys: %w", err)
+	}
+	
+	s := &DB{db: db}
+	if err := s.migrate(); err != nil {
+		return nil, fmt.Errorf("migrate: %w", err)
+	}
+	
+	return s, nil
 }
 
-func (db *DB) saveLocked() error {
-    bs, err := json.MarshalIndent(db, "", "  ")
-    if err != nil { return err }
-    return os.WriteFile(filepath.Join(db.dir, "app.json"), bs, 0o644)
+func (db *DB) migrate() error {
+	schema := `
+	CREATE TABLE IF NOT EXISTS tasks (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		mode TEXT NOT NULL,
+		source_remote TEXT NOT NULL,
+		source_path TEXT NOT NULL,
+		target_remote TEXT NOT NULL,
+		target_path TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+	
+	CREATE TABLE IF NOT EXISTS schedules (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		task_id INTEGER NOT NULL,
+		spec TEXT NOT NULL,
+		enabled BOOLEAN DEFAULT 1,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+	);
+	
+	CREATE TABLE IF NOT EXISTS runs (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		task_id INTEGER NOT NULL,
+		rc_job_id INTEGER DEFAULT 0,
+		status TEXT NOT NULL,
+		trigger TEXT NOT NULL,
+		summary TEXT DEFAULT '{}',
+		error TEXT DEFAULT '',
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+	);
+	
+	CREATE INDEX IF NOT EXISTS idx_runs_task_id ON runs(task_id);
+	CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at);
+	CREATE INDEX IF NOT EXISTS idx_schedules_task_id ON schedules(task_id);
+	`
+	_, err := db.db.Exec(schema)
+	return err
 }
 
-func (db *DB) ListTasks() []Task { db.mu.Lock(); defer db.mu.Unlock(); out := append([]Task(nil), db.Tasks...); return out }
-func (db *DB) ListSchedules() []Schedule { db.mu.Lock(); defer db.mu.Unlock(); out := append([]Schedule(nil), db.Schedules...); return out }
-func (db *DB) ListRuns() []Run { db.mu.Lock(); defer db.mu.Unlock(); out := append([]Run(nil), db.Runs...); return out }
+func (db *DB) Close() error {
+	return db.db.Close()
+}
+
+// ===== Tasks =====
+
+func (db *DB) ListTasks() ([]Task, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	rows, err := db.db.Query(`
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, created_at 
+		FROM tasks ORDER BY id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var tasks []Task
+	for rows.Next() {
+		var t Task
+		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, t)
+	}
+	return tasks, nil
+}
 
 func (db *DB) AddTask(t Task) (Task, error) {
-    db.mu.Lock(); defer db.mu.Unlock()
-    t.ID = db.NextTaskID; db.NextTaskID++; t.CreatedAt = time.Now()
-    db.Tasks = append([]Task{t}, db.Tasks...)
-    return t, db.saveLocked()
-}
-
-func (db *DB) AddSchedule(s Schedule) (Schedule, error) {
-    db.mu.Lock(); defer db.mu.Unlock()
-    s.ID = db.NextScheduleID; db.NextScheduleID++; s.CreatedAt = time.Now()
-    db.Schedules = append([]Schedule{s}, db.Schedules...)
-    return s, db.saveLocked()
-}
-
-func (db *DB) AddRun(r Run) (Run, error) {
-    db.mu.Lock(); defer db.mu.Unlock()
-    r.ID = db.NextRunID; db.NextRunID++; now := time.Now(); r.CreatedAt = now; r.UpdatedAt = now
-    db.Runs = append([]Run{r}, db.Runs...)
-    return r, db.saveLocked()
-}
-
-func (db *DB) UpdateRun(id int64, fn func(*Run)) error {
-    db.mu.Lock(); defer db.mu.Unlock()
-    for i := range db.Runs {
-        if db.Runs[i].ID == id {
-            fn(&db.Runs[i])
-            db.Runs[i].UpdatedAt = time.Now()
-            return db.saveLocked()
-        }
-    }
-    return nil
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	result, err := db.db.Exec(`
+		INSERT INTO tasks (name, mode, source_remote, source_path, target_remote, target_path) 
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+	if err != nil {
+		return Task{}, err
+	}
+	
+	id, err := result.LastInsertId()
+	if err != nil {
+		return Task{}, err
+	}
+	
+	t.ID = id
+	t.CreatedAt = time.Now()
+	return t, nil
 }
 
 func (db *DB) GetTask(id int64) (Task, bool) {
-    db.mu.Lock(); defer db.mu.Unlock()
-    for _, t := range db.Tasks { if t.ID == id { return t, true } }
-    return Task{}, false
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	var t Task
+	err := db.db.QueryRow(`
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, created_at 
+		FROM tasks WHERE id = ?`, id).Scan(
+		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.CreatedAt)
+	if err != nil {
+		return Task{}, false
+	}
+	return t, true
+}
+
+func (db *DB) DeleteTask(id int64) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec("DELETE FROM tasks WHERE id = ?", id)
+	return err
+}
+
+// ===== Schedules =====
+
+func (db *DB) ListSchedules() ([]Schedule, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	rows, err := db.db.Query(`
+		SELECT id, task_id, spec, enabled, created_at 
+		FROM schedules ORDER BY id DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var schedules []Schedule
+	for rows.Next() {
+		var s Schedule
+		err := rows.Scan(&s.ID, &s.TaskID, &s.Spec, &s.Enabled, &s.CreatedAt)
+		if err != nil {
+			return nil, err
+		}
+		schedules = append(schedules, s)
+	}
+	return schedules, nil
+}
+
+func (db *DB) AddSchedule(s Schedule) (Schedule, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	result, err := db.db.Exec(`
+		INSERT INTO schedules (task_id, spec, enabled) VALUES (?, ?, ?)`,
+		s.TaskID, s.Spec, s.Enabled)
+	if err != nil {
+		return Schedule{}, err
+	}
+	
+	id, err := result.LastInsertId()
+	if err != nil {
+		return Schedule{}, err
+	}
+	
+	s.ID = id
+	s.CreatedAt = time.Now()
+	return s, nil
+}
+
+func (db *DB) DeleteSchedule(id int64) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec("DELETE FROM schedules WHERE id = ?", id)
+	return err
+}
+
+func (db *DB) UpdateScheduleEnabled(id int64, enabled bool) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec("UPDATE schedules SET enabled = ? WHERE id = ?", enabled, id)
+	return err
+}
+
+// ===== Runs =====
+
+func (db *DB) ListRuns() ([]Run, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	rows, err := db.db.Query(`
+		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
+		FROM runs ORDER BY id DESC LIMIT 100`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	return db.scanRuns(rows)
+}
+
+func (db *DB) ListRunsByTask(taskID int64) ([]Run, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	rows, err := db.db.Query(`
+		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
+		FROM runs WHERE task_id = ? ORDER BY id DESC LIMIT 100`, taskID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	return db.scanRuns(rows)
+}
+
+func (db *DB) scanRuns(rows *sql.Rows) ([]Run, error) {
+	var runs []Run
+	for rows.Next() {
+		var r Run
+		var summaryJSON string
+		err := rows.Scan(&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal([]byte(summaryJSON), &r.Summary); err != nil {
+			r.Summary = make(map[string]any)
+		}
+		runs = append(runs, r)
+	}
+	return runs, nil
+}
+
+func (db *DB) AddRun(r Run) (Run, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	summaryJSON, err := json.Marshal(r.Summary)
+	if err != nil {
+		summaryJSON = []byte("{}")
+	}
+	
+	result, err := db.db.Exec(`
+		INSERT INTO runs (task_id, rc_job_id, status, trigger, summary, error) 
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		r.TaskID, r.RcJobID, r.Status, r.Trigger, string(summaryJSON), r.Error)
+	if err != nil {
+		return Run{}, err
+	}
+	
+	id, err := result.LastInsertId()
+	if err != nil {
+		return Run{}, err
+	}
+	
+	r.ID = id
+	r.CreatedAt = time.Now()
+	r.UpdatedAt = time.Now()
+	return r, nil
+}
+
+func (db *DB) UpdateRun(id int64, fn func(*Run)) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	// Fetch current
+	var r Run
+	var summaryJSON string
+	err := db.db.QueryRow(`
+		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
+		FROM runs WHERE id = ?`, id).Scan(
+		&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal([]byte(summaryJSON), &r.Summary); err != nil {
+		r.Summary = make(map[string]any)
+	}
+	
+	// Apply update
+	fn(&r)
+	r.UpdatedAt = time.Now()
+	
+	summaryBytes, _ := json.Marshal(r.Summary)
+	
+	_, err = db.db.Exec(`
+		UPDATE runs SET status = ?, summary = ?, error = ?, updated_at = ? WHERE id = ?`,
+		r.Status, string(summaryBytes), r.Error, r.UpdatedAt, id)
+	return err
+}
+
+func (db *DB) GetRun(id int64) (Run, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	var r Run
+	var summaryJSON string
+	err := db.db.QueryRow(`
+		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
+		FROM runs WHERE id = ?`, id).Scan(
+		&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt)
+	if err != nil {
+		return Run{}, err
+	}
+	if err := json.Unmarshal([]byte(summaryJSON), &r.Summary); err != nil {
+		r.Summary = make(map[string]any)
+	}
+	return r, nil
 }
