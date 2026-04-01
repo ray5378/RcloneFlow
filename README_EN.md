@@ -1,27 +1,29 @@
 # RcloneFlow
 
-A powerful web-based Rclone management interface for multi-storage copy/sync/move task management.
+A web-based Rclone management interface for multi-storage copy/sync/move task management.
 
-[中文文档](README_ZH.md)
+[中文](README.md)
 
 ## Features
 
-- **Multi-Storage Management** - Add, edit, and manage multiple Rclone remotes
-- **File Browser** - Browse and navigate remote storage files
-- **Task Management** - Create and manage copy/sync tasks between remotes
-- **Scheduled Tasks** - Set up automated sync with cron-like scheduling
-- **Run History** - Track task execution history and status
+- **Multi-storage Management** - Add, edit and manage multiple Rclone remotes
+- **File Browser** - Browse and navigate remote storage files with clipboard operations
+- **Task Management** - Create and manage copy/sync/move tasks between storages
+- **Scheduled Tasks** - Automate sync with cron-style scheduling
+- **Run History** - Track task execution history and real-time status
+- **Real-time Status Sync** - Background sync with rclone job API
 - **Modern UI** - Clean, responsive web interface
+- **Unified Error Handling** - Toast notifications, friendly error messages
 
 ## Requirements
 
 - Go 1.22+
-- Rclone (with RC mode enabled)
+- Rclone (RC mode enabled)
 - Git
 
 ## Quick Start
 
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/ray5378/RcloneFlow.git
@@ -30,7 +32,7 @@ cd RcloneFlow
 
 ### 2. Configure Rclone
 
-Make sure Rclone is installed and configured with your remotes. You can configure it at `~/.config/rclone/rclone.conf` or set the `RCLONE_CONFIG` environment variable.
+Make sure Rclone is installed and remotes are configured. Config is usually at `~/.config/rclone/rclone.conf`.
 
 ### 3. Start Rclone RC Server
 
@@ -48,27 +50,207 @@ export RCLONE_RC_PASS=your_pass
 ### 4. Build and Run
 
 ```bash
-# Build
+# Build backend
 go build -o server ./cmd/server
 
 # Run
 ./server
 ```
 
-The server will start on port 17870 by default. Access it at http://localhost:17870
+Server starts on port 17870 by default. Visit http://localhost:17870
 
-### 5. Environment Variables
+### 5. Configuration
+
+Config file `config.yaml`:
+```yaml
+server:
+  addr: ":17870"
+  static_dir: "./web"
+
+rclone:
+  rc_url: "http://127.0.0.1:5572"
+  rc_user: ""
+  rc_pass: ""
+  timeout: "120s"
+
+storage:
+  data_dir: "./data"
+
+log:
+  level: "info"
+  output: "stdout"
+
+sync:
+  pool_interval: 5      # Job status sync interval (seconds)
+  schedule_interval: 1  # Schedule check interval (minutes)
+```
+
+### 6. Environment Variables
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+|------|------|--------|
 | `APP_ADDR` | Server address | `:17870` |
 | `APP_DATA_DIR` | Data directory | `./data` |
 | `RCLONE_RC_URL` | Rclone RC URL | `http://127.0.0.1:5572` |
-| `RCLONE_RC_USER` | Rclone RC username | - |
+| `RCLONE_RC_USER` | Rclone RC user | - |
 | `RCLONE_RC_PASS` | Rclone RC password | - |
 | `RCLONE_RC_TIMEOUT` | RC timeout | `120s` |
 
-## Docker
+## Project Structure
+
+```
+RcloneFlow/
+├── cmd/
+│   └── server/              # Main application entry
+├── internal/
+│   ├── adapter/            # Rclone API adapter layer
+│   ├── controller/         # HTTP controllers
+│   ├── dao/                # Data Access Layer
+│   ├── service/            # Business Logic Layer
+│   ├── scheduler/          # Task scheduler
+│   ├── router/             # Route definitions
+│   ├── store/              # Database wrapper (SQLite)
+│   └── config/             # Configuration management
+├── frontend/               # Frontend source (Vue 3 + TypeScript)
+│   └── src/
+│       ├── api/            # API layer (unified封装)
+│       ├── components/     # Vue components
+│       └── views/          # Page views
+├── migrations/              # Database migrations (goose)
+├── web/                    # Compiled frontend files
+├── config.yaml             # Configuration file
+├── Dockerfile
+└── docker-compose.yml
+```
+
+## Architecture
+
+### Backend (Go)
+
+- **Router** - HTTP routing, request dispatch
+- **Controller** - Parameter validation, service invocation
+- **Service** - Business logic
+- **DAO** - Database operations
+- **Adapter** - Rclone API adapter
+
+### Frontend (Vue 3 + TypeScript)
+
+- **API Layer** - Unified API calls
+  - `api/client.ts` - HTTP client with interceptors
+  - `api/errors.ts` - Unified error handling
+  - `api/task.ts` - Task APIs
+  - `api/run.ts` - Run history APIs
+  - `api/remote.ts` - Remote storage APIs
+  - `api/browser.ts` - File browser APIs
+- **Components** - Toast, Modal etc.
+- **Views** - TaskView, BrowserView etc.
+
+## API Endpoints
+
+### Tasks
+| Method | Endpoint | Description |
+|------|------|------|
+| GET | `/api/tasks` | List all tasks |
+| POST | `/api/tasks` | Create task |
+| PUT | `/api/tasks` | Update task |
+| DELETE | `/api/tasks/{id}` | Delete task |
+| POST | `/api/tasks/{id}/run` | Run task |
+
+### Schedules
+| Method | Endpoint | Description |
+|------|------|------|
+| GET | `/api/schedules` | List all schedules |
+| POST | `/api/schedules` | Create schedule |
+| DELETE | `/api/schedules/{id}` | Delete schedule |
+
+### Runs
+| Method | Endpoint | Description |
+|------|------|------|
+| GET | `/api/runs` | List run history |
+| GET | `/api/runs/{id}` | Get run details |
+| DELETE | `/api/runs/{id}` | Clear run record |
+| GET | `/api/runs/active` | Get active runs with real-time status |
+
+### Remotes
+| Method | Endpoint | Description |
+|------|------|------|
+| GET | `/api/remotes` | List all remotes |
+| POST | `/api/remotes` | Create remote |
+| PUT | `/api/remotes` | Update remote |
+| GET | `/api/remotes/config/{name}` | Get remote config |
+| DELETE | `/api/config/{name}` | Delete remote |
+| POST | `/api/remotes/test` | Test remote connection |
+| GET | `/api/providers` | List supported remote types |
+
+### Browser
+| Method | Endpoint | Description |
+|------|------|------|
+| GET | `/api/browser/list` | List directory contents |
+| POST | `/api/fs/copy` | Copy file |
+| POST | `/api/fs/move` | Move file |
+| POST | `/api/fs/copyDir` | Copy directory |
+| POST | `/api/fs/moveDir` | Move directory |
+| POST | `/api/fs/delete` | Delete file |
+| POST | `/api/fs/purge` | Delete directory |
+| POST | `/api/fs/mkdir` | Create directory |
+
+## Database Migrations
+
+Using goose for versioned database migrations:
+
+```bash
+# Check migration status
+goose status
+
+# Run migrations
+goose up
+
+# Rollback one version
+goose down
+
+# Create new migration
+goose create add_new_field
+```
+
+Migration files are in `migrations/` directory.
+
+## Development
+
+### Frontend Development
+
+```bash
+cd frontend
+
+# Install dependencies
+npm install
+
+# Dev mode (hot reload)
+npm run dev
+
+# Run tests
+npm test
+
+# Coverage report
+npm run test:coverage
+
+# Production build
+npm run build
+```
+
+### Backend Development
+
+```bash
+# Run tests
+go test ./...
+
+# Coverage report
+go test -cover ./...
+
+# Build
+go build -o server ./cmd/server
+```
+
+## Docker Deployment
 
 ### Build Image
 
@@ -117,69 +299,15 @@ services:
     command: rcd --rc-user=your_user --rc-pass=your_pass --rc-addr=0.0.0.0:5572
 ```
 
-## Project Structure
-
-```
-RcloneFlow/
-├── cmd/
-│   └── server/          # Main application entry point
-├── internal/
-│   ├── app/            # HTTP server and API handlers
-│   ├── rclone/         # Rclone RC client wrapper
-│   ├── scheduler/      # Task scheduling logic
-│   └── store/          # Data persistence (SQLite)
-├── web/
-│   ├── index.html      # Frontend SPA (Vue.js)
-│   └── vendor/         # Vue.js CDN bundle
-├── data/               # Application data directory
-├── Dockerfile
-├── docker-compose.yml
-├── go.mod
-└── README.md
-```
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/remotes` | List all remotes |
-| POST | `/api/remotes` | Create new remote |
-| PUT | `/api/remotes` | Update remote config |
-| GET | `/api/remotes/config/{name}` | Get remote config |
-| POST | `/api/remotes/test` | Test remote connection |
-| GET | `/api/providers` | List supported providers |
-| GET | `/api/browser/list` | List directory contents |
-| GET/POST | `/api/tasks` | List/Create tasks |
-| POST | `/api/tasks/{id}/run` | Run a task |
-| GET/POST | `/api/schedules` | List/Create schedules |
-| GET | `/api/runs` | List run history |
-
-## Development
-
-### Build Frontend (Optional)
-
-The frontend is bundled as a single HTML file with embedded Vue.js. For development:
-
-```bash
-# Frontend is served directly from web/index.html
-# No build step required for basic development
-```
-
-### Run Tests
-
-```bash
-go test ./...
-```
-
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Pull requests are welcome!
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License - See LICENSE file.
 
-## Acknowledgments
+## Acknowledgements
 
-- [Rclone](https://rclone.org/) - The powerful cloud storage sync tool
-- [Vue.js](https://vuejs.org/) - The progressive JavaScript framework
+- [Rclone](https://rclone.org/) - Powerful cloud storage sync tool
+- [Vue.js](https://vuejs.org/) - Progressive JavaScript framework
