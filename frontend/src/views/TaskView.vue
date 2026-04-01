@@ -326,7 +326,7 @@ async function clearRun(id: number) {
                 :key="item.Path"
                 class="path-item"
                 :class="{ 'is-dir': item.IsDir }"
-                @click="item.IsDir ? navigateSourcePath(item) : selectSourcePath(item)"
+                @click="onSourcePathClick(item)"
               >
                 {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
               </div>
@@ -360,7 +360,7 @@ async function clearRun(id: number) {
                 :key="item.Path"
                 class="path-item"
                 :class="{ 'is-dir': item.IsDir }"
-                @click="item.IsDir ? navigateTargetPath(item) : selectTargetPath(item)"
+                @click="onTargetPathClick(item)"
               >
                 {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
               </div>
