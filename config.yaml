@@ -1,0 +1,32 @@
+# RcloneFlow 配置文件
+# 配置文件路径: ~/.config/rcloneflow/config.yaml 或 ./config.yaml
+
+# rclone RC 连接配置
+rclone:
+  # rclone RC 服务器地址
+  rc_url: "http://127.0.0.1:5572"
+  # rclone RC 用户名（可选）
+  rc_user: ""
+  # rclone RC 密码（可选）
+  rc_pass: ""
+  # 请求超时时间
+  timeout: "120s"
+
+# 服务器配置
+server:
+  # 监听地址和端口
+  addr: ":17870"
+  # 静态文件目录
+  static_dir: "./web"
+
+# 数据存储配置
+storage:
+  # 数据库目录
+  data_dir: "./data"
+
+# 日志配置
+log:
+  # 日志级别: debug, info, warn, error
+  level: "info"
+  # 日志输出: stdout, stderr, 或文件路径
+  output: "stdout"

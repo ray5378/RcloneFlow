@@ -3,8 +3,8 @@ package app
 import (
 	"log"
 	"net/http"
-	"os"
 
+	"rcloneflow/internal/config"
 	"rcloneflow/internal/controller"
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/router"
@@ -14,13 +14,9 @@ import (
 )
 
 // Run 启动服务器
-func Run() error {
+func Run(cfg *config.Config) error {
 	// 初始化数据库
-	dbDir := os.Getenv("APP_DATA_DIR")
-	if dbDir == "" {
-		dbDir = "./data"
-	}
-	db, err := store.Open(dbDir)
+	db, err := store.Open(cfg.GetDataDir())
 	if err != nil {
 		return err
 	}
@@ -58,10 +54,7 @@ func Run() error {
 	handler := withCORS(mux)
 
 	// 启动服务器
-	addr := os.Getenv("APP_ADDR")
-	if addr == "" {
-		addr = ":17870"
-	}
+	addr := cfg.GetServerAddr()
 	log.Printf("listening on %s", addr)
 	return http.ListenAndServe(addr, handler)
 }

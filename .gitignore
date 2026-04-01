@@ -43,4 +43,3 @@ data/
 frontend/dist/
 frontend/node_modules/
 frontend/package-lock.json
-data/
