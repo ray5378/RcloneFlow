@@ -181,6 +181,16 @@ func (db *DB) GetTask(id int64) (Task, bool) {
 	return t, true
 }
 
+func (db *DB) UpdateTask(id int64, t Task) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec(`
+		UPDATE tasks SET name=?, mode=?, source_remote=?, source_path=?, target_remote=?, target_path=?
+		WHERE id=?`, t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, id)
+	return err
+}
+
 func (db *DB) DeleteTask(id int64) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()

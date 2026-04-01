@@ -81,16 +81,33 @@ async function createTask() {
     return
   }
   try {
-    await api.createTask({
-      name: createForm.value.name,
-      mode: createForm.value.mode,
-      sourceRemote: createForm.value.sourceRemote,
-      sourcePath: createForm.value.sourcePath,
-      targetRemote: createForm.value.targetRemote,
-      targetPath: createForm.value.targetPath,
-    })
-    showCreateModal.value = false
+    if (editingTask.value) {
+      // 更新任务
+      await api.updateTask(editingTask.value.id, {
+        name: createForm.value.name,
+        mode: createForm.value.mode,
+        sourceRemote: createForm.value.sourceRemote,
+        sourcePath: createForm.value.sourcePath,
+        targetRemote: createForm.value.targetRemote,
+        targetPath: createForm.value.targetPath,
+      })
+      editingTask.value = null
+    } else {
+      // 新建任务
+      await api.createTask({
+        name: createForm.value.name,
+        mode: createForm.value.mode,
+        sourceRemote: createForm.value.sourceRemote,
+        sourcePath: createForm.value.sourcePath,
+        targetRemote: createForm.value.targetRemote,
+        targetPath: createForm.value.targetPath,
+      })
+    }
     createForm.value = { name: '', mode: 'copy', sourceRemote: '', sourcePath: '', targetRemote: '', targetPath: '' }
+    sourcePathOptions.value = []
+    targetPathOptions.value = []
+    sourceCurrentPath.value = ''
+    targetCurrentPath.value = ''
     await loadData()
   } catch (e) {
     alert((e as Error).message)
@@ -119,13 +136,11 @@ function editTask(task: Task) {
   }
   // 加载源路径选项
   if (task.sourceRemote) {
-    sourceCurrentPath.value = task.sourcePath || ''
-    loadSourcePath(task.sourceRemote, task.sourcePath || '')
+    onSourceRemoteChange()
   }
   // 加载目标路径选项
   if (task.targetRemote) {
-    targetCurrentPath.value = task.targetPath || ''
-    loadTargetPath(task.targetRemote, task.targetPath || '')
+    onTargetRemoteChange()
   }
   currentModule.value = 'add'
   openMenuId.value = null

@@ -168,6 +168,14 @@ func (s *Server) handleTasks(w http.ResponseWriter, r *http.Request) {
         t, err := s.db.AddTask(req)
         if err != nil { writeJSON(w, 500, map[string]any{"error": err.Error()}); return }
         writeJSON(w, 200, t)
+    case http.MethodPut:
+        var req struct {
+            ID int64 `json:"id"`
+            Task store.Task `json:"task"`
+        }
+        if err := decode(r, &req); err != nil { writeJSON(w, 400, map[string]any{"error": err.Error()}); return }
+        if err := s.db.UpdateTask(req.ID, req.Task); err != nil { writeJSON(w, 500, map[string]any{"error": err.Error()}); return }
+        writeJSON(w, 200, nil)
     default:
         w.WriteHeader(405)
     }

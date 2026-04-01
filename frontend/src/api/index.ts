@@ -147,6 +147,13 @@ export function createTask(task: Omit<Task, 'id' | 'createdAt'>) {
   })
 }
 
+export function updateTask(taskId: number, task: Omit<Task, 'id' | 'createdAt'>) {
+  return api('/api/tasks', {
+    method: 'PUT',
+    body: JSON.stringify({ id: taskId, task }),
+  })
+}
+
 export function runTask(taskId: number) {
   return api(`/api/tasks/${taskId}/run`, { method: 'POST' })
 }
