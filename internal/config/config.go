@@ -13,9 +13,10 @@ import (
 // Config 应用配置
 type Config struct {
 	Rclone  RcloneConfig  `yaml:"rclone"`
-	Server ServerConfig  `yaml:"server"`
+	Server  ServerConfig  `yaml:"server"`
 	Storage StorageConfig `yaml:"storage"`
-	Log    LogConfig     `yaml:"log"`
+	Log     LogConfig     `yaml:"log"`
+	Sync    SyncConfig    `yaml:"sync"`
 }
 
 // RcloneConfig rclone连接配置
@@ -28,8 +29,16 @@ type RcloneConfig struct {
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Addr      string `yaml:"addr"`
-	StaticDir string `yaml:"static_dir"`
+	Addr       string `yaml:"addr"`
+	StaticDir  string `yaml:"static_dir"`
+	ReadTimeout  int `yaml:"read_timeout"`  // 秒
+	WriteTimeout int `yaml:"write_timeout"` // 秒
+}
+
+// SyncConfig 同步配置
+type SyncConfig struct {
+	PoolInterval   int `yaml:"pool_interval"`    // 任务状态同步间隔（秒）
+	ScheduleInterval int `yaml:"schedule_interval"` // 定时任务检查间隔（分钟）
 }
 
 // StorageConfig 存储配置
@@ -51,8 +60,10 @@ func DefaultConfig() *Config {
 			Timeout: 120 * time.Second,
 		},
 		Server: ServerConfig{
-			Addr:      ":17870",
-			StaticDir: "./web",
+			Addr:         ":17870",
+			StaticDir:    "./web",
+			ReadTimeout:  30,
+			WriteTimeout: 30,
 		},
 		Storage: StorageConfig{
 			DataDir: "./data",
@@ -60,6 +71,10 @@ func DefaultConfig() *Config {
 		Log: LogConfig{
 			Level:  "info",
 			Output: "stdout",
+		},
+		Sync: SyncConfig{
+			PoolInterval:      5,   // 5秒
+			ScheduleInterval:   1,   // 1分钟
 		},
 	}
 }
@@ -196,6 +211,16 @@ func (c *Config) GetLogLevel() string {
 // GetLogOutput 返回日志输出
 func (c *Config) GetLogOutput() string {
 	return c.Log.Output
+}
+
+// GetPoolInterval 返回任务状态同步间隔（秒）
+func (c *Config) GetPoolInterval() int {
+	return c.Sync.PoolInterval
+}
+
+// GetScheduleInterval 返回定时任务检查间隔（分钟）
+func (c *Config) GetScheduleInterval() int {
+	return c.Sync.ScheduleInterval
 }
 
 // ToEnvMap 转换为环境变量映射（用于传递给子组件）

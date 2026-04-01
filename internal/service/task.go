@@ -2,21 +2,20 @@ package service
 
 import (
 	"context"
-	"fmt"
 
-	"rcloneflow/internal/rclone"
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/store"
 )
 
 // TaskService 任务服务层
 type TaskService struct {
-	db *store.DB
-	rc *rclone.Client
+	db  *store.DB
+	runner adapter.TaskRunner
 }
 
 // NewTaskService 创建任务服务
-func NewTaskService(db *store.DB, rc *rclone.Client) *TaskService {
-	return &TaskService{db: db, rc: rc}
+func NewTaskService(db *store.DB, runner adapter.TaskRunner) *TaskService {
+	return &TaskService{db: db, runner: runner}
 }
 
 // ListTasks 获取所有任务
@@ -43,11 +42,11 @@ func (s *TaskService) DeleteTask(id int64) error {
 func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string) error {
 	t, ok := s.db.GetTask(taskID)
 	if !ok {
-		return fmt.Errorf("task not found")
+		return ErrTaskNotFound
 	}
 
-	// 启动rclone任务
-	jobID, err := s.rc.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger)
+	// 通过runner启动任务
+	jobID, err := s.runner.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger)
 	if err != nil {
 		return err
 	}

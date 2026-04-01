@@ -41,7 +41,8 @@ func Run(cfg *config.Config) error {
 	rc := rclone.NewFromEnv()
 
 	// 初始化服务层
-	taskSvc := service.NewTaskService(db, rc)
+	taskRunner := adapter.NewTaskRunner(rc)
+	taskSvc := service.NewTaskService(db, taskRunner)
 	scheduleSvc := service.NewScheduleService(db)
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
 
@@ -64,7 +65,7 @@ func Run(cfg *config.Config) error {
 	}
 
 	// 启动任务状态同步服务
-	jobSync := service.NewJobSyncService(db, rc)
+	jobSync := service.NewJobSyncService(db, rc, cfg.GetPoolInterval())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go jobSync.Start(ctx)

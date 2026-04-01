@@ -13,9 +13,10 @@ import (
 
 // JobSyncService 任务状态同步服务
 type JobSyncService struct {
-	db  JobStatusProvider
-	rc  *rclone.Client
-	stop chan struct{}
+	db          JobStatusProvider
+	rc          *rclone.Client
+	poolGap     time.Duration
+	stop        chan struct{}
 }
 
 // JobStatusProvider 任务状态提供者接口
@@ -25,19 +26,20 @@ type JobStatusProvider interface {
 }
 
 // NewJobSyncService 创建任务同步服务
-func NewJobSyncService(db JobStatusProvider, rc *rclone.Client) *JobSyncService {
+func NewJobSyncService(db JobStatusProvider, rc *rclone.Client, poolIntervalSec int) *JobSyncService {
 	return &JobSyncService{
-		db:  db,
-		rc:  rc,
-		stop: make(chan struct{}),
+		db:      db,
+		rc:      rc,
+		poolGap: time.Duration(poolIntervalSec) * time.Second,
+		stop:    make(chan struct{}),
 	}
 }
 
 // Start 启动同步服务
 func (s *JobSyncService) Start(ctx context.Context) {
-	logger.Info("启动任务状态同步服务")
+	logger.Info("启动任务状态同步服务", zap.Duration("interval", s.poolGap))
 	
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(s.poolGap)
 	defer ticker.Stop()
 	
 	for {

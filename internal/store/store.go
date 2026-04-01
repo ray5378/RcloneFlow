@@ -63,12 +63,25 @@ func Open(dir string) (*DB, error) {
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
 	}
 	
-	s := &DB{db: db}
+	s := NewDB(db)
 	if err := s.migrate(); err != nil {
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 	
 	return s, nil
+}
+
+// openDB 打开数据库（供内部迁移使用）
+func openDB(path string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite3", path+"?_journal_mode=WAL&_busy_timeout=5000")
+	if err != nil {
+		return nil, err
+	}
+	_, err = db.Exec("PRAGMA foreign_keys = ON")
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
 }
 
 func (db *DB) migrate() error {
