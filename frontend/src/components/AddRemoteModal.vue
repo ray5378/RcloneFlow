@@ -92,6 +92,12 @@ function selectProvider(provider: Provider) {
       remoteOptions.value[opt.Name] = opt.DefaultStr
     }
   }
+  
+  // SMB 存储特殊默认配置
+  if (provider.Name === 'smb') {
+    remoteOptions.value['idle_timeout'] = '0s'
+    remoteOptions.value['encoding'] = 'None'
+  }
 }
 
 function nextStep() {
