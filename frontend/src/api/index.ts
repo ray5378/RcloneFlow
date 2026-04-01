@@ -1,192 +1,80 @@
-import type { Task, Schedule, Run, Provider } from '../types'
+/**
+ * API 统一导出模块
+ * 
+ * 使用方式:
+ * import { getTasks, createTask } from '@/api'
+ * import { getSchedules } from '@/api'
+ * import { listPath, copyFile } from '@/api'
+ */
 
-const BASE = ''
+// ============ Task API ============
+export {
+  getTasks,
+  createTask,
+  updateTask,
+  runTask,
+  deleteTask,
+} from './task'
 
-async function api<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(BASE + path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
-  const data = await res.json().catch(() => ({}))
-  if (!res.ok) throw new Error((data as { error?: string }).error || res.statusText)
-  return data as T
-}
+// 兼容性别名 (旧代码迁移)
+export const listTasks = getTasks
 
-// Remotes
-export function listRemotes() {
-  return api<{ remotes: string[]; version: string }>('/api/remotes')
-}
+// ============ Schedule API ============
+export {
+  getSchedules,
+  createSchedule,
+  deleteSchedule,
+} from './schedule'
 
-export function createRemote(name: string, type: string, parameters: Record<string, unknown>) {
-  return api('/api/remotes', {
-    method: 'POST',
-    body: JSON.stringify({ name, type, parameters }),
-  })
-}
+// 兼容性别名
+export const listSchedules = getSchedules
 
-export function updateRemote(name: string, type: string, parameters: Record<string, unknown>) {
-  return api('/api/remotes', {
-    method: 'PUT',
-    body: JSON.stringify({ name, type, parameters }),
-  })
-}
+// ============ Run API ============
+export {
+  getRuns,
+  getRun,
+  clearRun,
+  getJobStatus,
+} from './run'
 
-export function getRemoteConfig(name: string) {
-  return api<Record<string, unknown>>(`/api/remotes/config/${encodeURIComponent(name)}`)
-}
+// 兼容性别名
+export const listRuns = getRuns
 
-export function deleteRemote(name: string) {
-  return api(`/api/config/${encodeURIComponent(name)}`, { method: 'DELETE' })
-}
+// ============ Remote API ============
+export {
+  getRemotes,
+  createRemote,
+  updateRemote,
+  getRemoteConfig,
+  deleteRemote,
+  testRemote,
+  getProviders,
+} from './remote'
 
-export function testRemote(name: string) {
-  return api<{ ok: boolean; count: number }>('/api/remotes/test', {
-    method: 'POST',
-    body: JSON.stringify({ name }),
-  })
-}
+// 兼容性别名
+export const listRemotes = getRemotes
+export const listProviders = getProviders
 
-// Providers
-export function listProviders() {
-  return api<{ providers: Provider[] }>('/api/providers')
-}
+// ============ Browser API ============
+export type { FileItem } from './browser'
+export {
+  listPath,
+  copyFile,
+  moveFile,
+  copyDir,
+  moveDir,
+  deleteFile,
+  purgeDir,
+  mkdir,
+} from './browser'
 
-// Browser
-export function listPath(remote: string, path: string) {
-  return api<{ fs: string; items: FileItem[] }>(
-    `/api/browser/list?remote=${encodeURIComponent(remote)}&path=${encodeURIComponent(path)}`
-  )
-}
-
-// 复制文件 (operations/copyfile)
-export function copyFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  return api('/api/fs/copy', {
-    method: 'POST',
-    body: JSON.stringify({ 
-      srcFs: srcRemote + ':', 
-      srcRemote: srcPath, 
-      dstFs: dstRemote + ':', 
-      dstRemote: dstPath 
-    }),
-  })
-}
-
-// 移动文件 (operations/movefile)
-export function moveFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  return api('/api/fs/move', {
-    method: 'POST',
-    body: JSON.stringify({ 
-      srcFs: srcRemote + ':', 
-      srcRemote: srcPath, 
-      dstFs: dstRemote + ':', 
-      dstRemote: dstPath 
-    }),
-  })
-}
-
-// 复制目录 (sync/copy) - srcFs和dstFs格式为 remote:完整路径
-export function copyDir(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  return api('/api/fs/copyDir', {
-    method: 'POST',
-    body: JSON.stringify({ 
-      srcFs: srcRemote + ':' + srcPath, 
-      dstFs: dstRemote + ':' + dstPath,
-      createEmptySrcDirs: true 
-    }),
-  })
-}
-
-// 移动目录 (sync/move) - srcFs和dstFs格式为 remote:完整路径
-export function moveDir(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
-  return api('/api/fs/moveDir', {
-    method: 'POST',
-    body: JSON.stringify({ 
-      srcFs: srcRemote + ':' + srcPath, 
-      dstFs: dstRemote + ':' + dstPath,
-      createEmptySrcDirs: true,
-      deleteEmptySrcDirs: true 
-    }),
-  })
-}
-
-// 删除文件 (operations/deletefile)
-// 删除文件 (operations/deletefile)
-export function deleteFile(remote: string, path: string) {
-  return api('/api/fs/delete', {
-    method: 'POST',
-    body: JSON.stringify({ fs: remote + ':', remote: path }),
-  })
-}
-
-// 删除目录及内容 (operations/purge)
-export function purgeDir(remote: string, path: string) {
-  return api('/api/fs/purge', {
-    method: 'POST',
-    body: JSON.stringify({ fs: remote + ':', remote: path }),
-  })
-}
-
-export interface FileItem {
-  Path: string
-  Name: string
-  Size: string
-  IsDir: boolean
-  ModTime: string
-  MimeType?: string
-}
-
-// Tasks
-export function listTasks() {
-  return api<Task[]>('/api/tasks')
-}
-
-export function createTask(task: Omit<Task, 'id' | 'createdAt'>) {
-  return api<Task>('/api/tasks', {
-    method: 'POST',
-    body: JSON.stringify(task),
-  })
-}
-
-export function updateTask(taskId: number, task: Omit<Task, 'id' | 'createdAt'>) {
-  return api('/api/tasks', {
-    method: 'PUT',
-    body: JSON.stringify({ id: taskId, task }),
-  })
-}
-
-export function runTask(taskId: number) {
-  return api(`/api/tasks/${taskId}/run`, { method: 'POST' })
-}
-
-export function deleteTask(taskId: number) {
-  return api(`/api/tasks/${taskId}`, { method: 'DELETE' })
-}
-
-// Schedules
-export function listSchedules() {
-  return api<Schedule[]>('/api/schedules')
-}
-
-export function createSchedule(schedule: Omit<Schedule, 'id' | 'createdAt'>) {
-  return api<Schedule>('/api/schedules', {
-    method: 'POST',
-    body: JSON.stringify(schedule),
-  })
-}
-
-export function deleteSchedule(scheduleId: number) {
-  return api(`/api/schedules/${scheduleId}`, { method: 'DELETE' })
-}
-
-// Runs
-export function listRuns() {
-  return api<Run[]>('/api/runs')
-}
-
-export function getRunStatus(runId: number) {
-  return api<Run>(`/api/runs/${runId}`)
-}
-
-export function clearRun(runId: number) {
-  return api(`/api/runs/${runId}`, { method: 'DELETE' })
-}
+// ============ 错误处理 ============
+export {
+  showErrorToast,
+  showSuccessToast,
+  handleApiError,
+  withErrorHandler,
+  registerToast,
+  errorMessage,
+  showError,
+} from './errors'
