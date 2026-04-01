@@ -7,7 +7,7 @@ const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
 const runs = ref<Run[]>([])
 const remotes = ref<string[]>([])
-const selectedTask = ref<Task | null>(null)
+const selectedTaskId = ref<number | null>(null)
 const taskMenu = ref<string | number>('')
 const showCreateModal = ref(false)
 
@@ -41,16 +41,8 @@ async function loadData() {
   }
 }
 
-async function openTask(task: Task) {
-  selectedTask.value = task
-}
-
 function getTaskSchedules(taskId: number) {
   return schedules.value.filter(s => s.taskId === taskId)
-}
-
-function getTaskRuns(taskId: number) {
-  return runs.value.filter(r => r.taskId === taskId)
 }
 
 function formatTime(time: string | undefined) {
@@ -114,8 +106,8 @@ async function deleteTask(taskId: number) {
   if (!confirm('确定删除此任务？')) return
   try {
     await api.deleteTask(taskId)
-    if (selectedTask.value?.id === taskId) {
-      selectedTask.value = null
+    if (selectedTaskId.value === taskId) {
+      selectedTaskId.value = null
     }
     await loadData()
   } catch (e) {
@@ -133,19 +125,10 @@ async function deleteSchedule(id: number) {
   }
 }
 
-async function createSchedule() {
-  if (!selectedTask.value) {
-    alert('请先选择一个任务')
-    return
-  }
-  const spec = prompt('输入执行周期（如：5m, 10m, 1h, 6h, 12h, 24h）')
-  if (!spec) return
+async function clearRun(id: number) {
+  if (!confirm('确定清除此记录？')) return
   try {
-    await api.createSchedule({
-      taskId: selectedTask.value.id,
-      spec: '@every ' + spec,
-      enabled: true,
-    })
+    await api.clearRun(id)
     await loadData()
   } catch (e) {
     alert((e as Error).message)
@@ -172,8 +155,8 @@ async function createSchedule() {
         v-for="task in tasks"
         :key="task.id"
         class="tile"
-        :class="{ active: selectedTask?.id === task.id }"
-        @click="openTask(task)"
+        :class="{ active: selectedTaskId === task.id }"
+        @click="selectedTaskId = task.id"
       >
         <div class="tile-header">
           <span class="tile-name">{{ task.name }}</span>
@@ -182,21 +165,24 @@ async function createSchedule() {
           {{ task.mode }}: {{ task.sourceRemote }} → {{ task.targetRemote }}
         </div>
       </div>
+      <div v-if="!tasks.length" style="padding: 20px; color: #888; text-align: center; width: 100%">
+        暂无任务
+      </div>
     </div>
   </div>
 
-  <!-- Task Detail View -->
-  <div v-if="selectedTask" class="card">
+  <!-- Task Detail -->
+  <div v-if="selectedTaskId" class="card">
     <div class="card-header">
-      <div class="title">{{ selectedTask.name }}</div>
+      <div class="title">{{ tasks.find(t => t.id === selectedTaskId)?.name }}</div>
       <div class="actions" @click.stop>
-        <button class="ghost small" @click="runTask(selectedTask!.id)">运行</button>
+        <button class="ghost small" @click="runTask(selectedTaskId!)">运行</button>
         <div class="menu-area">
-          <button class="menu-btn" @click="taskMenu = taskMenu === selectedTask!.id ? '' : selectedTask!.id">
+          <button class="menu-btn" @click="taskMenu = taskMenu === selectedTaskId ? '' : selectedTaskId">
             ⋮
           </button>
-          <div v-if="taskMenu === selectedTask!.id" class="menu-pop">
-            <button class="danger" @click="deleteTask(selectedTask!.id); taskMenu = ''">删除</button>
+          <div v-if="taskMenu === selectedTaskId" class="menu-pop">
+            <button class="danger" @click="deleteTask(selectedTaskId!); taskMenu = ''">删除</button>
           </div>
         </div>
       </div>
@@ -204,61 +190,59 @@ async function createSchedule() {
     <div class="list">
       <div class="item">
         <span class="label">模式</span>
-        <span class="value">{{ selectedTask.mode }}</span>
+        <span class="value">{{ tasks.find(t => t.id === selectedTaskId)?.mode }}</span>
       </div>
       <div class="item">
         <span class="label">源存储</span>
-        <span class="value">{{ selectedTask.sourceRemote }}</span>
+        <span class="value">{{ tasks.find(t => t.id === selectedTaskId)?.sourceRemote }}</span>
       </div>
       <div class="item">
         <span class="label">源路径</span>
-        <span class="value">{{ selectedTask.sourcePath || '/' }}</span>
+        <span class="value">{{ tasks.find(t => t.id === selectedTaskId)?.sourcePath || '/' }}</span>
       </div>
       <div class="item">
         <span class="label">目标存储</span>
-        <span class="value">{{ selectedTask.targetRemote }}</span>
+        <span class="value">{{ tasks.find(t => t.id === selectedTaskId)?.targetRemote }}</span>
       </div>
       <div class="item">
         <span class="label">目标路径</span>
-        <span class="value">{{ selectedTask.targetPath || '/' }}</span>
+        <span class="value">{{ tasks.find(t => t.id === selectedTaskId)?.targetPath || '/' }}</span>
       </div>
     </div>
-  </div>
-
-  <!-- Schedule List -->
-  <div v-if="selectedTask" class="card">
-    <div class="card-header">
-      <div class="title">定时记录</div>
-      <div class="actions">
-        <button class="ghost small" @click="createSchedule">添加定时</button>
-      </div>
-    </div>
+    <!-- Task Schedules -->
+    <div class="sub-header">定时记录</div>
     <div class="list">
-      <div v-for="s in getTaskSchedules(selectedTask!.id)" :key="s.id" class="item">
+      <div v-for="s in getTaskSchedules(selectedTaskId!)" :key="s.id" class="item">
         <span class="value">周期: {{ s.spec }}</span>
         <button class="ghost small danger-text" @click="deleteSchedule(s.id)">删除</button>
       </div>
-      <div v-if="!getTaskSchedules(selectedTask!.id).length" class="empty">暂无定时记录</div>
+      <div v-if="!getTaskSchedules(selectedTaskId!).length" class="empty">暂无定时记录</div>
     </div>
   </div>
 
-  <!-- Run History -->
-  <div v-if="selectedTask" class="card">
+  <!-- History Records -->
+  <div class="card">
     <div class="card-header">
       <div class="title">历史记录</div>
     </div>
     <div class="list-header">
-      <span class="col-name">状态</span>
+      <span class="col-name">任务</span>
+      <span class="col-status">状态</span>
       <span class="col-time">开始时间</span>
       <span class="col-time">结束时间</span>
+      <span class="col-action">操作</span>
     </div>
     <div class="list">
-      <div v-for="run in getTaskRuns(selectedTask!.id)" :key="run.id" class="item">
+      <div v-for="run in runs" :key="run.id" class="item">
+        <div class="name">
+          <strong>{{ tasks.find(t => t.id === run.taskId)?.name || `任务 #${run.taskId}` }}</strong>
+        </div>
         <span :class="['status', getStatusClass(run.status)]">{{ run.status }}</span>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
         <span class="time">{{ formatTime(run.finishedAt) }}</span>
+        <button class="ghost small" @click="clearRun(run.id)">清除</button>
       </div>
-      <div v-if="!getTaskRuns(selectedTask!.id).length" class="empty">暂无历史记录</div>
+      <div v-if="!runs.length" class="empty">暂无历史记录</div>
     </div>
   </div>
 
@@ -314,6 +298,71 @@ async function createSchedule() {
 </template>
 
 <style scoped>
+.tile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
+}
+
+.tile {
+  min-width: 180px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #252525;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1 1 calc(25% - 12px);
+  max-width: calc(25% - 12px);
+}
+
+.tile:hover {
+  background: #2a2a2a;
+}
+
+.tile.active {
+  background: #1e3a5f;
+  border: 1px solid #2563a0;
+}
+
+body.light .tile {
+  background: #f5f5f5;
+}
+
+body.light .tile:hover {
+  background: #e8e8e8;
+}
+
+body.light .tile.active {
+  background: #e3f2fd;
+  border-color: #bbdefb;
+}
+
+.tile-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.tile-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #fff;
+}
+
+body.light .tile-name {
+  color: #1a1a1a;
+}
+
+.tile-desc {
+  font-size: 12px;
+  color: #888;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .list-header {
   display: flex;
   justify-content: space-between;
@@ -324,28 +373,38 @@ async function createSchedule() {
   border-bottom: 1px solid #333;
 }
 
-.col-name { flex: 1; }
-.col-time { width: 180px; text-align: right; }
-
 body.light .list-header {
   background: #f5f5f5;
   color: #666;
   border-bottom: 1px solid #e0e0e0;
 }
 
+.col-name { flex: 1; }
+.col-status { width: 80px; text-align: center; }
+.col-time { width: 150px; text-align: right; }
+.col-action { width: 60px; text-align: right; }
+
 .item {
   display: flex;
   align-items: center;
   padding: 10px 20px;
   border-bottom: 1px solid #252525;
+  gap: 12px;
 }
 
 body.light .item {
   border-color: #f0f0f0;
 }
 
+.item .name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .item .label {
-  width: 100px;
+  width: 80px;
   color: #888;
   font-size: 13px;
 }
@@ -354,6 +413,9 @@ body.light .item {
   flex: 1;
   color: #e0e0e0;
   font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 body.light .item .value {
@@ -372,15 +434,29 @@ body.light .item .value {
 .status.success { background: #388e3c; color: #fff; }
 .status.failed { background: #d32f2f; color: #fff; }
 
+.time {
+  width: 150px;
+  text-align: right;
+  color: #888;
+  font-size: 13px;
+}
+
 .danger-text {
   color: #ef5350 !important;
 }
 
-.time {
-  width: 180px;
-  text-align: right;
-  color: #888;
+.sub-header {
+  padding: 10px 20px;
   font-size: 13px;
+  font-weight: 600;
+  color: #888;
+  background: #1a1a1a;
+  border-bottom: 1px solid #252525;
+}
+
+body.light .sub-header {
+  background: #f0f0f0;
+  border-color: #e0e0e0;
 }
 
 .modal-content .field-item {
@@ -403,6 +479,7 @@ body.light .item .value {
   background: #252525;
   color: #e0e0e0;
   font-size: 14px;
+  box-sizing: border-box;
 }
 
 body.light .modal-content input,
