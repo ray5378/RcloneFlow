@@ -2,12 +2,14 @@ package scheduler
 
 import (
 	"context"
-	"log"
 	"strings"
 	"time"
 
+	"rcloneflow/internal/logger"
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/store"
+
+	"go.uber.org/zap"
 )
 
 // Runner 任务运行器接口
@@ -84,7 +86,10 @@ func (s *Scheduler) Start() error {
 		}
 		d, ok := parseSpec(item.Spec)
 		if !ok {
-			log.Printf("skip schedule %d: unsupported spec %q (current MVP supports @every 5m or 5m)", item.ID, item.Spec)
+			logger.Warn("跳过不支持的定时规格", 
+				zap.Int64("schedule_id", item.ID),
+				zap.String("spec", item.Spec),
+				zap.String("reason", "仅支持 @every Xm 或 Xh 格式"))
 			continue
 		}
 		go func(taskID int64, every time.Duration) {
@@ -92,7 +97,10 @@ func (s *Scheduler) Start() error {
 			defer ticker.Stop()
 			for range ticker.C {
 				if err := s.r.RunTask(context.Background(), taskID, "schedule"); err != nil {
-					log.Printf("schedule run failed for task %d: %v", taskID, err)
+					logger.Error("定时任务执行失败",
+						zap.Int64("task_id", taskID),
+						zap.Duration("interval", every),
+						zap.Error(err))
 				}
 			}
 		}(item.TaskID, d)

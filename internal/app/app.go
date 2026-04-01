@@ -1,23 +1,38 @@
 package app
 
 import (
-	"log"
 	"net/http"
 
 	"rcloneflow/internal/config"
 	"rcloneflow/internal/controller"
+	"rcloneflow/internal/logger"
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/router"
 	"rcloneflow/internal/scheduler"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
+
+	"go.uber.org/zap"
 )
 
 // Run 启动服务器
 func Run(cfg *config.Config) error {
+	// 初始化日志
+	if err := logger.Init(cfg.GetLogLevel(), cfg.GetLogOutput()); err != nil {
+		return err
+	}
+	defer logger.Sync()
+	
+	logger.Info("启动RcloneFlow服务",
+		zap.String("addr", cfg.GetServerAddr()),
+		zap.String("data_dir", cfg.GetDataDir()),
+		zap.String("log_level", cfg.GetLogLevel()),
+	)
+
 	// 初始化数据库
 	db, err := store.Open(cfg.GetDataDir())
 	if err != nil {
+		logger.Error("数据库初始化失败", zap.Error(err))
 		return err
 	}
 
@@ -43,6 +58,7 @@ func Run(cfg *config.Config) error {
 	// 初始化调度器
 	sched := scheduler.New(db, rc)
 	if err := sched.Start(); err != nil {
+		logger.Error("调度器初始化失败", zap.Error(err))
 		return err
 	}
 
@@ -55,7 +71,7 @@ func Run(cfg *config.Config) error {
 
 	// 启动服务器
 	addr := cfg.GetServerAddr()
-	log.Printf("listening on %s", addr)
+	logger.Info("服务监听中", zap.String("addr", addr))
 	return http.ListenAndServe(addr, handler)
 }
 
