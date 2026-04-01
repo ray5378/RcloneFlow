@@ -339,7 +339,7 @@ body.light .theme-btn:hover {
   background: #1e1e1e;
   border-radius: 12px;
   padding: 0;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 
