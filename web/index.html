@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RcloneFlow</title>
+  <style>
+    *{box-sizing:border-box} body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#f5f7fb;color:#111827}
+    .app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}.sidebar{background:#0f172a;color:#fff;padding:24px 16px;display:grid;gap:16px;align-content:start}.brand{font-size:22px;font-weight:700}.brand small{display:block;font-size:12px;color:#94a3b8;margin-top:4px}
+    .nav{display:grid;gap:8px}.nav button{width:100%;text-align:left;padding:12px 14px;border-radius:12px;background:#111827;border:1px solid #1f2937;color:#e5e7eb;cursor:pointer;transition:.18s ease}.nav button:hover{background:#1f2937;border-color:#334155}.nav button.active{background:#2563eb;border-color:#2563eb;color:#fff}.main{padding:24px;display:grid;gap:16px}.topbar{display:flex;justify-content:space-between;align-items:center;gap:16px}.muted{color:#6b7280;font-size:14px}.page{display:none;gap:16px}.page.active{display:grid}.card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:16px}.browser-layout{display:grid;gap:16px;align-content:start}.storage-panel{align-self:start}.grid{display:grid;gap:12px}.two{grid-template-columns:repeat(2,minmax(0,1fr))}.three{grid-template-columns:repeat(3,minmax(0,1fr))}.four{grid-template-columns:repeat(4,minmax(0,1fr))}.actions{display:flex;gap:8px;flex-wrap:wrap}input,select,button,textarea{padding:10px 12px;border-radius:10px;border:1px solid #d1d5db;font:inherit}button{cursor:pointer;background:#2563eb;color:#fff;border:none;transition:.18s ease}button:hover{filter:brightness(.98);transform:translateY(-1px)}button:focus-visible{outline:2px solid #93c5fd;outline-offset:2px}.ghost{background:#eef2ff;color:#1d4ed8;border:1px solid #c7d2fe}.ghost:hover{background:#dbeafe;border-color:#93c5fd}.ghost.small{padding:6px 10px;font-size:13px;border-radius:8px}.list{display:grid;gap:10px}.item{padding:14px 16px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;cursor:pointer;transition:.18s ease}.item:hover{border-color:#93c5fd;background:#eff6ff;transform:translateY(-1px)}.item:focus-within{border-color:#60a5fa;box-shadow:0 0 0 3px rgba(147,197,253,.35)}.tile-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}.tile{padding:16px;border:1px solid #e5e7eb;border-radius:16px;background:#fff;cursor:pointer;transition:.18s ease}.tile:hover{border-color:#93c5fd;background:#eff6ff;transform:translateY(-1px)}.tile.active{border-color:#60a5fa;background:#eff6ff;box-shadow:0 0 0 3px rgba(147,197,253,.35)}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:12px}pre{white-space:pre-wrap;background:#0b1020;color:#d1e7ff;padding:12px;border-radius:10px;max-height:340px;overflow:auto}.pathbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:4px 0}.crumb{border:none;background:transparent;color:#2563eb;padding:0;font-size:17px;line-height:1.4;cursor:pointer}.crumb:hover{color:#1d4ed8;text-decoration:underline}.crumb.current{color:#111827;font-weight:700;cursor:default}.empty{padding:24px;border:1px dashed #cbd5e1;border-radius:14px;background:#f8fafc;color:#64748b;text-align:center}.subview{display:none;gap:16px}.subview.active{display:grid}.manage-row{display:flex;justify-content:space-between;align-items:center;gap:12px}.menu-btn{width:40px;height:40px;border-radius:10px;background:#eef2ff;color:#1d4ed8;border:1px solid #c7d2fe;font-size:20px;line-height:1}.menu-area{position:relative}.menu-pop{position:absolute;right:0;top:46px;background:#fff;border:1px solid #dbe3f0;border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.12);min-width:150px;overflow:hidden;z-index:20}.menu-pop button{width:100%;text-align:left;border-radius:0;background:#fff;color:#111827;border:none;padding:10px 12px}.menu-pop button:hover{background:#f8fafc}.danger{color:#b91c1c !important}.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:100}.modal{background:#fff;border-radius:16px;padding:24px;max-width:600px;width:90%;max-height:90vh;overflow-y:auto}.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.modal-close{background:none;border:none;font-size:24px;cursor:pointer}.stepper{display:flex;gap:8px;margin-bottom:24px}.step{flex:1;padding:12px;text-align:center;background:#e5e7eb;border-radius:8px}.step.active{background:#2563eb;color:#fff}.step.done{background:#22c55e;color:#fff}.provider-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}.provider-card{padding:16px;border:2px solid #e5e7eb;border-radius:12px;cursor:pointer;transition:.18s}.provider-card:hover{border-color:#93c5fd}.provider-card.selected{border-color:#2563eb;background:#eff6ff}.provider-card img{width:40px;height:40px;object-fit:contain;margin-bottom:8px}.field-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.field-item label{display:block;font-weight:500;margin-bottom:4px}.field-item label .required{color:#dc2626}.field-item input,.field-item select,.field-item textarea{width:100%}.field-item .help{font-size:12px;color:#6b7280;margin-top:4px}.progress-bar{height:8px;background:#e5e7eb;border-radius:4px;overflow:hidden;margin-bottom:16px}.progress-fill{height:100%;background:#2563eb;transition:width .3s}@media (max-width:1000px){.app{grid-template-columns:1fr}.main{padding:16px}.two,.three,.four{grid-template-columns:1fr}.field-grid{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<div id="app"></div>
+<script src="/vendor/vue.global.prod.js"></script>
+<script>
+const { createApp, reactive, computed, onMounted, nextTick } = Vue
+createApp({
+  setup(){
+    // ===== RC API 调用 (对齐 angular 的 rc.call 方式) =====
+    const rc = async (operation, params = {}) => {
+      const res = await fetch('/' + operation, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || res.statusText)
+      return data
+    }
+
+    const pages={
+      browser:['文件管理','浏览存储和目录。'],
+      tasks:['任务管理','创建复制 / 同步 / 移动任务。'],
+      schedules:['定时任务','配置多个周期任务。'],
+      runs:['运行记录','查看任务执行状态。']
+    }
+
+    const state=reactive({
+      currentPage:'browser',version:'加载中...',browserSubview:'explorer',
+      remotes:[],browserFs:'',browserPath:'',browserItems:[],browserView:'list',browserError:'',browserNotice:'',
+      // 添加存储向导
+      showAddRemote:false,addStep:0,providerSearch:'',
+      providers:[],selectedProviderName:'',selectedProvider:null,remoteOptions:{},
+      remoteName:'',creatingRemote:false,createSuccess:false,
+      // 任务相关
+      tasks:[],schedules:[],runs:[],runStatus:null,
+      taskForm:{name:'',mode:'copy',sourceRemote:'',sourcePath:'',targetRemote:'',targetPath:''},
+      scheduleForm:{taskId:'',spec:'5m'},
+      remoteMenu:'',taskMenu:'',
+      // 测试状态: { remoteName: 'idle'|'testing'|'success'|'failed' }
+      remoteTestState:{},
+      // 修改配置模式 (复用添加存储弹窗)
+      isEditMode:false,editOriginalName:'',
+      // 自定义介绍
+      remoteDescriptions:JSON.parse(localStorage.getItem('remoteDescriptions') || '{}'),
+      showEditDesc:false,editDescRemote:'',editDescText:''
+    })
+
+    // 计算属性 - 搜索时自动选中第一个
+    const filteredProviders = computed(() => {
+      if (!state.providers) return []
+      const filtered = state.providers.filter(p => {
+        if (!state.providerSearch) return true
+        // 只匹配存储类型名称开头
+        const s = state.providerSearch.toLowerCase()
+        return p.Name.toLowerCase().startsWith(s)
+      }).sort((a,b) => a.Name.localeCompare(b.Name))
+      
+      // 有搜索词且没有选中时，自动选中第一个
+      if (state.providerSearch && filtered.length > 0 && !state.selectedProvider) {
+        nextTick(() => {
+          const first = filtered[0]
+          if (state.selectedProviderName !== first.Name) {
+            state.selectedProviderName = first.Name
+            selectProvider(first)
+          }
+        })
+      }
+      
+      return filtered
+    })
+
+    const providerOptions = computed(() => {
+      if (!state.selectedProvider) return []
+      return (state.selectedProvider.Options || []).filter(opt => {
+        // 过滤 provider 相关字段 (s3 等)
+        if (opt.Provider) return false
+        // 过滤高级选项
+        if (opt.Advanced) return false
+        return true
+      })
+    })
+
+    const providerAllOptions = computed(() => {
+      if (!state.selectedProvider) return []
+      return state.selectedProvider.Options || []
+    })
+
+    const breadcrumbs=computed(()=>{
+      const parts=(state.browserPath||'').split('/').filter(Boolean)
+      const out=[{label: state.browserFs || 'root', path: ''}]
+      let cur=''
+      for(const part of parts){ cur = cur ? cur + '/' + part : part; out.push({label: part, path: cur}) }
+      return out
+    })
+
+    // ===== 页面导航 =====
+    function switchPage(page){
+      state.currentPage=page
+      if(page==='browser') state.browserSubview='explorer'
+      state.remoteMenu=''
+      state.taskMenu=''
+      state.runStatus=null
+      state.showAddRemote = false
+      location.hash=page
+    }
+
+    // ===== 存储相关 =====
+    async function loadRemotes(){
+      try {
+        // 使用后端 API 获取存储列表
+        const j = await fetch('/api/remotes').then(r => r.json())
+        console.log('loadRemotes:', j)
+        state.remotes = j.remotes || []
+      } catch(e) {
+        console.error('loadRemotes error:', e)
+        state.remotes = []
+      }
+      // 获取版本
+      try {
+        const j = await fetch('/api/remotes').then(r => r.json())
+        state.version = 'rclone ' + (j.version||'-')
+      } catch(e) {
+        state.version = 'rclone'
+      }
+      console.log('state.remotes:', state.remotes)
+      if(!state.taskForm.sourceRemote && state.remotes[0]){
+        state.taskForm.sourceRemote = state.remotes[0]
+        state.taskForm.targetRemote = state.remotes[0]
+      }
+      if(!state.browserFs && state.remotes[0]) state.browserFs=state.remotes[0]
+    }
+
+    async function loadProviders(){
+      // 对齐 angular: 使用 config/providers
+      try {
+        // 使用 fetch 直接 GET 调用
+        const res = await fetch('/api/providers')
+        const data = await res.json()
+        console.log('Providers loaded:', data.providers?.length)
+        state.providers = data.providers || []
+      } catch(e) {
+        console.error('loadProviders error:', e)
+        state.providers = []
+      }
+    }
+
+    async function openRemote(remote){
+      state.browserFs=remote
+      state.browserPath=''
+      state.browserSubview='explorer'
+      state.currentPage='browser'
+      location.hash='browser'
+      await browse('')
+      await nextTick()
+      const browserCard=document.querySelector('[data-browser-panel]')
+      if(browserCard) browserCard.scrollIntoView({behavior:'smooth', block:'start'})
+    }
+
+    // ===== 文件浏览 =====
+    async function browse(targetPath=state.browserPath){
+      if(!state.browserFs) return
+      const normalized=(targetPath||'').replace(/^\/+|\/+$/g,'')
+      try{
+        // 通过后端 API 列出文件
+        const res = await fetch('/api/browser/list?remote=' + state.browserFs + '&path=' + encodeURIComponent(normalized))
+        const data = await res.json()
+        state.browserPath=normalized
+        state.browserItems=(data.items||[]).sort((a,b)=>Number(!!b.IsDir)-Number(!!a.IsDir)||String(a.Name||'').localeCompare(String(b.Name||'')))
+        state.browserError=''
+        state.browserNotice=''
+      }catch(err){
+        const message=String(err.message||'目录加载失败')
+        state.browserError=message
+        state.browserNotice=message.includes('context deadline exceeded') ? 'SMB 浏览超时，请稍后重试。已保留上一次成功的目录内容。' : message
+        alert(state.browserNotice)
+      }
+    }
+
+    function joinBrowserPath(base,name){
+      const b=(base||'').replace(/^\/+|\/+$/g,'')
+      const n=(name||'').replace(/^\/+|\/+$/g,'')
+      if(!b) return n
+      if(!n) return b
+      return b + '/' + n
+    }
+
+    function browserParentPath(p){
+      const cur=(p||'').replace(/^\/+|\/+$/g,'')
+      if(!cur) return ''
+      const parts=cur.split('/').filter(Boolean)
+      parts.pop()
+      return parts.join('/')
+    }
+
+    async function goParent(){await browse(browserParentPath(state.browserPath))}
+    async function jumpToPath(path){await browse(path||'')}
+    function enterItem(item){
+      if(item.IsDir||item.IsDir===true){
+        const itemPath=(item.Path||'').replace(/^\/+|\/+$/g,'')
+        const itemName=(item.Name||'').replace(/^\/+|\/+$/g,'')
+        const nextPath=(item.IsBucket && !state.browserPath) ? itemPath : joinBrowserPath(state.browserPath, itemName || itemPath)
+        browse(nextPath)
+      }
+    }
+
+    // ===== 添加存储向导 =====
+    function openAddRemote(){
+      state.showAddRemote = true
+      state.addStep = 0
+      state.remoteName = ''
+      state.remoteOptions = {}
+      state.selectedProviderName = ''
+      state.selectedProvider = null
+      loadProviders()
+    }
+
+    function closeAddRemote(){
+      state.showAddRemote = false
+      state.addStep = 0
+      state.remoteName = ''
+      state.remoteOptions = {}
+      state.selectedProvider = null
+    }
+
+    function selectProvider(provider){
+      state.selectedProvider = provider
+      state.selectedProviderName = provider ? provider.Name : ''
+      state.remoteOptions = {}
+      // 设置默认值（和 angular 完全一致：设置所有选项的 DefaultStr，包括高级选项）
+      if (provider && provider.Options) {
+        provider.Options.forEach(opt => {
+          // 跳过不需要的字段
+          if (opt.Name === 'headers') { return }
+          
+          // 使用 DefaultStr（和 angular 完全一致，包括高级选项）
+          if (opt.DefaultStr !== '') {
+            state.remoteOptions[opt.Name] = opt.DefaultStr
+          }
+        })
+      }
+    }
+
+    function onProviderNameChange(e){
+      const name = e.target.value
+      const provider = state.providers.find(p => p.Name === name)
+      selectProvider(provider)
+    }
+
+    function selectFirstFiltered(){
+      if (filteredProviders.length > 0) {
+        const first = filteredProviders[0]
+        state.selectedProviderName = first.Name
+        selectProvider(first)
+      }
+    }
+
+    function nextStep(){
+      if (state.isEditMode) {
+        // 编辑模式: 配置选项 -> 确认保存
+        if (state.addStep === 1) state.addStep = 3
+      } else {
+        if (state.addStep < 3) state.addStep++
+      }
+    }
+
+    function prevStep(){
+      if (state.isEditMode) {
+        // 编辑模式: 确认保存 -> 配置选项
+        if (state.addStep === 3) state.addStep = 1
+      } else {
+        if (state.addStep > 0) state.addStep--
+      }
+    }
+
+    async function createRemote(){
+      if (!state.remoteName || !state.selectedProvider) {
+        alert('请填写存储名称和选择类型')
+        return
+      }
+      state.creatingRemote = true
+      
+      // 不过滤 falsy 值（保留 false、0 等）
+      const params = { ...state.remoteOptions }
+      
+      console.log(state.isEditMode ? 'Updating remote:' : 'Creating remote:', state.remoteName, state.selectedProvider.Name, params)
+      
+      try {
+        const response = await fetch('/api/remotes', {
+          method: state.isEditMode ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: state.remoteName,
+            type: state.selectedProvider.Name,
+            parameters: params
+          })
+        })
+        
+        console.log('Response status:', response.status)
+        
+        if (!response.ok) {
+          const text = await response.text()
+          console.log('Error response:', text)
+          throw new Error(text)
+        }
+        
+        const data = await response.json()
+        console.log('Success:', data)
+        state.createSuccess = true
+      } catch(e) {
+        console.error('Error:', e)
+        alert('创建失败: ' + e.message)
+        state.creatingRemote = false
+      }
+    }
+
+    function confirmAndClose(){
+      state.showAddRemote = false
+      state.addStep = 0
+      state.remoteName = ''
+      state.remoteOptions = {}
+      state.selectedProvider = null
+      state.creatingRemote = false
+      state.createSuccess = false
+      state.isEditMode = false
+      state.editOriginalName = ''
+      loadRemotes()
+    }
+
+    // ===== 修改存储配置 (复用添加存储弹窗) =====
+    async function openEditRemote(name){
+      try {
+        // 获取存储配置
+        const res = await fetch('/api/remotes/config/' + encodeURIComponent(name))
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || '获取配置失败')
+        
+        // 获取类型
+        const type = data.type || ''
+        // 获取提供商信息
+        if (!state.providers.length) {
+          await loadProviders()
+        }
+        
+        // 查找对应的 provider
+        const provider = state.providers.find(p => p.Name === type)
+        if (!provider) {
+          throw new Error('找不到对应的存储类型: ' + type)
+        }
+        
+        // 设置为编辑模式
+        state.isEditMode = true
+        state.editOriginalName = name
+        
+        // 预填表单
+        state.selectedProviderName = type
+        state.selectedProvider = provider
+        state.remoteOptions = { ...data }
+        // 移除 type 和 name 字段，它们不需要修改
+        delete state.remoteOptions.type
+        delete state.remoteOptions.name
+        
+        // 跳转到步骤1（配置选项页面），编辑模式跳过类型选择
+        state.addStep = 1
+        state.remoteName = name
+        state.showAddRemote = true
+        
+      } catch(e) {
+        alert('获取存储配置失败: ' + e.message)
+      }
+    }
+
+    // ===== 自定义介绍 =====
+    function openEditDesc(name){
+      state.editDescRemote = name
+      state.editDescText = state.remoteDescriptions[name] || ''
+      state.showEditDesc = true
+    }
+
+    function closeEditDesc(){
+      state.showEditDesc = false
+      state.editDescRemote = ''
+      state.editDescText = ''
+    }
+
+    function saveEditDesc(){
+      state.remoteDescriptions[state.editDescRemote] = state.editDescText
+      localStorage.setItem('remoteDescriptions', JSON.stringify(state.remoteDescriptions))
+      closeEditDesc()
+    }
+
+    // ===== 测试/删除存储 =====
+    async function testRemote(name){
+      // 如果正在测试或已有结果未清除，跳过
+      if (state.remoteTestState[name] === 'testing') return
+      
+      state.remoteTestState[name] = 'testing'
+      try {
+        const res = await fetch('/api/remotes/test', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name })
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || '测试失败')
+        state.remoteTestState[name] = 'success'
+      } catch(e) {
+        state.remoteTestState[name] = 'failed'
+      }
+      
+      // 5秒后恢复idle状态
+      setTimeout(() => {
+        if (state.remoteTestState[name] !== 'testing') {
+          state.remoteTestState[name] = 'idle'
+        }
+      }, 5000)
+    }
+    
+    function getTestButtonText(name){
+      const s = state.remoteTestState[name]
+      if (s === 'testing') return '测试中...'
+      if (s === 'success') return '成功 ✓'
+      if (s === 'failed') return '失败 ✗'
+      return '测试'
+    }
+
+    async function deleteRemote(name){
+      if (!confirm('确定要删除存储 "' + name + '" 吗？')) return
+      try {
+        const res = await fetch('/api/config/' + name, { method: 'DELETE' })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error || '删除失败')
+        }
+        await loadRemotes()
+      } catch(e) {
+        alert('删除失败: ' + e.message)
+      }
+    }
+
+    function openManageStorage(){switchPage('browser'); state.browserSubview='manage-storage'}
+
+    // ===== 任务相关 =====
+    async function loadTasks(){
+      const j = await fetch('/api/tasks').then(r => r.json())
+      state.tasks = j || []
+      if(!state.scheduleForm.taskId && state.tasks[0]) state.scheduleForm.taskId = state.tasks[0].id
+    }
+    async function createTask(){
+      await fetch('/api/tasks',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(state.taskForm)
+      })
+      await loadTasks()
+    }
+    async function runTask(id){
+      await fetch(`/api/tasks/${id}/run`,{method:'POST'})
+      await loadRuns()
+      switchPage('runs')
+    }
+    async function loadSchedules(){
+      const j = await fetch('/api/schedules').then(r => r.json())
+      state.schedules = j || []
+    }
+    async function createSchedule(){
+      await fetch('/api/schedules',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({taskId:Number(state.scheduleForm.taskId),spec:state.scheduleForm.spec,enabled:true})
+      })
+      await loadSchedules()
+    }
+    async function loadRuns(){
+      const j = await fetch('/api/runs').then(r => r.json())
+      state.runs = j || []
+    }
+    async function loadRunStatus(id){
+      state.runStatus = await fetch('/api/runs/'+id).then(r => r.json())
+    }
+    async function deleteTask(id){alert('删除 task 入口已预留，后端删除接口下一步补')}
+
+    // ===== 生命周期 =====
+    onMounted(async()=>{
+      await Promise.all([loadRemotes(),loadTasks(),loadSchedules(),loadRuns()])
+      const p=(location.hash||'#browser').slice(1)
+      if(pages[p]) state.currentPage=p
+      if(state.remotes[0]) openRemote(state.remotes[0]).catch(()=>{})
+    })
+
+    return {
+      pages,state,switchPage,breadcrumbs,filteredProviders,providerOptions,providerAllOptions,
+      loadRemotes,loadProviders,openRemote,browse,goParent,jumpToPath,enterItem,
+      openAddRemote,closeAddRemote,selectProvider,onProviderNameChange,selectFirstFiltered,nextStep,prevStep,createRemote,confirmAndClose,
+      testRemote,getTestButtonText,deleteRemote,openManageStorage,
+      openEditRemote,openEditDesc,closeEditDesc,saveEditDesc,
+      loadTasks,createTask,runTask,loadSchedules,createSchedule,loadRuns,loadRunStatus,deleteTask
+    }
+  },
+  template:`
+  <div class="app">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="brand">RcloneFlow<small>多存储复制 / 同步 / 移动任务工作台</small></div>
+      <div class="nav">
+        <button v-for="(meta,key) in pages" :key="key" :class="{active: state.currentPage===key}" @click="switchPage(key)">{{ meta[0] }}</button>
+      </div>
+      <div class="muted">{{ state.version }}</div>
+    </aside>
+
+    <main class="main">
+      <!-- 文件管理页面 -->
+      <section class="page" :class="{active: state.currentPage==='browser'}">
+        <!-- 文件浏览视图 -->
+        <div class="subview" :class="{active: state.browserSubview==='explorer'}">
+          <div class="browser-layout">
+            <div class="card storage-panel">
+              <div class="topbar">
+                <div>
+                  <div style="font-size:18px;font-weight:600">存储节点</div>
+                  <div class="muted">选择浏览存储文件</div>
+                </div>
+                <div class="actions">
+                  <button class="ghost small" @click="openManageStorage">管理存储</button>
+                  <button class="ghost small" @click="openAddRemote">添加存储</button>
+                </div>
+              </div>
+              <div class="tile-grid" style="margin-top:12px">
+                <div class="tile" :class="{active: state.browserFs===name}" v-for="name in state.remotes" :key="name" @click="openRemote(name)">
+                  <div class="manage-row"><strong>{{ name }}</strong></div>
+                  <div v-if="state.remoteDescriptions[name]" class="muted" style="margin-top:6px">{{ state.remoteDescriptions[name] }}</div>
+                </div>
+              </div>
+            </div>
+            <div class="card" data-browser-panel>
+              <div class="topbar">
+                <div>
+                  <div style="font-size:18px;font-weight:600">文件浏览</div>
+                  <div class="muted">当前存储内容列表。</div>
+                </div>
+                <div class="actions">
+                  <button class="ghost" @click="goParent" :disabled="!state.browserPath">返回上级</button>
+                  <button class="ghost" @click="browse">刷新当前目录</button>
+                </div>
+              </div>
+              <div class="pathbar" style="margin-top:12px">
+                <template v-for="(crumb,idx) in breadcrumbs" :key="crumb.path + idx">
+                  <button class="crumb" :class="{current: idx===breadcrumbs.length-1}" @click="idx===breadcrumbs.length-1 ? null : jumpToPath(crumb.path)">{{ crumb.label }}</button>
+                  <span v-if="idx < breadcrumbs.length-1" class="muted">/</span>
+                </template>
+              </div>
+              <div v-if="state.browserNotice" class="notice">{{ state.browserNotice }}</div>
+              <div class="list" style="margin-top:12px">
+                <div class="item" v-for="item in state.browserItems" :key="item.Path||item.Name" @click="enterItem(item)">
+                  <div class="manage-row"><strong>{{ item.Name || item.Path }}</strong><span class="muted">{{ item.IsDir ? '目录' : '文件' }}</span></div>
+                </div>
+              </div>
+              <div v-if="!state.browserItems.length && !state.browserError" class="empty" style="margin-top:12px">当前目录暂无内容</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 管理存储视图 -->
+        <div class="subview" :class="{active: state.browserSubview==='manage-storage'}">
+          <div class="card">
+            <!-- 标题栏 -->
+            <div class="manage-row" style="margin-bottom:12px">
+              <div style="font-size:18px;font-weight:600">管理存储</div>
+              <div class="actions">
+                <button class="ghost small" @click="state.browserSubview='explorer'">返回</button>
+                <button class="ghost small" @click="openAddRemote">添加存储</button>
+              </div>
+            </div>
+            <div style="border-top:1px solid #e5e7eb;padding-top:12px">
+              <div class="list">
+                <div class="item" v-for="name in state.remotes" :key="name" @click="openRemote(name)">
+                  <div class="manage-row">
+                    <div><strong>{{ name }}</strong><span class="muted" style="margin-left:8px">点击打开</span></div>
+                    <div class="actions" @click.stop>
+                      <button class="ghost small" @click="openEditRemote(name)">修改配置</button>
+                      <button class="ghost small" @click="openEditDesc(name)">自定义介绍</button>
+                      <button class="ghost small" @click="testRemote(name)" :disabled="state.remoteTestState[name]==='testing'">{{ getTestButtonText(name) }}</button>
+                      <div class="menu-area">
+                        <button class="menu-btn ghost small" @click="state.remoteMenu = state.remoteMenu===name ? '' : name">⋮</button>
+                        <div v-if="state.remoteMenu===name" class="menu-pop">
+                          <button class="danger" @click="deleteRemote(name); state.remoteMenu=''">删除</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 任务管理页面 -->
+      <section class="page" :class="{active: state.currentPage==='tasks'}">
+        <div class="card">
+          <div class="topbar">
+            <div><strong>Tasks</strong><div class="muted">创建 copy / sync 任务。</div></div>
+            <button @click="createTask">创建任务</button>
+          </div>
+          <div class="grid three" style="margin-top:12px">
+            <input v-model="state.taskForm.name" placeholder="任务名">
+            <select v-model="state.taskForm.mode"><option>copy</option><option>sync</option></select>
+            <select v-model="state.taskForm.sourceRemote"><option v-for="name in state.remotes" :value="name">{{ name }}</option></select>
+            <input v-model="state.taskForm.sourcePath" placeholder="源路径">
+            <select v-model="state.taskForm.targetRemote"><option v-for="name in state.remotes" :value="name">{{ name }}</option></select>
+            <input v-model="state.taskForm.targetPath" placeholder="目标路径">
+          </div>
+        </div>
+        <div class="card">
+          <div class="topbar"><strong>任务列表</strong><button class="ghost" @click="loadTasks">刷新</button></div>
+          <div class="list" style="margin-top:12px">
+            <div class="item" v-for="t in state.tasks" :key="t.id">
+              <div class="manage-row">
+                <div><strong>#{{ t.id }} {{ t.name }}</strong><div class='muted'>{{ t.mode }}: {{ t.sourceRemote }}:{{ t.sourcePath||'' }} → {{ t.targetRemote }}:{{ t.targetPath||'' }}</div></div>
+                <div class="actions">
+                  <button @click="runTask(t.id)">立即运行</button>
+                  <div class="menu-area">
+                    <button class="menu-btn ghost" @click="state.taskMenu = state.taskMenu===t.id ? '' : t.id">⋮</button>
+                    <div v-if="state.taskMenu===t.id" class="menu-pop">
+                      <button @click="runTask(t.id); state.taskMenu=''">立即运行</button>
+                      <button class="danger" @click="deleteTask(t.id); state.taskMenu=''">删除</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 定时任务页面 -->
+      <section class="page" :class="{active: state.currentPage==='schedules'}">
+        <div class="card">
+          <div class="topbar">
+            <div><strong>Schedules</strong><div class="muted">当前 MVP 支持 5m / 1h / @every 5m</div></div>
+            <button @click="createSchedule">添加定时</button>
+          </div>
+          <div class="grid two" style="margin-top:12px">
+            <select v-model="state.scheduleForm.taskId"><option v-for="t in state.tasks" :value="t.id">#{{ t.id }} {{ t.name }}</option></select>
+            <input v-model="state.scheduleForm.spec" placeholder="5m / 1h / @every 5m">
+          </div>
+        </div>
+        <div class="card">
+          <div class="topbar"><strong>定时列表</strong><button class="ghost" @click="loadSchedules">刷新</button></div>
+          <div class="list" style="margin-top:12px">
+            <div class="item" v-for="s in state.schedules" :key="s.id">#{{ s.id }} task={{ s.taskId }} spec={{ s.spec }} enabled={{ s.enabled }}</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 运行记录页面 -->
+      <section class="page" :class="{active: state.currentPage==='runs'}">
+        <div class="card two grid">
+          <div>
+            <div class="topbar"><strong>运行记录</strong><button class="ghost" @click="loadRuns">刷新</button></div>
+            <div class="list" style="margin-top:12px">
+              <div class="item" v-for="r in state.runs" :key="r.id">
+                <strong>#{{ r.id }}</strong>
+                <div class="muted">task={{ r.taskId }} rcJob={{ r.rcJobId }} status={{ r.status }}</div>
+                <div class="actions" style="margin-top:10px"><button class="ghost" @click="loadRunStatus(r.id)">查看状态</button></div>
+              </div>
+            </div>
+          </div>
+          <div><strong>状态详情</strong><pre>{{ JSON.stringify(state.runStatus,null,2) }}</pre></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 添加存储弹窗 -->
+    <div v-if="state.showAddRemote" class="modal-overlay" @click.self="closeAddRemote">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>{{ state.isEditMode ? '修改存储配置' : '添加存储' }}</h2>
+          <button class="modal-close" @click="closeAddRemote">&times;</button>
+        </div>
+
+        <!-- 步骤条 -->
+        <div class="stepper" v-if="!state.isEditMode">
+          <div class="step" :class="{active: state.addStep===0, done: state.addStep>0}">1. 选择类型</div>
+          <div class="step" :class="{active: state.addStep===1, done: state.addStep>1}">2. 配置选项</div>
+          <div class="step" :class="{active: state.addStep===2, done: state.addStep>2}">3. 存储名称</div>
+          <div class="step" :class="{active: state.addStep===3}">4. 保存</div>
+        </div>
+        <!-- 编辑模式: 配置选项 -> 确认保存 -->
+        <div class="stepper" v-else>
+          <div class="step" :class="{active: state.addStep===1, done: state.addStep>1}">1. 配置选项</div>
+          <div class="step" :class="{active: state.addStep===3}">2. 确认保存</div>
+        </div>
+
+    <!-- Step 1: 选择 Provider (下拉选择 + 搜索) -->
+    <div v-if="state.addStep===0">
+      <div class="field-item">
+        <label>选择存储类型 <span class="required">*</span></label>
+        <input v-model="state.providerSearch" placeholder="输入存储类型名称搜索 (如 s3, webdav, google)..." style="width:100%;margin-bottom:8px">
+        <select v-model="state.selectedProviderName" :style="{width:'100%'}" size="10" @change="onProviderNameChange">
+          <option value="">-- 请选择 --</option>
+          <option v-for="p in filteredProviders" :key="p.Name" :value="p.Name">{{ p.Name }}</option>
+        </select>
+      </div>
+      <div v-if="filteredProviders.length > 0 && state.providerSearch" style="margin-top:8px">
+        <span class="muted">找到 {{ filteredProviders.length }} 个匹配 "{{ state.providerSearch }}" 的存储类型</span>
+      </div>
+      <div v-if="state.selectedProvider" style="margin-top:20px;padding:16px;background:#f0f9ff;border-radius:8px">
+        <div><strong>已选择:</strong> {{ state.selectedProvider.Name }}</div>
+        <div class="muted">{{ state.selectedProvider.Description }}</div>
+      </div>
+      <div class="actions" style="margin-top:16px;justify-content:flex-end">
+        <button color="primary" :disabled="!state.selectedProvider" @click="nextStep">下一步</button>
+      </div>
+    </div>
+
+        <!-- Step 2: 配置选项 -->
+        <div v-if="state.addStep===1 && state.selectedProvider">
+          <div class="field-grid">
+            <div class="field-item" v-for="opt in providerOptions" :key="opt.Name">
+              <label>{{ opt.Name }} <span v-if="opt.Required" class="required">*</span></label>
+              <!-- 如果有 Examples，做成下拉框 -->
+              <select v-if="opt.Examples && opt.Examples.length" v-model="state.remoteOptions[opt.Name]" :style="{width:'100%'}">
+                <option value="">-- 请选择 --</option>
+                <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">{{ ex.Value }} - {{ ex.Help }}</option>
+              </select>
+              <!-- 否则用输入框 -->
+              <input v-else v-model="state.remoteOptions[opt.Name]" :type="opt.IsPassword ? 'password' : 'text'" :placeholder="opt.Help.split('\\n')[0]">
+              <div class="help">{{ opt.Help }}</div>
+            </div>
+          </div>
+          <!-- 高级选项 -->
+          <details style="margin-top:16px">
+            <summary style="cursor:pointer;color:#2563eb">高级选项</summary>
+            <div class="field-grid" style="margin-top:12px">
+              <div class="field-item" v-for="opt in providerAllOptions.filter(o=>o.Advanced)" :key="opt.Name">
+                <label>{{ opt.Name }} <span v-if="opt.Required" class="required">*</span></label>
+                <select v-if="opt.Examples && opt.Examples.length" v-model="state.remoteOptions[opt.Name]" :style="{width:'100%'}">
+                  <option value="">-- 请选择 --</option>
+                  <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">{{ ex.Value }} - {{ ex.Help }}</option>
+                </select>
+                <input v-else v-model="state.remoteOptions[opt.Name]" :type="opt.IsPassword ? 'password' : 'text'" :placeholder="opt.Help.split('\\n')[0]">
+              </div>
+            </div>
+          </details>
+          <div class="actions" style="margin-top:16px;justify-content:space-between">
+            <button class="ghost" @click="prevStep">上一步</button>
+            <button color="primary" @click="nextStep">下一步</button>
+          </div>
+        </div>
+
+        <!-- Step 3: 输入名称 -->
+        <div v-if="state.addStep===2">
+          <div class="field-item">
+            <label>存储名称 <span class="required">*</span></label>
+            <input v-model="state.remoteName" placeholder="例如: my-google-drive">
+            <div class="help">只允许字母、数字、下划线和连字符</div>
+          </div>
+          <div class="actions" style="margin-top:16px;justify-content:space-between">
+            <button class="ghost" @click="prevStep">上一步</button>
+            <button color="primary" :disabled="!state.remoteName || state.remoteName.length<2" @click="nextStep">下一步</button>
+          </div>
+        </div>
+
+        <!-- Step 4: 保存 -->
+        <div v-if="state.addStep===3">
+          <div class="card" style="background:#f0f9ff;margin-bottom:16px">
+            <div><strong>存储类型:</strong> {{ state.selectedProvider?.Name }}</div>
+            <div><strong>存储名称:</strong> {{ state.remoteName }}</div>
+          </div>
+          <div class="actions" style="justify-content:space-between">
+            <button class="ghost" @click="prevStep" :disabled="state.createSuccess || state.isEditMode">上一步</button>
+            <button v-if="!state.createSuccess" color="primary" :disabled="state.creatingRemote" @click="createRemote">
+              {{ state.creatingRemote ? '保存中...' : (state.isEditMode ? '保存修改' : '保存') }}
+            </button>
+            <button v-else color="primary" @click="confirmAndClose">
+              {{ state.isEditMode ? '修改成功，点击关闭' : '添加成功，点击关闭' }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 自定义介绍弹窗 -->
+    <div v-if="state.showEditDesc" class="modal-overlay" @click.self="closeEditDesc">
+      <div class="modal">
+        <div class="modal-header">
+          <h2>自定义介绍</h2>
+          <button class="modal-close" @click="closeEditDesc">&times;</button>
+        </div>
+        <div class="card" style="background:#f0f9ff;margin-bottom:16px">
+          <div><strong>存储名称:</strong> {{ state.editDescRemote }}</div>
+        </div>
+        <div class="field-item">
+          <label>介绍文字</label>
+          <input v-model="state.editDescText" placeholder="输入该存储的自定义介绍文字..." style="width:100%">
+          <div class="help">设置后将在存储节点页面显示</div>
+        </div>
+        <div class="actions" style="margin-top:16px;justify-content:flex-end">
+          <button class="ghost" @click="closeEditDesc">取消</button>
+          <button color="primary" @click="saveEditDesc">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>`
+}).mount('#app')
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+services:
+  rclone:
+    image: rclone/rclone:latest
+    container_name: rclone-remote-rcd
+    restart: unless-stopped
+    command: >
+      rcd
+      --rc-addr=0.0.0.0:5572
+      --rc-no-auth
+    ports:
+      - "5572:5572"
+    volumes:
+      - ./runtime/rclone:/config/rclone
+      - ./runtime/data:/data
+
+  app:
+    build: .
+    container_name: rclone-remote-app
+    restart: unless-stopped
+    depends_on:
+      - rclone
+    environment:
+      APP_ADDR: ":17870"
+      APP_DATA_DIR: "/app/data"
+      RCLONE_RC_URL: "http://rclone:5572"
+    ports:
+      - "17870:17870"
+    volumes:
+      - ./runtime/app:/app/data
