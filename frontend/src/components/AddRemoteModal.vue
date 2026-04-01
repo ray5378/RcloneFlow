@@ -1,0 +1,203 @@
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue'
+import Modal from './Modal.vue'
+import * as api from '../api'
+import type { Provider } from '../types'
+
+const props = defineProps<{
+  show: boolean
+  editMode?: boolean
+  editName?: string
+}>()
+
+const emit = defineEmits<{
+  close: []
+  success: []
+}>()
+
+const step = ref(0)
+const search = ref('')
+const selectedProviderName = ref('')
+const selectedProvider = ref<Provider | null>(null)
+const remoteName = ref('')
+const remoteOptions = ref<Record<string, string>>({})
+const creating = ref(false)
+const success = ref(false)
+const providers = ref<Provider[]>([])
+
+const filteredProviders = computed(() => {
+  if (!providers.value) return []
+  return providers.value
+    .filter(p => {
+      if (!search.value) return true
+      return p.Name.toLowerCase().startsWith(search.value.toLowerCase())
+    })
+    .sort((a, b) => a.Name.localeCompare(b.Name))
+})
+
+const providerOptions = computed(() => {
+  if (!selectedProvider.value) return []
+  return (selectedProvider.value.Options || []).filter((opt: { Provider?: unknown; Advanced?: boolean }) => {
+    if (opt.Provider) return false
+    if (opt.Advanced) return false
+    return true
+  })
+})
+
+watch(() => props.show, async (val) => {
+  if (val) {
+    step.value = 0
+    search.value = ''
+    selectedProviderName.value = ''
+    selectedProvider.value = null
+    remoteName.value = ''
+    remoteOptions.value = {}
+    creating.value = false
+    success.value = false
+    
+    // Load providers
+    const data = await api.listProviders()
+    providers.value = data.providers || []
+  }
+})
+
+function selectProvider(provider: Provider) {
+  selectedProvider.value = provider
+  selectedProviderName.value = provider.Name
+  step.value = 1
+  remoteOptions.value = {}
+}
+
+function nextStep() {
+  if (step.value === 1) {
+    step.value = 3
+  }
+}
+
+function prevStep() {
+  if (step.value === 3) {
+    step.value = 1
+  }
+}
+
+async function create() {
+  creating.value = true
+  try {
+    const params: Record<string, unknown> = {}
+    for (const key in remoteOptions.value) {
+      params[key] = remoteOptions.value[key]
+    }
+    
+    if (props.editMode && props.editName) {
+      await api.updateRemote(remoteName.value, selectedProvider.value!.Name, params)
+    } else {
+      await api.createRemote(remoteName.value, selectedProvider.value!.Name, params)
+    }
+    success.value = true
+    setTimeout(() => {
+      emit('success')
+      emit('close')
+    }, 1000)
+  } catch (e) {
+    alert((e as Error).message)
+  } finally {
+    creating.value = false
+  }
+}
+
+defineExpose({ loadConfig: async (name: string) => {
+  const config = await api.getRemoteConfig(name)
+  remoteName.value = name
+  const type = config.type as string
+  const provider = providers.value.find(p => p.Name === type)
+  if (provider) {
+    selectedProvider.value = provider
+    selectedProviderName.value = type
+    for (const key in config) {
+      if (key !== 'type' && key !== 'name') {
+        remoteOptions.value[key] = String(config[key])
+      }
+    }
+    step.value = 3
+  }
+}})
+</script>
+
+<template>
+  <Modal :show="show" :title="editMode ? '修改存储配置' : '添加存储'" @close="emit('close')">
+    <!-- Stepper -->
+    <div v-if="!editMode" class="stepper">
+      <div class="step" :class="{ active: step === 0, done: step > 0 }">1. 选择类型</div>
+      <div class="step" :class="{ active: step === 1, done: step > 1 }">2. 配置选项</div>
+      <div class="step" :class="{ active: step === 2, done: step > 2 }">3. 存储名称</div>
+      <div class="step" :class="{ active: step === 3 }">4. 保存</div>
+    </div>
+    <div v-else class="stepper">
+      <div class="step" :class="{ active: step === 1, done: step > 1 }">1. 配置选项</div>
+      <div class="step" :class="{ active: step === 3 }">2. 确认保存</div>
+    </div>
+
+    <!-- Step 0: Select Provider -->
+    <div v-if="step === 0">
+      <input
+        v-model="search"
+        type="text"
+        placeholder="搜索存储类型..."
+        style="width: 100%; margin-bottom: 16px"
+      />
+      <div class="provider-grid">
+        <div
+          v-for="p in filteredProviders"
+          :key="p.Name"
+          class="provider-card"
+          :class="{ selected: selectedProviderName === p.Name }"
+          @click="selectProvider(p)"
+        >
+          <strong>{{ p.Name }}</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 1: Configure Options -->
+    <div v-if="step === 1">
+      <div class="field-grid">
+        <div v-for="opt in providerOptions" :key="opt.Name" class="field-item">
+          <label>{{ opt.Name }}</label>
+          <input
+            v-if="!opt.Password"
+            v-model="remoteOptions[opt.Name]"
+            type="text"
+            :placeholder="opt.Help"
+          />
+          <input
+            v-else
+            v-model="remoteOptions[opt.Name]"
+            type="password"
+            :placeholder="opt.Help"
+          />
+        </div>
+      </div>
+      <div class="actions" style="margin-top: 16px; justify-content: space-between">
+        <button class="ghost" @click="prevStep">上一步</button>
+        <button @click="nextStep">下一步</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Save -->
+    <div v-if="step === 3">
+      <div class="card" style="background: #f0f9ff; margin-bottom: 16px">
+        <div><strong>存储类型:</strong> {{ selectedProvider?.Name }}</div>
+        <div><strong>存储名称:</strong> {{ remoteName }}</div>
+      </div>
+      <div class="actions" style="justify-content: space-between">
+        <button v-if="!editMode" class="ghost" @click="prevStep" :disabled="success">上一步</button>
+        <button v-if="!success" color="primary" :disabled="creating" @click="create">
+          {{ creating ? '保存中...' : (editMode ? '保存修改' : '保存') }}
+        </button>
+        <button v-else color="primary" @click="emit('close')">
+          {{ editMode ? '修改成功，点击关闭' : '添加成功，点击关闭' }}
+        </button>
+      </div>
+    </div>
+  </Modal>
+</template>

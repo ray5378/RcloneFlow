@@ -1,0 +1,282 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import AddRemoteModal from '../components/AddRemoteModal.vue'
+import EditDescModal from '../components/EditDescModal.vue'
+import * as api from '../api'
+import type { RemoteTestState, FileItem } from '../types'
+
+defineProps<{
+  version: string
+}>()
+
+const emit = defineEmits<{
+  navigate: [subview: string]
+}>()
+
+const remotes = ref<string[]>([])
+const browserFs = ref('')
+const browserPath = ref('')
+const browserItems = ref<FileItem[]>([])
+const browserError = ref('')
+const testState = ref<Record<string, RemoteTestState>>({})
+const remoteMenu = ref('')
+
+const descriptions = ref<Record<string, string>>(
+  JSON.parse(localStorage.getItem('remoteDescriptions') || '{}')
+)
+
+const showAddRemote = ref(false)
+const showEditDesc = ref(false)
+const editDescRemote = ref('')
+const addRemoteModal = ref<InstanceType<typeof AddRemoteModal> | null>(null)
+
+const subview = ref('explorer')
+
+const breadcrumbs = computed(() => {
+  const parts = browserPath.value.split('/').filter(Boolean)
+  const crumbs = [{ name: browserFs.value + ':', path: '' }]
+  let current = ''
+  for (const p of parts) {
+    current += '/' + p
+    crumbs.push({ name: p, path: current })
+  }
+  return crumbs
+})
+
+onMounted(async () => {
+  await loadRemotes()
+})
+
+async function loadRemotes() {
+  try {
+    const data = await api.listRemotes()
+    remotes.value = data.remotes || []
+    emit('navigate', 'explorer')
+  } catch (e) {
+    browserError.value = (e as Error).message
+  }
+}
+
+async function openRemote(name: string) {
+  browserFs.value = name
+  browserPath.value = ''
+  await refreshBrowser()
+  subview.value = 'explorer'
+}
+
+async function refreshBrowser() {
+  if (!browserFs.value) return
+  browserError.value = ''
+  try {
+    const data = await api.listPath(browserFs.value, browserPath.value)
+    browserItems.value = data.items || []
+  } catch (e) {
+    browserError.value = (e as Error).message
+  }
+}
+
+function enterItem(item: FileItem) {
+  if (!item.IsDir) return
+  browserPath.value = item.Path
+  refreshBrowser()
+}
+
+function goParent() {
+  const parts = browserPath.value.split('/').filter(Boolean)
+  parts.pop()
+  browserPath.value = parts.join('/')
+  refreshBrowser()
+}
+
+async function testRemote(name: string) {
+  if (testState.value[name] === 'testing') return
+  testState.value[name] = 'testing'
+  try {
+    await api.testRemote(name)
+    testState.value[name] = 'success'
+  } catch {
+    testState.value[name] = 'failed'
+  }
+  setTimeout(() => {
+    testState.value[name] = 'idle'
+  }, 5000)
+}
+
+function getTestText(name: string) {
+  const s = testState.value[name]
+  if (s === 'testing') return '测试中...'
+  if (s === 'success') return '成功 ✓'
+  if (s === 'failed') return '失败 ✗'
+  return '测试'
+}
+
+async function deleteRemote(name: string) {
+  if (!confirm(`确定删除存储 "${name}"？`)) return
+  try {
+    await api.deleteRemote(name)
+    await loadRemotes()
+  } catch (e) {
+    alert((e as Error).message)
+  }
+}
+
+function openEditDesc(name: string) {
+  editDescRemote.value = name
+  showEditDesc.value = true
+}
+
+function saveDesc(desc: string) {
+  descriptions.value[editDescRemote.value] = desc
+  localStorage.setItem('remoteDescriptions', JSON.stringify(descriptions.value))
+}
+
+function openManageStorage() {
+  subview.value = 'manage-storage'
+}
+
+function openAddRemote() {
+  showAddRemote.value = true
+}
+</script>
+
+<template>
+  <!-- Storage Panel -->
+  <div class="card storage-panel">
+    <div class="topbar">
+      <div>
+        <div style="font-size: 18px; font-weight: 600">存储节点</div>
+        <div class="muted">选择浏览存储文件</div>
+      </div>
+      <div class="actions">
+        <button class="ghost small" @click="openManageStorage">管理存储</button>
+        <button class="ghost small" @click="openAddRemote">添加存储</button>
+      </div>
+    </div>
+    <div class="tile-grid" style="margin-top: 12px">
+      <div
+        v-for="name in remotes"
+        :key="name"
+        class="tile"
+        :class="{ active: browserFs === name }"
+        @click="openRemote(name)"
+      >
+        <div class="manage-row">
+          <strong>{{ name }}</strong>
+        </div>
+        <div v-if="descriptions[name]" class="muted" style="margin-top: 6px">
+          {{ descriptions[name] }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Browser Panel -->
+  <div v-if="subview === 'explorer'" class="card browser-layout">
+    <div class="topbar">
+      <div class="pathbar">
+        <button
+          v-for="(crumb, i) in breadcrumbs"
+          :key="crumb.path"
+          class="crumb"
+          :class="{ current: i === breadcrumbs.length - 1 }"
+          @click="crumb.path !== browserPath && (browserPath = crumb.path, refreshBrowser())"
+        >
+          {{ crumb.name }}
+        </button>
+      </div>
+      <div class="actions">
+        <button class="ghost small" @click="refreshBrowser">刷新</button>
+      </div>
+    </div>
+
+    <div v-if="browserError" class="card" style="color: #dc2626">{{ browserError }}</div>
+
+    <div class="list">
+      <div v-if="browserPath" class="item" @click="goParent">
+        <div class="manage-row">
+          <span>..</span>
+          <span class="muted">返回上级</span>
+        </div>
+      </div>
+      <div
+        v-for="item in browserItems"
+        :key="item.Path"
+        class="item"
+        @click="enterItem(item)"
+      >
+        <div class="manage-row">
+          <span>
+            {{ item.Name }}
+            <span v-if="item.IsDir" class="muted">/</span>
+          </span>
+          <span class="muted">{{ item.Size }}</span>
+        </div>
+      </div>
+      <div v-if="!browserItems.length && !browserError" class="empty">
+        空目录
+      </div>
+    </div>
+  </div>
+
+  <!-- Manage Storage Subview -->
+  <div v-if="subview === 'manage-storage'" class="card">
+    <div class="manage-row" style="margin-bottom: 12px">
+      <div style="font-size: 18px; font-weight: 600">管理存储</div>
+      <div class="actions">
+        <button class="ghost small" @click="subview = 'explorer'">返回</button>
+        <button class="ghost small" @click="openAddRemote">添加存储</button>
+      </div>
+    </div>
+    <div style="border-top: 1px solid #e5e7eb; padding-top: 12px">
+      <div class="list">
+        <div v-for="name in remotes" :key="name" class="item" @click="openRemote(name)">
+          <div class="manage-row">
+            <div>
+              <strong>{{ name }}</strong>
+            </div>
+            <div class="actions" @click.stop>
+              <button class="ghost small" @click="addRemoteModal?.loadConfig(name)">修改配置</button>
+              <button class="ghost small" @click="openEditDesc(name)">自定义介绍</button>
+              <button
+                class="ghost small"
+                @click="testRemote(name)"
+                :disabled="testState[name] === 'testing'"
+              >
+                {{ getTestText(name) }}
+              </button>
+              <div class="menu-area">
+                <button
+                  class="menu-btn ghost small"
+                  @click="remoteMenu = remoteMenu === name ? '' : name"
+                >
+                  ⋮
+                </button>
+                <div v-if="remoteMenu === name" class="menu-pop">
+                  <button class="danger" @click="deleteRemote(name); remoteMenu = ''">
+                    删除
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modals -->
+  <AddRemoteModal
+    ref="addRemoteModal"
+    :show="showAddRemote"
+    :edit-mode="false"
+    @close="showAddRemote = false"
+    @success="loadRemotes"
+  />
+  <EditDescModal
+    :show="showEditDesc"
+    :remote-name="editDescRemote"
+    :description="descriptions[editDescRemote] || ''"
+    @close="showEditDesc = false"
+    @save="saveDesc"
+  />
+</template>
