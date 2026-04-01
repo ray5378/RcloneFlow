@@ -591,6 +591,14 @@ async function openEditRemote(name: string) {
 .col-time { width: 180px; text-align: right; }
 .col-size { width: 100px; text-align: right; }
 
+.item .name {
+  color: #e0e0e0;
+}
+
+body.light .item .name {
+  color: #1a1a1a;
+}
+
 .item .meta {
   display: flex;
   gap: 24px;
@@ -599,14 +607,14 @@ async function openEditRemote(name: string) {
 .item .meta .time {
   width: 180px;
   text-align: right;
-  color: #666;
+  color: #888;
   font-size: 13px;
 }
 
 .item .meta .size {
   width: 100px;
   text-align: right;
-  color: #666;
+  color: #888;
   font-size: 13px;
 }
 

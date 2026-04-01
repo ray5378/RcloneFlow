@@ -61,21 +61,21 @@ export function listPath(remote: string, path: string) {
 export function copyFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
   return api('/api/fs/copy', {
     method: 'POST',
-    body: JSON.stringify({ srcRemote, srcPath, dstRemote, dstPath }),
+    body: JSON.stringify({ srcFs: srcRemote + ':', srcRemote: srcPath, dstFs: dstRemote + ':', dstRemote: dstPath }),
   })
 }
 
 export function moveFile(srcRemote: string, srcPath: string, dstRemote: string, dstPath: string) {
   return api('/api/fs/move', {
     method: 'POST',
-    body: JSON.stringify({ srcRemote, srcPath, dstRemote, dstPath }),
+    body: JSON.stringify({ srcFs: srcRemote + ':', srcRemote: srcPath, dstFs: dstRemote + ':', dstRemote: dstPath }),
   })
 }
 
 export function deleteFile(remote: string, path: string) {
   return api('/api/fs/delete', {
     method: 'POST',
-    body: JSON.stringify({ remote, path }),
+    body: JSON.stringify({ srcFs: remote + ':', srcRemote: path }),
   })
 }
 
