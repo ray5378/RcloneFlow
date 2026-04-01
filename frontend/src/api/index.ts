@@ -7,6 +7,11 @@
  * import { listPath, copyFile } from '@/api'
  */
 
+// ============ API客户端 ============
+export { api, get, post, put, del, patch, addResponseInterceptor } from './client'
+export type { ResponseInterceptor } from './client'
+export { default as apiRequest } from './client'
+
 // ============ Task API ============
 export {
   getTasks,
@@ -37,7 +42,6 @@ export {
   getJobStatus,
   getActiveRuns,
 } from './run'
-export type { ActiveRun } from './run'
 
 // 兼容性别名
 export const listRuns = getRuns
@@ -72,11 +76,14 @@ export {
 
 // ============ 错误处理 ============
 export {
-  showErrorToast,
+  showToast,
   showSuccessToast,
+  showErrorToast,
+  showWarningToast,
+  showInfoToast,
   handleApiError,
   withErrorHandler,
+  withConfirm,
   registerToast,
-  errorMessage,
-  showError,
 } from './errors'
+export type { ToastType } from './errors'
