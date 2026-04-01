@@ -35,11 +35,11 @@ const filteredProviders = computed(() => {
     .sort((a, b) => a.Name.localeCompare(b.Name))
 })
 
-// Show all options except those tied to a specific provider
+// Show all options except those tied to a specific provider (Provider field set means it's provider-specific)
 const providerOptions = computed(() => {
   if (!selectedProvider.value) return []
   return (selectedProvider.value.Options || []).filter((opt: ProviderOption) => {
-    if (opt.Provider) return false
+    if (opt.Provider && opt.Provider !== '') return false
     return true
   })
 })
@@ -86,10 +86,10 @@ function selectProvider(provider: Provider) {
   step.value = 1
   remoteOptions.value = {}
   
-  // Set default values
+  // Set default values using DefaultStr (string representation)
   for (const opt of providerOptions.value) {
-    if (opt.Default !== undefined && opt.Default !== null) {
-      remoteOptions.value[opt.Name] = String(opt.Default)
+    if (opt.DefaultStr && opt.DefaultStr !== '') {
+      remoteOptions.value[opt.Name] = opt.DefaultStr
     }
   }
 }
@@ -199,7 +199,7 @@ defineExpose({ loadConfig: async (name: string) => {
             </option>
           </select>
           <input
-            v-else-if="opt.Password"
+            v-else-if="opt.IsPassword"
             v-model="remoteOptions[opt.Name]"
             type="password"
             :placeholder="opt.Help"
@@ -224,7 +224,7 @@ defineExpose({ loadConfig: async (name: string) => {
             </option>
           </select>
           <input
-            v-else-if="opt.Password"
+            v-else-if="opt.IsPassword"
             v-model="remoteOptions[opt.Name]"
             type="password"
             :placeholder="opt.Help"
@@ -253,7 +253,7 @@ defineExpose({ loadConfig: async (name: string) => {
               </option>
             </select>
             <input
-              v-else-if="opt.Password"
+              v-else-if="opt.IsPassword"
               v-model="remoteOptions[opt.Name]"
               type="password"
               :placeholder="opt.Help"

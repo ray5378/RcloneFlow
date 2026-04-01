@@ -40,9 +40,10 @@ export interface FileItem {
 
 export interface Provider {
   Name: string
-  ArchInPath: boolean
-  HashTypes: string[]
-  Flags: ProviderFlag[]
+  Description?: string
+  ArchInPath?: boolean
+  HashTypes?: string[]
+  Flags?: ProviderFlag[]
   Options: ProviderOption[]
 }
 
@@ -60,18 +61,20 @@ export interface ProviderFlag {
 export interface ProviderOption {
   Name: string
   Help: string
-  Default: unknown
-  Provider: unknown
+  Provider?: string
+  Default?: unknown
   Required: boolean
-  Password: boolean
-  Hide: number
+  IsPassword: boolean
+  Hide: 0 | 2 | 3
   Advanced: boolean
+  DefaultStr: string
   Examples?: ProviderExample[]
 }
 
 export interface ProviderExample {
   Value: string
   Help: string
+  Provider?: string
 }
 
 export type RemoteTestState = 'idle' | 'testing' | 'success' | 'failed'
