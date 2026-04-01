@@ -98,12 +98,20 @@ function nextStep() {
   if (step.value === 0) {
     step.value = 1
   } else if (step.value === 1) {
+    if (!props.editMode) {
+      step.value = 2
+    } else {
+      step.value = 3
+    }
+  } else if (step.value === 2) {
     step.value = 3
   }
 }
 
 function prevStep() {
   if (step.value === 3) {
+    step.value = props.editMode ? 1 : 2
+  } else if (step.value === 2) {
     step.value = 1
   } else if (step.value === 1) {
     step.value = 0
@@ -282,6 +290,22 @@ defineExpose({ loadConfig: async (name: string) => {
       <div class="actions" style="margin-top: 16px; justify-content: space-between">
         <button v-if="!editMode" class="ghost" @click="prevStep">上一步</button>
         <button @click="nextStep">{{ editMode ? '下一步' : '下一步' }}</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Storage Name (if not editMode) -->
+    <div v-if="step === 2 && !editMode">
+      <div class="field-item">
+        <label>存储名称 <span style="color: #dc2626">*</span></label>
+        <input
+          v-model="remoteName"
+          type="text"
+          placeholder="输入存储名称，如: mydrive"
+        />
+      </div>
+      <div class="actions" style="margin-top: 16px; justify-content: space-between">
+        <button class="ghost" @click="prevStep">上一步</button>
+        <button @click="nextStep" :disabled="!remoteName">下一步</button>
       </div>
     </div>
 

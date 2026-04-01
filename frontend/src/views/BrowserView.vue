@@ -126,8 +126,10 @@ async function loadRemotes() {
     const data = await api.listRemotes()
     remotes.value = data.remotes || []
     
-    if (!browserFs.value && remotes.value.length > 0) {
-      await openRemote(remotes.value[0])
+    // Always use the first remote in sorted order as default after page load
+    const orderedRemotes = getOrderedRemotes()
+    if (orderedRemotes.length > 0) {
+      await openRemote(orderedRemotes[0])
     }
     
     emit('navigate', 'explorer')
