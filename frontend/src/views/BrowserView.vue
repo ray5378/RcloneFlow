@@ -26,6 +26,8 @@ const descriptions = ref<Record<string, string>>(
 )
 
 const showAddRemote = ref(false)
+const isEditMode = ref(false)
+const editRemoteName = ref('')
 const showEditDesc = ref(false)
 const editDescRemote = ref('')
 const addRemoteModal = ref<InstanceType<typeof AddRemoteModal> | null>(null)
@@ -141,7 +143,21 @@ function openManageStorage() {
 }
 
 function openAddRemote() {
+  isEditMode.value = false
+  editRemoteName.value = ''
   showAddRemote.value = true
+}
+
+async function openEditRemote(name: string) {
+  isEditMode.value = true
+  editRemoteName.value = name
+  showAddRemote.value = true
+  // Wait for modal to load providers, then load config
+  setTimeout(async () => {
+    if (addRemoteModal.value) {
+      await addRemoteModal.value.loadConfig(name)
+    }
+  }, 100)
 }
 </script>
 
@@ -241,7 +257,7 @@ function openAddRemote() {
               <strong>{{ name }}</strong>
             </div>
             <div class="actions" @click.stop>
-              <button class="ghost small" @click="addRemoteModal?.loadConfig(name)">修改配置</button>
+              <button class="ghost small" @click="openEditRemote(name)">修改配置</button>
               <button class="ghost small" @click="openEditDesc(name)">自定义介绍</button>
               <button
                 class="ghost small"
@@ -274,7 +290,8 @@ function openAddRemote() {
   <AddRemoteModal
     ref="addRemoteModal"
     :show="showAddRemote"
-    :edit-mode="false"
+    :edit-mode="isEditMode"
+    :edit-name="editRemoteName"
     @close="showAddRemote = false"
     @success="loadRemotes"
   />
