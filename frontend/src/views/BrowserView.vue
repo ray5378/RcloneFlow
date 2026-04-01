@@ -180,6 +180,16 @@ function formatTime(time: string) {
   }
 }
 
+function formatSize(size: string) {
+  if (!size || size === '-') return '-'
+  const bytes = parseInt(size)
+  if (isNaN(bytes)) return size
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' K'
+  if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' M'
+  return (bytes / (1024 * 1024 * 1024)).toFixed(1) + ' G'
+}
+
 // Context menu handlers
 function showContextMenu(e: MouseEvent, item: FileItem) {
   e.preventDefault()
@@ -204,11 +214,16 @@ async function copyItem() {
 
 async function moveItem() {
   if (!contextMenu.value.item) return
-  pendingAction.value = 'move'
-  targetRemote.value = browserFs.value
-  targetPath.value = browserPath.value
-  showTargetPicker.value = true
-  closeContextMenu()
+  // Move (cut-paste): directly move to current directory
+  try {
+    const srcPath = contextMenu.value.item.Path
+    const dstPath = browserPath.value ? browserPath.value + '/' + contextMenu.value.item.Name : contextMenu.value.item.Name
+    await api.moveFile(browserFs.value, srcPath, browserFs.value, dstPath)
+    closeContextMenu()
+    await refreshBrowser()
+  } catch (e) {
+    alert((e as Error).message)
+  }
 }
 
 function pasteItem() {
@@ -425,7 +440,7 @@ async function openEditRemote(name: string) {
         </div>
         <div class="meta">
           <span class="time">{{ formatTime(item.ModTime) }}</span>
-          <span class="size">{{ item.IsDir ? '-' : item.Size }}</span>
+          <span class="size">{{ item.IsDir ? '-' : formatSize(item.Size) }}</span>
         </div>
       </div>
       <div v-if="browserError" class="item" style="color: #ef5350">
@@ -587,6 +602,12 @@ async function openEditRemote(name: string) {
   border-bottom: 1px solid #333;
 }
 
+body.light .list-header {
+  background: #f5f5f5;
+  color: #666;
+  border-bottom: 1px solid #e0e0e0;
+}
+
 .col-name { flex: 1; }
 .col-time { width: 180px; text-align: right; }
 .col-size { width: 100px; text-align: right; }
@@ -597,6 +618,11 @@ async function openEditRemote(name: string) {
 
 body.light .item .name {
   color: #1a1a1a;
+}
+
+body.light .item .meta .time,
+body.light .item .meta .size {
+  color: #888;
 }
 
 .item .meta {
