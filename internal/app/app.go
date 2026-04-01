@@ -387,14 +387,14 @@ func (s *Server) handleDeleteFile(w http.ResponseWriter, r *http.Request) {
         return
     }
     var req struct {
-        SrcFs     string `json:"srcFs"`
-        SrcRemote string `json:"srcRemote"`
+        Fs     string `json:"fs"`
+        Remote string `json:"remote"`
     }
     if err := decode(r, &req); err != nil {
         writeJSON(w, 400, map[string]any{"error": err.Error()})
         return
     }
-    if err := s.rc.DeleteFile(r.Context(), req.SrcFs, req.SrcRemote); err != nil {
+    if err := s.rc.DeleteFile(r.Context(), req.Fs, req.Remote); err != nil {
         writeJSON(w, 500, map[string]any{"error": err.Error()})
         return
     }

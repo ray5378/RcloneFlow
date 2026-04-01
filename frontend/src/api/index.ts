@@ -84,7 +84,7 @@ export function deleteFile(remote: string, path: string) {
   const cleanPath = path.startsWith('/') ? path.slice(1) : path
   return api('/api/fs/delete', {
     method: 'POST',
-    body: JSON.stringify({ srcFs: remote + ':', srcRemote: cleanPath }),
+    body: JSON.stringify({ fs: remote + ':', remote: cleanPath }),
   })
 }
 
