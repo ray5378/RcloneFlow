@@ -321,7 +321,7 @@ function goBackTarget() {
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="item.IsDir ? selectSourceDir(item) : selectSourceFile(item)" @dblclick="item.IsDir && openSourceDir(item)">
+              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="createForm.sourcePath = item.Path, showSourcePathInput = false" @dblclick="item.IsDir && openSourceDir(item)">
                 <span v-if="item.IsDir" class="dir-arrow" @click.stop="openSourceDir(item)">▶</span>
                 <span v-else class="file-icon">📄</span>
                 <span class="item-name">{{ item.Name }}</span>
@@ -349,7 +349,7 @@ function goBackTarget() {
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="item.IsDir ? selectTargetDir(item) : selectTargetFile(item)" @dblclick="item.IsDir && openTargetDir(item)">
+              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="createForm.targetPath = item.Path, showTargetPathInput = false" @dblclick="item.IsDir && openTargetDir(item)">
                 <span v-if="item.IsDir" class="dir-arrow" @click.stop="openTargetDir(item)">▶</span>
                 <span v-else class="file-icon">📄</span>
                 <span class="item-name">{{ item.Name }}</span>
@@ -484,3 +484,4 @@ body.light .tile:hover { background: #e8e8e8; }
 body.light .tile-name { color: #1a1a1a; }
 .tile-desc { font-size: 12px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 </style>XXX
+// test comment 2026年 04月 01日 星期三 21:10:19 CST
