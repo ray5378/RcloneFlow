@@ -12,6 +12,7 @@ import (
 )
 
 // JobSyncService 任务状态同步服务
+// 定期从 rclone job API 同步任务状态到数据库
 type JobSyncService struct {
 	db          JobStatusProvider
 	rc          *rclone.Client
@@ -36,6 +37,7 @@ func NewJobSyncService(db JobStatusProvider, rc *rclone.Client, poolIntervalSec 
 }
 
 // Start 启动同步服务
+// 后台goroutine定期从rclone job API获取任务状态并更新数据库
 func (s *JobSyncService) Start(ctx context.Context) {
 	logger.Info("启动任务状态同步服务", zap.Duration("interval", s.poolGap))
 	
@@ -62,6 +64,7 @@ func (s *JobSyncService) Stop() {
 }
 
 // syncRunningJobs 同步运行中的任务状态
+// 从数据库获取所有 running 状态的任务，调用 rclone job API 获取最新状态并更新
 func (s *JobSyncService) syncRunningJobs() {
 	runs, err := s.db.ListRunningRuns()
 	if err != nil {
@@ -80,7 +83,7 @@ func (s *JobSyncService) syncRunningJobs() {
 			continue
 		}
 
-		// 查询rclone job状态
+		// 调用 rclone job API 获取任务状态
 		status, err := s.rc.JobStatus(context.Background(), run.RcJobID)
 		if err != nil {
 			logger.Warn("查询任务状态失败",
@@ -90,7 +93,7 @@ func (s *JobSyncService) syncRunningJobs() {
 			continue
 		}
 
-		// 解析状态
+		// 解析 rclone 返回的状态
 		newStatus := "running"
 		errorMsg := ""
 		
@@ -112,7 +115,7 @@ func (s *JobSyncService) syncRunningJobs() {
 					zap.String("new_status", newStatus),
 					zap.Error(err))
 			} else {
-				logger.Info("任务状态已更新",
+				logger.Info("任务状态已同步",
 					zap.Int64("run_id", run.ID),
 					zap.Int64("job_id", run.RcJobID),
 					zap.String("status", newStatus))

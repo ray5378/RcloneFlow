@@ -58,13 +58,13 @@ func Run(cfg *config.Config) error {
 	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl)
 
 	// 初始化调度器
-	sched := scheduler.New(db, rc)
+	sched := scheduler.New(db, taskRunner)
 	if err := sched.Start(); err != nil {
 		logger.Error("调度器初始化失败", zap.Error(err))
 		return err
 	}
 
-	// 启动任务状态同步服务
+	// 启动任务状态同步服务（定期从rclone job API同步状态到数据库）
 	jobSync := service.NewJobSyncService(db, rc, cfg.GetPoolInterval())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
