@@ -163,32 +163,32 @@ async function loadPathOptions(remote: string, type: 'source' | 'target', path: 
 }
 
 function onSourcePathClick(item: any) {
-  // Single click selects
+  // Arrow click - navigate into directory
+  if (item.IsDir) {
+    loadPathOptions(createForm.value.sourceRemote, 'source', item.Path)
+  }
+}
+
+function onSourceNameClick(item: any) {
+  // Name click - select file or do nothing for dir
   if (!item.IsDir) {
     createForm.value.sourcePath = item.Path
     showSourcePathInput.value = false
   }
 }
 
-function onSourcePathDblClick(item: any) {
-  // Double click navigates into directory
+function onTargetPathClick(item: any) {
+  // Arrow click - navigate into directory
   if (item.IsDir) {
-    loadPathOptions(createForm.value.sourceRemote, 'source', item.Path)
+    loadPathOptions(createForm.value.targetRemote, 'target', item.Path)
   }
 }
 
-function onTargetPathClick(item: any) {
-  // Single click selects
+function onTargetNameClick(item: any) {
+  // Name click - select file or do nothing for dir
   if (!item.IsDir) {
     createForm.value.targetPath = item.Path
     showTargetPathInput.value = false
-  }
-}
-
-function onTargetPathDblClick(item: any) {
-  // Double click navigates into directory
-  if (item.IsDir) {
-    loadPathOptions(createForm.value.targetRemote, 'target', item.Path)
   }
 }
 
@@ -311,8 +311,10 @@ function goBackTarget() {
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onSourcePathClick(item)" @dblclick="onSourcePathDblClick(item)">
-                {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
+              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }">
+                <span v-if="item.IsDir" class="dir-arrow" @click="onSourcePathClick(item)">▶</span>
+                <span v-else class="file-icon">📄</span>
+                <span class="item-name" @click="onSourceNameClick(item)">{{ item.Name }}</span>
               </div>
               <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
             </div>
@@ -337,8 +339,10 @@ function goBackTarget() {
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onTargetPathClick(item)" @dblclick="onTargetPathDblClick(item)">
-                {{ item.IsDir ? '📁' : '📄' }} {{ item.Name }}
+              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }">
+                <span v-if="item.IsDir" class="dir-arrow" @click="onTargetPathClick(item)">▶</span>
+                <span v-else class="file-icon">📄</span>
+                <span class="item-name" @click="onTargetNameClick(item)">{{ item.Name }}</span>
               </div>
               <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
             </div>
@@ -451,16 +455,28 @@ body.light .path-bar { background: #f5f5f5; border-color: #ddd; }
 .path-label { font-size: 12px; color: #888; }
 .path-list { max-height: 200px; overflow-y: auto; padding: 8px; }
 .path-item {
-  padding: 8px 12px;
+  padding: 6px 12px;
   border-radius: 6px;
   cursor: pointer;
   font-size: 13px;
   color: #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 body.light .path-item { color: #333; }
 .path-item:hover { background: #333; }
 body.light .path-item:hover { background: #f0f0f0; }
-.path-item.is-dir { color: #64b5f6; font-weight: 500; }
+.dir-arrow {
+  color: #64b5f6;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 4px;
+}
+.dir-arrow:hover { color: #90caf9; }
+.file-icon { font-size: 12px; }
+.item-name { flex: 1; }
+.path-item.is-dir .item-name { color: #64b5f6; font-weight: 500; }
 .path-empty { padding: 20px; text-align: center; color: #666; font-size: 13px; }
 .form-actions { margin-top: 20px; }
 .tile-grid {
