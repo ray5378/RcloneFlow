@@ -1,0 +1,50 @@
+package service
+
+import "fmt"
+
+// RunRecord 运行记录结构
+type RunRecord struct {
+	ID         int64
+	TaskID     int64
+	RcJobID    int64
+	Status     string
+	Trigger    string
+	StartedAt  string
+	FinishedAt string
+	Error      string
+	Summary    string
+}
+
+// RunServiceInterface 运行记录服务接口
+type RunServiceInterface interface {
+	ListRuns() ([]RunRecord, error)
+	UpdateRun(id int64, updateFn func(*RunRecord))
+}
+
+// RunService 运行记录服务层
+type RunService struct {
+	db RunServiceInterface
+}
+
+// NewRunService 创建运行记录服务
+func NewRunService(db RunServiceInterface) *RunService {
+	return &RunService{db: db}
+}
+
+// ListRuns 获取所有运行记录
+func (s *RunService) ListRuns() ([]RunRecord, error) {
+	return s.db.ListRuns()
+}
+
+// UpdateRunStatus 更新运行状态
+func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
+	s.db.UpdateRun(id, func(r *RunRecord) {
+		r.Summary = fmt.Sprintf("%v", summary)
+		if finished, ok := summary["finished"].(bool); ok && finished {
+			r.Status = "finished"
+		}
+		if success, ok := summary["success"].(bool); ok && !success {
+			r.Status = "failed"
+		}
+	})
+}

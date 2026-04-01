@@ -250,10 +250,16 @@ function openAndSetSource(item: any) {
   }
 }
 
-function pickSource(item: any) {
+function onSourceClick(item: any) {
   // 单击行：直接设置源路径
   createForm.value.sourcePath = item.Path
   showSourcePathInput.value = false
+}
+
+function onSourceArrow(item: any) {
+  // 箭头点击：打开并设置为源路径
+  createForm.value.sourcePath = item.Path
+  loadSourcePath(createForm.value.sourceRemote, item.Path)
 }
 
 function openTargetDir(item: any) {
@@ -270,10 +276,16 @@ function openAndSetTarget(item: any) {
   }
 }
 
-function pickTarget(item: any) {
+function onTargetClick(item: any) {
   // 单击行：直接设置目标路径
   createForm.value.targetPath = item.Path
   showTargetPathInput.value = false
+}
+
+function onTargetArrow(item: any) {
+  // 箭头点击：打开并设置目标路径
+  createForm.value.targetPath = item.Path
+  loadTargetPath(createForm.value.targetRemote, item.Path)
 }
 
 function selectSourceDir(item: any) {
@@ -432,8 +444,8 @@ function goBackTarget() {
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="(() => { console.log('source click', item.Path); createForm.value.sourcePath = item.Path; showSourcePathInput.value = false; })()">
-                <span v-if="item.IsDir" class="dir-arrow" @click.stop="(() => { console.log('arrow click', item.Path); createForm.value.sourcePath = item.Path; loadSourcePath(createForm.value.sourceRemote, item.Path); })()">▶</span>
+              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onSourceClick(item)">
+                <span v-if="item.IsDir" class="dir-arrow" @click.stop="onSourceArrow(item)">▶</span>
                 <span v-else class="file-icon">📄</span>
                 <span class="item-name">{{ item.Name }}</span>
               </div>
@@ -461,8 +473,8 @@ function goBackTarget() {
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="(() => { createForm.value.targetPath = item.Path; showTargetPathInput.value = false; })()">
-                <span v-if="item.IsDir" class="dir-arrow" @click.stop="(() => { createForm.value.targetPath = item.Path; loadTargetPath(createForm.value.targetRemote, item.Path); })()">▶</span>
+              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onTargetClick(item)">
+                <span v-if="item.IsDir" class="dir-arrow" @click.stop="onTargetArrow(item)">▶</span>
                 <span v-else class="file-icon">📄</span>
                 <span class="item-name">{{ item.Name }}</span>
               </div>

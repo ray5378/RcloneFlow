@@ -288,3 +288,35 @@ func (c *Client) PublicLink(ctx context.Context, fs, remote string) (string, err
     }
     return out.URL, nil
 }
+
+// RunTask 运行任务并返回JobID
+func (c *Client) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string) (int64, error) {
+    src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
+    dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
+
+    ep := "sync/copy"
+    if strings.ToLower(mode) == "sync" {
+        ep = "sync/sync"
+    } else if strings.ToLower(mode) == "move" {
+        ep = "sync/move"
+    }
+
+    var out struct {
+        JobID int64 `json:"jobid"`
+    }
+    req := map[string]any{
+        "srcFs": src,
+        "dstFs": dst,
+    }
+    // sync 操作使用 createEmptySrcDirs
+    if strings.HasPrefix(ep, "sync/") {
+        req["createEmptySrcDirs"] = true
+        if ep == "sync/move" {
+            req["deleteEmptySrcDirs"] = true
+        }
+    }
+    req["_async"] = true
+
+    err := c.Call(ctx, ep, req, &out)
+    return out.JobID, err
+}
