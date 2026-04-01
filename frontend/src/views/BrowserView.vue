@@ -164,14 +164,16 @@ async function openEditRemote(name: string) {
 <template>
   <!-- Storage Panel -->
   <div class="card storage-panel">
-    <div class="topbar">
-      <div>
-        <div style="font-size: 18px; font-weight: 600">存储节点</div>
-        <div class="muted">选择浏览存储文件</div>
-      </div>
-      <div class="actions">
-        <button class="ghost small" @click="openManageStorage">管理存储</button>
-        <button class="ghost small" @click="openAddRemote">添加存储</button>
+    <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 12px">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start">
+        <div>
+          <div style="font-size: 18px; font-weight: 600">存储节点</div>
+          <div class="muted" style="margin-top: 4px">选择浏览存储文件</div>
+        </div>
+        <div class="actions">
+          <button class="ghost small" @click="openManageStorage">管理存储</button>
+          <button class="ghost small" @click="openAddRemote">添加存储</button>
+        </div>
       </div>
     </div>
     <div class="tile-grid" style="margin-top: 12px">
@@ -194,25 +196,21 @@ async function openEditRemote(name: string) {
 
   <!-- Browser Panel -->
   <div v-if="subview === 'explorer'" class="card browser-layout">
-    <div class="topbar">
+    <div style="border-bottom: 1px solid #e5e7eb; padding-bottom: 12px">
       <div style="font-size: 18px; font-weight: 600">文件浏览</div>
+      <div class="muted" style="margin-top: 4px">点击查看文件</div>
     </div>
-    <div class="topbar" style="margin-top: 8px">
-      <div class="pathbar">
-        <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
-          <span v-if="i > 0" style="color: #9ca3af"> / </span>
-          <button
-            class="crumb"
-            :class="{ current: i === breadcrumbs.length - 1 }"
-            @click="crumb.path !== browserPath && (browserPath = crumb.path, refreshBrowser())"
-          >
-            {{ crumb.name }}
-          </button>
-        </template>
-      </div>
-      <div class="actions">
-        <button class="ghost small" @click="refreshBrowser">刷新</button>
-      </div>
+    <div class="pathbar" style="margin-top: 12px">
+      <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
+        <span v-if="i > 0" style="color: #9ca3af"> / </span>
+        <button
+          class="crumb"
+          :class="{ current: i === breadcrumbs.length - 1 }"
+          @click="crumb.path !== browserPath && (browserPath = crumb.path, refreshBrowser())"
+        >
+          {{ crumb.name }}
+        </button>
+      </template>
     </div>
 
     <div v-if="browserError" class="card" style="color: #dc2626">{{ browserError }}</div>
