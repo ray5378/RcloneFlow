@@ -23,6 +23,8 @@ const filteredTasks = computed(() => {
 const remotes = ref<string[]>([])
 const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const historyFilterTaskId = ref<number | null>(null)
+const showDetailModal = ref(false)
+const runDetail = ref<any>({})
 const showCreateModal = ref(false)
 
 const createForm = ref({
@@ -360,6 +362,58 @@ async function deleteSchedule(id: number) {
   }
 }
 
+function showRunDetail(run: any) {
+  runDetail.value = run
+  showDetailModal.value = true
+}
+
+function formatSummary(summary: any): string {
+  if (!summary) return '-'
+  if (typeof summary === 'string') {
+    try {
+      summary = JSON.parse(summary)
+    } catch {
+      return summary
+    }
+  }
+  if (typeof summary !== 'object') return String(summary)
+  
+  const parts: string[] = []
+  if (summary.bytes !== undefined) {
+    parts.push(`传输量: ${formatBytes(summary.bytes)}`)
+  }
+  if (summary.transferred !== undefined) {
+    parts.push(`文件数: ${summary.transferred}`)
+  }
+  if (summary.deleted !== undefined) {
+    parts.push(`删除: ${summary.deleted}`)
+  }
+  if (summary.errors !== undefined) {
+    parts.push(`错误: ${summary.errors}`)
+  }
+  if (summary.speed !== undefined) {
+    parts.push(`速度: ${summary.speed}`)
+  }
+  if (summary.elapsedTime !== undefined) {
+    parts.push(`耗时: ${summary.elapsedTime}`)
+  }
+  if (summary.finished !== undefined) {
+    parts.push(`完成: ${summary.finished ? '是' : '否'}`)
+  }
+  if (summary.success !== undefined) {
+    parts.push(`成功: ${summary.success ? '是' : '否'}`)
+  }
+  return parts.length > 0 ? parts.join('\n') : JSON.stringify(summary, null, 2)
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
 async function clearRun(id: number) {
   if (!confirm('确定清除此记录？')) return
   try {
@@ -585,9 +639,70 @@ function goBackTarget() {
         </div>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
         <span class="time">{{ formatDuration(run.startedAt, run.finishedAt) }}</span>
-        <button class="ghost small" @click="clearRun(run.id)">清除</button>
+        <button class="ghost small" @click="showRunDetail(run)">详情</button>
+        <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
       </div>
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>
+    </div>
+
+    <!-- 运行详情弹窗 -->
+    <div v-if="showDetailModal" class="modal-overlay" @click.self="showDetailModal = false">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>运行详情</h3>
+          <button class="close-btn" @click="showDetailModal = false">×</button>
+        </div>
+        <div class="modal-body">
+          <div class="detail-item">
+            <label>任务名称：</label>
+            <span>{{ runDetail.taskName || '-' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>执行模式：</label>
+            <span>{{ runDetail.taskMode || '-' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>状态：</label>
+            <span :class="['status', getStatusClass(runDetail.status)]">{{ runDetail.status }}</span>
+          </div>
+          <div class="detail-item">
+            <label>触发方式：</label>
+            <span>{{ runDetail.trigger === 'schedule' ? '定时任务' : '手动执行' }}</span>
+          </div>
+          <div class="detail-item full-width">
+            <label>源路径：</label>
+            <span>{{ runDetail.sourceRemote }}:{{ runDetail.sourcePath || '/' }}</span>
+          </div>
+          <div class="detail-item full-width">
+            <label>目标路径：</label>
+            <span>{{ runDetail.targetRemote }}:{{ runDetail.targetPath || '/' }}</span>
+          </div>
+          <div class="detail-item">
+            <label>开始时间：</label>
+            <span>{{ formatTime(runDetail.startedAt) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>结束时间：</label>
+            <span>{{ formatTime(runDetail.finishedAt) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>耗时：</label>
+            <span>{{ formatDuration(runDetail.startedAt, runDetail.finishedAt) }}</span>
+          </div>
+          <div class="detail-item">
+            <label>传输速度：</label>
+            <span>{{ runDetail.speed || '-' }}</span>
+          </div>
+          <div class="detail-item full-width">
+            <label>传输统计：</label>
+            <pre class="summary-pre">{{ formatSummary(runDetail.summary) }}</pre>
+          </div>
+          <div v-if="runDetail.error" class="detail-item full-width">
+            <label>错误信息：</label>
+            <span class="error-text">{{ runDetail.error }}</span>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
