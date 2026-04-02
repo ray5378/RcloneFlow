@@ -22,6 +22,7 @@ const filteredTasks = computed(() => {
 
 const remotes = ref<string[]>([])
 const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
+const historyFilterTaskId = ref<number | null>(null)
 const showCreateModal = ref(false)
 
 const createForm = ref({
@@ -175,6 +176,17 @@ async function createTask() {
   } catch (e) {
     alert((e as Error).message)
   }
+}
+
+// 过滤后的历史记录
+const filteredRuns = computed(() => {
+  if (historyFilterTaskId.value === null) return runs.value
+  return runs.value.filter(r => r.taskId === historyFilterTaskId.value)
+})
+
+function viewTaskHistory(taskId: number) {
+  historyFilterTaskId.value = taskId
+  currentModule.value = 'history'
 }
 
 async function runTask(taskId: number) {
@@ -513,6 +525,7 @@ function goBackTarget() {
             <span v-else class="no-schedule">未设置</span>
           </div>
           <div class="item-actions">
+            <button class="ghost small" @click.stop="viewTaskHistory(task.id)">📋 历史</button>
             <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
               {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}
             </button>
@@ -537,7 +550,12 @@ function goBackTarget() {
   </div>
 
   <div v-if="currentModule === 'history'" class="card">
-    <div class="card-header"><div class="title">历史记录</div></div>
+    <div class="card-header">
+      <div class="title">历史记录</div>
+      <button v-if="historyFilterTaskId !== null" class="ghost small" @click="historyFilterTaskId = null">
+        ← 返回全部
+      </button>
+    </div>
     <div class="list-header">
       <span class="col-name">任务</span>
       <span class="col-status">状态</span>
@@ -546,14 +564,14 @@ function goBackTarget() {
       <span class="col-action">操作</span>
     </div>
     <div class="list">
-      <div v-for="run in runs" :key="run.id" class="item">
+      <div v-for="run in filteredRuns" :key="run.id" class="item">
         <div class="name"><strong>{{ tasks.find(t => t.id === run.taskId)?.name || `任务 #${run.taskId}` }}</strong></div>
         <span :class="['status', getStatusClass(run.status)]">{{ run.status }}</span>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
         <span class="time">{{ formatTime(run.finishedAt) }}</span>
         <button class="ghost small" @click="clearRun(run.id)">清除</button>
       </div>
-      <div v-if="!runs.length" class="empty">暂无历史记录</div>
+      <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>
     </div>
   </div>
 
