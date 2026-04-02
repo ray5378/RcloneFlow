@@ -529,8 +529,8 @@ function goBackTarget() {
       <div v-for="run in runs" :key="run.id" class="item">
         <div class="name"><strong>{{ tasks.find(t => t.id === run.taskId)?.name || `任务 #${run.taskId}` }}</strong></div>
         <span :class="['status', getStatusClass(run.status)]">{{ run.status }}</span>
-        <span class="time">{{ formatTime(run.startedAt) }}</span>
-        <span class="time">{{ formatTime(run.finishedAt) }}</span>
+        <span class="time">{{ formatTime(run.createdAt) }}</span>
+        <span class="time">{{ formatTime(run.updatedAt) }}</span>
         <button class="ghost small" @click="clearRun(run.id)">清除</button>
       </div>
       <div v-if="!runs.length" class="empty">暂无历史记录</div>
