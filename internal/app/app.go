@@ -67,7 +67,7 @@ func Run(cfg *config.Config) error {
 	jobSync := service.NewJobSyncService(db, rc, cfg.GetPoolInterval())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	jobSync.Start(ctx)
+	go jobSync.Start(ctx)
 
 	// 设置路由
 	mux := http.NewServeMux()
