@@ -20,6 +20,12 @@ const browserItems = ref<FileItem[]>([])
 const browserError = ref('')
 const testState = ref<Record<string, RemoteTestState>>({})
 const remoteMenu = ref('')
+const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
+  show: false,
+  title: '',
+  message: '',
+  onConfirm: () => {}
+})
 
 const descriptions = ref<Record<string, string>>(
   JSON.parse(localStorage.getItem('remoteDescriptions') || '{}')
@@ -377,15 +383,21 @@ function getTestText(name: string) {
 }
 
 async function deleteRemote(name: string) {
-  if (!confirm(`确定删除存储 "${name}"？`)) return
-  try {
-    await api.deleteRemote(name)
-    // 删除本地存储的介绍 - 同时更新localStorage和组件变量
-    delete descriptions.value[name]
-    localStorage.setItem('remoteDescriptions', JSON.stringify(descriptions.value))
-    await loadRemotes()
-  } catch (e) {
-    alert((e as Error).message)
+  confirmModal.value = {
+    show: true,
+    title: '删除存储',
+    message: `确定删除存储 "${name}"？此操作不可恢复！`,
+    onConfirm: async () => {
+      try {
+        await api.deleteRemote(name)
+        // 删除本地存储的介绍 - 同时更新localStorage和组件变量
+        delete descriptions.value[name]
+        localStorage.setItem('remoteDescriptions', JSON.stringify(descriptions.value))
+        await loadRemotes()
+      } catch (e) {
+        alert((e as Error).message)
+      }
+    }
   }
 }
 
@@ -600,12 +612,29 @@ async function openEditRemote(name: string) {
               ⋮
             </button>
             <div v-if="remoteMenu === name" class="menu-pop">
-              <button class="danger" @click="deleteRemote(name); remoteMenu = ''">
-                删除
+              <button class="danger-text" @click="deleteRemote(name); remoteMenu = ''">
+                🗑️
               </button>
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认删除弹窗 -->
+  <div v-if="confirmModal.show" class="modal-overlay" @click.self="confirmModal.show = false">
+    <div class="modal-content confirm-modal">
+      <div class="modal-header">
+        <h3>{{ confirmModal.title }}</h3>
+        <button class="close-btn" @click="confirmModal.show = false">×</button>
+      </div>
+      <div class="modal-body">
+        <p>{{ confirmModal.message }}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" @click="confirmModal.show = false">取消</button>
+        <button class="primary danger" @click="() => { confirmModal.onConfirm(); confirmModal.show = false }">确认</button>
       </div>
     </div>
   </div>
