@@ -158,7 +158,17 @@ async function refreshBrowser() {
 
 function enterItem(item: FileItem) {
   if (!item.IsDir) return
-  browserPath.value = item.Path
+  // item.Path is already the full path including remote prefix
+  // e.g., "fnOS:/来自：百度网盘/测试/子文件夹"
+  // Extract path without the remote prefix (e.g., "来自：百度网盘/测试/子文件夹")
+  const remotePrefix = browserFs.value + ':'
+  let newPath = item.Path
+  if (newPath.startsWith(remotePrefix)) {
+    newPath = newPath.substring(remotePrefix.length)
+  }
+  // Remove leading slash
+  newPath = newPath.replace(/^\/+/, '')
+  browserPath.value = newPath
   refreshBrowser()
 }
 
@@ -195,6 +205,17 @@ function showContextMenu(e: MouseEvent, item: FileItem) {
   }
 }
 
+// Right-click on empty space shows paste option
+function showBackgroundMenu(e: MouseEvent) {
+  e.preventDefault()
+  contextMenu.value = {
+    show: true,
+    x: e.clientX,
+    y: e.clientY,
+    item: null  // null means background click
+  }
+}
+
 function closeContextMenu() {
   contextMenu.value.show = false
 }
@@ -227,30 +248,33 @@ async function pasteItem() {
     alert('剪贴板为空，请先复制或剪切文件')
     return
   }
+  if (!browserFs.value) {
+    alert('请先选择一个存储节点')
+    return
+  }
   try {
     const isDir = clipboardItem.value.IsDir
-    const srcPath = clipboardItem.value.Path
-    // For directory paste, we use the original dir name; for file, use file name
-    const dstPath = browserPath.value ? browserPath.value + '/' + clipboardItem.value.Name : clipboardItem.value.Name
+    // srcPath is the full relative path from the file item (ensure no leading slash)
+    const srcPath = clipboardItem.value.Path.replace(/^\/+/, '')
+    // dstPath is the destination path in the current browser view (ensure no leading slash)
+    const dstPath = (browserPath.value ? browserPath.value.replace(/^\/+/, '') + '/' : '') + clipboardItem.value.Name
     
-    console.log('=== Paste Info ===')
-    console.log('browserFs:', browserFs.value)
-    console.log('browserPath:', browserPath.value)
-    console.log('srcPath:', srcPath)
-    console.log('dstPath:', dstPath)
-    console.log('clipboardAction:', clipboardAction.value)
-    console.log('IsDir:', isDir)
-    
+    // For directory operations (copyDir/moveDir), use fs format: "remote:full/path"
+    // For file operations (copyFile/moveFile), use fs + remote format: "remote:", "path"
     if (clipboardAction.value === 'copy') {
       if (isDir) {
+        // Directory copy: copyDir(remote, srcPath, remote, dstPath) - 4个参数
         await api.copyDir(browserFs.value, srcPath, browserFs.value, dstPath)
       } else {
+        // File copy: copyFile(remote, srcPath, remote, dstPath) - 4个参数
         await api.copyFile(browserFs.value, srcPath, browserFs.value, dstPath)
       }
     } else if (clipboardAction.value === 'move') {
       if (isDir) {
+        // Directory move: moveDir(remote, srcPath, remote, dstPath) - 4个参数
         await api.moveDir(browserFs.value, srcPath, browserFs.value, dstPath)
       } else {
+        // File move: moveFile(remote, srcPath, remote, dstPath) - 4个参数
         await api.moveFile(browserFs.value, srcPath, browserFs.value, dstPath)
       }
     }
@@ -273,15 +297,31 @@ function startRename() {
 
 async function confirmRename() {
   if (!renamingItem.value || !renameInput.value) return
+  if (!browserFs.value) {
+    alert('请先选择一个存储节点')
+    return
+  }
   try {
-    const srcPath = renamingItem.value.Path
-    const dstPath = browserPath.value ? browserPath.value + '/' + renameInput.value : renameInput.value
-    await api.moveFile(browserFs.value, srcPath, browserFs.value, dstPath)
+    const isDir = renamingItem.value.IsDir
+    const srcPath = renamingItem.value.Path.replace(/^\/+/, '')
+    // 构建目标路径: 当前目录/新名称 (确保路径格式一致)
+    const dstPath = (browserPath.value ? browserPath.value.replace(/^\/+/, '') + '/' : '') + renameInput.value
+    
+    if (isDir) {
+      // 目录移动使用 sync/move
+      // moveDir(remote, srcPath, remote, dstPath) - 4个参数
+      await api.moveDir(browserFs.value, srcPath, browserFs.value, dstPath)
+    } else {
+      // 文件移动使用 operations/movefile
+      // moveFile(remote, srcPath, remote, dstPath) - 4个参数
+      await api.moveFile(browserFs.value, srcPath, browserFs.value, dstPath)
+    }
+    
     showRenameInput.value = false
     renamingItem.value = null
     await refreshBrowser()
   } catch (e) {
-    alert((e as Error).message)
+    alert('重命名失败: ' + (e as Error).message)
   }
 }
 
@@ -294,12 +334,11 @@ function confirmDelete() {
 
 async function executeDelete() {
   if (!deletingItem.value) return
+  if (!browserFs.value) {
+    alert('请先选择一个存储节点')
+    return
+  }
   try {
-    console.log('=== Delete Info ===')
-    console.log('browserFs:', browserFs.value)
-    console.log('deletingItem.Path:', deletingItem.value.Path)
-    console.log('IsDir:', deletingItem.value.IsDir)
-    
     if (deletingItem.value.IsDir) {
       // 目录使用 purge
       await api.purgeDir(browserFs.value, deletingItem.value.Path)
@@ -443,13 +482,13 @@ async function openEditRemote(name: string) {
       <span class="col-time">修改时间</span>
       <span class="col-size">大小</span>
     </div>
-    <div class="list">
+    <div class="list" @contextmenu.prevent="showBackgroundMenu($event)">
       <div
         v-for="item in browserItems"
         :key="item.Path"
         class="item"
         @click="enterItem(item)"
-        @contextmenu="showContextMenu($event, item)"
+        @contextmenu.stop="showContextMenu($event, item)"
       >
         <div class="name">
           <span :class="item.IsDir ? 'folder' : 'icon'">{{ item.IsDir ? '📁' : '📄' }}</span>
@@ -464,7 +503,7 @@ async function openEditRemote(name: string) {
         {{ browserError }}
       </div>
       <div v-if="!browserItems.length && !browserError" class="empty">
-        空目录
+        空目录 (右键可粘贴)
       </div>
     </div>
   </div>
@@ -475,11 +514,18 @@ async function openEditRemote(name: string) {
     class="context-menu"
     :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }"
   >
-    <button @click="copyItem">复制</button>
-    <button @click="moveItem">移动</button>
-    <button @click="pasteItem" :disabled="!clipboardItem">粘贴</button>
-    <button @click="startRename">重命名</button>
-    <button class="danger" @click="confirmDelete">删除</button>
+    <!-- Item context menu -->
+    <template v-if="contextMenu.item">
+      <button @click="copyItem">复制</button>
+      <button @click="moveItem">移动</button>
+      <button @click="pasteItem" :disabled="!clipboardItem">粘贴</button>
+      <button @click="startRename">重命名</button>
+      <button class="danger" @click="confirmDelete">删除</button>
+    </template>
+    <!-- Background context menu (empty area) -->
+    <template v-else>
+      <button @click="pasteItem" :disabled="!clipboardItem">粘贴到当前目录</button>
+    </template>
   </div>
 
   <!-- Delete Confirmation Modal -->
