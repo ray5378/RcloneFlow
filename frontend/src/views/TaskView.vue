@@ -266,6 +266,18 @@ async function runTask(taskId: number) {
   }
 }
 
+async function goToAddTask() {
+  // Reload remotes before switching to add mode
+  try {
+    const remoteData = await api.listRemotes()
+    remotes.value = remoteData?.remotes || []
+  } catch (e) {
+    console.error('Failed to load remotes:', e)
+  }
+  currentModule.value = 'add'
+  openMenuId.value = null
+}
+
 function editTask(task: Task) {
   editingTask.value = task
   
@@ -617,7 +629,7 @@ function goBackTarget() {
       <div class="title">任务列表</div>
       <div class="header-actions">
         <input v-model="taskSearch" type="text" placeholder="搜索任务..." class="search-input" />
-        <button class="primary small" @click="currentModule = 'add'">+ 添加任务</button>
+        <button class="primary small" @click="goToAddTask">+ 添加任务</button>
       </div>
     </div>
     <div class="list-header">
