@@ -275,38 +275,69 @@ go build -o server ./cmd/server
 
 ## Docker 部署
 
-### 构建镜像
-
-```bash
-docker build -t rcloneflow .
-```
-
-### Docker Compose
+### 使用 Docker Compose（推荐）
 
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
-  rcloneflow:
-    build: .
-    ports:
-      - "17870:17870"
-    environment:
-      - RCLONE_RC_URL=http://rclone:5572
-      - RCLONE_RC_USER=your_user
-      - RCLONE_RC_PASS=your_pass
-    volumes:
-      - ./data:/app/data
-      - /path/to/rclone/config:/root/.config/rclone
-    depends_on:
-      - rclone
-
   rclone:
-    image: rclone/rclone
+    image: rclone/rclone:latest
+    container_name: rclone
+    restart: always
+    command:
+      - rcd
+      - --rc-addr=:5572
+      - --rc-user=你的用户名
+      - --rc-pass=你的密码
+      - --config=/config/rclone/rclone.conf
+      - --log-level=INFO
+    ports:
+      - "5572:5572"
     volumes:
       - /path/to/rclone/config:/config/rclone
-      - /path/to/your/data:/data
-    command: rcd --rc-user=your_user --rc-pass=your_pass --rc-addr=0.0.0.0:5572
+      - /path/to/rclone/cache:/root/.cache/rclone
+    environment:
+      - TZ=Asia/Shanghai
+
+  rcloneflow:
+    image: ray5378/rcloneflow:latest
+    container_name: rcloneflow
+    restart: always
+    user: "0:0"
+    ports:
+      - "17870:17870"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
+      - APP_ADDR=:17870
+      - RCLONE_RC_URL=http://rclone:5572
+      - RCLONE_RC_USER=你的用户名
+      - RCLONE_RC_PASS=你的密码
+    depends_on:
+      - rclone
 ```
+
+**部署步骤：**
+
+```bash
+# 1. 创建数据目录
+mkdir -p data
+
+# 2. 启动服务
+docker-compose up -d
+
+# 3. 查看日志
+docker logs -f rcloneflow
+```
+
+访问 http://localhost:17870 即可使用。
+
+### 注意事项
+
+- **数据目录权限**：如果使用 bind mount 挂载数据目录，确保目录属主为 1000:1000，或使用 named volume
+- **Rclone RC 地址**：`RCLONE_RC_URL` 必须使用 `http://rclone:5572` 格式（容器内部域名）
+- **首次登录**：默认账号密码为 `admin` / `admin`，首次使用请修改密码
 
 ## 贡献
 
