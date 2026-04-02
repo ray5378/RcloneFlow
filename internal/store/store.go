@@ -211,9 +211,13 @@ func (db *DB) ListTasks() ([]Task, error) {
 	var tasks []Task
 	for rows.Next() {
 		var t Task
-		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.Options, &t.CreatedAt)
+		var options sql.NullString
+		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.CreatedAt)
 		if err != nil {
 			return nil, err
+		}
+		if options.Valid {
+			t.Options = []byte(options.String)
 		}
 		tasks = append(tasks, t)
 	}
@@ -247,12 +251,16 @@ func (db *DB) GetTask(id int64) (Task, bool) {
 	defer db.mu.Unlock()
 	
 	var t Task
+	var options sql.NullString
 	err := db.db.QueryRow(`
 		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at 
 		FROM tasks WHERE id = ?`, id).Scan(
-		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.Options, &t.CreatedAt)
+		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.CreatedAt)
 	if err != nil {
 		return Task{}, false
+	}
+	if options.Valid {
+		t.Options = []byte(options.String)
 	}
 	return t, true
 }
