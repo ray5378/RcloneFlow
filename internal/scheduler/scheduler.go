@@ -68,45 +68,23 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 	return err
 }
 
-// ParseSpecToCron 将前端格式转为标准cron表达式(5段:分 时 日 月 周)
+// ParseSpecToCron 将前端格式转为标准cron表达式(5段)
 // 前端格式: month,week,day,hour,minute (5字段,无年)
-// 例如: "1,3,5,*,15,30" -> "30 15 1,3,5 1 *" (每天15:30的1号,3号,5号)
-// 特殊值: * = 每月/每天, 空 = 不设置(用于周/日)
+//
+// 前端spec示例: "1,3,5,*,,17,19,12"
+// 转换后cron: "12,19 17 1,3,5 * *"
+//
+// 说明: 前端 hour="17,19", minute="12" 表示12分且17时或19时
+// 因为cron标准是 minute hour day month week, multi-values要保持在对应字段
 func ParseSpecToCron(month, week, day, hour, minute string) (string, bool) {
-	// 处理分钟
+	// 处理分钟 (0-59)
 	min := minute
 	if min == "" || min == "*" {
 		min = "*"
-	}
-
-	// 处理小时
-	h := hour
-	if h == "" || h == "*" {
-		h = "*"
-	}
-
-	// 处理日
-	d := day
-	if d == "" {
-		d = "*"
-	}
-
-	// 处理月
-	m := month
-	if m == "" || m == "*" {
-		m = "*"
-	}
-
-	// 处理周(0=周日,1=周一...)
-	w := week
-	if w == "" {
-		w = "*"
-	}
-
-	// 验证分钟有效(0-59)
-	if min != "*" {
+	} else {
+		// 验证每个值
 		for _, part := range strings.Split(min, ",") {
-			val, err := strconv.Atoi(part)
+			val, err := strconv.Atoi(strings.TrimSpace(part))
 			if err != nil {
 				return "", false
 			}
@@ -116,10 +94,13 @@ func ParseSpecToCron(month, week, day, hour, minute string) (string, bool) {
 		}
 	}
 
-	// 验证小时有效(0-23)
-	if h != "*" {
+	// 处理小时 (0-23)
+	h := hour
+	if h == "" || h == "*" {
+		h = "*"
+	} else {
 		for _, part := range strings.Split(h, ",") {
-			val, err := strconv.Atoi(part)
+			val, err := strconv.Atoi(strings.TrimSpace(part))
 			if err != nil {
 				return "", false
 			}
@@ -129,10 +110,13 @@ func ParseSpecToCron(month, week, day, hour, minute string) (string, bool) {
 		}
 	}
 
-	// 验证日有效(1-31)
-	if d != "*" {
+	// 处理日 (1-31)
+	d := day
+	if d == "" || d == "*" {
+		d = "*"
+	} else {
 		for _, part := range strings.Split(d, ",") {
-			val, err := strconv.Atoi(part)
+			val, err := strconv.Atoi(strings.TrimSpace(part))
 			if err != nil {
 				return "", false
 			}
@@ -142,10 +126,13 @@ func ParseSpecToCron(month, week, day, hour, minute string) (string, bool) {
 		}
 	}
 
-	// 验证月有效(1-12)
-	if m != "*" {
+	// 处理月 (1-12)
+	m := month
+	if m == "" || m == "*" {
+		m = "*"
+	} else {
 		for _, part := range strings.Split(m, ",") {
-			val, err := strconv.Atoi(part)
+			val, err := strconv.Atoi(strings.TrimSpace(part))
 			if err != nil {
 				return "", false
 			}
@@ -155,10 +142,13 @@ func ParseSpecToCron(month, week, day, hour, minute string) (string, bool) {
 		}
 	}
 
-	// 验证周有效(0-6, 0=周日)
-	if w != "*" {
+	// 处理周 (0-6, 0=周日)
+	w := week
+	if w == "" || w == "*" {
+		w = "*"
+	} else {
 		for _, part := range strings.Split(w, ",") {
-			val, err := strconv.Atoi(part)
+			val, err := strconv.Atoi(strings.TrimSpace(part))
 			if err != nil {
 				return "", false
 			}
@@ -168,7 +158,8 @@ func ParseSpecToCron(month, week, day, hour, minute string) (string, bool) {
 		}
 	}
 
-	// 返回标准cron格式(秒 分 时 日 月 周)
+	// 返回标准cron格式: 秒 分 时 日 月 周
+	// 注意: multi-values (如 "17,19") 要保持在正确的字段位置
 	return "0 " + min + " " + h + " " + d + " " + m + " " + w, true
 }
 

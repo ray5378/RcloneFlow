@@ -24,11 +24,11 @@ type Task struct {
 }
 
 type Schedule struct {
-	ID           int64     `json:"id"`
+	ID           int64      `json:"id"`
 	TaskID       int64     `json:"taskId"`
 	Spec         string    `json:"spec"`
 	Enabled      bool      `json:"enabled"`
-	NextRunTime  time.Time `json:"nextRunTime,omitempty"`
+	NextRunTime  *time.Time `json:"nextRunTime,omitempty"`
 	CreatedAt    time.Time `json:"createdAt"`
 }
 

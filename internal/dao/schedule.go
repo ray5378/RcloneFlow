@@ -19,14 +19,10 @@ func NewScheduleDAO(db *sql.DB) *ScheduleDAO {
 
 // Create 创建定时任务
 func (d *ScheduleDAO) Create(schedule store.Schedule) (store.Schedule, error) {
-	var nextRunTime interface{}
-	if !schedule.NextRunTime.IsZero() {
-		nextRunTime = schedule.NextRunTime
-	}
 	result, err := d.db.Exec(`
 		INSERT INTO schedules (task_id, spec, enabled, next_run_time)
 		VALUES (?, ?, ?, ?)`,
-		schedule.TaskID, schedule.Spec, schedule.Enabled, nextRunTime)
+		schedule.TaskID, schedule.Spec, schedule.Enabled, schedule.NextRunTime)
 	if err != nil {
 		return store.Schedule{}, err
 	}
@@ -51,7 +47,7 @@ func (d *ScheduleDAO) GetByID(id int64) (store.Schedule, error) {
 		return store.Schedule{}, err
 	}
 	if nextRunTime.Valid {
-		s.NextRunTime = nextRunTime.Time
+		s.NextRunTime = &nextRunTime.Time
 	}
 	return s, nil
 }
@@ -74,7 +70,7 @@ func (d *ScheduleDAO) GetAll() ([]store.Schedule, error) {
 			continue
 		}
 		if nextRunTime.Valid {
-			s.NextRunTime = nextRunTime.Time
+			s.NextRunTime = &nextRunTime.Time
 		}
 		schedules = append(schedules, s)
 	}
@@ -99,7 +95,7 @@ func (d *ScheduleDAO) GetByTaskID(taskID int64) ([]store.Schedule, error) {
 			continue
 		}
 		if nextRunTime.Valid {
-			s.NextRunTime = nextRunTime.Time
+			s.NextRunTime = &nextRunTime.Time
 		}
 		schedules = append(schedules, s)
 	}
