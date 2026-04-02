@@ -712,3 +712,12 @@ func (db *DB) UpdatePassword(id int64, hashedPassword string) error {
 	_, err := db.db.Exec(`UPDATE users SET password = ? WHERE id = ?`, hashedPassword, id)
 	return err
 }
+
+// UpdateUsername 更新用户名
+func (db *DB) UpdateUsername(id int64, username string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec(`UPDATE users SET username = ? WHERE id = ?`, username, id)
+	return err
+}

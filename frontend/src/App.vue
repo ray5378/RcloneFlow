@@ -18,6 +18,7 @@ const showPasswordModal = ref(false)
 const user = getUser()
 
 const passwordForm = reactive({
+  username: user?.username || '',
   oldPassword: '',
   newPassword: '',
   confirmPassword: ''
@@ -57,18 +58,18 @@ function handleLogout() {
 }
 
 async function handleChangePassword() {
-  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+  if (passwordForm.newPassword && passwordForm.newPassword !== passwordForm.confirmPassword) {
     alert('新密码与确认密码不一致')
     return
   }
-  if (passwordForm.newPassword.length < 6) {
+  if (passwordForm.newPassword && passwordForm.newPassword.length < 6) {
     alert('新密码长度至少6位')
     return
   }
   
   try {
-    await changePassword(passwordForm.oldPassword, passwordForm.newPassword)
-    alert('密码修改成功，请重新登录')
+    await changePassword(passwordForm.oldPassword, passwordForm.newPassword, passwordForm.username)
+    alert('修改成功，请重新登录')
     showPasswordModal.value = false
     handleLogout()
   } catch (e: any) {
@@ -144,12 +145,16 @@ onMounted(async () => {
           </div>
           <div class="modal-body">
             <div class="field-item">
+              <label>用户名</label>
+              <input v-model="passwordForm.username" type="text" placeholder="输入新用户名" />
+            </div>
+            <div class="field-item">
               <label>旧密码</label>
-              <input v-model="passwordForm.oldPassword" type="password" placeholder="输入旧密码" />
+              <input v-model="passwordForm.oldPassword" type="password" placeholder="输入旧密码（修改密码时必填）" />
             </div>
             <div class="field-item">
               <label>新密码</label>
-              <input v-model="passwordForm.newPassword" type="password" placeholder="输入新密码" />
+              <input v-model="passwordForm.newPassword" type="password" placeholder="输入新密码（留空则不修改）" />
             </div>
             <div class="field-item">
               <label>确认新密码</label>

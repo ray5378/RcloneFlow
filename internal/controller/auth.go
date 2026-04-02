@@ -130,18 +130,14 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 type ChangePasswordRequest struct {
 	OldPassword string `json:"oldPassword"`
 	NewPassword string `json:"newPassword"`
+	Username    string `json:"username,omitempty"`
 }
 
-// ChangePassword 修改密码
+// ChangePassword 修改密码和用户名
 func (c *AuthController) ChangePassword(w http.ResponseWriter, r *http.Request) {
 	var req ChangePasswordRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, `{"error":"无效的请求格式"}`, http.StatusBadRequest)
-		return
-	}
-
-	if req.OldPassword == "" || req.NewPassword == "" {
-		http.Error(w, `{"error":"旧密码和新密码都不能为空"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -166,27 +162,61 @@ func (c *AuthController) ChangePassword(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// 验证旧密码
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
-		http.Error(w, `{"error":"旧密码错误"}`, http.StatusUnauthorized)
-		return
+	// 如果提供了新密码，则验证旧密码并更新
+	if req.NewPassword != "" {
+		if req.OldPassword == "" {
+			http.Error(w, `{"error":"请提供旧密码"}`, http.StatusBadRequest)
+			return
+		}
+
+		// 验证旧密码
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
+			http.Error(w, `{"error":"旧密码错误"}`, http.StatusUnauthorized)
+			return
+		}
+
+		// 加密新密码
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+		if err != nil {
+			http.Error(w, `{"error":"密码加密失败"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// 更新密码
+		if err := c.db.UpdatePassword(user.ID, string(hashedPassword)); err != nil {
+			http.Error(w, `{"error":"更新密码失败"}`, http.StatusInternalServerError)
+			return
+		}
 	}
 
-	// 加密新密码
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-	if err != nil {
-		http.Error(w, `{"error":"密码加密失败"}`, http.StatusInternalServerError)
-		return
-	}
+	// 如果提供了新用户名，则更新用户名
+	if req.Username != "" && req.Username != user.Username {
+		// 检查新用户名是否已被占用
+		if existingUser, exists := c.db.GetUserByUsername(req.Username); exists && existingUser.ID != user.ID {
+			http.Error(w, `{"error":"用户名已被占用"}`, http.StatusConflict)
+			return
+		}
 
-	// 更新密码
-	if err := c.db.UpdatePassword(user.ID, string(hashedPassword)); err != nil {
-		http.Error(w, `{"error":"更新密码失败"}`, http.StatusInternalServerError)
-		return
+		if err := c.db.UpdateUsername(user.ID, req.Username); err != nil {
+			http.Error(w, `{"error":"更新用户名失败"}`, http.StatusInternalServerError)
+			return
+		}
+
+		// 更新localStorage中的用户信息（前端通过重新登录处理）
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	
+	finalUsername := req.Username
+	if finalUsername == "" {
+		finalUsername = user.Username
+	}
+	
 	json.NewEncoder(w).Encode(map[string]any{
-		"message": "密码修改成功",
+		"message": "修改成功",
+		"user": map[string]any{
+			"id":       user.ID,
+			"username": finalUsername,
+		},
 	})
 }

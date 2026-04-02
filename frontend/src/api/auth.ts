@@ -53,14 +53,14 @@ export function getUser(): { id: number; username: string } | null {
   return user ? JSON.parse(user) : null
 }
 
-export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+export async function changePassword(oldPassword: string, newPassword: string, username?: string): Promise<void> {
   const res = await fetch('/api/auth/change-password', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${getToken()}`
     },
-    body: JSON.stringify({ oldPassword, newPassword })
+    body: JSON.stringify({ oldPassword, newPassword, username })
   })
   
   if (!res.ok) {
