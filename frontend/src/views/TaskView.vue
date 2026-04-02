@@ -553,7 +553,7 @@ function goBackTarget() {
     <div class="card-header">
       <div class="title">历史记录</div>
       <button v-if="historyFilterTaskId !== null" class="ghost small" @click="historyFilterTaskId = null">
-        ← 返回全部
+        ← 返回任务列表
       </button>
     </div>
     <div class="list-header">
