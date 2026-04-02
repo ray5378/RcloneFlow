@@ -4,15 +4,23 @@ import "fmt"
 
 // RunRecord 运行记录结构
 type RunRecord struct {
-	ID         int64  `json:"id"`
-	TaskID     int64  `json:"taskId"`
-	RcJobID    int64  `json:"rcJobId"`
-	Status     string `json:"status"`
-	Trigger    string `json:"trigger"`
-	StartedAt  string `json:"startedAt"`
-	FinishedAt string `json:"finishedAt"`
-	Error      string `json:"error,omitempty"`
-	Summary    string `json:"summary,omitempty"`
+	ID               int64  `json:"id"`
+	TaskID           int64  `json:"taskId"`
+	RcJobID          int64  `json:"rcJobId"`
+	Status           string `json:"status"`
+	Trigger          string `json:"trigger"`
+	StartedAt        string `json:"startedAt"`
+	FinishedAt       string `json:"finishedAt,omitempty"`
+	TaskName         string `json:"taskName,omitempty"`
+	TaskMode         string `json:"taskMode,omitempty"`
+	SourceRemote     string `json:"sourceRemote,omitempty"`
+	SourcePath       string `json:"sourcePath,omitempty"`
+	TargetRemote     string `json:"targetRemote,omitempty"`
+	TargetPath       string `json:"targetPath,omitempty"`
+	BytesTransferred int64  `json:"bytesTransferred,omitempty"`
+	Speed            string `json:"speed,omitempty"`
+	Error            string `json:"error,omitempty"`
+	Summary          string `json:"summary,omitempty"`
 }
 
 // RunServiceInterface 运行记录服务接口

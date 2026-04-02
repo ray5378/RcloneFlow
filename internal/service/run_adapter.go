@@ -2,6 +2,7 @@ package service
 
 import (
 	"encoding/json"
+	"time"
 
 	"rcloneflow/internal/store"
 )
@@ -14,6 +15,19 @@ type storeRunAdapter struct {
 // NewStoreRunAdapter 创建适配器
 func NewStoreRunAdapter(db *store.DB) RunServiceInterface {
 	return &storeRunAdapter{db: db}
+}
+
+// formatTime 格式化时间
+func formatTime(t time.Time) string {
+	return t.Format("2006-01-02T15:04:05Z")
+}
+
+// formatOptTime 格式化可选时间
+func formatOptTime(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format("2006-01-02T15:04:05Z")
 }
 
 // ListRuns 获取所有运行记录
@@ -30,14 +44,23 @@ func (a *storeRunAdapter) ListRuns() ([]RunRecord, error) {
 			summaryStr = string(bs)
 		}
 		result[i] = RunRecord{
-			ID:         r.ID,
-			TaskID:     r.TaskID,
-			RcJobID:    r.RcJobID,
-			Status:     r.Status,
-			Trigger:    r.Trigger,
-			StartedAt:  r.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			Summary:    summaryStr,
-			Error:      r.Error,
+			ID:               r.ID,
+			TaskID:           r.TaskID,
+			RcJobID:          r.RcJobID,
+			Status:           r.Status,
+			Trigger:         r.Trigger,
+			StartedAt:        formatTime(r.CreatedAt),
+			FinishedAt:       formatOptTime(r.FinishedAt),
+			TaskName:         r.TaskName,
+			TaskMode:         r.TaskMode,
+			SourceRemote:     r.SourceRemote,
+			SourcePath:       r.SourcePath,
+			TargetRemote:     r.TargetRemote,
+			TargetPath:       r.TargetPath,
+			BytesTransferred: r.BytesTransferred,
+			Speed:            r.Speed,
+			Error:            r.Error,
+			Summary:          summaryStr,
 		}
 	}
 	return result, nil
@@ -57,14 +80,23 @@ func (a *storeRunAdapter) ListActiveRuns() ([]RunRecord, error) {
 			summaryStr = string(bs)
 		}
 		result[i] = RunRecord{
-			ID:         r.ID,
-			TaskID:     r.TaskID,
-			RcJobID:    r.RcJobID,
-			Status:     r.Status,
-			Trigger:    r.Trigger,
-			StartedAt:  r.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			Summary:    summaryStr,
-			Error:      r.Error,
+			ID:               r.ID,
+			TaskID:           r.TaskID,
+			RcJobID:          r.RcJobID,
+			Status:           r.Status,
+			Trigger:         r.Trigger,
+			StartedAt:        formatTime(r.CreatedAt),
+			FinishedAt:       formatOptTime(r.FinishedAt),
+			TaskName:         r.TaskName,
+			TaskMode:         r.TaskMode,
+			SourceRemote:     r.SourceRemote,
+			SourcePath:       r.SourcePath,
+			TargetRemote:     r.TargetRemote,
+			TargetPath:       r.TargetPath,
+			BytesTransferred: r.BytesTransferred,
+			Speed:            r.Speed,
+			Error:            r.Error,
+			Summary:          summaryStr,
 		}
 	}
 	return result, nil
@@ -74,13 +106,22 @@ func (a *storeRunAdapter) ListActiveRuns() ([]RunRecord, error) {
 func (a *storeRunAdapter) UpdateRun(id int64, updateFn func(*RunRecord)) {
 	a.db.UpdateRun(id, func(r *store.Run) {
 		record := &RunRecord{
-			ID:         r.ID,
-			TaskID:     r.TaskID,
-			RcJobID:    r.RcJobID,
-			Status:     r.Status,
-			Trigger:    r.Trigger,
-			StartedAt:  r.CreatedAt.Format("2006-01-02T15:04:05Z"),
-			Error:      r.Error,
+			ID:               r.ID,
+			TaskID:           r.TaskID,
+			RcJobID:          r.RcJobID,
+			Status:           r.Status,
+			Trigger:         r.Trigger,
+			StartedAt:        formatTime(r.CreatedAt),
+			FinishedAt:       formatOptTime(r.FinishedAt),
+			TaskName:         r.TaskName,
+			TaskMode:         r.TaskMode,
+			SourceRemote:     r.SourceRemote,
+			SourcePath:       r.SourcePath,
+			TargetRemote:     r.TargetRemote,
+			TargetPath:       r.TargetPath,
+			BytesTransferred: r.BytesTransferred,
+			Speed:            r.Speed,
+			Error:            r.Error,
 		}
 		if r.Summary != nil {
 			bs, _ := json.Marshal(r.Summary)
@@ -88,12 +129,19 @@ func (a *storeRunAdapter) UpdateRun(id int64, updateFn func(*RunRecord)) {
 		}
 		updateFn(record)
 		r.Status = record.Status
+		r.FinishedAt = nil
+		if record.FinishedAt != "" {
+			t, _ := time.Parse("2006-01-02T15:04:05Z", record.FinishedAt)
+			r.FinishedAt = &t
+		}
+		r.Speed = record.Speed
+		r.BytesTransferred = record.BytesTransferred
+		r.Error = record.Error
 		if record.Summary != "" {
 			var summary map[string]any
 			json.Unmarshal([]byte(record.Summary), &summary)
 			r.Summary = summary
 		}
-		r.Error = record.Error
 	})
 }
 

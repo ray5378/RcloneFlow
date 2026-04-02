@@ -23,10 +23,18 @@ export interface Run {
   rcJobId: number
   status: string
   trigger: string
+  startedAt: string
+  finishedAt?: string
+  taskName?: string
+  taskMode?: string
+  sourceRemote?: string
+  sourcePath?: string
+  targetRemote?: string
+  targetPath?: string
+  bytesTransferred?: number
+  speed?: string
   summary?: string
   error?: string
-  startedAt?: string
-  finishedAt?: string
 }
 
 export interface FileItem {
