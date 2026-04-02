@@ -41,14 +41,13 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}
-		item, err := c.scheduleSvc.CreateSchedule(req.TaskID, req.Spec)
+		item, err := c.scheduleSvc.CreateSchedule(req.TaskID, req.Spec, req.Enabled)
 		if err != nil {
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
 		// 添加到调度器
 		if req.Enabled {
-			item.Enabled = true
 			c.sched.AddSchedule(item)
 		}
 		WriteJSON(w, 200, item)

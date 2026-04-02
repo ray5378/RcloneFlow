@@ -20,10 +20,11 @@ func (s *ScheduleService) ListSchedules() ([]store.Schedule, error) {
 }
 
 // CreateSchedule 创建定时任务
-func (s *ScheduleService) CreateSchedule(taskID int64, spec string) (store.Schedule, error) {
+func (s *ScheduleService) CreateSchedule(taskID int64, spec string, enabled bool) (store.Schedule, error) {
 	return s.db.AddSchedule(store.Schedule{
 		TaskID: taskID,
 		Spec:   spec,
+		Enabled: enabled,
 	})
 }
 
