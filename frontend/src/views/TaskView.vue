@@ -7,7 +7,7 @@ const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
 const runs = ref<Run[]>([])
 const remotes = ref<string[]>([])
-const currentModule = ref<'history' | 'schedule' | 'add' | 'tasks'>('tasks')
+const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const showCreateModal = ref(false)
 
 const createForm = ref({
@@ -480,9 +480,6 @@ function goBackTarget() {
       <button class="tab-btn" :class="{ active: currentModule === 'history' }" @click="currentModule = 'history'">
         历史记录
       </button>
-      <button class="tab-btn" :class="{ active: currentModule === 'schedule' }" @click="currentModule = 'schedule'">
-        定时任务
-      </button>
       <button class="tab-btn" :class="{ active: currentModule === 'add' }" @click="currentModule = 'add'">
         添加任务
       </button>
@@ -540,27 +537,7 @@ function goBackTarget() {
     </div>
   </div>
 
-  <div v-if="currentModule === 'schedule'" class="card">
-    <div class="card-header"><div class="title">定时任务</div></div>
-    <div class="list-header">
-      <span class="col-name">任务</span>
-      <span class="col-info">周期</span>
-      <span class="col-action">操作</span>
-    </div>
-    <div class="list">
-      <div v-for="s in schedules" :key="s.id" class="item">
-        <div class="name"><strong>{{ tasks.find(t => t.id === s.taskId)?.name || `任务 #${s.taskId}` }}</strong></div>
-        <span class="info">{{ s.spec }}</span>
-        <div class="item-actions">
-          <button class="ghost small" @click="runTask(s.taskId)">运行</button>
-          <button class="ghost small danger-text" @click="deleteSchedule(s.id)">删除</button>
-        </div>
-      </div>
-      <div v-if="!schedules.length" class="empty">暂无定时任务</div>
-    </div>
-  </div>
-
-  <div v-if="currentModule === 'add'" class="card">
+    <div v-if="currentModule === 'add'" class="card">
     <div class="card-header"><div class="title">添加任务</div></div>
     <div class="form-content">
       <div class="field-item">
