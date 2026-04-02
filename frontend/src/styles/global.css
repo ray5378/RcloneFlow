@@ -368,6 +368,44 @@ body.light .card-header {
   border-color: #eee;
 }
 
+.search-box {
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 13px;
+  width: 200px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #1e88e5;
+}
+
+.search-input::placeholder {
+  color: #666;
+}
+
+body.light .search-input {
+  background: #fff;
+  color: #333;
+  border-color: #ccc;
+}
+
+body.light .search-input:focus {
+  border-color: #1e88e5;
+}
+
+body.light .search-input::placeholder {
+  color: #999;
+}
+
 .card-content {
   padding: 16px 20px;
 }

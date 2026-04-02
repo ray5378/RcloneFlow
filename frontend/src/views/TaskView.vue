@@ -1,11 +1,25 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import * as api from '../api'
 import type { Task, Schedule, Run } from '../types'
 
 const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
 const runs = ref<Run[]>([])
+const taskSearch = ref('')
+
+// 过滤后的任务列表
+const filteredTasks = computed(() => {
+  if (!taskSearch.value) return tasks.value
+  const q = taskSearch.value.toLowerCase()
+  return tasks.value.filter(t =>
+    t.name.toLowerCase().includes(q) ||
+    t.sourceRemote.toLowerCase().includes(q) ||
+    t.targetRemote.toLowerCase().includes(q) ||
+    t.mode.toLowerCase().includes(q)
+  )
+})
+
 const remotes = ref<string[]>([])
 const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const showCreateModal = ref(false)
@@ -487,9 +501,14 @@ function goBackTarget() {
   </div>
 
   <div v-if="currentModule === 'tasks'" class="card">
-    <div class="card-header"><div class="title">任务列表</div></div>
+    <div class="card-header">
+      <div class="title">任务列表</div>
+      <div class="search-box">
+        <input v-model="taskSearch" type="text" placeholder="搜索任务..." class="search-input" />
+      </div>
+    </div>
     <div class="tile-grid">
-      <div v-for="task in tasks" :key="task.id" class="tile" @click="closeMenus">
+      <div v-for="task in filteredTasks" :key="task.id" class="tile" @click="closeMenus">
         <div class="tile-info">
           <div class="tile-header"><span class="tile-name">{{ task.name }}</span></div>
           <div class="tile-desc">{{ task.mode }} {{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }} → {{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</div>
