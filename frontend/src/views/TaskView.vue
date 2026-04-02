@@ -46,6 +46,7 @@ const createForm = ref({
 
 const openMenuId = ref<number | null>(null)
 const editingTask = ref<Task | null>(null)
+const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
 
 const sourcePathOptions = ref<any[]>([])
 const targetPathOptions = ref<any[]>([])
@@ -149,6 +150,13 @@ function getStatusText(status: string) {
 }
 
 async function createTask() {
+  // 如果已完成，点击返回任务列表
+  if (creatingState.value === 'done') {
+    creatingState.value = 'idle'
+    currentModule.value = 'tasks'
+    return
+  }
+
   if (!createForm.value.name) {
     alert('请输入任务名称')
     return
@@ -157,6 +165,8 @@ async function createTask() {
     alert('请选择源和目标存储')
     return
   }
+
+  creatingState.value = 'loading'
   try {
     // 构建任务数据
     const taskData = {
@@ -214,8 +224,9 @@ async function createTask() {
     targetCurrentPath.value = ''
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
     await loadData()
-    currentModule.value = 'tasks'
+    creatingState.value = 'done'
   } catch (e) {
+    creatingState.value = 'idle'
     alert((e as Error).message)
   }
 }
@@ -1039,7 +1050,17 @@ function goBackTarget() {
       </div>
 
       <div class="form-actions">
-        <button class="primary" @click="createTask">创建任务</button>
+        <button 
+          class="primary" 
+          :class="{ 'btn-success': creatingState === 'done' }"
+          :disabled="creatingState === 'loading'"
+          @click="createTask"
+        >
+          <template v-if="creatingState === 'done'">已创建 ✓ (点击返回)</template>
+          <template v-else-if="creatingState === 'loading'">创建中...</template>
+          <template v-else-if="editingTask">保存修改</template>
+          <template v-else>创建任务</template>
+        </button>
       </div>
     </div>
   </div>
@@ -1178,6 +1199,8 @@ body.light .schedule-item select { background: #fff; color: #333; border-color: 
 .path-item.is-dir .item-name { color: #64b5f6; font-weight: 500; }
 .path-empty { padding: 20px; text-align: center; color: #666; font-size: 13px; }
 .form-actions { margin-top: 20px; }
+.btn-success { background: #2e7d32 !important; border-color: #2e7d32 !important; }
+.btn-success:hover { background: #388e3c !important; }
 .tile-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px 20px; }
 .tile {
   min-width: 180px;
