@@ -725,7 +725,7 @@ function goBackTarget() {
         </div>
         <div class="modal-footer">
           <button class="ghost" @click="confirmModal.show = false">取消</button>
-          <button class="primary danger" @click="() => { confirmModal.onConfirm(); confirmModal.show = false }">确认</button>
+          <button class="primary danger" @click="confirmModal.show = false; confirmModal.onConfirm()">确认</button>
         </div>
       </div>
     </div>
