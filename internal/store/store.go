@@ -33,15 +33,26 @@ type Schedule struct {
 }
 
 type Run struct {
-	ID        int64             `json:"id"`
-	TaskID    int64             `json:"taskId"`
-	RcJobID   int64             `json:"rcJobId"`
-	Status    string            `json:"status"`
-	Trigger   string            `json:"trigger"`
-	Summary   map[string]any   `json:"summary,omitempty"`
-	Error     string            `json:"error,omitempty"`
-	CreatedAt time.Time        `json:"createdAt"`
-	UpdatedAt time.Time        `json:"updatedAt"`
+	ID               int64        `json:"id"`
+	TaskID           int64        `json:"taskId"`
+	RcJobID          int64        `json:"rcJobId"`
+	Status           string       `json:"status"`
+	Trigger          string       `json:"trigger"`
+	Summary          map[string]any `json:"summary,omitempty"`
+	Error            string       `json:"error,omitempty"`
+	CreatedAt        time.Time   `json:"createdAt"`
+	UpdatedAt        time.Time   `json:"updatedAt"`
+	// 任务详情
+	TaskName         string       `json:"taskName,omitempty"`
+	TaskMode         string       `json:"taskMode,omitempty"`
+	SourceRemote     string       `json:"sourceRemote,omitempty"`
+	SourcePath       string       `json:"sourcePath,omitempty"`
+	TargetRemote     string       `json:"targetRemote,omitempty"`
+	TargetPath       string       `json:"targetPath,omitempty"`
+	// 传输详情
+	FinishedAt       *time.Time  `json:"finishedAt,omitempty"`
+	BytesTransferred int64        `json:"bytesTransferred,omitempty"`
+	Speed            string       `json:"speed,omitempty"`
 }
 
 type DB struct {

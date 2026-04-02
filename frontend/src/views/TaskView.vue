@@ -107,6 +107,25 @@ function formatTime(time: string | undefined) {
   }
 }
 
+function formatDuration(startTime: string | undefined, endTime: string | undefined) {
+  if (!startTime) return '-'
+  const start = new Date(startTime).getTime()
+  const end = endTime ? new Date(endTime).getTime() : Date.now()
+  const diff = Math.max(0, end - start)
+  
+  const seconds = Math.floor(diff / 1000) % 60
+  const minutes = Math.floor(diff / 60000) % 60
+  const hours = Math.floor(diff / 3600000)
+  
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds}s`
+  } else {
+    return `${seconds}s`
+  }
+}
+
 function getStatusClass(status: string) {
   switch (status) {
     case 'running': return 'running'
@@ -549,16 +568,23 @@ function goBackTarget() {
     <div class="list-header">
       <span class="col-name">任务</span>
       <span class="col-status">状态</span>
-      <span class="col-time">开始时间</span>
-      <span class="col-time">结束时间</span>
+      <span class="col-path-full">路径</span>
+      <span class="col-time">开始</span>
+      <span class="col-time">耗时</span>
       <span class="col-action">操作</span>
     </div>
     <div class="list">
-      <div v-for="run in filteredRuns" :key="run.id" class="item">
-        <div class="name"><strong>{{ tasks.find(t => t.id === run.taskId)?.name || `任务 #${run.taskId}` }}</strong></div>
+      <div v-for="run in filteredRuns" :key="run.id" class="item run-item">
+        <div class="name">
+          <strong>{{ run.taskName || `任务 #${run.taskId}` }}</strong>
+          <span class="mode-tag" v-if="run.taskMode">{{ run.taskMode }}</span>
+        </div>
         <span :class="['status', getStatusClass(run.status)]">{{ run.status }}</span>
+        <div class="path-full">
+          <span class="path-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
+        </div>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
-        <span class="time">{{ formatTime(run.finishedAt) }}</span>
+        <span class="time">{{ formatDuration(run.startedAt, run.finishedAt) }}</span>
         <button class="ghost small" @click="clearRun(run.id)">清除</button>
       </div>
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>

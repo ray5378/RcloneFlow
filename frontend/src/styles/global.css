@@ -612,6 +612,11 @@ body.light .list-header {
   text-align: right;
 }
 
+.col-path-full {
+  flex: 1;
+  min-width: 200px;
+}
+
 .item-actions {
   display: flex;
   gap: 4px;
@@ -626,6 +631,51 @@ body.light .list-header {
 .task-item {
   padding: 12px 20px;
   border-bottom: 1px solid #2a2a2a;
+}
+
+.run-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.run-item:last-child {
+  border-bottom: none;
+}
+
+.run-item .name {
+  min-width: 120px;
+}
+
+.run-item .status {
+  min-width: 70px;
+}
+
+.run-item .path-full {
+  flex: 1;
+  min-width: 200px;
+  overflow: hidden;
+}
+
+.run-item .path-text {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: #888;
+}
+
+body.light .run-item .path-text {
+  color: #666;
+}
+
+.run-item .time {
+  min-width: 80px;
+  font-size: 12px;
+  color: #666;
 }
 
 .task-item:last-child {
