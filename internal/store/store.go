@@ -721,3 +721,25 @@ func (db *DB) UpdateUsername(id int64, username string) error {
 	_, err := db.db.Exec(`UPDATE users SET username = ? WHERE id = ?`, username, id)
 	return err
 }
+
+// ListUsers 获取所有用户
+func (db *DB) ListUsers() ([]User, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	rows, err := db.db.Query(`SELECT id, username, password, created_at FROM users`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	
+	var users []User
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Username, &u.Password, &u.CreatedAt); err != nil {
+			continue
+		}
+		users = append(users, u)
+	}
+	return users, nil
+}

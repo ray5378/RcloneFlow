@@ -103,19 +103,15 @@ func withCORS(next http.Handler) http.Handler {
 
 // createDefaultAdmin 创建默认管理员账户
 func createDefaultAdmin(db *store.DB) {
-	// 检查是否已存在admin用户，如果存在则重置密码
-	if user, exists := db.GetUserByUsername("admin"); exists {
-		// 重置为默认密码 admin
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-		if err != nil {
-			logger.Error("重置管理员密码失败", zap.Error(err))
-			return
-		}
-		if err := db.UpdatePassword(user.ID, string(hashedPassword)); err != nil {
-			logger.Error("重置管理员密码失败", zap.Error(err))
-			return
-		}
-		logger.Info("已重置管理员密码: admin / admin")
+	// 检查数据库中是否已有任何用户
+	users, err := db.ListUsers()
+	if err != nil {
+		logger.Error("检查用户列表失败", zap.Error(err))
+		return
+	}
+
+	// 如果已有用户，不创建默认账户
+	if len(users) > 0 {
 		return
 	}
 
