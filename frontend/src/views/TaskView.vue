@@ -483,23 +483,6 @@ function goBackTarget() {
 </script>
 
 <template>
-  <div class="card">
-    <div class="card-header">
-      <div class="title">功能模块</div>
-    </div>
-    <div class="module-tabs">
-      <button class="tab-btn" :class="{ active: currentModule === 'tasks' }" @click="currentModule = 'tasks'">
-        任务列表
-      </button>
-      <button class="tab-btn" :class="{ active: currentModule === 'history' }" @click="currentModule = 'history'">
-        历史记录
-      </button>
-      <button class="tab-btn" :class="{ active: currentModule === 'add' }" @click="currentModule = 'add'">
-        添加任务
-      </button>
-    </div>
-  </div>
-
   <div v-if="currentModule === 'tasks'" class="card">
     <div class="card-header">
       <div class="title">任务列表</div>
