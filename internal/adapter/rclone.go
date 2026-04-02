@@ -580,10 +580,11 @@ type StartJobRequest struct {
 	SrcFs  string `json:"srcFs"`
 	DstFs  string `json:"dstFs"`
 	Async  bool   `json:"_async"`
+	*TaskOptions
 }
 
 // StartJob 启动同步任务
-func (c *RcloneClient) StartJob(ctx context.Context, mode, srcFs, dstFs string) (int64, error) {
+func (c *RcloneClient) StartJob(ctx context.Context, mode, srcFs, dstFs string, opts *TaskOptions) (int64, error) {
 	// sync/copy 或 sync/sync 或 sync/move
 	ep := "sync/copy"
 	switch strings.ToLower(mode) {
@@ -595,13 +596,10 @@ func (c *RcloneClient) StartJob(ctx context.Context, mode, srcFs, dstFs string) 
 	
 	var resp JobIDResponse
 	req := &StartJobRequest{
-		SrcFs: srcFs,
-		DstFs: dstFs,
-		Async: true,
-	}
-	// sync操作添加额外参数
-	if strings.HasPrefix(ep, "sync/") {
-		req.SrcFs = srcFs
+		SrcFs:        srcFs,
+		DstFs:        dstFs,
+		Async:        true,
+		TaskOptions:  opts,
 	}
 	
 	if err := c.Call(ctx, ep, req, &resp); err != nil {

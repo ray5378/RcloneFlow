@@ -13,14 +13,15 @@ import (
 )
 
 type Task struct {
-	ID           int64     `json:"id"`
-	Name         string    `json:"name"`
-	Mode         string    `json:"mode"`
-	SourceRemote string    `json:"sourceRemote"`
-	SourcePath   string    `json:"sourcePath"`
-	TargetRemote string    `json:"targetRemote"`
-	TargetPath   string    `json:"targetPath"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID           int64           `json:"id"`
+	Name         string          `json:"name"`
+	Mode         string          `json:"mode"`
+	SourceRemote string          `json:"sourceRemote"`
+	SourcePath   string          `json:"sourcePath"`
+	TargetRemote string          `json:"targetRemote"`
+	TargetPath   string          `json:"targetPath"`
+	Options      json.RawMessage `json:"options,omitempty"`
+	CreatedAt    time.Time       `json:"createdAt"`
 }
 
 type Schedule struct {
@@ -200,7 +201,7 @@ func (db *DB) ListTasks() ([]Task, error) {
 	defer db.mu.Unlock()
 	
 	rows, err := db.db.Query(`
-		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, created_at 
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at 
 		FROM tasks ORDER BY id DESC`)
 	if err != nil {
 		return nil, err
@@ -210,7 +211,7 @@ func (db *DB) ListTasks() ([]Task, error) {
 	var tasks []Task
 	for rows.Next() {
 		var t Task
-		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.CreatedAt)
+		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.Options, &t.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -224,9 +225,9 @@ func (db *DB) AddTask(t Task) (Task, error) {
 	defer db.mu.Unlock()
 	
 	result, err := db.db.Exec(`
-		INSERT INTO tasks (name, mode, source_remote, source_path, target_remote, target_path) 
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+		INSERT INTO tasks (name, mode, source_remote, source_path, target_remote, target_path, options) 
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options)
 	if err != nil {
 		return Task{}, err
 	}
@@ -247,9 +248,9 @@ func (db *DB) GetTask(id int64) (Task, bool) {
 	
 	var t Task
 	err := db.db.QueryRow(`
-		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, created_at 
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at 
 		FROM tasks WHERE id = ?`, id).Scan(
-		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.CreatedAt)
+		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.Options, &t.CreatedAt)
 	if err != nil {
 		return Task{}, false
 	}

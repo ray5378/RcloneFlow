@@ -175,8 +175,8 @@ func (c *Client) PublicLink(ctx context.Context, fs, remote string) (string, err
 }
 
 // StartJob 启动任务
-func (c *Client) StartJob(ctx context.Context, mode, srcFs, dstFs string) (int64, error) {
-	return c.cli.StartJob(ctx, mode, srcFs, dstFs)
+func (c *Client) StartJob(ctx context.Context, mode, srcFs, dstFs string, opts *adapter.TaskOptions) (int64, error) {
+	return c.cli.StartJob(ctx, mode, srcFs, dstFs, opts)
 }
 
 // JobStatus 获取任务状态
@@ -193,8 +193,8 @@ func (c *Client) JobStatus(ctx context.Context, jobID int64) (map[string]any, er
 }
 
 // RunTask 运行任务
-func (c *Client) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string) (int64, error) {
+func (c *Client) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string, opts *adapter.TaskOptions) (int64, error) {
 	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
 	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
-	return c.cli.StartJob(ctx, mode, src, dst)
+	return c.cli.StartJob(ctx, mode, src, dst, opts)
 }

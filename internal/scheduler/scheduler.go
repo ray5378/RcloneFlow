@@ -2,11 +2,13 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
 	"time"
 
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/logger"
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/store"
@@ -48,7 +50,16 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 		return nil
 	}
 
-	jobID, err := r.rc.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger)
+	// 解析任务选项
+	var opts *adapter.TaskOptions
+	if len(t.Options) > 0 {
+		var taskOpts adapter.TaskOptions
+		if err := json.Unmarshal(t.Options, &taskOpts); err == nil {
+			opts = &taskOpts
+		}
+	}
+
+	jobID, err := r.rc.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger, opts)
 	if err != nil {
 		r.db.AddRun(store.Run{
 			TaskID:       taskID,

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/rclone"
 )
 
@@ -203,6 +204,6 @@ func (c *RemoteController) RcloneClient() *rclone.Client {
 }
 
 // RunTask 运行任务
-func (c *RemoteController) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string) (int64, error) {
-	return c.rc.RunTask(ctx, taskID, mode, srcRemote, srcPath, dstRemote, dstPath, trigger)
+func (c *RemoteController) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string, opts *adapter.TaskOptions) (int64, error) {
+	return c.rc.RunTask(ctx, taskID, mode, srcRemote, srcPath, dstRemote, dstPath, trigger, opts)
 }

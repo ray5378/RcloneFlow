@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/store"
@@ -45,8 +46,17 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		return ErrTaskNotFound
 	}
 
+	// 解析任务选项
+	var opts *adapter.TaskOptions
+	if len(t.Options) > 0 {
+		var taskOpts adapter.TaskOptions
+		if err := json.Unmarshal(t.Options, &taskOpts); err == nil {
+			opts = &taskOpts
+		}
+	}
+
 	// 通过runner启动任务
-	jobID, err := s.runner.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger)
+	jobID, err := s.runner.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger, opts)
 	if err != nil {
 		return err
 	}
