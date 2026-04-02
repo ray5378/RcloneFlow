@@ -47,6 +47,7 @@ const createForm = ref({
 const openMenuId = ref<number | null>(null)
 const editingTask = ref<Task | null>(null)
 const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
+const runningTaskId = ref<number | null>(null)
 
 const sourcePathOptions = ref<any[]>([])
 const targetPathOptions = ref<any[]>([])
@@ -243,11 +244,18 @@ function viewTaskHistory(taskId: number) {
 }
 
 async function runTask(taskId: number) {
+  if (runningTaskId.value !== null) return
+  runningTaskId.value = taskId
   try {
     await api.runTask(taskId)
-    alert('任务已启动')
-    await loadData()
+    // 5秒后恢复
+    setTimeout(() => {
+      if (runningTaskId.value === taskId) {
+        runningTaskId.value = null
+      }
+    }, 5000)
   } catch (e) {
+    runningTaskId.value = null
     alert((e as Error).message)
   }
 }
@@ -627,7 +635,15 @@ function goBackTarget() {
             <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
               {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}
             </button>
-            <button class="ghost small" @click.stop="runTask(task.id)">▶ 执行</button>
+            <button 
+              class="ghost small" 
+              :class="{ 'btn-running': runningTaskId === task.id }"
+              :disabled="runningTaskId === task.id"
+              @click.stop="runTask(task.id)"
+            >
+              <template v-if="runningTaskId === task.id">运行成功</template>
+              <template v-else>▶ 手动运行</template>
+            </button>
             <button class="ghost small" @click.stop="editTask(task)">✏️</button>
             <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
           </div>
@@ -1201,6 +1217,7 @@ body.light .schedule-item select { background: #fff; color: #333; border-color: 
 .form-actions { margin-top: 20px; }
 .btn-success { background: #2e7d32 !important; border-color: #2e7d32 !important; }
 .btn-success:hover { background: #388e3c !important; }
+.btn-running { background: #2e7d32 !important; border-color: #2e7d32 !important; color: #fff !important; }
 .tile-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px 20px; }
 .tile {
   min-width: 180px;
