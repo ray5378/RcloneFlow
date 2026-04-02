@@ -439,13 +439,13 @@ function goBackTarget() {
         <div class="path-selector">
           <div class="path-browse">
             <div class="path-bar">
+              <span class="path-selected">已选: /{{ createForm.sourcePath || '未选择' }}</span>
               <span class="path-label">当前: /{{ sourceCurrentPath || '根目录' }}</span>
-              <span v-if="createForm.sourcePath" class="path-selected">已选: /{{ createForm.sourcePath }}</span>
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
               <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onSourceClick(item)">
-                <span v-if="item.IsDir" class="dir-arrow" @click.stop="onSourceArrow(item)">▶</span>
+                <span v-if="item.IsDir" class="folder-icon" @click.stop="onSourceArrow(item)">📁</span>
                 <span v-else class="file-icon">📄</span>
                 <span class="item-name">{{ item.Name }}</span>
               </div>
@@ -468,13 +468,13 @@ function goBackTarget() {
         <div class="path-selector">
           <div class="path-browse">
             <div class="path-bar">
+              <span class="path-selected">已选: /{{ createForm.targetPath || '未选择' }}</span>
               <span class="path-label">当前: /{{ targetCurrentPath || '根目录' }}</span>
-              <span v-if="createForm.targetPath" class="path-selected">已选: /{{ createForm.targetPath }}</span>
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
               <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onTargetClick(item)">
-                <span v-if="item.IsDir" class="dir-arrow" @click.stop="onTargetArrow(item)">▶</span>
+                <span v-if="item.IsDir" class="folder-icon" @click.stop="onTargetArrow(item)">📁</span>
                 <span v-else class="file-icon">📄</span>
                 <span class="item-name">{{ item.Name }}</span>
               </div>
@@ -567,8 +567,8 @@ body.light .form-content select { background: #fff; border-color: #ddd; color: #
 body.light .path-browse { border-color: #ddd; background: #fff; }
 .path-bar { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: #1a1a1a; border-bottom: 1px solid #333; }
 body.light .path-bar { background: #f5f5f5; border-color: #ddd; }
+.path-selected { font-size: 12px; color: #4caf50; font-weight: 600; }
 .path-label { font-size: 12px; color: #888; }
-.path-selected { font-size: 12px; color: #4caf50; margin-left: 12px; font-weight: 600; }
 .path-list { max-height: 200px; overflow-y: auto; padding: 8px; }
 .path-item {
   padding: 6px 12px;
@@ -583,8 +583,8 @@ body.light .path-bar { background: #f5f5f5; border-color: #ddd; }
 body.light .path-item { color: #333; }
 .path-item:hover { background: #333; }
 body.light .path-item:hover { background: #f0f0f0; }
-.dir-arrow { color: #64b5f6; font-size: 10px; cursor: pointer; padding: 2px 4px; background: #333; border-radius: 3px; margin-right: 4px; }
-.dir-arrow:hover { color: #90caf9; background: #444; }
+.folder-icon { margin-right: 4px; }
+.file-icon { margin-right: 4px; }
 .file-icon { font-size: 12px; }
 .item-name { flex: 1; }
 .path-item.is-dir .item-name { color: #64b5f6; font-weight: 500; }
