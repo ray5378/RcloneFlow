@@ -52,3 +52,19 @@ export function getUser(): { id: number; username: string } | null {
   const user = localStorage.getItem('user')
   return user ? JSON.parse(user) : null
 }
+
+export async function changePassword(oldPassword: string, newPassword: string): Promise<void> {
+  const res = await fetch('/api/auth/change-password', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({ oldPassword, newPassword })
+  })
+  
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: '修改失败' }))
+    throw new Error(error.error || '修改失败')
+  }
+}

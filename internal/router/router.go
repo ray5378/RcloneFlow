@@ -45,11 +45,13 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	mux.HandleFunc("/healthz", r.remoteCtrl.Healthz)
 
 	// 认证相关（公开）
-	mux.HandleFunc("/api/auth/register", r.authCtrl.Register)
 	mux.HandleFunc("/api/auth/login", r.authCtrl.Login)
 
 	// 需要认证的API路由
 	apiMux := http.NewServeMux()
+
+	// 修改密码
+	apiMux.HandleFunc("/api/auth/change-password", r.authCtrl.ChangePassword)
 
 	// 远程存储相关
 	apiMux.HandleFunc("/api/remotes", r.remoteCtrl.HandleRemotes)

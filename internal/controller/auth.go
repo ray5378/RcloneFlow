@@ -3,6 +3,7 @@ package controller
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"rcloneflow/internal/auth"
 	"rcloneflow/internal/store"
@@ -122,5 +123,70 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 			"id":       user.ID,
 			"username": user.Username,
 		},
+	})
+}
+
+// ChangePasswordRequest 修改密码请求
+type ChangePasswordRequest struct {
+	OldPassword string `json:"oldPassword"`
+	NewPassword string `json:"newPassword"`
+}
+
+// ChangePassword 修改密码
+func (c *AuthController) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var req ChangePasswordRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"无效的请求格式"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.OldPassword == "" || req.NewPassword == "" {
+		http.Error(w, `{"error":"旧密码和新密码都不能为空"}`, http.StatusBadRequest)
+		return
+	}
+
+	// 从Authorization header获取当前用户
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, `{"error":"未提供认证token"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// 解析token获取用户名
+	claims, err := auth.ValidateToken(strings.TrimPrefix(authHeader, "Bearer "))
+	if err != nil {
+		http.Error(w, `{"error":"token无效"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// 获取用户信息
+	user, exists := c.db.GetUserByUsername(claims.Username)
+	if !exists {
+		http.Error(w, `{"error":"用户不存在"}`, http.StatusNotFound)
+		return
+	}
+
+	// 验证旧密码
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
+		http.Error(w, `{"error":"旧密码错误"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// 加密新密码
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		http.Error(w, `{"error":"密码加密失败"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// 更新密码
+	if err := c.db.UpdatePassword(user.ID, string(hashedPassword)); err != nil {
+		http.Error(w, `{"error":"更新密码失败"}`, http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"message": "密码修改成功",
 	})
 }

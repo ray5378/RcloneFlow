@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
 import LoginView from './views/LoginView.vue'
 import * as api from './api'
-import { isLoggedIn as checkAuth } from './api/auth'
+import { isLoggedIn as checkAuth, getUser, logout, changePassword } from './api/auth'
 
 const currentPage = ref('browser')
 const taskViewKey = ref(0)
@@ -12,6 +12,16 @@ const version = ref('加载中...')
 const isLight = ref(localStorage.getItem('theme') === 'light')
 const isAuth = ref(false)
 const authChecked = ref(false)
+const showSettings = ref(false)
+const showPasswordModal = ref(false)
+
+const user = getUser()
+
+const passwordForm = reactive({
+  oldPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
 
 const pages = {
   browser: '文件管理',
@@ -39,6 +49,31 @@ function toggleTheme() {
 
 function handleLoginSuccess() {
   isAuth.value = true
+}
+
+function handleLogout() {
+  logout()
+  isAuth.value = false
+}
+
+async function handleChangePassword() {
+  if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+    alert('新密码与确认密码不一致')
+    return
+  }
+  if (passwordForm.newPassword.length < 6) {
+    alert('新密码长度至少6位')
+    return
+  }
+  
+  try {
+    await changePassword(passwordForm.oldPassword, passwordForm.newPassword)
+    alert('密码修改成功，请重新登录')
+    showPasswordModal.value = false
+    handleLogout()
+  } catch (e: any) {
+    alert(e.message || '修改失败')
+  }
 }
 
 onMounted(async () => {
@@ -84,9 +119,14 @@ onMounted(async () => {
             {{ name }}
           </button>
         </nav>
-        <button class="theme-btn" @click="toggleTheme">
-          {{ isLight ? '🌙 深色模式' : '☀️ 浅色模式' }}
-        </button>
+        <div class="header-actions">
+          <button class="settings-btn" @click="showPasswordModal = true">
+            {{ user?.username }}
+          </button>
+          <button class="theme-btn" @click="toggleTheme">
+            {{ isLight ? '🌙' : '☀️' }}
+          </button>
+        </div>
       </header>
 
       <!-- Main Content -->
@@ -94,6 +134,200 @@ onMounted(async () => {
         <BrowserView v-if="currentPage === 'browser'" :version="version" />
         <TaskView v-if="currentPage === 'tasks'" :key="taskViewKey" />
       </main>
+
+      <!-- 修改密码弹窗 -->
+      <div v-if="showPasswordModal" class="modal-overlay" @click.self="showPasswordModal = false">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h3>修改密码</h3>
+            <button class="close-btn" @click="showPasswordModal = false">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="field-item">
+              <label>旧密码</label>
+              <input v-model="passwordForm.oldPassword" type="password" placeholder="输入旧密码" />
+            </div>
+            <div class="field-item">
+              <label>新密码</label>
+              <input v-model="passwordForm.newPassword" type="password" placeholder="输入新密码" />
+            </div>
+            <div class="field-item">
+              <label>确认新密码</label>
+              <input v-model="passwordForm.confirmPassword" type="password" placeholder="再次输入新密码" />
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="ghost" @click="showPasswordModal = false">取消</button>
+            <button class="primary" @click="handleChangePassword">保存</button>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
+
+<style scoped>
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-btn {
+  padding: 6px 12px;
+  background: #252525;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #ccc;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-btn:hover {
+  background: #333;
+  color: #fff;
+}
+
+body.light .settings-btn {
+  background: #f0f0f0;
+  border-color: #ddd;
+  color: #666;
+}
+
+body.light .settings-btn:hover {
+  background: #e0e0e0;
+  color: #333;
+}
+
+.theme-btn {
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid #333;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+body.light .theme-btn {
+  border-color: #ddd;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #1e1e2f;
+  border-radius: 16px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  border: 1px solid #333;
+}
+
+body.light .modal-content {
+  background: #fff;
+  border-color: #ddd;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #fff;
+}
+
+body.light .modal-header h3 {
+  color: #1a1a1a;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: #888;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+.modal-body {
+  margin-bottom: 20px;
+}
+
+.field-item {
+  margin-bottom: 16px;
+}
+
+.field-item label {
+  display: block;
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.field-item input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #252525;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+body.light .field-item input {
+  background: #f5f5f5;
+  border-color: #ddd;
+  color: #1a1a1a;
+}
+
+.field-item input:focus {
+  outline: none;
+  border-color: #64b5f6;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.modal-footer button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.modal-footer .ghost {
+  background: transparent;
+  border: 1px solid #333;
+  color: #ccc;
+}
+
+.modal-footer .primary {
+  background: #64b5f6;
+  border: none;
+  color: #fff;
+}
+
+body.light .modal-footer .ghost {
+  border-color: #ddd;
+  color: #666;
+}
+</style>

@@ -38,4 +38,4 @@ export { showToast, showSuccessToast, showErrorToast, showWarningToast, showInfo
 export type { ToastType } from './errors'
 
 // ============ 认证 ============
-export { login, register, logout, getToken, isLoggedIn, getUser } from './auth'
+export { login, register, logout, getToken, isLoggedIn, getUser, changePassword } from './auth'

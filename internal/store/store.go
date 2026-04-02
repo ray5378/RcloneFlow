@@ -703,3 +703,12 @@ func (db *DB) GetUserByID(id int64) (User, bool) {
 	}
 	return u, true
 }
+
+// UpdatePassword 更新密码
+func (db *DB) UpdatePassword(id int64, hashedPassword string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec(`UPDATE users SET password = ? WHERE id = ?`, hashedPassword, id)
+	return err
+}

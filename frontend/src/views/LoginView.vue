@@ -5,17 +5,6 @@
         <h1>RcloneFlow</h1>
         <p>文件同步管理平台</p>
       </div>
-      
-      <div class="login-tabs">
-        <button 
-          :class="{ active: mode === 'login' }" 
-          @click="mode = 'login'"
-        >登录</button>
-        <button 
-          :class="{ active: mode === 'register' }" 
-          @click="mode = 'register'"
-        >注册</button>
-      </div>
 
       <form @submit.prevent="handleSubmit">
         <div class="field-item">
@@ -41,7 +30,7 @@
         <div v-if="error" class="error-message">{{ error }}</div>
 
         <button type="submit" class="primary-btn" :disabled="loading">
-          {{ loading ? '处理中...' : (mode === 'login' ? '登录' : '注册') }}
+          {{ loading ? '登录中...' : '登录' }}
         </button>
       </form>
     </div>
@@ -50,19 +39,18 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { login, register } from '../api/auth'
+import { login } from '../api/auth'
 
 const emit = defineEmits<{
   (e: 'success'): void
 }>()
 
-const mode = ref<'login' | 'register'>('login')
 const loading = ref(false)
 const error = ref('')
 
 const form = reactive({
-  username: '',
-  password: ''
+  username: 'admin',
+  password: 'admin'
 })
 
 async function handleSubmit() {
@@ -70,17 +58,15 @@ async function handleSubmit() {
   loading.value = true
 
   try {
-    const data = mode.value === 'login' 
-      ? await login(form.username, form.password)
-      : await register(form.username, form.password)
+    const data = await login(form.username, form.password)
     
     // 保存token到localStorage
-    localStorage.setItem('token', data.token)
+    localStorage.setItem('authToken', data.token)
     localStorage.setItem('user', JSON.stringify(data.user))
     
     emit('success')
   } catch (e: any) {
-    error.value = e.message || '操作失败'
+    error.value = e.message || '登录失败'
   } finally {
     loading.value = false
   }
@@ -126,44 +112,6 @@ body.light .login-card {
   color: #888;
   margin: 0;
   font-size: 14px;
-}
-
-.login-tabs {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 24px;
-  background: #252525;
-  border-radius: 8px;
-  padding: 4px;
-}
-
-body.light .login-tabs {
-  background: #f0f0f0;
-}
-
-.login-tabs button {
-  flex: 1;
-  padding: 10px;
-  border: none;
-  background: transparent;
-  color: #888;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-}
-
-.login-tabs button.active {
-  background: #64b5f6;
-  color: #fff;
-}
-
-.login-tabs button:hover:not(.active) {
-  color: #ccc;
-}
-
-body.light .login-tabs button:hover:not(.active) {
-  color: #666;
 }
 
 .field-item {
