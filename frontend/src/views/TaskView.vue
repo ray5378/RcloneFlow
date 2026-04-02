@@ -138,6 +138,22 @@ async function createTask() {
         targetRemote: createForm.value.targetRemote,
         targetPath: createForm.value.targetPath,
       })
+      // 更新定时规则：先删除旧的在创建新的
+      const oldSchedule = getScheduleByTaskId(editingTask.value.id)
+      if (oldSchedule) {
+        await api.deleteSchedule(oldSchedule.id)
+      }
+      if (createForm.value.enableSchedule) {
+        const spec = [
+          createForm.value.scheduleYear || '*',
+          createForm.value.scheduleMonth || '*',
+          createForm.value.scheduleWeek || '',
+          createForm.value.scheduleDay || '',
+          createForm.value.scheduleHour || '00',
+          createForm.value.scheduleMinute || '00',
+        ].join(',')
+        await api.createSchedule({ taskId: editingTask.value.id, spec, enabled: true })
+      }
       editingTask.value = null
     } else {
       // 新建任务
@@ -552,7 +568,7 @@ function goBackTarget() {
   <div v-if="currentModule === 'history'" class="card">
     <div class="card-header">
       <div class="title">历史记录</div>
-      <button v-if="historyFilterTaskId !== null" class="ghost small" @click="historyFilterTaskId = null">
+      <button v-if="historyFilterTaskId !== null" class="ghost small" @click="currentModule = 'tasks'">
         ← 返回任务列表
       </button>
     </div>
