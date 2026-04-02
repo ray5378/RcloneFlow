@@ -70,7 +70,7 @@ function confirmField(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
     // 空表示使用*代表任意
     createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = '*'
   } else {
-    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = val.join(',')
+    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = val.join('|')
   }
 }
 
@@ -148,7 +148,7 @@ async function createTask() {
           createForm.value.scheduleDay || '*',
           createForm.value.scheduleMonth || '*',
           createForm.value.scheduleWeek || '*',
-        ].join(',')
+        ].join('|')
         await api.createSchedule({ taskId: editingTask.value.id, spec, enabled: true })
       }
       editingTask.value = null
@@ -170,7 +170,7 @@ async function createTask() {
           createForm.value.scheduleDay || '*',
           createForm.value.scheduleMonth || '*',
           createForm.value.scheduleWeek || '*',
-        ].join(',')
+        ].join('|')
         await api.createSchedule({ taskId: task.id, spec, enabled: true })
       }
     }
@@ -311,11 +311,11 @@ async function toggleSchedule(taskId: number) {
 
 function formatScheduleSpec(spec: string): string {
   if (!spec) return ''
-  const parts = spec.split(',')
+  const parts = spec.split('|')
   if (parts.length !== 5) return spec
   
   // 标准cron格式: minute hour day month week
-  // 例如: "43,17,19,*,*" 显示为 "43 17,19 * * *"
+  // 例如: "43|17,19|*|**|*" 显示为 "43 17,19 * * *"
   const [minute, hour, day, month, week] = parts
   
   // 显示为标准cron格式
