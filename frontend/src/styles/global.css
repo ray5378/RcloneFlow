@@ -373,6 +373,16 @@ body.light .card-header {
   align-items: center;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-actions .primary {
+  white-space: nowrap;
+}
+
 .search-input {
   padding: 6px 12px;
   border-radius: 6px;

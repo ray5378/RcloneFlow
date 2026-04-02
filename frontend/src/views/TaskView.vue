@@ -503,8 +503,9 @@ function goBackTarget() {
   <div v-if="currentModule === 'tasks'" class="card">
     <div class="card-header">
       <div class="title">任务列表</div>
-      <div class="search-box">
+      <div class="header-actions">
         <input v-model="taskSearch" type="text" placeholder="搜索任务..." class="search-input" />
+        <button class="primary small" @click="currentModule = 'add'">+ 添加任务</button>
       </div>
     </div>
     <div class="list-header">
