@@ -551,29 +551,6 @@ body.light .mode-tag {
   text-align: right;
 }
 
-.path-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-}
-
-.path-remote {
-  color: #888;
-  font-size: 12px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 150px;
-}
-
-.path-arrow {
-  color: #555;
-  flex-shrink: 0;
-}
-
 .schedule-info {
   display: flex;
   align-items: center;
@@ -616,11 +593,6 @@ body.light .list-header {
   min-width: 150px;
 }
 
-.col-path {
-  flex: 1;
-  min-width: 200px;
-}
-
 .col-schedule {
   min-width: 200px;
 }
@@ -639,6 +611,52 @@ body.light .list-header {
 .item-actions button {
   padding: 4px 8px;
   font-size: 12px;
+}
+
+.task-item {
+  padding: 12px 20px;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.task-item:last-child {
+  border-bottom: none;
+}
+
+.task-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.task-paths {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #1a1a1a;
+  border-radius: 6px;
+}
+
+body.light .task-paths {
+  background: #f5f5f5;
+}
+
+.path-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0;
+}
+
+.path-label {
+  color: #666;
+  font-size: 11px;
+  min-width: 30px;
+}
+
+.path-value {
+  color: #888;
+  font-size: 12px;
+  word-break: break-all;
 }
 
 /* Tile grid for storage nodes */

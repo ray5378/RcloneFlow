@@ -509,37 +509,43 @@ function goBackTarget() {
     </div>
     <div class="list-header">
       <span class="col-name">任务</span>
-      <span class="col-path">路径</span>
       <span class="col-schedule">定时</span>
       <span class="col-action">操作</span>
     </div>
     <div class="list">
-      <div v-for="task in filteredTasks" :key="task.id" class="item">
-        <div class="name">
-          <strong>{{ task.name }}</strong>
-          <span class="mode-tag">{{ task.mode }}</span>
+      <div v-for="task in filteredTasks" :key="task.id" class="task-item">
+        <div class="task-main">
+          <div class="name">
+            <strong>{{ task.name }}</strong>
+            <span class="mode-tag">{{ task.mode }}</span>
+          </div>
+          <div class="schedule-info">
+            <template v-if="getScheduleByTaskId(task.id)">
+              <span :class="['schedule-badge', getScheduleByTaskId(task.id)?.enabled ? 'enabled' : 'disabled']">
+                {{ getScheduleByTaskId(task.id)?.enabled ? '已启用' : '已禁用' }}
+              </span>
+              <span class="schedule-rule">{{ formatScheduleSpec(getScheduleByTaskId(task.id)?.spec || '') }}</span>
+            </template>
+            <span v-else class="no-schedule">未设置</span>
+          </div>
+          <div class="item-actions">
+            <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
+              {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}
+            </button>
+            <button class="ghost small" @click.stop="runTask(task.id)">▶ 执行</button>
+            <button class="ghost small" @click.stop="editTask(task)">✏️</button>
+            <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
+          </div>
         </div>
-        <div class="path-info">
-          <span class="path-remote">{{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }}</span>
-          <span class="path-arrow">→</span>
-          <span class="path-remote">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
-        </div>
-        <div class="schedule-info">
-          <template v-if="getScheduleByTaskId(task.id)">
-            <span :class="['schedule-badge', getScheduleByTaskId(task.id)?.enabled ? 'enabled' : 'disabled']">
-              {{ getScheduleByTaskId(task.id)?.enabled ? '已启用' : '已禁用' }}
-            </span>
-            <span class="schedule-rule">{{ formatScheduleSpec(getScheduleByTaskId(task.id)?.spec || '') }}</span>
-          </template>
-          <span v-else class="no-schedule">未设置</span>
-        </div>
-        <div class="item-actions">
-          <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
-            {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}
-          </button>
-          <button class="ghost small" @click.stop="runTask(task.id)">▶ 执行</button>
-          <button class="ghost small" @click.stop="editTask(task)">✏️</button>
-          <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
+        <div class="task-paths">
+          <div class="path-row">
+            <span class="path-label">源:</span>
+            <span class="path-value">{{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }}</span>
+          </div>
+          <div class="path-row">
+            <span class="path-label">目标:</span>
+            <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
+          </div>
         </div>
       </div>
       <div v-if="!filteredTasks.length" class="empty">暂无任务</div>
