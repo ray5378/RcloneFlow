@@ -144,9 +144,9 @@ async function createTask() {
       if (createForm.value.enableSchedule) {
         const spec = [
           createForm.value.scheduleMonth || '*',
-          createForm.value.scheduleWeek || '',
-          createForm.value.scheduleDay || '',
-          createForm.value.scheduleHour || '00',
+          createForm.value.scheduleWeek || '*',
+          createForm.value.scheduleDay || '*',
+          createForm.value.scheduleHour || '*',
           createForm.value.scheduleMinute || '00',
         ].join(',')
         await api.createSchedule({ taskId: editingTask.value.id, spec, enabled: true })
@@ -166,7 +166,7 @@ async function createTask() {
       if (createForm.value.enableSchedule) {
         const spec = [
           createForm.value.scheduleMonth || '*',
-          createForm.value.scheduleWeek || '',
+          createForm.value.scheduleWeek || '*',
           createForm.value.scheduleDay || '',
           createForm.value.scheduleHour || '00',
           createForm.value.scheduleMinute || '00',
@@ -312,17 +312,15 @@ async function toggleSchedule(taskId: number) {
 function formatScheduleSpec(spec: string): string {
   if (!spec) return ''
   const parts = spec.split(',')
-  if (parts.length !== 6) return spec
-  const [year, month, week, day, hour, minute] = parts
-  const yearStr = year === '*' ? '每年' : year
+  if (parts.length !== 5) return spec
+  const [month, week, day, hour, minute] = parts
+  
   const monthStr = month === '*' ? '每月' : month + '月'
   const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
   let weekStr = ''
   if (week === '*') {
     weekStr = '每天'
-  } else if (week === '') {
-    weekStr = ''
-  } else {
+  } else if (week !== '') {
     const days = week.split(',').map(d => weekNames[parseInt(d)] || d)
     weekStr = days.join(',')
   }
@@ -332,7 +330,6 @@ function formatScheduleSpec(spec: string): string {
   
   // 组合显示
   const parts2: string[] = []
-  if (year !== '*') parts2.push(yearStr)
   if (month !== '*') parts2.push(monthStr)
   if (weekStr) parts2.push(weekStr)
   if (dayStr && day !== '*') parts2.push(dayStr)
