@@ -26,6 +26,7 @@ const historyFilterTaskId = ref<number | null>(null)
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
 const showCreateModal = ref(false)
+const showAdvancedOptions = ref(false)
 
 const createForm = ref({
   name: '',
@@ -40,6 +41,7 @@ const createForm = ref({
   scheduleDay: '',       // 空 = 不设置, 或 "1,15,28"
   scheduleHour: '00',   // "00,12,18"
   scheduleMinute: '00', // "00,30,59"
+  options: {} as Record<string, any>,
 })
 
 const openMenuId = ref<number | null>(null)
@@ -156,16 +158,19 @@ async function createTask() {
     return
   }
   try {
+    // 构建任务数据
+    const taskData = {
+      name: createForm.value.name,
+      mode: createForm.value.mode,
+      sourceRemote: createForm.value.sourceRemote,
+      sourcePath: createForm.value.sourcePath,
+      targetRemote: createForm.value.targetRemote,
+      targetPath: createForm.value.targetPath,
+    }
+
     if (editingTask.value) {
       // 更新任务
-      await api.updateTask(editingTask.value.id, {
-        name: createForm.value.name,
-        mode: createForm.value.mode,
-        sourceRemote: createForm.value.sourceRemote,
-        sourcePath: createForm.value.sourcePath,
-        targetRemote: createForm.value.targetRemote,
-        targetPath: createForm.value.targetPath,
-      })
+      await api.updateTask(editingTask.value.id, taskData)
       // 更新定时规则：先删除旧的在创建新的
       const oldSchedule = getScheduleByTaskId(editingTask.value.id)
       if (oldSchedule) {
@@ -184,14 +189,7 @@ async function createTask() {
       editingTask.value = null
     } else {
       // 新建任务
-      const task = await api.createTask({
-        name: createForm.value.name,
-        mode: createForm.value.mode,
-        sourceRemote: createForm.value.sourceRemote,
-        sourcePath: createForm.value.sourcePath,
-        targetRemote: createForm.value.targetRemote,
-        targetPath: createForm.value.targetPath,
-      })
+      const task = await api.createTask(taskData)
       // 如果启用了定时任务，创建定时规则
       if (createForm.value.enableSchedule) {
         const spec = [
@@ -207,7 +205,8 @@ async function createTask() {
     createForm.value = { 
       name: '', mode: 'copy', sourceRemote: '', sourcePath: '', targetRemote: '', targetPath: '',
       enableSchedule: false,
-      scheduleMonth: '*', scheduleWeek: '*', scheduleDay: '*', scheduleHour: '*', scheduleMinute: '00'
+      scheduleMonth: '*', scheduleWeek: '*', scheduleDay: '*', scheduleHour: '*', scheduleMinute: '00',
+      options: {}
     }
     sourcePathOptions.value = []
     targetPathOptions.value = []
@@ -264,6 +263,7 @@ function editTask(task: Task) {
       scheduleDay: parts[2] || '*',
       scheduleMonth: parts[3] || '*',
       scheduleWeek: parts[4] || '*',
+      options: task.options || {},
     }
     // 更新临时选择状态
     tempSchedule.value = {
@@ -287,6 +287,7 @@ function editTask(task: Task) {
       scheduleDay: '',
       scheduleHour: '00',
       scheduleMinute: '00',
+      options: task.options || {},
     }
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
   }
@@ -808,10 +809,15 @@ function goBackTarget() {
 
       <!-- 定时任务设置 -->
       <div class="schedule-section">
-        <label class="schedule-toggle">
-          <input type="checkbox" v-model="createForm.enableSchedule" />
-          <span>启用定时任务</span>
-        </label>
+        <div class="section-header">
+          <label class="schedule-toggle">
+            <input type="checkbox" v-model="createForm.enableSchedule" />
+            <span>启用定时任务</span>
+          </label>
+          <button type="button" class="ghost small" @click="showAdvancedOptions = !showAdvancedOptions">
+            {{ showAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}
+          </button>
+        </div>
         <div v-if="createForm.enableSchedule" class="schedule-grid">
           <!-- 月 -->
           <div class="schedule-item">
@@ -864,6 +870,170 @@ function goBackTarget() {
             </select>
             <button type="button" class="ghost small" @click="confirmField('minute')">确定</button>
             <span class="selected-val">{{ createForm.scheduleMinute === '*' ? '每分' : (createForm.scheduleMinute || '00') + '分' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 高级选项 -->
+      <div v-if="showAdvancedOptions" class="advanced-section">
+        <div class="advanced-group">
+          <div class="advanced-group-title">过滤参数</div>
+          <div class="advanced-row">
+            <label>排除 (exclude)</label>
+            <textarea v-model="createForm.options.exclude" placeholder="每行一个规则, 如: *.txt&#10;备份/**" rows="3"></textarea>
+          </div>
+          <div class="advanced-row">
+            <label>包含 (include)</label>
+            <textarea v-model="createForm.options.include" placeholder="每行一个规则, 如: *.pdf&#10;文档/**" rows="3"></textarea>
+          </div>
+          <div class="advanced-row">
+            <label>过滤规则 (filter)</label>
+            <textarea v-model="createForm.options.filter" placeholder="每行一个规则, 如: - *.tmp&#10;+ *.bak" rows="3"></textarea>
+          </div>
+          <div class="advanced-row inline">
+            <label>忽略大小写</label>
+            <input type="checkbox" v-model="createForm.options.ignoreCase" />
+          </div>
+          <div class="advanced-row inline">
+            <label>忽略已存在的文件</label>
+            <input type="checkbox" v-model="createForm.options.ignoreExisting" />
+          </div>
+          <div class="advanced-row inline">
+            <label>删除被排除的文件</label>
+            <input type="checkbox" v-model="createForm.options.deleteExcluded" />
+          </div>
+        </div>
+
+        <div class="advanced-group">
+          <div class="advanced-group-title">比较策略</div>
+          <div class="advanced-row inline">
+            <label>校验和比较</label>
+            <input type="checkbox" v-model="createForm.options.checksum" />
+          </div>
+          <div class="advanced-row inline">
+            <label>仅按大小</label>
+            <input type="checkbox" v-model="createForm.options.sizeOnly" />
+          </div>
+          <div class="advanced-row inline">
+            <label>忽略大小</label>
+            <input type="checkbox" v-model="createForm.options.ignoreSize" />
+          </div>
+          <div class="advanced-row inline">
+            <label>忽略时间</label>
+            <input type="checkbox" v-model="createForm.options.ignoreTimes" />
+          </div>
+          <div class="advanced-row inline">
+            <label>更新较新的</label>
+            <input type="checkbox" v-model="createForm.options.update" />
+          </div>
+          <div class="advanced-row">
+            <label>时间窗口</label>
+            <input type="text" v-model="createForm.options.modifyWindow" placeholder="如: 1h2s" />
+          </div>
+        </div>
+
+        <div class="advanced-group">
+          <div class="advanced-group-title">路径策略</div>
+          <div class="advanced-row inline">
+            <label>不遍历</label>
+            <input type="checkbox" v-model="createForm.options.noTraverse" />
+          </div>
+          <div class="advanced-row inline">
+            <label>不检查目标</label>
+            <input type="checkbox" v-model="createForm.options.noCheckDest" />
+          </div>
+          <div class="advanced-row">
+            <label>比较目录</label>
+            <input type="text" v-model="createForm.options.compareDest" placeholder="remote:path" />
+          </div>
+          <div class="advanced-row">
+            <label>复制目录</label>
+            <input type="text" v-model="createForm.options.copyDest" placeholder="remote:path" />
+          </div>
+        </div>
+
+        <div class="advanced-group">
+          <div class="advanced-group-title">传输控制</div>
+          <div class="advanced-row">
+            <label>并发传输数</label>
+            <input type="number" v-model="createForm.options.transfers" min="1" max="100" />
+          </div>
+          <div class="advanced-row">
+            <label>带宽限制</label>
+            <input type="text" v-model="createForm.options.bwLimit" placeholder="如: 10M" />
+          </div>
+          <div class="advanced-row inline">
+            <label>多线程传输</label>
+            <input type="checkbox" v-model="createForm.options.multiThreadStreams" />
+          </div>
+          <div class="advanced-row">
+            <label>最大传输</label>
+            <input type="number" v-model="createForm.options.maxTransfer" min="0" placeholder="字节数, 0表示无限制" />
+          </div>
+          <div class="advanced-row">
+            <label>最大时长</label>
+            <input type="number" v-model="createForm.options.maxDuration" min="0" placeholder="秒, 0表示无限制" />
+          </div>
+        </div>
+
+        <div class="advanced-group">
+          <div class="advanced-group-title">同步选项</div>
+          <div class="advanced-row">
+            <label>删除时机</label>
+            <select v-model="createForm.options.cutoffMode">
+              <option value="">默认</option>
+              <option value="before">删除前</option>
+              <option value="during">删除中</option>
+              <option value="after">删除后</option>
+            </select>
+          </div>
+          <div class="advanced-row">
+            <label>最大删除数</label>
+            <input type="number" v-model="createForm.options.maxDelete" min="0" />
+          </div>
+          <div class="advanced-row inline">
+            <label>跟踪重命名</label>
+            <input type="checkbox" v-model="createForm.options.trackRenames" />
+          </div>
+          <div class="advanced-row inline">
+            <label>忽略错误</label>
+            <input type="checkbox" v-model="createForm.options.ignoreErrors" />
+          </div>
+        </div>
+
+        <div class="advanced-group">
+          <div class="advanced-group-title">其他选项</div>
+          <div class="advanced-row inline">
+            <label>模拟运行 (dry-run)</label>
+            <input type="checkbox" v-model="createForm.options.dryRun" />
+          </div>
+          <div class="advanced-row inline">
+            <label>交互模式</label>
+            <input type="checkbox" v-model="createForm.options.interactive" />
+          </div>
+          <div class="advanced-row inline">
+            <label>检查前先检查</label>
+            <input type="checkbox" v-model="createForm.options.checkFirst" />
+          </div>
+          <div class="advanced-row inline">
+            <label>服务器端跨配置</label>
+            <input type="checkbox" v-model="createForm.options.serverSideAcrossConfigs" />
+          </div>
+          <div class="advanced-row">
+            <label>检查器数</label>
+            <input type="number" v-model="createForm.options.checkers" min="1" max="100" />
+          </div>
+          <div class="advanced-row">
+            <label>重试次数</label>
+            <input type="number" v-model="createForm.options.retries" min="0" />
+          </div>
+          <div class="advanced-row">
+            <label>备份目录</label>
+            <input type="text" v-model="createForm.options.backupDir" placeholder="remote:path" />
+          </div>
+          <div class="advanced-row">
+            <label>日志文件</label>
+            <input type="text" v-model="createForm.options.logFile" placeholder="/path/to/log" />
           </div>
         </div>
       </div>
@@ -974,6 +1144,28 @@ body.light .path-item:hover { background: #f0f0f0; }
 body.light .schedule-section { border-top-color: #ddd; }
 .schedule-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; margin-bottom: 12px; }
 .schedule-toggle input { width: 16px; height: 16px; }
+.section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+
+/* 高级选项 */
+.advanced-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #333; }
+body.light .advanced-section { border-top-color: #ddd; }
+.advanced-group { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #2a2a2a; }
+body.light .advanced-group { border-bottom-color: #eee; }
+.advanced-group:last-child { border-bottom: none; }
+.advanced-group-title { font-weight: 600; font-size: 13px; color: #64b5f6; margin-bottom: 12px; }
+.advanced-row { margin-bottom: 12px; }
+.advanced-row label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; }
+.advanced-row input[type="text"],
+.advanced-row input[type="number"] { width: 100%; padding: 8px 12px; border: 1px solid #333; border-radius: 8px; background: #252525; color: #e0e0e0; font-size: 13px; }
+body.light .advanced-row input { background: #fff; border-color: #ddd; color: #1a1a1a; }
+.advanced-row input:focus { outline: none; border-color: #64b5f6; }
+.advanced-row.inline { display: flex; align-items: center; gap: 8px; }
+.advanced-row.inline label { margin-bottom: 0; }
+.advanced-row.inline input[type="checkbox"] { width: 16px; height: 16px; }
+.advanced-row textarea { width: 100%; padding: 8px 12px; border: 1px solid #333; border-radius: 8px; background: #252525; color: #e0e0e0; font-size: 13px; resize: vertical; font-family: inherit; }
+body.light .advanced-row textarea { background: #fff; border-color: #ddd; color: #1a1a1a; }
+.advanced-row select { width: 100%; padding: 8px 12px; border: 1px solid #333; border-radius: 8px; background: #252525; color: #e0e0e0; font-size: 13px; }
+body.light .advanced-row select { background: #fff; border-color: #ddd; color: #1a1a1a; }
 .schedule-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
 .schedule-item { display: flex; flex-direction: column; gap: 4px; }
 .schedule-item label { font-size: 12px; color: #888; font-weight: 600; }
