@@ -161,7 +161,22 @@ RcloneFlow/
 |------|------|------|
 | GET | `/api/schedules` | List all schedules |
 | POST | `/api/schedules` | Create schedule |
+| PUT | `/api/schedules/{id}` | Enable/disable schedule |
 | DELETE | `/api/schedules/{id}` | Delete schedule |
+
+#### Schedule Spec Format
+Schedule uses 6-field cron expression: `year,month,week,day,hour,minute`
+
+| Field | Description | Example |
+|------|------|------|
+| year | Year | `*` every year, `2026,2027` specific years |
+| month | Month | `*` every month, `1,3,5` specific months |
+| week | Weekday | `*` every day, `1,3,5` Mon,Wed,Fri |
+| day | Day of month | `*` every day, `1,15` specific days |
+| hour | Hour | `*` every hour, `00,12` specific hours |
+| minute | Minute | `*` every minute, `00,30` specific minutes |
+
+Example: `*,*,,2,02,00` = Execute at 02:00 on 2nd of every month
 
 ### Runs
 | Method | Endpoint | Description |
