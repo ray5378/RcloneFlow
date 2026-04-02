@@ -99,6 +99,29 @@ function onDragEnd() {
   draggedRemote.value = ''
 }
 
+// 检查路径是否包含路径穿越风险
+function hasPathTraversal(path: string): boolean {
+  // 检查 .. 或 . 路径
+  const normalized = path.replace(/\\/g, '/')
+  if (normalized.includes('..') || normalized.includes('./') || normalized === '.') {
+    return true
+  }
+  // 检查 URL 编码的 ..
+  if (normalized.includes('%2e%2e') || normalized.includes('%2e.')) {
+    return true
+  }
+  return false
+}
+
+// 验证路径安全性
+function validatePath(path: string, name: string = '路径'): boolean {
+  if (hasPathTraversal(path)) {
+    alert(`${name}包含非法字符，存在路径穿越风险`)
+    return false
+  }
+  return true
+}
+
 const showAddRemote = ref(false)
 const isEditMode = ref(false)
 const editRemoteName = ref('')
@@ -258,12 +281,17 @@ async function pasteItem() {
     alert('请先选择一个存储节点')
     return
   }
+
+  // 验证源路径
+  const srcPath = clipboardItem.value.Path.replace(/^\/+/, '')
+  if (!validatePath(srcPath, '源路径')) return
+
+  // 验证目标路径
+  const dstPath = (browserPath.value ? browserPath.value.replace(/^\/+/, '') + '/' : '') + clipboardItem.value.Name
+  if (!validatePath(dstPath, '目标路径')) return
+
   try {
     const isDir = clipboardItem.value.IsDir
-    // srcPath is the full relative path from the file item (ensure no leading slash)
-    const srcPath = clipboardItem.value.Path.replace(/^\/+/, '')
-    // dstPath is the destination path in the current browser view (ensure no leading slash)
-    const dstPath = (browserPath.value ? browserPath.value.replace(/^\/+/, '') + '/' : '') + clipboardItem.value.Name
     
     // For directory operations (copyDir/moveDir), use fs format: "remote:full/path"
     // For file operations (copyFile/moveFile), use fs + remote format: "remote:", "path"
@@ -344,6 +372,10 @@ async function executeDelete() {
     alert('请先选择一个存储节点')
     return
   }
+
+  // 验证路径
+  if (!validatePath(deletingItem.value.Path, '删除路径')) return
+
   try {
     if (deletingItem.value.IsDir) {
       // 目录使用 purge
