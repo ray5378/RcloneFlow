@@ -1,29 +1,40 @@
+version: '3.8'
+
 services:
   rclone:
     image: rclone/rclone:latest
-    container_name: rclone-remote-rcd
-    restart: unless-stopped
-    command: >
-      rcd
-      --rc-addr=0.0.0.0:5572
-      --rc-no-auth
+    container_name: rclone2
+    restart: always
+    command:
+      - rcd
+      - --rc-addr=:5572
+      - --rc-user=admin
+      - --rc-pass=aa123456
+      - --rc-web-gui
+      - --rc-web-gui-update
+      - --config=/config/rclone/rclone.conf
+      - --log-level=INFO
     ports:
       - "5572:5572"
     volumes:
-      - ./runtime/rclone:/config/rclone
-      - ./runtime/data:/data
-
-  app:
-    build: .
-    container_name: rclone-remote-app
-    restart: unless-stopped
-    depends_on:
-      - rclone
+      - /vol1/1000/SSD/docker/rclone2/config:/config/rclone
+      - /vol1/1000/SSD/docker/rclone2/cache:/root/.cache/rclone
     environment:
-      APP_ADDR: ":17870"
-      APP_DATA_DIR: "/app/data"
-      RCLONE_RC_URL: "http://rclone:5572"
+      - TZ=Asia/Shanghai
+
+  rcloneflow:
+    image: ray5378/rcloneflow:test-0.0.1
+    container_name: rcloneflow
+    restart: always
     ports:
       - "17870:17870"
     volumes:
-      - ./runtime/app:/app/data
+      - ./data:/app/data
+    environment:
+      - TZ=Asia/Shanghai
+      - RCLONE_RC_ADDR=rclone:5572
+      - RCLONE_RC_USER=admin
+      - RCLONE_RC_PASS=aa123456
+      - RCLONE_CONFIG=/config/rclone/rclone.conf
+    depends_on:
+      - rclone
