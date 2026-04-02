@@ -36,3 +36,6 @@ export { listPath, copyFile, moveFile, copyDir, moveDir, deleteFile, purgeDir, m
 // ============ 错误处理 ============
 export { showToast, showSuccessToast, showErrorToast, showWarningToast, showInfoToast, handleApiError, withErrorHandler, withConfirm, registerToast } from './errors'
 export type { ToastType } from './errors'
+
+// ============ 认证 ============
+export { login, register, logout, getToken, isLoggedIn, getUser } from './auth'
