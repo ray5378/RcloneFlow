@@ -26,6 +26,7 @@ const historyFilterTaskId = ref<number | null>(null)
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
 const showCreateModal = ref(false)
+const showAdvancedOptions = ref(false)
 
 const createForm = ref({
   name: '',
@@ -45,7 +46,6 @@ const createForm = ref({
 
 const openMenuId = ref<number | null>(null)
 const editingTask = ref<Task | null>(null)
-const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
 
 const sourcePathOptions = ref<any[]>([])
 const targetPathOptions = ref<any[]>([])
@@ -157,7 +157,6 @@ async function createTask() {
     alert('请选择源和目标存储')
     return
   }
-  creatingState.value = 'loading'
   try {
     // 构建任务数据
     const taskData = {
@@ -215,14 +214,8 @@ async function createTask() {
     targetCurrentPath.value = ''
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
     await loadData()
-    creatingState.value = 'done'
-    // 显示成功状态后自动关闭
-    setTimeout(() => {
-      creatingState.value = 'idle'
-      currentModule.value = 'tasks'
-    }, 1000)
+    currentModule.value = 'tasks'
   } catch (e) {
-    creatingState.value = 'idle'
     alert((e as Error).message)
   }
 }
@@ -816,10 +809,12 @@ function goBackTarget() {
 
       <!-- 定时任务设置 -->
       <div class="schedule-section">
-        <label class="schedule-toggle">
-          <input type="checkbox" v-model="createForm.enableSchedule" />
-          <span>启用定时任务</span>
-        </label>
+        <div class="section-header">
+          <label class="schedule-toggle">
+            <input type="checkbox" v-model="createForm.enableSchedule" />
+            <span>启用定时任务</span>
+          </label>
+        </div>
         <div v-if="createForm.enableSchedule" class="schedule-grid">
           <!-- 月 -->
           <div class="schedule-item">
@@ -877,10 +872,10 @@ function goBackTarget() {
       </div>
 
       <!-- 高级选项 -->
-      <div class="advanced-section">
-        <div class="advanced-section-header">
-          <span class="advanced-title">高级选项</span>
-        </div>
+      <button type="button" class="ghost small" @click="showAdvancedOptions = !showAdvancedOptions">
+        {{ showAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}
+      </button>
+      <div v-if="showAdvancedOptions" class="advanced-section">
         <div class="advanced-group">
           <div class="advanced-group-title">过滤参数</div>
           <div class="advanced-row">
@@ -1044,25 +1039,7 @@ function goBackTarget() {
       </div>
 
       <div class="form-actions">
-        <button 
-          v-if="editingTask" 
-          class="primary" 
-          :disabled="creatingState === 'loading'"
-          @click="createTask"
-        >
-          {{ creatingState === 'loading' ? '保存中...' : '保存修改' }}
-        </button>
-        <button 
-          v-else 
-          class="primary" 
-          :class="{ 'btn-success': creatingState === 'done' }"
-          :disabled="creatingState === 'loading'"
-          @click="createTask"
-        >
-          <template v-if="creatingState === 'done'">已创建 ✓</template>
-          <template v-else-if="creatingState === 'loading'">创建中...</template>
-          <template v-else>创建任务</template>
-        </button>
+        <button class="primary" @click="createTask">创建任务</button>
       </div>
     </div>
   </div>
@@ -1172,8 +1149,6 @@ body.light .schedule-section { border-top-color: #ddd; }
 /* 高级选项 */
 .advanced-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #333; }
 body.light .advanced-section { border-top-color: #ddd; }
-.advanced-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.advanced-title { font-weight: 600; font-size: 13px; color: #64b5f6; }
 .advanced-group { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #2a2a2a; }
 body.light .advanced-group { border-bottom-color: #eee; }
 .advanced-group:last-child { border-bottom: none; }
@@ -1203,8 +1178,6 @@ body.light .schedule-item select { background: #fff; color: #333; border-color: 
 .path-item.is-dir .item-name { color: #64b5f6; font-weight: 500; }
 .path-empty { padding: 20px; text-align: center; color: #666; font-size: 13px; }
 .form-actions { margin-top: 20px; }
-.btn-success { background: #2e7d32 !important; border-color: #2e7d32 !important; }
-.btn-success:hover { background: #388e3c !important; }
 .tile-grid { display: flex; flex-wrap: wrap; gap: 12px; padding: 16px 20px; }
 .tile {
   min-width: 180px;
