@@ -175,14 +175,56 @@ async function runTask(taskId: number) {
 
 function editTask(task: Task) {
   editingTask.value = task
-  createForm.value = {
-    name: task.name,
-    mode: task.mode,
-    sourceRemote: task.sourceRemote,
-    sourcePath: task.sourcePath || '',
-    targetRemote: task.targetRemote,
-    targetPath: task.targetPath || '',
+  
+  // 查找该任务的定时规则
+  const schedule = getScheduleByTaskId(task.id)
+  
+  if (schedule) {
+    // 解析 spec: year,month,week,day,hour,minute
+    const parts = schedule.spec.split(',')
+    createForm.value = {
+      name: task.name,
+      mode: task.mode,
+      sourceRemote: task.sourceRemote,
+      sourcePath: task.sourcePath || '',
+      targetRemote: task.targetRemote,
+      targetPath: task.targetPath || '',
+      enableSchedule: true,
+      scheduleYear: parts[0] || '*',
+      scheduleMonth: parts[1] || '*',
+      scheduleWeek: parts[2] || '',
+      scheduleDay: parts[3] || '',
+      scheduleHour: parts[4] || '00',
+      scheduleMinute: parts[5] || '00',
+    }
+    // 更新临时选择状态
+    tempSchedule.value = {
+      year: parts[0] && parts[0] !== '*' ? parts[0].split(',') : [],
+      month: parts[1] && parts[1] !== '*' ? parts[1].split(',') : [],
+      week: parts[2] ? parts[2].split(',') : [],
+      day: parts[3] ? parts[3].split(',') : [],
+      hour: parts[4] && parts[4] !== '*' ? parts[4].split(',') : [],
+      minute: parts[5] && parts[5] !== '*' ? parts[5].split(',') : [],
+    }
+  } else {
+    createForm.value = {
+      name: task.name,
+      mode: task.mode,
+      sourceRemote: task.sourceRemote,
+      sourcePath: task.sourcePath || '',
+      targetRemote: task.targetRemote,
+      targetPath: task.targetPath || '',
+      enableSchedule: false,
+      scheduleYear: '*',
+      scheduleMonth: '*',
+      scheduleWeek: '',
+      scheduleDay: '',
+      scheduleHour: '00',
+      scheduleMinute: '00',
+    }
+    tempSchedule.value = { year: [], month: [], week: [], day: [], hour: [], minute: [] }
   }
+  
   // 加载源路径选项 - 加载父目录以便显示文件
   if (task.sourceRemote) {
     const parentPath = getParentPath(task.sourcePath || '')
