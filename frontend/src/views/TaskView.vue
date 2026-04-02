@@ -185,6 +185,7 @@ async function createTask() {
     targetCurrentPath.value = ''
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
     await loadData()
+    currentModule.value = 'tasks'
   } catch (e) {
     alert((e as Error).message)
   }
