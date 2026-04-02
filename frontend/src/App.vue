@@ -12,7 +12,7 @@ const version = ref('加载中...')
 const isLight = ref(localStorage.getItem('theme') === 'light')
 const isAuth = ref(false)
 const authChecked = ref(false)
-const showSettings = ref(false)
+const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
 
 const user = getUser()
@@ -32,7 +32,6 @@ const pages = {
 function switchPage(page: string) {
   currentPage.value = page
   if (page === 'tasks') {
-    // 切换到任务管理时重置视图
     taskViewKey.value++
   }
 }
@@ -55,6 +54,7 @@ function handleLoginSuccess() {
 function handleLogout() {
   logout()
   isAuth.value = false
+  showSettingsModal.value = false
 }
 
 async function handleChangePassword() {
@@ -71,10 +71,15 @@ async function handleChangePassword() {
     await changePassword(passwordForm.oldPassword, passwordForm.newPassword, passwordForm.username)
     alert('修改成功，请重新登录')
     showPasswordModal.value = false
+    showSettingsModal.value = false
     handleLogout()
   } catch (e: any) {
     alert(e.message || '修改失败')
   }
+}
+
+function openGitHub() {
+  window.open('https://github.com/ray5378/RcloneFlow/tree/master', '_blank')
 }
 
 onMounted(async () => {
@@ -82,7 +87,6 @@ onMounted(async () => {
     document.body.classList.add('light')
   }
   
-  // 检查登录状态
   isAuth.value = checkAuth()
   authChecked.value = true
   
@@ -94,7 +98,6 @@ onMounted(async () => {
     const data = await api.listRemotes()
     version.value = data.version || '未知版本'
   } catch {
-    // 如果请求失败（可能是401），可能需要重新登录
     version.value = '未连接'
   }
 })
@@ -121,11 +124,8 @@ onMounted(async () => {
           </button>
         </nav>
         <div class="header-actions">
-          <button class="settings-btn" @click="showPasswordModal = true">
-            {{ user?.username }}
-          </button>
-          <button class="theme-btn" @click="toggleTheme">
-            {{ isLight ? '🌙' : '☀️' }}
+          <button class="settings-btn" @click="showSettingsModal = true">
+            ⚙️ 设置
           </button>
         </div>
       </header>
@@ -136,11 +136,43 @@ onMounted(async () => {
         <TaskView v-if="currentPage === 'tasks'" :key="taskViewKey" />
       </main>
 
+      <!-- 设置弹窗 -->
+      <div v-if="showSettingsModal" class="modal-overlay" @click.self="showSettingsModal = false">
+        <div class="modal-content settings-modal">
+          <div class="modal-header">
+            <h3>设置</h3>
+            <button class="close-btn" @click="showSettingsModal = false">×</button>
+          </div>
+          <div class="settings-list">
+            <div class="settings-item" @click="showPasswordModal = true; passwordForm.username = user?.username || ''">
+              <span class="settings-icon">👤</span>
+              <span class="settings-text">账号管理</span>
+              <span class="settings-arrow">›</span>
+            </div>
+            <div class="settings-item" @click="toggleTheme">
+              <span class="settings-icon">{{ isLight ? '🌙' : '☀️' }}</span>
+              <span class="settings-text">{{ isLight ? '深色模式' : '浅色模式' }}</span>
+              <span class="settings-arrow">›</span>
+            </div>
+            <div class="settings-item" @click="openGitHub">
+              <span class="settings-icon">⭐</span>
+              <span class="settings-text">给项目点个Star</span>
+              <span class="settings-arrow">↗</span>
+            </div>
+            <div class="settings-item danger" @click="handleLogout">
+              <span class="settings-icon">🚪</span>
+              <span class="settings-text">退出登录</span>
+              <span class="settings-arrow">›</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 修改密码弹窗 -->
       <div v-if="showPasswordModal" class="modal-overlay" @click.self="showPasswordModal = false">
         <div class="modal-content">
           <div class="modal-header">
-            <h3>修改密码</h3>
+            <h3>账号管理</h3>
             <button class="close-btn" @click="showPasswordModal = false">×</button>
           </div>
           <div class="modal-body">
@@ -179,42 +211,28 @@ onMounted(async () => {
 }
 
 .settings-btn {
-  padding: 6px 12px;
-  background: #252525;
+  padding: 6px 14px;
+  background: transparent;
   border: 1px solid #333;
   border-radius: 8px;
   color: #ccc;
-  font-size: 13px;
+  font-size: 14px;
   cursor: pointer;
 }
 
 .settings-btn:hover {
-  background: #333;
+  background: #252525;
   color: #fff;
 }
 
 body.light .settings-btn {
-  background: #f0f0f0;
   border-color: #ddd;
   color: #666;
 }
 
 body.light .settings-btn:hover {
-  background: #e0e0e0;
+  background: #f0f0f0;
   color: #333;
-}
-
-.theme-btn {
-  padding: 6px 12px;
-  background: transparent;
-  border: 1px solid #333;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-body.light .theme-btn {
-  border-color: #ddd;
 }
 
 .modal-overlay {
@@ -239,6 +257,10 @@ body.light .theme-btn {
 body.light .modal-content {
   background: #fff;
   border-color: #ddd;
+}
+
+.settings-modal {
+  max-width: 320px;
 }
 
 .modal-header {
@@ -268,6 +290,63 @@ body.light .modal-header h3 {
 
 .close-btn:hover {
   color: #fff;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-item {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background: #252525;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.settings-item:hover {
+  background: #333;
+}
+
+body.light .settings-item {
+  background: #f5f5f5;
+}
+
+body.light .settings-item:hover {
+  background: #e8e8e8;
+}
+
+.settings-item.danger .settings-icon,
+.settings-item.danger .settings-text {
+  color: #ef5350;
+}
+
+.settings-item.danger:hover {
+  background: rgba(239, 83, 80, 0.1);
+}
+
+.settings-icon {
+  font-size: 18px;
+  margin-right: 12px;
+}
+
+.settings-text {
+  flex: 1;
+  color: #e0e0e0;
+  font-size: 14px;
+}
+
+body.light .settings-text {
+  color: #333;
+}
+
+.settings-arrow {
+  color: #666;
+  font-size: 18px;
 }
 
 .modal-body {
