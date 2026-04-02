@@ -58,6 +58,26 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 		}
 		WriteJSON(w, 200, map[string]any{"deleted": true})
 
+	case http.MethodPut:
+		p := strings.TrimPrefix(r.URL.Path, "/api/schedules/")
+		id, err := strconv.ParseInt(p, 10, 64)
+		if err != nil {
+			WriteJSON(w, 400, map[string]any{"error": "invalid schedule id"})
+			return
+		}
+		var req struct {
+			Enabled bool `json:"enabled"`
+		}
+		if err := DecodeRequest(r, &req); err != nil {
+			WriteJSON(w, 400, map[string]any{"error": err.Error()})
+			return
+		}
+		if err := c.scheduleSvc.SetScheduleEnabled(id, req.Enabled); err != nil {
+			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			return
+		}
+		WriteJSON(w, 200, map[string]any{"enabled": req.Enabled})
+
 	default:
 		w.WriteHeader(405)
 	}

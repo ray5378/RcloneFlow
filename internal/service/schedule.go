@@ -31,3 +31,8 @@ func (s *ScheduleService) CreateSchedule(taskID int64, spec string) (store.Sched
 func (s *ScheduleService) DeleteSchedule(id int64) error {
 	return s.db.DeleteSchedule(id)
 }
+
+// SetScheduleEnabled 启用/禁用定时任务
+func (s *ScheduleService) SetScheduleEnabled(id int64, enabled bool) error {
+	return s.db.SetScheduleEnabled(id, enabled)
+}

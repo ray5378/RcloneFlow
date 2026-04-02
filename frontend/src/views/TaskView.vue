@@ -217,6 +217,21 @@ async function deleteTask(id: number) {
   }
 }
 
+function getScheduleByTaskId(taskId: number) {
+  return schedules.value.find(s => s.taskId === taskId)
+}
+
+async function toggleSchedule(taskId: number) {
+  const schedule = getScheduleByTaskId(taskId)
+  if (!schedule) return
+  try {
+    await api.updateSchedule(schedule.id, !schedule.enabled)
+    await loadData()
+  } catch (e) {
+    alert((e as Error).message)
+  }
+}
+
 function toggleMenu(id: number) {
   openMenuId.value = openMenuId.value === id ? null : id
 }
@@ -406,8 +421,16 @@ function goBackTarget() {
         <div class="tile-info">
           <div class="tile-header"><span class="tile-name">{{ task.name }}</span></div>
           <div class="tile-desc">{{ task.mode }} {{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }} → {{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</div>
+          <div v-if="getScheduleByTaskId(task.id)" class="tile-schedule">
+            <span :class="['schedule-badge', getScheduleByTaskId(task.id)?.enabled ? 'enabled' : 'disabled']">
+              ⏰ {{ getScheduleByTaskId(task.id)?.enabled ? '已启用' : '已禁用' }}
+            </span>
+          </div>
         </div>
         <div class="tile-actions">
+          <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
+            {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 暂停' : '▶ 启用' }}
+          </button>
           <button class="ghost small" @click.stop="runTask(task.id)">▶ 执行</button>
           <button class="ghost small" @click.stop="editTask(task)">✏️ 修改</button>
           <button class="ghost small menu-btn" @click.stop="toggleMenu(task.id)">⋮</button>

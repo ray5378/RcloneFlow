@@ -17,7 +17,7 @@ export { getTasks, createTask, updateTask, runTask, deleteTask } from './task'
 export { getTasks as listTasks } from './task'
 
 // ============ Schedule API ============
-export { getSchedules, createSchedule, deleteSchedule } from './schedule'
+export { getSchedules, createSchedule, updateSchedule, deleteSchedule } from './schedule'
 export { getSchedules as listSchedules } from './schedule'
 
 // ============ Run API ============

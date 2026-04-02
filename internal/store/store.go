@@ -332,6 +332,15 @@ func (db *DB) DeleteSchedule(id int64) error {
 	return err
 }
 
+// SetScheduleEnabled 启用/禁用定时任务
+func (db *DB) SetScheduleEnabled(id int64, enabled bool) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec("UPDATE schedules SET enabled = ? WHERE id = ?", enabled, id)
+	return err
+}
+
 func (db *DB) UpdateScheduleEnabled(id int64, enabled bool) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()

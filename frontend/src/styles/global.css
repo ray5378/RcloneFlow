@@ -574,6 +574,38 @@ body.light .tile .tile-drag {
   line-height: 1.4;
 }
 
+.tile-schedule {
+  margin-top: 6px;
+}
+
+.schedule-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.schedule-badge.enabled {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.schedule-badge.disabled {
+  background: #ffebee;
+  color: #c62828;
+}
+
+body.dark .schedule-badge.enabled {
+  background: #1b5e20;
+  color: #a5d6a7;
+}
+
+body.dark .schedule-badge.disabled {
+  background: #b71c1c;
+  color: #ffcdd2;
+}
+
 /* Actions */
 .actions {
   display: flex;
