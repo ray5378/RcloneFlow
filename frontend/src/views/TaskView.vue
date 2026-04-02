@@ -137,6 +137,15 @@ function getStatusClass(status: string) {
   }
 }
 
+function getStatusText(status: string) {
+  switch (status) {
+    case 'running': return '运行中'
+    case 'finished': return '已完成'
+    case 'failed': return '失败'
+    default: return status
+  }
+}
+
 async function createTask() {
   if (!createForm.value.name) {
     alert('请输入任务名称')
@@ -650,7 +659,7 @@ function goBackTarget() {
           <strong>{{ run.taskName || `任务 #${run.taskId}` }}</strong>
           <span class="mode-tag" v-if="run.taskMode">{{ run.taskMode }}</span>
         </div>
-        <span :class="['status', getStatusClass(run.status)]">{{ run.status }}</span>
+        <span :class="['status', getStatusClass(run.status)]">{{ getStatusText(run.status) }}</span>
         <div class="path-full">
           <span class="path-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
         </div>
@@ -680,7 +689,7 @@ function goBackTarget() {
           </div>
           <div class="detail-item">
             <label>状态：</label>
-            <span :class="['status', getStatusClass(runDetail.status)]">{{ runDetail.status }}</span>
+            <span :class="['status', getStatusClass(runDetail.status)]">{{ getStatusText(runDetail.status) }}</span>
           </div>
           <div class="detail-item">
             <label>触发方式：</label>
