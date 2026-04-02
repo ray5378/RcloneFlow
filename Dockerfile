@@ -1,17 +1,15 @@
-FROM golang:1.22-bookworm AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
-COPY go.mod ./
-RUN go mod download || true
+COPY go.mod go.sum ./
+RUN go mod download
 COPY cmd ./cmd
 COPY internal ./internal
 COPY web ./web
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/rclone-remote ./cmd/server
 
-FROM debian:bookworm-slim
+FROM alpine:3.19
 WORKDIR /app
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends ca-certificates tzdata \
-  && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache ca-certificates
 COPY --from=builder /out/rclone-remote /app/rclone-remote
 COPY web /app/web
 EXPOSE 17870

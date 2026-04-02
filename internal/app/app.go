@@ -60,9 +60,10 @@ func Run(cfg *config.Config) error {
 	scheduleCtrl := controller.NewScheduleController(scheduleSvc, sched)
 	runCtrl := controller.NewRunController(runSvc, rc)
 	fsCtrl := controller.NewFsController(rc)
+	authCtrl := controller.NewAuthController(db)
 
 	// 初始化路由
-	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl)
+	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl)
 
 	// 启动任务状态同步服务
 	jobSync := service.NewJobSyncService(db, rc, cfg.GetPoolInterval())
@@ -87,7 +88,7 @@ func Run(cfg *config.Config) error {
 func withCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
 		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
 		if r.Method == http.MethodOptions {
 			return

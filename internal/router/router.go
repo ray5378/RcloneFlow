@@ -3,21 +3,31 @@ package router
 import (
 	"net/http"
 
+	"rcloneflow/internal/auth"
 	"rcloneflow/internal/controller"
 )
 
 // Router 路由定义
 type Router struct {
-	remoteCtrl  *controller.RemoteController
-	taskCtrl   *controller.TaskController
-	browserCtrl *controller.BrowserController
+	remoteCtrl   *controller.RemoteController
+	taskCtrl     *controller.TaskController
+	browserCtrl  *controller.BrowserController
 	scheduleCtrl *controller.ScheduleController
-	runCtrl    *controller.RunController
-	fsCtrl     *controller.FsController
+	runCtrl      *controller.RunController
+	fsCtrl       *controller.FsController
+	authCtrl     *controller.AuthController
 }
 
 // New 创建路由实例
-func New(rc *controller.RemoteController, taskCtrl *controller.TaskController, browserCtrl *controller.BrowserController, scheduleCtrl *controller.ScheduleController, runCtrl *controller.RunController, fsCtrl *controller.FsController) *Router {
+func New(
+	rc *controller.RemoteController,
+	taskCtrl *controller.TaskController,
+	browserCtrl *controller.BrowserController,
+	scheduleCtrl *controller.ScheduleController,
+	runCtrl *controller.RunController,
+	fsCtrl *controller.FsController,
+	authCtrl *controller.AuthController,
+) *Router {
 	return &Router{
 		remoteCtrl:   rc,
 		taskCtrl:    taskCtrl,
@@ -25,51 +35,65 @@ func New(rc *controller.RemoteController, taskCtrl *controller.TaskController, b
 		scheduleCtrl: scheduleCtrl,
 		runCtrl:     runCtrl,
 		fsCtrl:      fsCtrl,
+		authCtrl:    authCtrl,
 	}
 }
 
 // Setup 注册所有路由
 func (r *Router) Setup(mux *http.ServeMux) {
-	// 健康检查
+	// 健康检查（公开）
 	mux.HandleFunc("/healthz", r.remoteCtrl.Healthz)
 
+	// 认证相关（公开）
+	mux.HandleFunc("/api/auth/register", r.authCtrl.Register)
+	mux.HandleFunc("/api/auth/login", r.authCtrl.Login)
+
+	// 需要认证的API路由
+	apiMux := http.NewServeMux()
+
 	// 远程存储相关
-	mux.HandleFunc("/api/remotes", r.remoteCtrl.HandleRemotes)
-	mux.HandleFunc("/api/remotes/config/", r.remoteCtrl.HandleRemoteConfig)
-	mux.HandleFunc("/api/remotes/test", r.remoteCtrl.HandleRemoteTest)
-	mux.HandleFunc("/api/providers", r.remoteCtrl.HandleProviders)
-	mux.HandleFunc("/api/config/dump", r.remoteCtrl.HandleConfigDump)
-	mux.HandleFunc("/api/config/", r.remoteCtrl.HandleConfigActions)
-	mux.HandleFunc("/api/usage/", r.remoteCtrl.HandleUsage)
-	mux.HandleFunc("/api/fsinfo/", r.remoteCtrl.HandleFsInfo)
+	apiMux.HandleFunc("/api/remotes", r.remoteCtrl.HandleRemotes)
+	apiMux.HandleFunc("/api/remotes/config/", r.remoteCtrl.HandleRemoteConfig)
+	apiMux.HandleFunc("/api/remotes/test", r.remoteCtrl.HandleRemoteTest)
+	apiMux.HandleFunc("/api/providers", r.remoteCtrl.HandleProviders)
+	apiMux.HandleFunc("/api/config/dump", r.remoteCtrl.HandleConfigDump)
+	apiMux.HandleFunc("/api/config/", r.remoteCtrl.HandleConfigActions)
+	apiMux.HandleFunc("/api/usage/", r.remoteCtrl.HandleUsage)
+	apiMux.HandleFunc("/api/fsinfo/", r.remoteCtrl.HandleFsInfo)
 
 	// 文件浏览器
-	mux.HandleFunc("/api/browser/list", r.browserCtrl.HandleList)
+	apiMux.HandleFunc("/api/browser/list", r.browserCtrl.HandleList)
 
 	// 文件系统操作
-	mux.HandleFunc("/api/fs/mkdir", r.fsCtrl.HandleMkdir)
-	mux.HandleFunc("/api/fs/delete", r.fsCtrl.HandleDeleteFile)
-	mux.HandleFunc("/api/fs/purge", r.fsCtrl.HandlePurge)
-	mux.HandleFunc("/api/fs/move", r.fsCtrl.HandleMove)
-	mux.HandleFunc("/api/fs/copy", r.fsCtrl.HandleCopy)
-	mux.HandleFunc("/api/fs/copyDir", r.fsCtrl.HandleCopyDir)
-	mux.HandleFunc("/api/fs/moveDir", r.fsCtrl.HandleMoveDir)
-	mux.HandleFunc("/api/fs/publiclink", r.fsCtrl.HandlePublicLink)
+	apiMux.HandleFunc("/api/fs/mkdir", r.fsCtrl.HandleMkdir)
+	apiMux.HandleFunc("/api/fs/delete", r.fsCtrl.HandleDeleteFile)
+	apiMux.HandleFunc("/api/fs/purge", r.fsCtrl.HandlePurge)
+	apiMux.HandleFunc("/api/fs/move", r.fsCtrl.HandleMove)
+	apiMux.HandleFunc("/api/fs/copy", r.fsCtrl.HandleCopy)
+	apiMux.HandleFunc("/api/fs/copyDir", r.fsCtrl.HandleCopyDir)
+	apiMux.HandleFunc("/api/fs/moveDir", r.fsCtrl.HandleMoveDir)
+	apiMux.HandleFunc("/api/fs/publiclink", r.fsCtrl.HandlePublicLink)
 
 	// 任务管理
-	mux.HandleFunc("/api/tasks", r.taskCtrl.HandleTasks)
-	mux.HandleFunc("/api/tasks/", r.taskCtrl.HandleTaskActions)
+	apiMux.HandleFunc("/api/tasks", r.taskCtrl.HandleTasks)
+	apiMux.HandleFunc("/api/tasks/", r.taskCtrl.HandleTaskActions)
 
 	// 定时任务
-	mux.HandleFunc("/api/schedules", r.scheduleCtrl.HandleSchedules)
-	mux.HandleFunc("/api/schedules/", r.scheduleCtrl.HandleSchedules)
+	apiMux.HandleFunc("/api/schedules", r.scheduleCtrl.HandleSchedules)
+	apiMux.HandleFunc("/api/schedules/", r.scheduleCtrl.HandleSchedules)
 
 	// 运行记录
-	mux.HandleFunc("/api/runs", r.runCtrl.HandleRuns)
-	mux.HandleFunc("/api/runs/active", r.runCtrl.HandleActiveRuns)
-	mux.HandleFunc("/api/runs/task/", r.runCtrl.HandleRunsByTask)
-	mux.HandleFunc("/api/runs/", r.runCtrl.HandleRunStatus)
+	apiMux.HandleFunc("/api/runs", r.runCtrl.HandleRuns)
+	apiMux.HandleFunc("/api/runs/active", r.runCtrl.HandleActiveRuns)
+	apiMux.HandleFunc("/api/runs/task/", r.runCtrl.HandleRunsByTask)
+	apiMux.HandleFunc("/api/runs/", r.runCtrl.HandleRunStatus)
 
-	// 静态文件
+	// 应用JWT中间件保护API路由
+	protectedMux := auth.JWTMiddleware(apiMux)
+
+	// 注册受保护的路由
+	mux.Handle("/api/", protectedMux)
+
+	// 静态文件（公开）
 	mux.Handle("/", http.FileServer(http.Dir("./web")))
 }

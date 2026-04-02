@@ -12,6 +12,14 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// User 用户模型
+type User struct {
+	ID        int64     `json:"id"`
+	Username  string    `json:"username"`
+	Password  string    `json:"-"` // 不返回密码
+	CreatedAt time.Time `json:"createdAt"`
+}
+
 type Task struct {
 	ID           int64           `json:"id"`
 	Name         string          `json:"name"`
@@ -154,10 +162,28 @@ func (db *DB) migrate() error {
 					finished_at DATETIME,
 					FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 				);
+
+				CREATE TABLE IF NOT EXISTS users (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					username TEXT UNIQUE NOT NULL,
+					password TEXT NOT NULL,
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+				);
 				
 				CREATE INDEX IF NOT EXISTS idx_runs_task_id ON runs(task_id);
 				CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at);
 				CREATE INDEX IF NOT EXISTS idx_schedules_task_id ON schedules(task_id);
+			`,
+		},
+		{
+			version: 2,
+			sql: `
+				CREATE TABLE IF NOT EXISTS users (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					username TEXT UNIQUE NOT NULL,
+					password TEXT NOT NULL,
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+				);
 			`,
 		},
 		// 未来迁移可以在这里添加
@@ -623,4 +649,57 @@ func (db *DB) UpdateRunStatus(id int64, status, errorMsg string, summary map[str
 		WHERE id = ?`,
 		status, string(summaryBytes), errorMsg, finishedAt, finishedAt, id)
 	return err
+}
+
+// ===== 用户相关操作 =====
+
+// CreateUser 创建用户
+func (db *DB) CreateUser(username, password string) (User, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	result, err := db.db.Exec(`
+		INSERT INTO users (username, password) VALUES (?, ?)`,
+		username, password)
+	if err != nil {
+		return User{}, err
+	}
+	
+	id, _ := result.LastInsertId()
+	return User{
+		ID:        id,
+		Username:  username,
+		Password:  password,
+		CreatedAt: time.Now(),
+	}, nil
+}
+
+// GetUserByUsername 根据用户名获取用户
+func (db *DB) GetUserByUsername(username string) (User, bool) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	var u User
+	err := db.db.QueryRow(`
+		SELECT id, username, password, created_at FROM users WHERE username = ?`, username).
+		Scan(&u.ID, &u.Username, &u.Password, &u.CreatedAt)
+	if err != nil {
+		return User{}, false
+	}
+	return u, true
+}
+
+// GetUserByID 根据ID获取用户
+func (db *DB) GetUserByID(id int64) (User, bool) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	var u User
+	err := db.db.QueryRow(`
+		SELECT id, username, password, created_at FROM users WHERE id = ?`, id).
+		Scan(&u.ID, &u.Username, &u.Password, &u.CreatedAt)
+	if err != nil {
+		return User{}, false
+	}
+	return u, true
 }
