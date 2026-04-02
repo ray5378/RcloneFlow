@@ -424,6 +424,16 @@ async function clearRun(id: number) {
   }
 }
 
+async function clearAllRuns() {
+  if (!confirm('确定删除所有历史记录？此操作不可恢复！')) return
+  try {
+    await api.clearAllRuns()
+    await loadData()
+  } catch (e) {
+    alert((e as Error).message)
+  }
+}
+
 function onSourceRemoteChange() {
   sourceCurrentPath.value = ''
   if (createForm.value.sourceRemote) {
@@ -615,9 +625,12 @@ function goBackTarget() {
   <div v-if="currentModule === 'history'" class="card">
     <div class="card-header">
       <div class="title">历史记录</div>
-      <button v-if="historyFilterTaskId !== null" class="ghost small" @click="currentModule = 'tasks'">
-        ← 返回任务列表
-      </button>
+      <div class="header-actions">
+        <button v-if="filteredRuns.length > 0" class="ghost small danger-text" @click="clearAllRuns">删除所有</button>
+        <button v-if="historyFilterTaskId !== null" class="ghost small" @click="currentModule = 'tasks'">
+          ← 返回
+        </button>
+      </div>
     </div>
     <div class="list-header">
       <span class="col-name">任务</span>

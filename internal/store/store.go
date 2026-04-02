@@ -297,6 +297,14 @@ func (db *DB) DeleteRun(id int64) error {
 	return err
 }
 
+func (db *DB) DeleteAllRuns() error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec("DELETE FROM runs")
+	return err
+}
+
 // ===== Schedules =====
 
 func (db *DB) ListSchedules() ([]Schedule, error) {

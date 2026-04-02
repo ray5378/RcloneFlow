@@ -20,6 +20,11 @@ export async function clearRun(runId: number): Promise<void> {
   return del(`/api/runs/${runId}`)
 }
 
+/** 清除所有历史记录 */
+export async function clearAllRuns(): Promise<void> {
+  return del('/api/runs')
+}
+
 /** 获取Job状态 (直接调用rclone job API) */
 export async function getJobStatus(jobId: number): Promise<Record<string, unknown>> {
   return get<Record<string, unknown>>(`/api/fs/jobStatus?jobId=${jobId}`)

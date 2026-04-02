@@ -149,3 +149,7 @@ func (a *storeRunAdapter) UpdateRun(id int64, updateFn func(*RunRecord)) {
 func (a *storeRunAdapter) DeleteRun(id int64) error {
 	return a.db.DeleteRun(id)
 }
+
+func (a *storeRunAdapter) DeleteAllRuns() error {
+	return a.db.DeleteAllRuns()
+}

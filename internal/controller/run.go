@@ -25,6 +25,16 @@ func NewRunController(runSvc *service.RunService, rc *rclone.Client) *RunControl
 
 // HandleRuns 处理运行记录列表
 func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
+	// DELETE /api/runs - 删除所有历史记录
+	if r.Method == http.MethodDelete {
+		if err := c.runSvc.DeleteAllRuns(); err != nil {
+			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			return
+		}
+		WriteJSON(w, 200, map[string]any{"deleted": true})
+		return
+	}
+
 	runs, err := c.runSvc.ListRuns()
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})

@@ -29,6 +29,7 @@ type RunServiceInterface interface {
 	ListActiveRuns() ([]RunRecord, error)
 	UpdateRun(id int64, updateFn func(*RunRecord))
 	DeleteRun(id int64) error
+	DeleteAllRuns() error
 }
 
 // RunService 运行记录服务层
@@ -66,4 +67,8 @@ func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
 
 func (s *RunService) DeleteRun(id int64) error {
 	return s.db.DeleteRun(id)
+}
+
+func (s *RunService) DeleteAllRuns() error {
+	return s.db.DeleteAllRuns()
 }
