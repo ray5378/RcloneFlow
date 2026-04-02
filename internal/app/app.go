@@ -49,19 +49,20 @@ func Run(cfg *config.Config) error {
 	remoteCtrl := controller.NewRemoteController(rc)
 	taskCtrl := controller.NewTaskController(taskSvc, rc)
 	browserCtrl := controller.NewBrowserController(rc)
-	scheduleCtrl := controller.NewScheduleController(scheduleSvc)
-	runCtrl := controller.NewRunController(runSvc, rc)
-	fsCtrl := controller.NewFsController(rc)
-
-	// 初始化路由
-	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl)
-
-	// 初始化调度器
+	
+	// 初始化调度器(需要在controller之前,以便传递)
 	sched := scheduler.New(db, rc)
 	if err := sched.Start(); err != nil {
 		logger.Error("调度器初始化失败", zap.Error(err))
 		return err
 	}
+	
+	scheduleCtrl := controller.NewScheduleController(scheduleSvc, sched)
+	runCtrl := controller.NewRunController(runSvc, rc)
+	fsCtrl := controller.NewFsController(rc)
+
+	// 初始化路由
+	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl)
 
 	// 启动任务状态同步服务
 	jobSync := service.NewJobSyncService(db, rc, cfg.GetPoolInterval())

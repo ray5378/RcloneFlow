@@ -24,11 +24,12 @@ type Task struct {
 }
 
 type Schedule struct {
-	ID        int64     `json:"id"`
-	TaskID    int64     `json:"taskId"`
-	Spec      string    `json:"spec"`
-	Enabled   bool      `json:"enabled"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID           int64     `json:"id"`
+	TaskID       int64     `json:"taskId"`
+	Spec         string    `json:"spec"`
+	Enabled      bool      `json:"enabled"`
+	NextRunTime  time.Time `json:"nextRunTime,omitempty"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
 type Run struct {
@@ -341,11 +342,12 @@ func (db *DB) SetScheduleEnabled(id int64, enabled bool) error {
 	return err
 }
 
-func (db *DB) UpdateScheduleEnabled(id int64, enabled bool) error {
+// UpdateScheduleNextRunTime 更新任务的下次触发时间
+func (db *DB) UpdateScheduleNextRunTime(id int64, nextRunTime time.Time) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 	
-	_, err := db.db.Exec("UPDATE schedules SET enabled = ? WHERE id = ?", enabled, id)
+	_, err := db.db.Exec("UPDATE schedules SET next_run_time = ? WHERE id = ?", nextRunTime, id)
 	return err
 }
 

@@ -5,17 +5,19 @@ import (
 	"strconv"
 	"strings"
 
+	"rcloneflow/internal/scheduler"
 	"rcloneflow/internal/service"
 )
 
 // ScheduleController 定时任务控制器
 type ScheduleController struct {
 	scheduleSvc *service.ScheduleService
+	sched      *scheduler.Scheduler
 }
 
 // NewScheduleController 创建定时任务控制器
-func NewScheduleController(scheduleSvc *service.ScheduleService) *ScheduleController {
-	return &ScheduleController{scheduleSvc: scheduleSvc}
+func NewScheduleController(scheduleSvc *service.ScheduleService, sched *scheduler.Scheduler) *ScheduleController {
+	return &ScheduleController{scheduleSvc: scheduleSvc, sched: sched}
 }
 
 // HandleSchedules 处理定时任务列表、创建和删除
@@ -33,6 +35,7 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 		var req struct {
 			TaskID int64  `json:"taskId"`
 			Spec   string `json:"spec"`
+			Enabled bool  `json:"enabled"`
 		}
 		if err := DecodeRequest(r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
@@ -42,6 +45,11 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 		if err != nil {
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
+		}
+		// 添加到调度器
+		if req.Enabled {
+			item.Enabled = true
+			c.sched.AddSchedule(item)
 		}
 		WriteJSON(w, 200, item)
 

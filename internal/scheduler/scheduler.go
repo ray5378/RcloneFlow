@@ -2,9 +2,10 @@ package scheduler
 
 import (
 	"context"
-	"errors"
+	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"rcloneflow/internal/logger"
 	"rcloneflow/internal/rclone"
@@ -21,9 +22,9 @@ type Runner interface {
 
 // Scheduler 定时任务调度器
 type Scheduler struct {
-	cron  *cron.Cron
-	db    *store.DB
-	r     Runner
+	cron *cron.Cron
+	db   *store.DB
+	r    Runner
 }
 
 // New 创建调度器
@@ -68,10 +69,10 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 }
 
 // ParseSpecToCron 将前端格式转为标准cron表达式(5段:分 时 日 月 周)
-// 前端格式: year,month,week,day,hour,minute
-// 例如: "*,1,3,5,*,00,30" -> "00 00 1,3,5 1 *"
-// 特殊值: * = 每年/每月/每时/每分, 空 = 不设置(用于日/周)
-func ParseSpecToCron(year, month, week, day, hour, minute string) (string, bool) {
+// 前端格式: month,week,day,hour,minute (5字段,无年)
+// 例如: "1,3,5,*,15,30" -> "30 15 1,3,5 1 *" (每天15:30的1号,3号,5号)
+// 特殊值: * = 每月/每天, 空 = 不设置(用于周/日)
+func ParseSpecToCron(month, week, day, hour, minute string) (string, bool) {
 	// 处理分钟
 	min := minute
 	if min == "" || min == "*" {
@@ -96,7 +97,7 @@ func ParseSpecToCron(year, month, week, day, hour, minute string) (string, bool)
 		m = "*"
 	}
 
-	// 处理周
+	// 处理周(0=周日,1=周一...)
 	w := week
 	if w == "" {
 		w = "*"
@@ -171,16 +172,59 @@ func ParseSpecToCron(year, month, week, day, hour, minute string) (string, bool)
 	return "0 " + min + " " + h + " " + d + " " + m + " " + w, true
 }
 
-func parseInt(s string) (int, error) {
-	s = strings.TrimSpace(s)
-	var n int
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return 0, errors.New("invalid number")
-		}
-		n = n*10 + int(c-'0')
+// CalcNextRun 计算下次触发时间
+func CalcNextRun(spec string) (time.Time, error) {
+	parser := cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow)
+	cronExpr, err := parser.Parse(spec)
+	if err != nil {
+		return time.Time{}, err
 	}
-	return n, nil
+	return cronExpr.Next(time.Now()), nil
+}
+
+// AddSchedule 添加定时任务到调度器(动态添加)
+func (s *Scheduler) AddSchedule(schedule store.Schedule) error {
+	if !schedule.Enabled {
+		return nil
+	}
+	parts := strings.Split(schedule.Spec, ",")
+	if len(parts) != 5 {
+		return fmt.Errorf("invalid spec format, expected 5 fields")
+	}
+	cronSpec, ok := ParseSpecToCron(parts[0], parts[1], parts[2], parts[3], parts[4])
+	if !ok {
+		return fmt.Errorf("invalid cron spec")
+	}
+	taskID := schedule.TaskID
+	scheduleID := schedule.ID
+	
+	// 计算下次触发时间
+	nextTime, err := CalcNextRun(cronSpec)
+	if err == nil {
+		s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
+	}
+	
+	_, err = s.cron.AddFunc(cronSpec, func() {
+		if err := s.r.RunTask(context.Background(), taskID, "schedule"); err != nil {
+			logger.Error("定时任务执行失败",
+				zap.Int64("task_id", taskID),
+				zap.String("spec", cronSpec),
+				zap.Error(err))
+		}
+		// 执行后更新下次触发时间
+		nextTime, err := CalcNextRun(cronSpec)
+		if err == nil {
+			s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	logger.Info("定时任务已添加(运行时)",
+		zap.Int64("schedule_id", scheduleID),
+		zap.Int64("task_id", taskID),
+		zap.String("cron_spec", cronSpec))
+	return nil
 }
 
 // Start 启动调度器
@@ -193,16 +237,16 @@ func (s *Scheduler) Start() error {
 		if !item.Enabled {
 			continue
 		}
-		// spec格式: "year,month,week,day,hour,minute"
+		// spec格式: "month,week,day,hour,minute" (5字段,无年)
 		parts := strings.Split(item.Spec, ",")
-		if len(parts) != 6 {
+		if len(parts) != 5 {
 			logger.Warn("跳过无效的定时规格",
 				zap.Int64("schedule_id", item.ID),
 				zap.String("spec", item.Spec),
-				zap.String("reason", "格式应为 year,month,week,day,hour,minute"))
+				zap.String("reason", "格式应为 month,week,day,hour,minute"))
 			continue
 		}
-		cronSpec, ok := ParseSpecToCron(parts[0], parts[1], parts[2], parts[3], parts[4], parts[5])
+		cronSpec, ok := ParseSpecToCron(parts[0], parts[1], parts[2], parts[3], parts[4])
 		if !ok {
 			logger.Warn("跳过不支持的定时规格",
 				zap.Int64("schedule_id", item.ID),
@@ -211,12 +255,24 @@ func (s *Scheduler) Start() error {
 			continue
 		}
 		taskID := item.TaskID
-		_, err := s.cron.AddFunc(cronSpec, func() {
+		scheduleID := item.ID
+		
+		// 计算并存储下次触发时间
+		nextTime, err := CalcNextRun(cronSpec)
+		if err == nil {
+			s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
+		}
+		
+		_, err = s.cron.AddFunc(cronSpec, func() {
 			if err := s.r.RunTask(context.Background(), taskID, "schedule"); err != nil {
 				logger.Error("定时任务执行失败",
 					zap.Int64("task_id", taskID),
 					zap.String("spec", cronSpec),
 					zap.Error(err))
+			}
+			// 执行后更新下次触发时间
+			if nextTime, err := CalcNextRun(cronSpec); err == nil {
+				s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
 			}
 		})
 		if err != nil {

@@ -33,7 +33,6 @@ const createForm = ref({
   targetRemote: '',
   targetPath: '',
   enableSchedule: false,
-  scheduleYear: '*',     // * = 每年, 或 "2026,2027"
   scheduleMonth: '*',     // * = 每月, 或 "1,3,5"
   scheduleWeek: '',      // 空 = 不设置, 或 "1,3,5" (周一三五)
   scheduleDay: '',       // 空 = 不设置, 或 "1,15,28"
@@ -57,7 +56,6 @@ const minuteOptions = Array.from({length: 60}, (_, i) => ({ value: String(i).pad
 
 // 临时选择状态
 const tempSchedule = ref({
-  year: [] as string[],
   month: [] as string[],
   week: [] as string[],
   day: [] as string[],
@@ -66,11 +64,11 @@ const tempSchedule = ref({
 })
 
 // 确认选择
-function confirmField(field: 'year' | 'month' | 'week' | 'day' | 'hour' | 'minute') {
+function confirmField(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
   const val = tempSchedule.value[field]
   if (val.length === 0) {
-    // 空表示不设置(周/日)或每年/每月(年/月)
-    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = field === 'year' || field === 'month' ? '*' : ''
+    // 空表示不设置
+    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = field === 'month' ? '*' : ''
   } else {
     createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = val.join(',')
   }
@@ -145,7 +143,6 @@ async function createTask() {
       }
       if (createForm.value.enableSchedule) {
         const spec = [
-          createForm.value.scheduleYear || '*',
           createForm.value.scheduleMonth || '*',
           createForm.value.scheduleWeek || '',
           createForm.value.scheduleDay || '',
@@ -168,7 +165,6 @@ async function createTask() {
       // 如果启用了定时任务，创建定时规则
       if (createForm.value.enableSchedule) {
         const spec = [
-          createForm.value.scheduleYear || '*',
           createForm.value.scheduleMonth || '*',
           createForm.value.scheduleWeek || '',
           createForm.value.scheduleDay || '',
@@ -181,7 +177,7 @@ async function createTask() {
     createForm.value = { 
       name: '', mode: 'copy', sourceRemote: '', sourcePath: '', targetRemote: '', targetPath: '',
       enableSchedule: false,
-      scheduleYear: '*', scheduleMonth: '*', scheduleWeek: '', scheduleDay: '', scheduleHour: '00', scheduleMinute: '00'
+      scheduleMonth: '*', scheduleWeek: '', scheduleDay: '', scheduleHour: '00', scheduleMinute: '00'
     }
     sourcePathOptions.value = []
     targetPathOptions.value = []
@@ -232,21 +228,19 @@ function editTask(task: Task) {
       targetRemote: task.targetRemote,
       targetPath: task.targetPath || '',
       enableSchedule: true,
-      scheduleYear: parts[0] || '*',
-      scheduleMonth: parts[1] || '*',
-      scheduleWeek: parts[2] || '',
-      scheduleDay: parts[3] || '',
-      scheduleHour: parts[4] || '00',
-      scheduleMinute: parts[5] || '00',
+      scheduleMonth: parts[0] || '*',
+      scheduleWeek: parts[1] || '',
+      scheduleDay: parts[2] || '',
+      scheduleHour: parts[3] || '00',
+      scheduleMinute: parts[4] || '00',
     }
     // 更新临时选择状态
     tempSchedule.value = {
-      year: parts[0] && parts[0] !== '*' ? parts[0].split(',') : [],
-      month: parts[1] && parts[1] !== '*' ? parts[1].split(',') : [],
-      week: parts[2] ? parts[2].split(',') : [],
-      day: parts[3] ? parts[3].split(',') : [],
-      hour: parts[4] && parts[4] !== '*' ? parts[4].split(',') : [],
-      minute: parts[5] && parts[5] !== '*' ? parts[5].split(',') : [],
+      month: parts[0] && parts[0] !== '*' ? parts[0].split(',') : [],
+      week: parts[1] ? parts[1].split(',') : [],
+      day: parts[2] ? parts[2].split(',') : [],
+      hour: parts[3] && parts[3] !== '*' ? parts[3].split(',') : [],
+      minute: parts[4] && parts[4] !== '*' ? parts[4].split(',') : [],
     }
   } else {
     createForm.value = {
@@ -257,7 +251,6 @@ function editTask(task: Task) {
       targetRemote: task.targetRemote,
       targetPath: task.targetPath || '',
       enableSchedule: false,
-      scheduleYear: '*',
       scheduleMonth: '*',
       scheduleWeek: '',
       scheduleDay: '',
@@ -672,16 +665,6 @@ function goBackTarget() {
           <span>启用定时任务</span>
         </label>
         <div v-if="createForm.enableSchedule" class="schedule-grid">
-          <!-- 年 -->
-          <div class="schedule-item">
-            <label>年</label>
-            <select v-model="tempSchedule.year" multiple size="6" @dblclick="confirmField('year')">
-              <option value="*">每年</option>
-              <option v-for="y in [2026,2027,2028,2029,2030]" :key="y" :value="String(y)">{{ y }}</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('year')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleYear === '*' ? '每年' : (createForm.scheduleYear || '每年') }}</span>
-          </div>
           <!-- 月 -->
           <div class="schedule-item">
             <label>月</label>
