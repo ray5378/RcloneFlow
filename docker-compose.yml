@@ -23,7 +23,6 @@ services:
     image: ray5378/rcloneflow:latest
     container_name: rcloneflow
     restart: always
-    user: "0:0"
     ports:
       - "17870:17870"
     volumes:
