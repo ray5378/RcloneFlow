@@ -68,99 +68,73 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 	return err
 }
 
-// ParseSpecToCron 将前端格式转为标准cron表达式(5段)
-// 前端格式: month,week,day,hour,minute (5字段,无年)
-//
-// 前端spec示例: "1,3,5,*,,17,19,12"
-// 转换后cron: "12,19 17 1,3,5 * *"
-//
-// 说明: 前端 hour="17,19", minute="12" 表示12分且17时或19时
-// 因为cron标准是 minute hour day month week, multi-values要保持在对应字段
-func ParseSpecToCron(month, week, day, hour, minute string) (string, bool) {
-	// 处理分钟 (0-59)
-	min := minute
-	if min == "" || min == "*" {
-		min = "*"
+// ParseSpecToCron 将前端格式转为标准cron表达式
+// 前端格式: minute,hour,day,month,week (5字段)
+// 例如: "43,17,19,*,*" -> "43 17,19 * * *"
+// 即: 43分 且 17时或19时, 每天, 每月, 每天
+func ParseSpecToCron(minute, hour, day, month, week string) (string, bool) {
+	// 分钟
+	if minute == "" || minute == "*" {
+		minute = "*"
 	} else {
-		// 验证每个值
-		for _, part := range strings.Split(min, ",") {
-			val, err := strconv.Atoi(strings.TrimSpace(part))
-			if err != nil {
-				return "", false
-			}
-			if val < 0 || val > 59 {
+		for _, p := range strings.Split(minute, ",") {
+			v, err := strconv.Atoi(strings.TrimSpace(p))
+			if err != nil || v < 0 || v > 59 {
 				return "", false
 			}
 		}
 	}
 
-	// 处理小时 (0-23)
-	h := hour
-	if h == "" || h == "*" {
-		h = "*"
+	// 小时
+	if hour == "" || hour == "*" {
+		hour = "*"
 	} else {
-		for _, part := range strings.Split(h, ",") {
-			val, err := strconv.Atoi(strings.TrimSpace(part))
-			if err != nil {
-				return "", false
-			}
-			if val < 0 || val > 23 {
+		for _, p := range strings.Split(hour, ",") {
+			v, err := strconv.Atoi(strings.TrimSpace(p))
+			if err != nil || v < 0 || v > 23 {
 				return "", false
 			}
 		}
 	}
 
-	// 处理日 (1-31)
-	d := day
-	if d == "" || d == "*" {
-		d = "*"
+	// 日
+	if day == "" || day == "*" {
+		day = "*"
 	} else {
-		for _, part := range strings.Split(d, ",") {
-			val, err := strconv.Atoi(strings.TrimSpace(part))
-			if err != nil {
-				return "", false
-			}
-			if val < 1 || val > 31 {
+		for _, p := range strings.Split(day, ",") {
+			v, err := strconv.Atoi(strings.TrimSpace(p))
+			if err != nil || v < 1 || v > 31 {
 				return "", false
 			}
 		}
 	}
 
-	// 处理月 (1-12)
-	m := month
-	if m == "" || m == "*" {
-		m = "*"
+	// 月
+	if month == "" || month == "*" {
+		month = "*"
 	} else {
-		for _, part := range strings.Split(m, ",") {
-			val, err := strconv.Atoi(strings.TrimSpace(part))
-			if err != nil {
-				return "", false
-			}
-			if val < 1 || val > 12 {
+		for _, p := range strings.Split(month, ",") {
+			v, err := strconv.Atoi(strings.TrimSpace(p))
+			if err != nil || v < 1 || v > 12 {
 				return "", false
 			}
 		}
 	}
 
-	// 处理周 (0-6, 0=周日)
-	w := week
-	if w == "" || w == "*" {
-		w = "*"
+	// 周
+	if week == "" || week == "*" {
+		week = "*"
 	} else {
-		for _, part := range strings.Split(w, ",") {
-			val, err := strconv.Atoi(strings.TrimSpace(part))
-			if err != nil {
-				return "", false
-			}
-			if val < 0 || val > 6 {
+		for _, p := range strings.Split(week, ",") {
+			v, err := strconv.Atoi(strings.TrimSpace(p))
+			if err != nil || v < 0 || v > 6 {
 				return "", false
 			}
 		}
 	}
 
-	// 返回标准cron格式: 秒 分 时 日 月 周
-	// 注意: multi-values (如 "17,19") 要保持在正确的字段位置
-	return "0 " + min + " " + h + " " + d + " " + m + " " + w, true
+	// 标准cron: 秒 分 时 日 月 周
+	return "0 " + minute + " " + hour + " " + day + " " + month + " " + week, true
 }
 
 // CalcNextRun 计算下次触发时间

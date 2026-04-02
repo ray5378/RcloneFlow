@@ -67,8 +67,8 @@ const tempSchedule = ref({
 function confirmField(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
   const val = tempSchedule.value[field]
   if (val.length === 0) {
-    // 空表示不设置
-    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = field === 'month' ? '*' : ''
+    // 空表示使用*代表任意
+    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = '*'
   } else {
     createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = val.join(',')
   }
@@ -143,11 +143,11 @@ async function createTask() {
       }
       if (createForm.value.enableSchedule) {
         const spec = [
+          createForm.value.scheduleMinute || '00',
+          createForm.value.scheduleHour || '*',
+          createForm.value.scheduleDay || '*',
           createForm.value.scheduleMonth || '*',
           createForm.value.scheduleWeek || '*',
-          createForm.value.scheduleDay || '*',
-          createForm.value.scheduleHour || '*',
-          createForm.value.scheduleMinute || '00',
         ].join(',')
         await api.createSchedule({ taskId: editingTask.value.id, spec, enabled: true })
       }
@@ -165,11 +165,11 @@ async function createTask() {
       // 如果启用了定时任务，创建定时规则
       if (createForm.value.enableSchedule) {
         const spec = [
+          createForm.value.scheduleMinute || '00',
+          createForm.value.scheduleHour || '*',
+          createForm.value.scheduleDay || '*',
           createForm.value.scheduleMonth || '*',
           createForm.value.scheduleWeek || '*',
-          createForm.value.scheduleDay || '',
-          createForm.value.scheduleHour || '00',
-          createForm.value.scheduleMinute || '00',
         ].join(',')
         await api.createSchedule({ taskId: task.id, spec, enabled: true })
       }
@@ -177,13 +177,13 @@ async function createTask() {
     createForm.value = { 
       name: '', mode: 'copy', sourceRemote: '', sourcePath: '', targetRemote: '', targetPath: '',
       enableSchedule: false,
-      scheduleMonth: '*', scheduleWeek: '', scheduleDay: '', scheduleHour: '00', scheduleMinute: '00'
+      scheduleMonth: '*', scheduleWeek: '*', scheduleDay: '*', scheduleHour: '*', scheduleMinute: '00'
     }
     sourcePathOptions.value = []
     targetPathOptions.value = []
     sourceCurrentPath.value = ''
     targetCurrentPath.value = ''
-    tempSchedule.value = { year: [], month: [], week: [], day: [], hour: [], minute: [] }
+    tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
     await loadData()
   } catch (e) {
     alert((e as Error).message)
@@ -228,19 +228,19 @@ function editTask(task: Task) {
       targetRemote: task.targetRemote,
       targetPath: task.targetPath || '',
       enableSchedule: true,
-      scheduleMonth: parts[0] || '*',
-      scheduleWeek: parts[1] || '',
-      scheduleDay: parts[2] || '',
-      scheduleHour: parts[3] || '00',
-      scheduleMinute: parts[4] || '00',
+      scheduleMinute: parts[0] || '00',
+      scheduleHour: parts[1] || '*',
+      scheduleDay: parts[2] || '*',
+      scheduleMonth: parts[3] || '*',
+      scheduleWeek: parts[4] || '*',
     }
     // 更新临时选择状态
     tempSchedule.value = {
-      month: parts[0] && parts[0] !== '*' ? parts[0].split(',') : [],
-      week: parts[1] ? parts[1].split(',') : [],
-      day: parts[2] ? parts[2].split(',') : [],
-      hour: parts[3] && parts[3] !== '*' ? parts[3].split(',') : [],
-      minute: parts[4] && parts[4] !== '*' ? parts[4].split(',') : [],
+      minute: parts[0] && parts[0] !== '*' ? parts[0].split(',') : [],
+      hour: parts[1] && parts[1] !== '*' ? parts[1].split(',') : [],
+      day: parts[2] && parts[2] !== '*' ? parts[2].split(',') : [],
+      month: parts[3] && parts[3] !== '*' ? parts[3].split(',') : [],
+      week: parts[4] && parts[4] !== '*' ? parts[4].split(',') : [],
     }
   } else {
     createForm.value = {
@@ -257,7 +257,7 @@ function editTask(task: Task) {
       scheduleHour: '00',
       scheduleMinute: '00',
     }
-    tempSchedule.value = { year: [], month: [], week: [], day: [], hour: [], minute: [] }
+    tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
   }
   
   // 加载源路径选项 - 加载父目录以便显示文件
@@ -313,30 +313,13 @@ function formatScheduleSpec(spec: string): string {
   if (!spec) return ''
   const parts = spec.split(',')
   if (parts.length !== 5) return spec
-  const [month, week, day, hour, minute] = parts
   
-  const monthStr = month === '*' ? '每月' : month + '月'
-  const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-  let weekStr = ''
-  if (week === '*') {
-    weekStr = '每天'
-  } else if (week !== '') {
-    const days = week.split(',').map(d => weekNames[parseInt(d)] || d)
-    weekStr = days.join(',')
-  }
-  const dayStr = day === '*' ? '每天' : (day ? day + '日' : '')
-  const hourStr = hour === '*' ? '' : hour + '时'
-  const minuteStr = minute === '*' ? '每分' : (minute ? minute + '分' : '')
+  // 标准cron格式: minute hour day month week
+  // 例如: "43,17,19,*,*" 显示为 "43 17,19 * * *"
+  const [minute, hour, day, month, week] = parts
   
-  // 组合显示
-  const parts2: string[] = []
-  if (month !== '*') parts2.push(monthStr)
-  if (weekStr) parts2.push(weekStr)
-  if (dayStr && day !== '*') parts2.push(dayStr)
-  if (hourStr) parts2.push(hourStr)
-  if (minuteStr && minute !== '*') parts2.push(minuteStr)
-  
-  return parts2.length > 0 ? parts2.join(' ') : '未设置'
+  // 显示为标准cron格式
+  return `${minute} ${hour} ${day} ${month} ${week}`
 }
 
 function toggleMenu(id: number) {
