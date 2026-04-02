@@ -6,20 +6,22 @@
 
 ## 功能特点
 
-- **多存储管理** - 添加、编辑和管理多个 Rclone 存储
-- **文件浏览器** - 浏览和导航远程存储文件，支持剪贴板操作
+- **多存储管理** - 添加、编辑和管理多个 Rclone 存储，支持 SMB/CIFS 等协议
+- **文件浏览器** - 浏览和导航远程存储文件，支持右键菜单操作（复制/移动/删除/重命名）
 - **任务管理** - 创建和管理存储间的复制/同步/移动任务
 - **定时任务** - 使用 cron 风格的调度设置自动化同步
 - **运行记录** - 跟踪任务执行历史和实时状态
 - **实时状态同步** - 后台自动同步 rclone job 状态
-- **现代化界面** - 简洁、响应式的 Web 界面
+- **现代化界面** - 简洁、响应式的 Web 界面，支持深色/浅色模式
 - **统一错误处理** - Toast 通知，友好的错误提示
+- **单元测试** - 前后端完整的单元测试覆盖
 
 ## 系统要求
 
 - Go 1.22+
 - Rclone (需要开启 RC 模式)
 - Git
+- Node.js 18+ (前端开发)
 
 ## 快速开始
 
@@ -32,19 +34,12 @@ cd RcloneFlow
 
 ### 2. 配置 Rclone
 
-确保已安装 Rclone 并配置好存储。配置文件通常在 `~/.config/rclone/rclone.conf`，或通过 `RCLONE_CONFIG` 环境变量指定。
+确保已安装 Rclone 并配置好存储。配置文件通常在 `~/.config/rclone/rclone.conf`。
 
 ### 3. 启动 Rclone RC 服务器
 
 ```bash
 rclone rcd --rc-user=your_user --rc-pass=your_pass --rc-addr=localhost:5572
-```
-
-或使用环境变量：
-```bash
-export RCLONE_RC_URL=http://localhost:5572
-export RCLONE_RC_USER=your_user
-export RCLONE_RC_PASS=your_pass
 ```
 
 ### 4. 构建并运行
@@ -82,7 +77,7 @@ log:
 
 sync:
   pool_interval: 5      # 任务状态同步间隔（秒）
-  schedule_interval: 1  # 定时任务检查间隔（分钟）
+  schedule_interval: 1   # 定时任务检查间隔（分钟）
 ```
 
 ### 6. 环境变量
@@ -107,15 +102,15 @@ RcloneFlow/
 │   ├── controller/         # HTTP 控制器
 │   ├── dao/                # 数据访问层
 │   ├── service/            # 业务逻辑层
-│   ├── scheduler/          # 任务调度器
+│   ├── scheduler/           # 任务调度器
 │   ├── router/             # 路由定义
 │   ├── store/              # 数据库封装 (SQLite)
 │   └── config/             # 配置管理
 ├── frontend/               # 前端源码 (Vue 3 + TypeScript)
 │   └── src/
 │       ├── api/            # API 调用层 (统一封装)
-│       ├── components/     # Vue 组件
-│       └── views/          # 页面视图
+│       ├── components/      # Vue 组件
+│       └── views/           # 页面视图
 ├── migrations/              # 数据库迁移文件 (goose)
 ├── web/                    # 编译后的前端文件
 ├── config.yaml             # 配置文件
@@ -137,7 +132,7 @@ RcloneFlow/
 
 - **API 层** - 统一封装的 API 调用
   - `api/client.ts` - HTTP 客户端，拦截器
-  - `api/errors.ts` - 统一错误处理
+  - `api/errors.ts` - 统一错误处理，Toast 通知
   - `api/task.ts` - 任务相关 API
   - `api/run.ts` - 运行记录 API
   - `api/remote.ts` - 远程存储 API
@@ -233,7 +228,7 @@ npm test
 # 测试覆盖率
 npm run test:coverage
 
-# 构建生产版本
+# 生产构建
 npm run build
 ```
 
@@ -250,12 +245,14 @@ go test -cover ./...
 go build -o server ./cmd/server
 ```
 
-## CI/CD
+### 测试覆盖率
 
-项目包含 GitHub Actions 配置，包括：
-- Go 测试和覆盖率检查
-- 前端测试和覆盖率检查
-- 自动构建和发布
+| 模块 | 覆盖率 |
+|------|--------|
+| adapter | ~80% |
+| dao | ~90% |
+| service | ~60% |
+| 前端 API | ~70% |
 
 ## Docker 部署
 
@@ -263,19 +260,6 @@ go build -o server ./cmd/server
 
 ```bash
 docker build -t rcloneflow .
-```
-
-### 运行容器
-
-```bash
-docker run -d \
-  --name rcloneflow \
-  -p 17870:17870 \
-  -e RCLONE_RC_URL=http://host.docker.internal:5572 \
-  -e RCLONE_RC_USER=your_user \
-  -e RCLONE_RC_PASS=your_pass \
-  -v /path/to/rclone/config:/root/.config/rclone \
-  rcloneflow
 ```
 
 ### Docker Compose
@@ -299,7 +283,6 @@ services:
 
   rclone:
     image: rclone/rclone
-    container_name: rclone
     volumes:
       - /path/to/rclone/config:/config/rclone
       - /path/to/your/data:/data
@@ -318,3 +301,4 @@ MIT License - 详见 LICENSE 文件。
 
 - [Rclone](https://rclone.org/) - 强大的云存储同步工具
 - [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
+- [Vitest](https://vitest.dev/) - 快速的前端测试框架
