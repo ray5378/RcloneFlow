@@ -507,31 +507,42 @@ function goBackTarget() {
         <input v-model="taskSearch" type="text" placeholder="搜索任务..." class="search-input" />
       </div>
     </div>
-    <div class="tile-grid">
-      <div v-for="task in filteredTasks" :key="task.id" class="tile" @click="closeMenus">
-        <div class="tile-info">
-          <div class="tile-header"><span class="tile-name">{{ task.name }}</span></div>
-          <div class="tile-desc">{{ task.mode }} {{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }} → {{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</div>
-          <div v-if="getScheduleByTaskId(task.id)" class="tile-schedule">
+    <div class="list-header">
+      <span class="col-name">任务</span>
+      <span class="col-path">路径</span>
+      <span class="col-schedule">定时</span>
+      <span class="col-action">操作</span>
+    </div>
+    <div class="list">
+      <div v-for="task in filteredTasks" :key="task.id" class="item">
+        <div class="name">
+          <strong>{{ task.name }}</strong>
+          <span class="mode-tag">{{ task.mode }}</span>
+        </div>
+        <div class="path-info">
+          <span class="path-remote">{{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }}</span>
+          <span class="path-arrow">→</span>
+          <span class="path-remote">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
+        </div>
+        <div class="schedule-info">
+          <template v-if="getScheduleByTaskId(task.id)">
             <span :class="['schedule-badge', getScheduleByTaskId(task.id)?.enabled ? 'enabled' : 'disabled']">
-              ⏰ {{ getScheduleByTaskId(task.id)?.enabled ? '已启用' : '已禁用' }}
+              {{ getScheduleByTaskId(task.id)?.enabled ? '已启用' : '已禁用' }}
             </span>
             <span class="schedule-rule">{{ formatScheduleSpec(getScheduleByTaskId(task.id)?.spec || '') }}</span>
-          </div>
+          </template>
+          <span v-else class="no-schedule">未设置</span>
         </div>
-        <div class="tile-actions">
+        <div class="item-actions">
           <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
-            {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭定时' : '▶ 开启定时' }}
+            {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}
           </button>
           <button class="ghost small" @click.stop="runTask(task.id)">▶ 执行</button>
-          <button class="ghost small" @click.stop="editTask(task)">✏️ 修改</button>
-          <button class="ghost small menu-btn" @click.stop="toggleMenu(task.id)">⋮</button>
-          <div v-if="openMenuId === task.id" class="tile-menu">
-            <button class="danger-text" @click.stop="deleteTask(task.id)">🗑️ 删除</button>
-          </div>
+          <button class="ghost small" @click.stop="editTask(task)">✏️</button>
+          <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
         </div>
       </div>
-      <div v-if="!tasks.length" style="padding: 20px; color: #888; text-align: center; width: 100%">暂无任务</div>
+      <div v-if="!filteredTasks.length" class="empty">暂无任务</div>
     </div>
   </div>
 
