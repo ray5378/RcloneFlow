@@ -26,7 +26,6 @@ const historyFilterTaskId = ref<number | null>(null)
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
 const showCreateModal = ref(false)
-const showAdvancedOptions = ref(false)
 
 const createForm = ref({
   name: '',
@@ -809,15 +808,10 @@ function goBackTarget() {
 
       <!-- 定时任务设置 -->
       <div class="schedule-section">
-        <div class="section-header">
-          <label class="schedule-toggle">
-            <input type="checkbox" v-model="createForm.enableSchedule" />
-            <span>启用定时任务</span>
-          </label>
-          <button type="button" class="ghost small" @click="showAdvancedOptions = !showAdvancedOptions">
-            {{ showAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}
-          </button>
-        </div>
+        <label class="schedule-toggle">
+          <input type="checkbox" v-model="createForm.enableSchedule" />
+          <span>启用定时任务</span>
+        </label>
         <div v-if="createForm.enableSchedule" class="schedule-grid">
           <!-- 月 -->
           <div class="schedule-item">
@@ -875,7 +869,10 @@ function goBackTarget() {
       </div>
 
       <!-- 高级选项 -->
-      <div v-if="showAdvancedOptions" class="advanced-section">
+      <div class="advanced-section">
+        <div class="advanced-section-header">
+          <span class="advanced-title">高级选项</span>
+        </div>
         <div class="advanced-group">
           <div class="advanced-group-title">过滤参数</div>
           <div class="advanced-row">
@@ -1149,6 +1146,8 @@ body.light .schedule-section { border-top-color: #ddd; }
 /* 高级选项 */
 .advanced-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #333; }
 body.light .advanced-section { border-top-color: #ddd; }
+.advanced-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.advanced-title { font-weight: 600; font-size: 13px; color: #64b5f6; }
 .advanced-group { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid #2a2a2a; }
 body.light .advanced-group { border-bottom-color: #eee; }
 .advanced-group:last-child { border-bottom: none; }
