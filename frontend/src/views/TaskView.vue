@@ -232,6 +232,39 @@ async function toggleSchedule(taskId: number) {
   }
 }
 
+function formatScheduleSpec(spec: string): string {
+  if (!spec) return ''
+  const parts = spec.split(',')
+  if (parts.length !== 6) return spec
+  const [year, month, week, day, hour, minute] = parts
+  const yearStr = year === '*' ? '每年' : year
+  const monthStr = month === '*' ? '每月' : month + '月'
+  const weekNames = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+  let weekStr = ''
+  if (week === '*') {
+    weekStr = '每天'
+  } else if (week === '') {
+    weekStr = ''
+  } else {
+    const days = week.split(',').map(d => weekNames[parseInt(d)] || d)
+    weekStr = days.join(',')
+  }
+  const dayStr = day === '*' ? '每天' : (day ? day + '日' : '')
+  const hourStr = hour === '*' ? '' : hour + '时'
+  const minuteStr = minute === '*' ? '每分' : (minute ? minute + '分' : '')
+  
+  // 组合显示
+  const parts2: string[] = []
+  if (year !== '*') parts2.push(yearStr)
+  if (month !== '*') parts2.push(monthStr)
+  if (weekStr) parts2.push(weekStr)
+  if (dayStr && day !== '*') parts2.push(dayStr)
+  if (hourStr) parts2.push(hourStr)
+  if (minuteStr && minute !== '*') parts2.push(minuteStr)
+  
+  return parts2.length > 0 ? parts2.join(' ') : '未设置'
+}
+
 function toggleMenu(id: number) {
   openMenuId.value = openMenuId.value === id ? null : id
 }
@@ -425,6 +458,7 @@ function goBackTarget() {
             <span :class="['schedule-badge', getScheduleByTaskId(task.id)?.enabled ? 'enabled' : 'disabled']">
               ⏰ {{ getScheduleByTaskId(task.id)?.enabled ? '已启用' : '已禁用' }}
             </span>
+            <span class="schedule-rule">{{ formatScheduleSpec(getScheduleByTaskId(task.id)?.spec || '') }}</span>
           </div>
         </div>
         <div class="tile-actions">
