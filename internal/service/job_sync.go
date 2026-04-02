@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"rcloneflow/internal/logger"
@@ -86,6 +87,17 @@ func (s *JobSyncService) syncRunningJobs() {
 		// 调用 rclone job API 获取任务状态
 		status, err := s.rc.JobStatus(context.Background(), run.RcJobID)
 		if err != nil {
+			// 如果job不存在于rclone中(可能已清理)，标记为finished
+			errStr := err.Error()
+			if strings.Contains(errStr, "job not found") || strings.Contains(errStr, "not found") {
+				logger.Info("任务已从rclone中移除，标记为已完成",
+					zap.Int64("run_id", run.ID),
+					zap.Int64("job_id", run.RcJobID))
+				if updErr := s.db.UpdateRunStatus(run.ID, "finished", "", nil); updErr != nil {
+					logger.Error("更新任务状态失败", zap.Int64("run_id", run.ID), zap.Error(updErr))
+				}
+				continue
+			}
 			logger.Warn("查询任务状态失败",
 				zap.Int64("run_id", run.ID),
 				zap.Int64("job_id", run.RcJobID),
