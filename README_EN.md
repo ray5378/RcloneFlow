@@ -165,18 +165,22 @@ RcloneFlow/
 | DELETE | `/api/schedules/{id}` | Delete schedule |
 
 #### Schedule Spec Format
-Schedule uses 6-field cron expression: `year,month,week,day,hour,minute`
+Schedule uses standard 5-field cron expression with `|` as field separator.
+
+**Format:** `minute|hour|day|month|week`
 
 | Field | Description | Example |
 |------|------|------|
-| year | Year | `*` every year, `2026,2027` specific years |
+| minute | Minute | `*` every minute, `00,30` specific minutes |
+| hour | Hour | `*` every hour, `17,19` specific hours |
+| day | Day of month | `*` every day, `1,15` specific days |
 | month | Month | `*` every month, `1,3,5` specific months |
 | week | Weekday | `*` every day, `1,3,5` Mon,Wed,Fri |
-| day | Day of month | `*` every day, `1,15` specific days |
-| hour | Hour | `*` every hour, `00,12` specific hours |
-| minute | Minute | `*` every minute, `00,30` specific minutes |
 
-Example: `*,*,,2,02,00` = Execute at 02:00 on 2nd of every month
+Examples:
+- `43|17,19|*|*|*` = 43 min past 17:00 or 19:00 every day → cron: `43 17,19 * * *`
+- `00|09|*|*|1,3,5` = 09:00 every Mon,Wed,Fri → cron: `0 00 09 * * 1,3,5`
+- `30|14|15|*|*` = 14:30 on 15th of every month → cron: `0 30 14 15 * *`
 
 ### Runs
 | Method | Endpoint | Description |
