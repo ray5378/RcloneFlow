@@ -1,24 +1,21 @@
-version: '3.8'
-
+version: "3.8"
 services:
   rclone:
     image: rclone/rclone:latest
-    container_name: rclone2
+    container_name: rclone
     restart: always
     command:
       - rcd
       - --rc-addr=:5572
       - --rc-user=admin
       - --rc-pass=aa123456
-      - --rc-web-gui
-      - --rc-web-gui-update
       - --config=/config/rclone/rclone.conf
       - --log-level=INFO
     ports:
       - "5572:5572"
     volumes:
-      - /vol1/1000/SSD/docker/rclone2/config:/config/rclone
-      - /vol1/1000/SSD/docker/rclone2/cache:/root/.cache/rclone
+      - /docker/rcloneflow/rclone/config:/config/rclone
+      - /docker/rcloneflow/rclone/cache:/root/.cache/rclone
     environment:
       - TZ=Asia/Shanghai
 
@@ -27,14 +24,14 @@ services:
     container_name: rcloneflow
     restart: always
     ports:
-      - "17870:17870"
+      - "27870:17870"
     volumes:
-      - ./data:/app/data
+      - /docker/rcloneflow/rcloneflow/data:/app/data
     environment:
       - TZ=Asia/Shanghai
+      - APP_ADDR=:17870
       - RCLONE_RC_ADDR=rclone:5572
       - RCLONE_RC_USER=admin
       - RCLONE_RC_PASS=aa123456
-      - RCLONE_CONFIG=/config/rclone/rclone.conf
     depends_on:
       - rclone

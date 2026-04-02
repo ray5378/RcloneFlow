@@ -61,7 +61,8 @@ async function handleSubmit() {
     const data = await login(form.username, form.password)
     
     // 保存token到localStorage
-    localStorage.setItem('authToken', data.token)
+    localStorage.setItem('authToken', data.accessToken)
+    localStorage.setItem('refreshToken', data.refreshToken)
     localStorage.setItem('user', JSON.stringify(data.user))
     
     emit('success')

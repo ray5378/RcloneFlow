@@ -47,8 +47,14 @@ function toggleTheme() {
   }
 }
 
-function handleLoginSuccess() {
+async function handleLoginSuccess() {
   isAuth.value = true
+  try {
+    const data = await api.listRemotes()
+    version.value = data.version || '未知版本'
+  } catch {
+    version.value = '未连接'
+  }
 }
 
 function handleLogout() {
