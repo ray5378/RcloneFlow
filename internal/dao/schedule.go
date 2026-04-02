@@ -35,16 +35,16 @@ func (d *ScheduleDAO) Create(schedule store.Schedule) (store.Schedule, error) {
 }
 
 // GetByID 根据ID获取定时任务
-func (d *ScheduleDAO) GetByID(id int64) (store.Schedule, bool) {
+func (d *ScheduleDAO) GetByID(id int64) (store.Schedule, error) {
 	var s store.Schedule
 	err := d.db.QueryRow(`
 		SELECT id, task_id, spec, enabled, created_at 
 		FROM schedules WHERE id = ?`, id).Scan(
 		&s.ID, &s.TaskID, &s.Spec, &s.Enabled, &s.CreatedAt)
 	if err != nil {
-		return store.Schedule{}, false
+		return store.Schedule{}, err
 	}
-	return s, true
+	return s, nil
 }
 
 // GetAll 获取所有定时任务

@@ -126,7 +126,7 @@ async function createTask() {
       editingTask.value = null
     } else {
       // 新建任务
-      await api.createTask({
+      const task = await api.createTask({
         name: createForm.value.name,
         mode: createForm.value.mode,
         sourceRemote: createForm.value.sourceRemote,
@@ -134,12 +134,29 @@ async function createTask() {
         targetRemote: createForm.value.targetRemote,
         targetPath: createForm.value.targetPath,
       })
+      // 如果启用了定时任务，创建定时规则
+      if (createForm.value.enableSchedule) {
+        const spec = [
+          createForm.value.scheduleYear || '*',
+          createForm.value.scheduleMonth || '*',
+          createForm.value.scheduleWeek || '',
+          createForm.value.scheduleDay || '',
+          createForm.value.scheduleHour || '00',
+          createForm.value.scheduleMinute || '00',
+        ].join(',')
+        await api.createSchedule({ taskId: task.id, spec, enabled: true })
+      }
     }
-    createForm.value = { name: '', mode: 'copy', sourceRemote: '', sourcePath: '', targetRemote: '', targetPath: '' }
+    createForm.value = { 
+      name: '', mode: 'copy', sourceRemote: '', sourcePath: '', targetRemote: '', targetPath: '',
+      enableSchedule: false,
+      scheduleYear: '*', scheduleMonth: '*', scheduleWeek: '', scheduleDay: '', scheduleHour: '00', scheduleMinute: '00'
+    }
     sourcePathOptions.value = []
     targetPathOptions.value = []
     sourceCurrentPath.value = ''
     targetCurrentPath.value = ''
+    tempSchedule.value = { year: [], month: [], week: [], day: [], hour: [], minute: [] }
     await loadData()
   } catch (e) {
     alert((e as Error).message)

@@ -2,8 +2,6 @@ package dao
 
 import (
 	"database/sql"
-	"encoding/json"
-	"time"
 
 	"rcloneflow/internal/store"
 )
@@ -37,7 +35,7 @@ func (d *TaskDAO) Create(task store.Task) (store.Task, error) {
 }
 
 // GetByID 根据ID获取任务
-func (d *TaskDAO) GetByID(id int64) (store.Task, bool) {
+func (d *TaskDAO) GetByID(id int64) (store.Task, error) {
 	var t store.Task
 	var sourcePath, targetPath string
 	err := d.db.QueryRow(`
@@ -45,11 +43,11 @@ func (d *TaskDAO) GetByID(id int64) (store.Task, bool) {
 		FROM tasks WHERE id = ?`, id).Scan(
 		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &sourcePath, &t.TargetRemote, &targetPath, &t.CreatedAt)
 	if err != nil {
-		return store.Task{}, false
+		return store.Task{}, err
 	}
 	t.SourcePath = sourcePath
 	t.TargetPath = targetPath
-	return t, true
+	return t, nil
 }
 
 // GetAll 获取所有任务
