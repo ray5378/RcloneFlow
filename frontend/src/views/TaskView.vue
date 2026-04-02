@@ -70,7 +70,7 @@ function confirmField(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
     // 空表示使用*代表任意
     createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = '*'
   } else {
-    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = val.join('|')
+    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = val.join(',')
   }
 }
 
