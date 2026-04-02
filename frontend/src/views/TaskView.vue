@@ -698,7 +698,10 @@ function goBackTarget() {
           <strong>{{ run.taskName || `任务 #${run.taskId}` }}</strong>
           <span class="mode-tag" v-if="run.taskMode">{{ run.taskMode }}</span>
         </div>
-        <span :class="['status', getStatusClass(run.status)]">{{ getStatusText(run.status) }}</span>
+        <span 
+          :class="['status', getStatusClass(run.status), 'clickable']"
+          @click="showRunDetail(run)"
+        >{{ getStatusText(run.status) }}</span>
         <div class="path-full">
           <span class="path-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
         </div>
@@ -1160,6 +1163,8 @@ body.light .item { border-color: #f0f0f0; }
 .status.running { background: #1976d2; color: #fff; }
 .status.success { background: #388e3c; color: #fff; }
 .status.failed { background: #d32f2f; color: #fff; }
+.status.clickable { cursor: pointer; }
+.status.clickable:hover { opacity: 0.8; }
 .time { width: 150px; text-align: right; color: #888; font-size: 13px; }
 .info { width: 120px; color: #888; font-size: 13px; }
 .item-actions { display: flex; gap: 8px; }
