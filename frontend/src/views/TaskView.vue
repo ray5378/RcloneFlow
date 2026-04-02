@@ -429,7 +429,7 @@ function goBackTarget() {
         </div>
         <div class="tile-actions">
           <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
-            {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 暂停' : '▶ 启用' }}
+            {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭定时' : '▶ 开启定时' }}
           </button>
           <button class="ghost small" @click.stop="runTask(task.id)">▶ 执行</button>
           <button class="ghost small" @click.stop="editTask(task)">✏️ 修改</button>
