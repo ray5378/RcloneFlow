@@ -53,10 +53,16 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 
 	// 记录运行
 	_, err = s.db.AddRun(store.Run{
-		TaskID:   taskID,
-		RcJobID:  jobID,
-		Status:   "running",
-		Trigger:  trigger,
+		TaskID:       taskID,
+		RcJobID:      jobID,
+		Status:       "running",
+		Trigger:     trigger,
+		TaskName:    t.Name,
+		TaskMode:    t.Mode,
+		SourceRemote: t.SourceRemote,
+		SourcePath:  t.SourcePath,
+		TargetRemote: t.TargetRemote,
+		TargetPath:  t.TargetPath,
 	})
 	return err
 }

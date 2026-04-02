@@ -377,7 +377,8 @@ func (db *DB) ListRuns() ([]Run, error) {
 	defer db.mu.Unlock()
 	
 	rows, err := db.db.Query(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
+		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
 		FROM runs ORDER BY id DESC LIMIT 100`)
 	if err != nil {
 		return nil, err
@@ -422,12 +423,45 @@ func (db *DB) scanRuns(rows *sql.Rows) ([]Run, error) {
 	for rows.Next() {
 		var r Run
 		var summaryJSON string
-		err := rows.Scan(&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt)
+		var finishedAt sql.NullTime
+		var speed sql.NullString
+		var taskName, taskMode, sourceRemote, sourcePath, targetRemote, targetPath sql.NullString
+		var bytesTransferred sql.NullInt64
+		err := rows.Scan(&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
+			&taskName, &taskMode, &sourceRemote, &sourcePath, &targetRemote, &targetPath,
+			&finishedAt, &bytesTransferred, &speed)
 		if err != nil {
 			return nil, err
 		}
 		if err := json.Unmarshal([]byte(summaryJSON), &r.Summary); err != nil {
 			r.Summary = make(map[string]any)
+		}
+		if finishedAt.Valid {
+			r.FinishedAt = &finishedAt.Time
+		}
+		if taskName.Valid {
+			r.TaskName = taskName.String
+		}
+		if taskMode.Valid {
+			r.TaskMode = taskMode.String
+		}
+		if sourceRemote.Valid {
+			r.SourceRemote = sourceRemote.String
+		}
+		if sourcePath.Valid {
+			r.SourcePath = sourcePath.String
+		}
+		if targetRemote.Valid {
+			r.TargetRemote = targetRemote.String
+		}
+		if targetPath.Valid {
+			r.TargetPath = targetPath.String
+		}
+		if bytesTransferred.Valid {
+			r.BytesTransferred = bytesTransferred.Int64
+		}
+		if speed.Valid {
+			r.Speed = speed.String
 		}
 		runs = append(runs, r)
 	}
@@ -444,9 +478,10 @@ func (db *DB) AddRun(r Run) (Run, error) {
 	}
 	
 	result, err := db.db.Exec(`
-		INSERT INTO runs (task_id, rc_job_id, status, trigger, summary, error) 
-		VALUES (?, ?, ?, ?, ?, ?)`,
-		r.TaskID, r.RcJobID, r.Status, r.Trigger, string(summaryJSON), r.Error)
+		INSERT INTO runs (task_id, rc_job_id, status, trigger, summary, error, task_name, task_mode, source_remote, source_path, target_remote, target_path) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.TaskID, r.RcJobID, r.Status, r.Trigger, string(summaryJSON), r.Error,
+		r.TaskName, r.TaskMode, r.SourceRemote, r.SourcePath, r.TargetRemote, r.TargetPath)
 	if err != nil {
 		return Run{}, err
 	}
