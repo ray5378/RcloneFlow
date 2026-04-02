@@ -23,10 +23,10 @@ export interface Run {
   rcJobId: number
   status: string
   trigger: string
-  summary?: Record<string, unknown>
+  summary?: string
   error?: string
-  createdAt: string
-  updatedAt: string
+  startedAt?: string
+  finishedAt?: string
 }
 
 export interface FileItem {
