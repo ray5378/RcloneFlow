@@ -1,16 +1,24 @@
 const API_BASE = ''
 
 interface AuthResponse {
-  token: string
+  accessToken: string
+  refreshToken: string
   user: {
     id: number
     username: string
   }
 }
 
+let isRefreshing = false
+
 async function request(url: string, data?: object): Promise<any> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
+  }
+
+  const token = getToken()
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
   }
 
   const res = await fetch(`${API_BASE}${url}`, {
@@ -18,6 +26,23 @@ async function request(url: string, data?: object): Promise<any> {
     headers,
     body: data ? JSON.stringify(data) : undefined
   })
+
+  // 如果是401且不是刷新请求，尝试刷新token
+  if (res.status === 401 && !url.includes('/auth/') && !isRefreshing) {
+    isRefreshing = true
+    try {
+      await refreshToken()
+      // 重试原请求
+      return request(url, data)
+    } catch {
+      // 刷新失败，登出
+      logout()
+      window.location.reload()
+      throw new Error('登录已过期')
+    } finally {
+      isRefreshing = false
+    }
+  }
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: '请求失败' }))
@@ -27,21 +52,86 @@ async function request(url: string, data?: object): Promise<any> {
   return res.json()
 }
 
+async function refreshToken(): Promise<void> {
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) {
+    throw new Error('No refresh token')
+  }
+
+  const res = await fetch(`${API_BASE}/api/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ refreshToken })
+  })
+
+  if (!res.ok) {
+    logout()
+    throw new Error('Refresh failed')
+  }
+
+  const data = await res.json()
+  setTokens(data.accessToken, data.refreshToken)
+}
+
+export function setTokens(accessToken: string, refreshToken: string) {
+  localStorage.setItem('authToken', accessToken)
+  localStorage.setItem('refreshToken', refreshToken)
+}
+
 export async function login(username: string, password: string): Promise<AuthResponse> {
-  return request('/api/auth/login', { username, password })
+  const res = await fetch(`${API_BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, password })
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: '登录失败' }))
+    throw new Error(error.error || '登录失败')
+  }
+
+  const data = await res.json()
+  setTokens(data.accessToken, data.refreshToken)
+  localStorage.setItem('user', JSON.stringify(data.user))
+  return data
 }
 
 export async function register(username: string, password: string): Promise<AuthResponse> {
-  return request('/api/auth/register', { username, password })
+  const res = await fetch(`${API_BASE}/api/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ username, password })
+  })
+
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({ error: '注册失败' }))
+    throw new Error(error.error || '注册失败')
+  }
+
+  const data = await res.json()
+  setTokens(data.accessToken, data.refreshToken)
+  localStorage.setItem('user', JSON.stringify(data.user))
+  return data
 }
 
 export function logout() {
   localStorage.removeItem('authToken')
+  localStorage.removeItem('refreshToken')
   localStorage.removeItem('user')
 }
 
 export function getToken(): string | null {
   return localStorage.getItem('authToken')
+}
+
+export function getRefreshToken(): string | null {
+  return localStorage.getItem('refreshToken')
 }
 
 export function isLoggedIn(): boolean {

@@ -46,6 +46,7 @@ func (r *Router) Setup(mux *http.ServeMux) {
 
 	// 认证相关（公开）
 	mux.HandleFunc("/api/auth/login", r.authCtrl.Login)
+	mux.HandleFunc("/api/auth/refresh", r.authCtrl.Refresh)
 
 	// 需要认证的API路由
 	apiMux := http.NewServeMux()

@@ -66,8 +66,8 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 生成token
-	token, err := auth.GenerateToken(user.ID, user.Username)
+	// 生成token对
+	tokens, err := auth.GenerateTokenPair(user.ID, user.Username)
 	if err != nil {
 		http.Error(w, `{"error":"生成token失败"}`, http.StatusInternalServerError)
 		return
@@ -75,7 +75,8 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"token": token,
+		"accessToken":  tokens.AccessToken,
+		"refreshToken": tokens.RefreshToken,
 		"user": map[string]any{
 			"id":       user.ID,
 			"username": user.Username,
@@ -109,8 +110,8 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 生成token
-	token, err := auth.GenerateToken(user.ID, user.Username)
+	// 生成token对
+	tokens, err := auth.GenerateTokenPair(user.ID, user.Username)
 	if err != nil {
 		http.Error(w, `{"error":"生成token失败"}`, http.StatusInternalServerError)
 		return
@@ -118,11 +119,44 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"token": token,
+		"accessToken":  tokens.AccessToken,
+		"refreshToken": tokens.RefreshToken,
 		"user": map[string]any{
 			"id":       user.ID,
 			"username": user.Username,
 		},
+	})
+}
+
+// RefreshRequest 刷新令牌请求
+type RefreshRequest struct {
+	RefreshToken string `json:"refreshToken"`
+}
+
+// Refresh 刷新令牌
+func (c *AuthController) Refresh(w http.ResponseWriter, r *http.Request) {
+	var req RefreshRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"无效的请求格式"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.RefreshToken == "" {
+		http.Error(w, `{"error":"refreshToken不能为空"}`, http.StatusBadRequest)
+		return
+	}
+
+	// 使用刷新令牌获取新的令牌对
+	tokens, err := auth.RefreshTokens(req.RefreshToken)
+	if err != nil {
+		http.Error(w, `{"error":"refreshToken无效或已过期"}`, http.StatusUnauthorized)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"accessToken":  tokens.AccessToken,
+		"refreshToken": tokens.RefreshToken,
 	})
 }
 
