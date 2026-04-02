@@ -713,23 +713,6 @@ function goBackTarget() {
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>
     </div>
 
-    <!-- 确认删除弹窗 -->
-    <div v-if="confirmModal.show" class="modal-overlay" @click.self="confirmModal.show = false">
-      <div class="modal-content confirm-modal">
-        <div class="modal-header">
-          <h3>{{ confirmModal.title }}</h3>
-          <button class="close-btn" @click="confirmModal.show = false">×</button>
-        </div>
-        <div class="modal-body">
-          <p>{{ confirmModal.message }}</p>
-        </div>
-        <div class="modal-footer">
-          <button class="ghost" @click="confirmModal.show = false">取消</button>
-          <button class="primary danger" @click="confirmModal.show = false; confirmModal.onConfirm()">确认</button>
-        </div>
-      </div>
-    </div>
-
     <!-- 运行详情弹窗 -->
     <div v-if="showDetailModal" class="modal-overlay" @click.self="showDetailModal = false">
       <div class="modal-content">
@@ -1108,6 +1091,23 @@ function goBackTarget() {
           <template v-else-if="editingTask">保存修改</template>
           <template v-else>创建任务</template>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认删除弹窗 -->
+  <div v-if="confirmModal.show" class="modal-overlay" @click.self="confirmModal.show = false">
+    <div class="modal-content confirm-modal">
+      <div class="modal-header">
+        <h3>{{ confirmModal.title }}</h3>
+        <button class="close-btn" @click="confirmModal.show = false">×</button>
+      </div>
+      <div class="modal-body">
+        <p>{{ confirmModal.message }}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" @click="confirmModal.show = false">取消</button>
+        <button class="primary danger" @click="confirmModal.show = false; confirmModal.onConfirm()">确认</button>
       </div>
     </div>
   </div>
