@@ -20,6 +20,7 @@ type RunServiceInterface interface {
 	ListRuns() ([]RunRecord, error)
 	ListActiveRuns() ([]RunRecord, error)
 	UpdateRun(id int64, updateFn func(*RunRecord))
+	DeleteRun(id int64) error
 }
 
 // RunService 运行记录服务层
@@ -53,4 +54,8 @@ func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
 			r.Status = "failed"
 		}
 	})
+}
+
+func (s *RunService) DeleteRun(id int64) error {
+	return s.db.DeleteRun(id)
 }

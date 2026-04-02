@@ -96,3 +96,8 @@ func (a *storeRunAdapter) UpdateRun(id int64, updateFn func(*RunRecord)) {
 		r.Error = record.Error
 	})
 }
+
+// DeleteRun 删除运行记录
+func (a *storeRunAdapter) DeleteRun(id int64) error {
+	return a.db.DeleteRun(id)
+}

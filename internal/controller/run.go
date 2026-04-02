@@ -36,6 +36,18 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 // HandleRunStatus 处理运行状态查询
 func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/api/runs/"), 10, 64)
+	
+	// DELETE 请求
+	if r.Method == http.MethodDelete {
+		if err := c.runSvc.DeleteRun(id); err != nil {
+			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			return
+		}
+		WriteJSON(w, 200, map[string]any{"deleted": true})
+		return
+	}
+	
+	// GET 请求
 	runs, err := c.runSvc.ListRuns()
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
