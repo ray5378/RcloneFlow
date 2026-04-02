@@ -43,6 +43,28 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, 200, runs)
 }
 
+// HandleRunsByTask 处理按任务ID删除历史记录
+func (c *RunController) HandleRunsByTask(w http.ResponseWriter, r *http.Request) {
+	taskId, _ := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/api/runs/task/"), 10, 64)
+
+	if r.Method == http.MethodDelete {
+		if err := c.runSvc.DeleteRunsByTask(taskId); err != nil {
+			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			return
+		}
+		WriteJSON(w, 200, map[string]any{"deleted": true})
+		return
+	}
+
+	// GET 请求 - 获取该任务的历史记录
+	runs, err := c.runSvc.ListRunsByTask(taskId)
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+	WriteJSON(w, 200, runs)
+}
+
 // HandleRunStatus 处理运行状态查询
 func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/api/runs/"), 10, 64)

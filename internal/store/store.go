@@ -305,6 +305,14 @@ func (db *DB) DeleteAllRuns() error {
 	return err
 }
 
+func (db *DB) DeleteRunsByTask(taskId int64) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec("DELETE FROM runs WHERE task_id = ?", taskId)
+	return err
+}
+
 // ===== Schedules =====
 
 func (db *DB) ListSchedules() ([]Schedule, error) {

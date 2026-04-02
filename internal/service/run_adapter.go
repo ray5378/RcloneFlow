@@ -66,6 +66,41 @@ func (a *storeRunAdapter) ListRuns() ([]RunRecord, error) {
 	return result, nil
 }
 
+func (a *storeRunAdapter) ListRunsByTask(taskId int64) ([]RunRecord, error) {
+	runs, err := a.db.ListRunsByTask(taskId)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]RunRecord, len(runs))
+	for i, r := range runs {
+		summaryStr := ""
+		if r.Summary != nil {
+			bs, _ := json.Marshal(r.Summary)
+			summaryStr = string(bs)
+		}
+		result[i] = RunRecord{
+			ID:               r.ID,
+			TaskID:           r.TaskID,
+			RcJobID:          r.RcJobID,
+			Status:           r.Status,
+			Trigger:         r.Trigger,
+			StartedAt:        formatTime(r.CreatedAt),
+			FinishedAt:       formatOptTime(r.FinishedAt),
+			TaskName:         r.TaskName,
+			TaskMode:         r.TaskMode,
+			SourceRemote:     r.SourceRemote,
+			SourcePath:       r.SourcePath,
+			TargetRemote:     r.TargetRemote,
+			TargetPath:       r.TargetPath,
+			BytesTransferred: r.BytesTransferred,
+			Speed:            r.Speed,
+			Error:            r.Error,
+			Summary:          summaryStr,
+		}
+	}
+	return result, nil
+}
+
 // ListActiveRuns 获取所有运行中的任务
 func (a *storeRunAdapter) ListActiveRuns() ([]RunRecord, error) {
 	runs, err := a.db.ListActiveRuns()
@@ -152,4 +187,8 @@ func (a *storeRunAdapter) DeleteRun(id int64) error {
 
 func (a *storeRunAdapter) DeleteAllRuns() error {
 	return a.db.DeleteAllRuns()
+}
+
+func (a *storeRunAdapter) DeleteRunsByTask(taskId int64) error {
+	return a.db.DeleteRunsByTask(taskId)
 }

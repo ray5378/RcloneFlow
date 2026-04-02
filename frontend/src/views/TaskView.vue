@@ -425,9 +425,13 @@ async function clearRun(id: number) {
 }
 
 async function clearAllRuns() {
-  if (!confirm('确定删除所有历史记录？此操作不可恢复！')) return
+  if (historyFilterTaskId.value === null) {
+    alert('请先选择任务')
+    return
+  }
+  if (!confirm('确定删除该任务所有历史记录？此操作不可恢复！')) return
   try {
-    await api.clearAllRuns()
+    await api.clearRunsByTask(historyFilterTaskId.value)
     await loadData()
   } catch (e) {
     alert((e as Error).message)
@@ -626,7 +630,7 @@ function goBackTarget() {
     <div class="card-header">
       <div class="title">历史记录</div>
       <div class="header-actions">
-        <button v-if="filteredRuns.length > 0" class="ghost small danger-text" @click="clearAllRuns">删除所有</button>
+        <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click="clearAllRuns">删除所有</button>
         <button v-if="historyFilterTaskId !== null" class="ghost small" @click="currentModule = 'tasks'">
           ← 返回
         </button>

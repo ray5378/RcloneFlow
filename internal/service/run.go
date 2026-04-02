@@ -26,10 +26,12 @@ type RunRecord struct {
 // RunServiceInterface 运行记录服务接口
 type RunServiceInterface interface {
 	ListRuns() ([]RunRecord, error)
+	ListRunsByTask(taskId int64) ([]RunRecord, error)
 	ListActiveRuns() ([]RunRecord, error)
 	UpdateRun(id int64, updateFn func(*RunRecord))
 	DeleteRun(id int64) error
 	DeleteAllRuns() error
+	DeleteRunsByTask(taskId int64) error
 }
 
 // RunService 运行记录服务层
@@ -45,6 +47,10 @@ func NewRunService(db RunServiceInterface) *RunService {
 // ListRuns 获取所有运行记录
 func (s *RunService) ListRuns() ([]RunRecord, error) {
 	return s.db.ListRuns()
+}
+
+func (s *RunService) ListRunsByTask(taskId int64) ([]RunRecord, error) {
+	return s.db.ListRunsByTask(taskId)
 }
 
 // ListActiveRuns 获取所有运行中的任务
@@ -71,4 +77,8 @@ func (s *RunService) DeleteRun(id int64) error {
 
 func (s *RunService) DeleteAllRuns() error {
 	return s.db.DeleteAllRuns()
+}
+
+func (s *RunService) DeleteRunsByTask(taskId int64) error {
+	return s.db.DeleteRunsByTask(taskId)
 }
