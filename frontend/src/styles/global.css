@@ -1446,3 +1446,48 @@ body.light ::-webkit-scrollbar-thumb {
 body.light ::-webkit-scrollbar-thumb:hover {
   background: #bbb;
 }
+
+/* 确认弹窗 */
+.confirm-modal .modal-body {
+  display: block !important;
+  padding: 16px 0;
+}
+
+.confirm-modal .modal-body p {
+  margin: 0;
+  font-size: 14px;
+  color: #ccc;
+  line-height: 1.6;
+}
+
+body.light .confirm-modal .modal-body p {
+  color: #666;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding-top: 16px;
+  border-top: 1px solid #333;
+}
+
+body.light .modal-footer {
+  border-top-color: #eee;
+}
+
+.modal-footer button {
+  padding: 8px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.modal-footer button.danger {
+  background: #d32f2f;
+  border-color: #d32f2f;
+  color: #fff;
+}
+
+.modal-footer button.danger:hover {
+  background: #f44336;
+}

@@ -27,6 +27,12 @@ const showDetailModal = ref(false)
 const runDetail = ref<any>({})
 const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
+const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
+  show: false,
+  title: '',
+  message: '',
+  onConfirm: () => {}
+})
 
 const createForm = ref({
   name: '',
@@ -334,15 +340,20 @@ function getParentPath(path: string): string {
   return parts.join('/')
 }
 
+function showConfirm(title: string, message: string, onConfirm: () => void) {
+  confirmModal.value = { show: true, title, message, onConfirm }
+}
+
 async function deleteTask(id: number) {
-  if (!confirm('确定删除此任务？')) return
-  try {
-    await api.deleteTask(id)
-    openMenuId.value = null
-    await loadData()
-  } catch (e) {
-    alert((e as Error).message)
-  }
+  showConfirm('删除任务', '确定删除此任务？此操作不可恢复！', async () => {
+    try {
+      await api.deleteTask(id)
+      openMenuId.value = null
+      await loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  })
 }
 
 function getScheduleByTaskId(taskId: number) {
@@ -444,7 +455,6 @@ function formatBytes(bytes: number): string {
 }
 
 async function clearRun(id: number) {
-  if (!confirm('确定清除此记录？')) return
   try {
     await api.clearRun(id)
     await loadData()
@@ -458,13 +468,14 @@ async function clearAllRuns() {
     alert('请先选择任务')
     return
   }
-  if (!confirm('确定删除该任务所有历史记录？此操作不可恢复！')) return
-  try {
-    await api.clearRunsByTask(historyFilterTaskId.value)
-    await loadData()
-  } catch (e) {
-    alert((e as Error).message)
-  }
+  showConfirm('删除所有历史', '确定删除该任务所有历史记录？此操作不可恢复！', async () => {
+    try {
+      await api.clearRunsByTask(historyFilterTaskId.value)
+      await loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  })
 }
 
 function onSourceRemoteChange() {
@@ -697,6 +708,23 @@ function goBackTarget() {
         <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
       </div>
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>
+    </div>
+
+    <!-- 确认删除弹窗 -->
+    <div v-if="confirmModal.show" class="modal-overlay" @click.self="confirmModal.show = false">
+      <div class="modal-content confirm-modal">
+        <div class="modal-header">
+          <h3>{{ confirmModal.title }}</h3>
+          <button class="close-btn" @click="confirmModal.show = false">×</button>
+        </div>
+        <div class="modal-body">
+          <p>{{ confirmModal.message }}</p>
+        </div>
+        <div class="modal-footer">
+          <button class="ghost" @click="confirmModal.show = false">取消</button>
+          <button class="primary danger" @click="() => { confirmModal.onConfirm(); confirmModal.show = false }">确认</button>
+        </div>
+      </div>
     </div>
 
     <!-- 运行详情弹窗 -->
