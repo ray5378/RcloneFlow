@@ -17,6 +17,13 @@ const createForm = ref({
   sourcePath: '',
   targetRemote: '',
   targetPath: '',
+  enableSchedule: false,
+  scheduleYear: '*',     // * = 每年, 或 "2026,2027"
+  scheduleMonth: '*',     // * = 每月, 或 "1,3,5"
+  scheduleWeek: '',      // 空 = 不设置, 或 "1,3,5" (周一三五)
+  scheduleDay: '',       // 空 = 不设置, 或 "1,15,28"
+  scheduleHour: '00',   // "00,12,18"
+  scheduleMinute: '00', // "00,30,59"
 })
 
 const openMenuId = ref<number | null>(null)
@@ -28,6 +35,31 @@ const showSourcePathInput = ref(false)
 const showTargetPathInput = ref(false)
 const sourceCurrentPath = ref('')
 const targetCurrentPath = ref('')
+
+// 定时选项
+const hourOptions = Array.from({length: 24}, (_, i) => ({ value: String(i).padStart(2,'0'), label: String(i).padStart(2,'0')+'时' }))
+const minuteOptions = Array.from({length: 60}, (_, i) => ({ value: String(i).padStart(2,'0'), label: String(i).padStart(2,'0')+'分' }))
+
+// 临时选择状态
+const tempSchedule = ref({
+  year: [] as string[],
+  month: [] as string[],
+  week: [] as string[],
+  day: [] as string[],
+  hour: [] as string[],
+  minute: [] as string[],
+})
+
+// 确认选择
+function confirmField(field: 'year' | 'month' | 'week' | 'day' | 'hour' | 'minute') {
+  const val = tempSchedule.value[field]
+  if (val.length === 0) {
+    // 空表示不设置(周/日)或每年/每月(年/月)
+    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = field === 'year' || field === 'month' ? '*' : ''
+  } else {
+    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = val.join(',')
+  }
+}
 
 onMounted(async () => {
   await loadData()
@@ -485,6 +517,79 @@ function goBackTarget() {
         </div>
         <input v-if="showTargetPathInput" v-model="createForm.targetPath" type="text" placeholder="手动输入路径" style="margin-top: 8px" />
       </div>
+
+      <!-- 定时任务设置 -->
+      <div class="schedule-section">
+        <label class="schedule-toggle">
+          <input type="checkbox" v-model="createForm.enableSchedule" />
+          <span>启用定时任务</span>
+        </label>
+        <div v-if="createForm.enableSchedule" class="schedule-grid">
+          <!-- 年 -->
+          <div class="schedule-item">
+            <label>年</label>
+            <select v-model="tempSchedule.year" multiple size="6" @dblclick="confirmField('year')">
+              <option value="*">每年</option>
+              <option v-for="y in [2026,2027,2028,2029,2030]" :key="y" :value="String(y)">{{ y }}</option>
+            </select>
+            <button type="button" class="ghost small" @click="confirmField('year')">确定</button>
+            <span class="selected-val">{{ createForm.scheduleYear === '*' ? '每年' : (createForm.scheduleYear || '每年') }}</span>
+          </div>
+          <!-- 月 -->
+          <div class="schedule-item">
+            <label>月</label>
+            <select v-model="tempSchedule.month" multiple size="6" @dblclick="confirmField('month')">
+              <option value="*">每月</option>
+              <option v-for="m in [1,2,3,4,5,6,7,8,9,10,11,12]" :key="m" :value="String(m)">{{ m }}月</option>
+            </select>
+            <button type="button" class="ghost small" @click="confirmField('month')">确定</button>
+            <span class="selected-val">{{ createForm.scheduleMonth === '*' ? '每月' : (createForm.scheduleMonth || '每月') }}</span>
+          </div>
+          <!-- 周 -->
+          <div class="schedule-item">
+            <label>周</label>
+            <select v-model="tempSchedule.week" multiple size="6" @dblclick="confirmField('week')">
+              <option value="*">每日</option>
+              <option value="">不设置</option>
+              <option v-for="(w, idx) in ['周一','周二','周三','周四','周五','周六','周日']" :key="w" :value="String(idx+1)">{{ w }}</option>
+            </select>
+            <button type="button" class="ghost small" @click="confirmField('week')">确定</button>
+            <span class="selected-val">{{ createForm.scheduleWeek === '*' ? '每日' : (createForm.scheduleWeek || '不设置') }}</span>
+          </div>
+          <!-- 日 -->
+          <div class="schedule-item">
+            <label>日</label>
+            <select v-model="tempSchedule.day" multiple size="6" @dblclick="confirmField('day')">
+              <option value="*">每日</option>
+              <option value="">不设置</option>
+              <option v-for="d in 31" :key="d" :value="String(d)">{{ d }}日</option>
+            </select>
+            <button type="button" class="ghost small" @click="confirmField('day')">确定</button>
+            <span class="selected-val">{{ createForm.scheduleDay === '*' ? '每日' : (createForm.scheduleDay || '不设置') }}</span>
+          </div>
+          <!-- 时 -->
+          <div class="schedule-item">
+            <label>时</label>
+            <select v-model="tempSchedule.hour" multiple size="6" @dblclick="confirmField('hour')">
+              <option value="*">每时</option>
+              <option v-for="h in 24" :key="h-1" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}时</option>
+            </select>
+            <button type="button" class="ghost small" @click="confirmField('hour')">确定</button>
+            <span class="selected-val">{{ createForm.scheduleHour === '*' ? '每时' : (createForm.scheduleHour || '00') + '时' }}</span>
+          </div>
+          <!-- 分 -->
+          <div class="schedule-item">
+            <label>分</label>
+            <select v-model="tempSchedule.minute" multiple size="6" @dblclick="confirmField('minute')">
+              <option value="*">每分</option>
+              <option v-for="m in 60" :key="m-1" :value="String(m-1).padStart(2,'0')">{{ String(m-1).padStart(2,'0') }}分</option>
+            </select>
+            <button type="button" class="ghost small" @click="confirmField('minute')">确定</button>
+            <span class="selected-val">{{ createForm.scheduleMinute === '*' ? '每分' : (createForm.scheduleMinute || '00') + '分' }}</span>
+          </div>
+        </div>
+      </div>
+
       <div class="form-actions">
         <button class="primary" @click="createTask">创建任务</button>
       </div>
@@ -583,8 +688,21 @@ body.light .path-bar { background: #f5f5f5; border-color: #ddd; }
 body.light .path-item { color: #333; }
 .path-item:hover { background: #333; }
 body.light .path-item:hover { background: #f0f0f0; }
-.folder-icon { margin-right: 4px; }
+.folder-icon { margin-right: 4px; cursor: pointer; }
 .file-icon { margin-right: 4px; }
+
+/* Schedule Section */
+.schedule-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #333; }
+body.light .schedule-section { border-top-color: #ddd; }
+.schedule-toggle { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; margin-bottom: 12px; }
+.schedule-toggle input { width: 16px; height: 16px; }
+.schedule-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }
+.schedule-item { display: flex; flex-direction: column; gap: 4px; }
+.schedule-item label { font-size: 12px; color: #888; font-weight: 600; }
+.schedule-item select { padding: 4px; border-radius: 4px; background: #2a2a2a; color: #fff; border: 1px solid #444; font-size: 12px; height: 150px; resize: none; }
+body.light .schedule-item select { background: #fff; color: #333; border-color: #ccc; }
+.schedule-item select option { padding: 2px 4px; }
+.selected-val { font-size: 11px; color: #4caf50; min-height: 14px; word-break: break-all; }
 .file-icon { font-size: 12px; }
 .item-name { flex: 1; }
 .path-item.is-dir .item-name { color: #64b5f6; font-weight: 500; }
