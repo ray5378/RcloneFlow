@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
 import * as api from './api'
 
 const currentPage = ref('browser')
+const taskViewKey = ref(0)
 const version = ref('加载中...')
 const isLight = ref(localStorage.getItem('theme') === 'light')
 
@@ -15,6 +16,10 @@ const pages = {
 
 function switchPage(page: string) {
   currentPage.value = page
+  if (page === 'tasks') {
+    // 切换到任务管理时重置视图
+    taskViewKey.value++
+  }
 }
 
 function toggleTheme() {
@@ -64,7 +69,7 @@ onMounted(async () => {
     <!-- Main Content -->
     <main class="main">
       <BrowserView v-if="currentPage === 'browser'" :version="version" />
-      <TaskView v-if="currentPage === 'tasks'" />
+      <TaskView v-if="currentPage === 'tasks'" :key="taskViewKey" />
     </main>
   </div>
 </template>
