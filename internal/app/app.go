@@ -14,6 +14,7 @@ import (
 	"rcloneflow/internal/store"
 
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // Run 启动服务器
@@ -36,6 +37,9 @@ func Run(cfg *config.Config) error {
 		logger.Error("数据库初始化失败", zap.Error(err))
 		return err
 	}
+
+	// 创建默认管理员账户
+	createDefaultAdmin(db)
 
 	// 初始化rclone客户端
 	rc := rclone.NewFromEnv()
@@ -95,4 +99,38 @@ func withCORS(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// createDefaultAdmin 创建默认管理员账户
+func createDefaultAdmin(db *store.DB) {
+	// 检查是否已存在admin用户，如果存在则重置密码
+	if user, exists := db.GetUserByUsername("admin"); exists {
+		// 重置为默认密码 admin
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+		if err != nil {
+			logger.Error("重置管理员密码失败", zap.Error(err))
+			return
+		}
+		if err := db.UpdatePassword(user.ID, string(hashedPassword)); err != nil {
+			logger.Error("重置管理员密码失败", zap.Error(err))
+			return
+		}
+		logger.Info("已重置管理员密码: admin / admin")
+		return
+	}
+
+	// 创建默认管理员
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
+	if err != nil {
+		logger.Error("创建默认管理员密码失败", zap.Error(err))
+		return
+	}
+
+	_, err = db.CreateUser("admin", string(hashedPassword))
+	if err != nil {
+		logger.Error("创建默认管理员账户失败", zap.Error(err))
+		return
+	}
+
+	logger.Info("已创建默认管理员账户: admin / admin")
 }
