@@ -496,7 +496,7 @@ function goBackTarget() {
 .module-tabs {
   display: flex;
   gap: 8px;
-  padding: 0 20px 16px;
+  padding: 16px 20px;
 }
 .tab-btn {
   padding: 10px 24px;

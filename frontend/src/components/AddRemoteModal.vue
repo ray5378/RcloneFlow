@@ -86,17 +86,24 @@ function selectProvider(provider: Provider) {
   step.value = 1
   remoteOptions.value = {}
   
-  // Set default values using DefaultStr (string representation)
+  // Set default values from API response
+  // Handle both Default (number) and DefaultStr (string)
   for (const opt of providerOptions.value) {
+    // Priority: DefaultStr > Default
     if (opt.DefaultStr && opt.DefaultStr !== '') {
       remoteOptions.value[opt.Name] = opt.DefaultStr
+    } else if (opt.Default !== undefined && opt.Default !== null && opt.Default !== '') {
+      remoteOptions.value[opt.Name] = String(opt.Default)
     }
   }
   
   // SMB 存储特殊默认配置
   if (provider.Name === 'smb') {
-    remoteOptions.value['idle_timeout'] = '0s'
-    remoteOptions.value['encoding'] = 'None'
+    remoteOptions.value['use_kerberos'] = 'false'
+    remoteOptions.value['idle_timeout'] = '1m0s'
+    remoteOptions.value['hide_special_share'] = 'true'
+    remoteOptions.value['case_insensitive'] = 'true'
+    remoteOptions.value['encoding'] = 'Slash,LtGt,DoubleQuote,Question,Asterisk,Pipe,BackSlash,Ctl,RightSpace,RightPeriod,InvalidUtf8,Dot'
   }
 }
 
