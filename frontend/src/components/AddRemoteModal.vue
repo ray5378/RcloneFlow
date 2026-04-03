@@ -86,16 +86,10 @@ function selectProvider(provider: Provider) {
   step.value = 1
   remoteOptions.value = {}
   
-  // Set default values from API response
-  // Handle both Default (number) and DefaultStr (string)
+  // Set default values from API response (same logic as Angular project)
   for (const opt of providerOptions.value) {
-    if (opt.DefaultStr && opt.DefaultStr !== '') {
-      // Use string default directly
-      remoteOptions.value[opt.Name] = opt.DefaultStr
-    } else if (opt.Default !== undefined && opt.Default !== null && opt.Default !== '') {
-      // Use numeric default - convert to string
-      remoteOptions.value[opt.Name] = String(opt.Default)
-    }
+    // Use DefaultStr as default value (same as Angular's new-backend.component.ts)
+    remoteOptions.value[opt.Name] = opt.DefaultStr || ''
   }
   
   // SMB 存储特殊默认配置（仅设置 API 未提供默认值的选项）
