@@ -137,6 +137,7 @@ func (db *DB) migrate() error {
 					source_path TEXT NOT NULL,
 					target_remote TEXT NOT NULL,
 					target_path TEXT NOT NULL,
+					options TEXT,
 					created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 				);
 				
@@ -146,6 +147,7 @@ func (db *DB) migrate() error {
 					spec TEXT NOT NULL,
 					enabled BOOLEAN DEFAULT 1,
 					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					next_run_time DATETIME,
 					FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 				);
 				
@@ -160,6 +162,14 @@ func (db *DB) migrate() error {
 					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 					updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 					finished_at DATETIME,
+					task_name TEXT,
+					task_mode TEXT,
+					source_remote TEXT,
+					source_path TEXT,
+					target_remote TEXT,
+					target_path TEXT,
+					bytes_transferred INTEGER DEFAULT 0,
+					speed TEXT,
 					FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
 				);
 
@@ -175,22 +185,6 @@ func (db *DB) migrate() error {
 				CREATE INDEX IF NOT EXISTS idx_schedules_task_id ON schedules(task_id);
 			`,
 		},
-		{
-			version: 2,
-			sql: `
-				CREATE TABLE IF NOT EXISTS users (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					username TEXT UNIQUE NOT NULL,
-					password TEXT NOT NULL,
-					created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-				);
-			`,
-		},
-		// 未来迁移可以在这里添加
-		// {
-		//     version: 2,
-		//     sql: `ALTER TABLE tasks ADD COLUMN new_field TEXT`,
-		// },
 	}
 
 	// 获取当前版本
