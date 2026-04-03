@@ -73,7 +73,7 @@ func DefaultConfig() *Config {
 			Output: "stdout",
 		},
 		Sync: SyncConfig{
-			PoolInterval:      5,   // 5秒
+			PoolInterval:      30,   // 30秒
 			ScheduleInterval:   1,   // 1分钟
 		},
 	}
