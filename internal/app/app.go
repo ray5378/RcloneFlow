@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"rcloneflow/internal/config"
 	"rcloneflow/internal/controller"
@@ -74,6 +75,19 @@ func Run(cfg *config.Config) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go jobSync.Start(ctx)
+
+	// 启动历史记录清理服务
+	if cfg.GetCleanupInterval() > 0 && cfg.GetCleanupRetention() > 0 {
+		cleanupSvc := service.NewCleanupService(
+			runSvc,
+			time.Duration(cfg.GetCleanupInterval())*time.Hour,
+			cfg.GetCleanupRetention(),
+		)
+		go cleanupSvc.Start(ctx)
+		logger.Info("历史记录清理服务已启动",
+			zap.Int("interval_hours", cfg.GetCleanupInterval()),
+			zap.Int("retention_days", cfg.GetCleanupRetention()))
+	}
 
 	// 设置路由
 	mux := http.NewServeMux()

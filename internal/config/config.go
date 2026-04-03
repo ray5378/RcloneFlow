@@ -37,8 +37,10 @@ type ServerConfig struct {
 
 // SyncConfig 同步配置
 type SyncConfig struct {
-	PoolInterval   int `yaml:"pool_interval"`    // 任务状态同步间隔（秒）
-	ScheduleInterval int `yaml:"schedule_interval"` // 定时任务检查间隔（分钟）
+	PoolInterval      int `yaml:"pool_interval"`       // 任务状态同步间隔（秒）
+	ScheduleInterval int `yaml:"schedule_interval"`   // 定时任务检查间隔（分钟）
+	CleanupInterval  int `yaml:"cleanup_interval"`    // 历史记录清理间隔（小时），0表示不清理
+	CleanupRetention int `yaml:"cleanup_retention"`   // 历史记录保留天数
 }
 
 // StorageConfig 存储配置
@@ -73,8 +75,10 @@ func DefaultConfig() *Config {
 			Output: "stdout",
 		},
 		Sync: SyncConfig{
-			PoolInterval:      30,   // 30秒
-			ScheduleInterval:   1,   // 1分钟
+			PoolInterval:      30,      // 30秒
+			ScheduleInterval:   1,      // 1分钟
+			CleanupInterval:  24,      // 24小时清理一次
+			CleanupRetention: 30,      // 保留30天
 		},
 	}
 }
@@ -221,6 +225,16 @@ func (c *Config) GetPoolInterval() int {
 // GetScheduleInterval 返回定时任务检查间隔（分钟）
 func (c *Config) GetScheduleInterval() int {
 	return c.Sync.ScheduleInterval
+}
+
+// GetCleanupInterval 返回历史记录清理间隔（小时），0表示不清理
+func (c *Config) GetCleanupInterval() int {
+	return c.Sync.CleanupInterval
+}
+
+// GetCleanupRetention 返回历史记录保留天数
+func (c *Config) GetCleanupRetention() int {
+	return c.Sync.CleanupRetention
 }
 
 // ToEnvMap 转换为环境变量映射（用于传递给子组件）

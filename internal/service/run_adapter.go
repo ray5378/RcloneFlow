@@ -192,3 +192,8 @@ func (a *storeRunAdapter) DeleteAllRuns() error {
 func (a *storeRunAdapter) DeleteRunsByTask(taskId int64) error {
 	return a.db.DeleteRunsByTask(taskId)
 }
+
+// CleanOldRuns 删除指定天数之前的运行记录
+func (a *storeRunAdapter) CleanOldRuns(days int) (int64, error) {
+	return a.db.CleanOldRuns(days)
+}

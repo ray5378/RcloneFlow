@@ -342,6 +342,24 @@ func (db *DB) DeleteRunsByTask(taskId int64) error {
 	return err
 }
 
+// CleanOldRuns 删除指定天数之前的运行记录
+func (db *DB) CleanOldRuns(days int) (int64, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	result, err := db.db.Exec("DELETE FROM runs WHERE created_at < datetime('now', ?)", fmt.Sprintf("-%d days", days))
+	if err != nil {
+		return 0, err
+	}
+	
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	
+	return affected, nil
+}
+
 // ===== Schedules =====
 
 func (db *DB) ListSchedules() ([]Schedule, error) {
