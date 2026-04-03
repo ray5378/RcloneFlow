@@ -88,12 +88,27 @@ function selectProvider(provider: Provider) {
   
   // Set default values from API response
   // Handle both Default (number) and DefaultStr (string)
+  // For numeric defaults, try to find the string representation from Examples
   for (const opt of providerOptions.value) {
-    // Priority: DefaultStr > Default
     if (opt.DefaultStr && opt.DefaultStr !== '') {
       remoteOptions.value[opt.Name] = opt.DefaultStr
     } else if (opt.Default !== undefined && opt.Default !== null && opt.Default !== '') {
-      remoteOptions.value[opt.Name] = String(opt.Default)
+      // Try to convert numeric default to string using Examples
+      const defaultStr = String(opt.Default)
+      let found = false
+      if (opt.Examples && opt.Examples.length > 0) {
+        for (const ex of opt.Examples) {
+          if (String(ex.Value) === defaultStr) {
+            remoteOptions.value[opt.Name] = String(ex.Value)
+            found = true
+            break
+          }
+        }
+      }
+      // If not found in examples, don't set it (leave empty for user to fill)
+      if (!found) {
+        delete remoteOptions.value[opt.Name]
+      }
     }
   }
   
