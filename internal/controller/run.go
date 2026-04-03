@@ -146,3 +146,20 @@ func (c *RunController) HandleGlobalStats(w http.ResponseWriter, r *http.Request
 	}
 	WriteJSON(w, 200, stats)
 }
+
+// HandleJobStatus 处理获取指定 Job 的状态
+func (c *RunController) HandleJobStatus(w http.ResponseWriter, r *http.Request) {
+	jobIdStr := r.PathValue("jobId")
+	jobId, err := strconv.ParseInt(jobIdStr, 10, 64)
+	if err != nil {
+		WriteJSON(w, 400, map[string]any{"error": "invalid job id"})
+		return
+	}
+
+	status, err := c.rc.JobStatus(r.Context(), jobId)
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+	WriteJSON(w, 200, status)
+}

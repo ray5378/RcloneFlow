@@ -29,6 +29,8 @@ const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
 const showGlobalStatsModal = ref(false)
 const globalStats = ref<any>({})
+const showTaskProgressModal = ref(false)
+const taskProgressData = ref<any>({})
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
   title: '',
@@ -1179,6 +1181,47 @@ function goBackTarget() {
         </div>
         <div class="progress-bar-container">
           <div class="progress-bar" :style="{ width: (globalStats.percentage || 0) + '%' }"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 任务实时进度弹窗 -->
+  <div v-if="showTaskProgressModal" class="modal-overlay" @click.self="showTaskProgressModal = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>任务实时进度 - {{ taskProgressData.name }}</h3>
+        <button class="close-btn" @click="showTaskProgressModal = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-item">
+          <label>任务状态：</label>
+          <span :class="taskProgressData.status === 'running' ? 'status-running' : taskProgressData.status === 'finished' ? 'status-success' : 'status-error'">
+            {{ taskProgressData.status === 'running' ? '运行中' : taskProgressData.status === 'finished' ? '已完成' : taskProgressData.status === 'no_runs' ? '无运行记录' : taskProgressData.status === 'error' ? '获取失败' : taskProgressData.status }}
+          </span>
+        </div>
+        <div class="detail-item">
+          <label>进度：</label>
+          <span>{{ taskProgressData.percentage !== undefined ? taskProgressData.percentage.toFixed(2) + '%' : '-' }}</span>
+        </div>
+        <div class="detail-item">
+          <label>当前速度：</label>
+          <span>{{ taskProgressData.speed || '-' }}</span>
+        </div>
+        <div class="detail-item">
+          <label>已传输/总大小：</label>
+          <span>{{ taskProgressData.bytes ? formatBytes(taskProgressData.bytes) : '-' }} / {{ taskProgressData.totalBytes ? formatBytes(taskProgressData.totalBytes) : '-' }}</span>
+        </div>
+        <div class="detail-item">
+          <label>预计剩余时间：</label>
+          <span>{{ taskProgressData.eta || '-' }}</span>
+        </div>
+        <div class="detail-item" v-if="taskProgressData.error">
+          <label>错误信息：</label>
+          <span class="error-text">{{ taskProgressData.error }}</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar" :style="{ width: (taskProgressData.percentage || 0) + '%' }"></div>
         </div>
       </div>
     </div>
