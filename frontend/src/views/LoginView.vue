@@ -49,8 +49,8 @@ const loading = ref(false)
 const error = ref('')
 
 const form = reactive({
-  username: 'admin',
-  password: 'admin'
+  username: '',
+  password: ''
 })
 
 async function handleSubmit() {
