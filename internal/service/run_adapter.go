@@ -202,3 +202,8 @@ func (a *storeRunAdapter) CleanOldRuns(days int) (int64, error) {
 func (a *storeRunAdapter) UpdateRunProgress(id int64, bytesTransferred int64, speed string) error {
 	return a.db.UpdateRunProgress(id, bytesTransferred, speed)
 }
+
+// UpdateRunStatusByJobId 根据 JobID 更新运行状态
+func (a *storeRunAdapter) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error {
+	return a.db.UpdateRunStatusByJobId(jobId, status, errorMsg)
+}

@@ -205,3 +205,10 @@ func (c *Client) CoreStats(ctx context.Context) (map[string]any, error) {
 	err := c.cli.Call(ctx, "core/stats", nil, &resp)
 	return resp, err
 }
+
+// JobStop 停止指定的 Job
+func (c *Client) JobStop(ctx context.Context, jobID int64) error {
+	params := map[string]any{"jobid": jobID}
+	var resp map[string]any
+	return c.cli.Call(ctx, "job/stop", params, &resp)
+}

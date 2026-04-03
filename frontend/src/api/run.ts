@@ -50,6 +50,11 @@ export async function getJobStatus(jobId: number): Promise<JobStatus> {
   return get<JobStatus>(`/api/jobs/${jobId}/status`)
 }
 
+/** 停止任务 Job */
+export async function stopJob(jobId: number): Promise<void> {
+  return get<void>(`/api/jobs/${jobId}/stop`)
+}
+
 /** 全局实时统计 */
 export interface GlobalStats {
   bytes: number        // 已传输字节

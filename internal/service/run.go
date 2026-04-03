@@ -33,6 +33,7 @@ type RunServiceInterface interface {
 	DeleteAllRuns() error
 	DeleteRunsByTask(taskId int64) error
 	CleanOldRuns(days int) (int64, error)
+	UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error
 }
 
 // RunService 运行记录服务层
@@ -87,4 +88,9 @@ func (s *RunService) DeleteRunsByTask(taskId int64) error {
 // CleanOldRuns 删除指定天数之前的运行记录，返回删除的记录数
 func (s *RunService) CleanOldRuns(days int) (int64, error) {
 	return s.db.CleanOldRuns(days)
+}
+
+// UpdateRunStatusByJobId 根据 JobID 更新运行状态
+func (s *RunService) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error {
+	return s.db.UpdateRunStatusByJobId(jobId, status, errorMsg)
 }

@@ -163,3 +163,23 @@ func (c *RunController) HandleJobStatus(w http.ResponseWriter, r *http.Request) 
 	}
 	WriteJSON(w, 200, status)
 }
+
+// HandleJobStop 处理停止指定的 Job
+func (c *RunController) HandleJobStop(w http.ResponseWriter, r *http.Request) {
+	jobIdStr := r.PathValue("jobId")
+	jobId, err := strconv.ParseInt(jobIdStr, 10, 64)
+	if err != nil {
+		WriteJSON(w, 400, map[string]any{"error": "invalid job id"})
+		return
+	}
+
+	if err := c.rc.JobStop(r.Context(), jobId); err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+
+	// 更新数据库中该任务的状态为 stopped
+	c.runSvc.UpdateRunStatusByJobId(jobId, "stopped", "用户手动停止")
+
+	WriteJSON(w, 200, map[string]any{"success": true})
+}
