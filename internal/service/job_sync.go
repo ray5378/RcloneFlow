@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -25,6 +26,7 @@ type JobSyncService struct {
 type JobStatusProvider interface {
 	ListRunningRuns() ([]store.JobStatus, error)
 	UpdateRunStatus(id int64, status, errorMsg string, summary map[string]any) error
+	UpdateRunProgress(id int64, bytesTransferred int64, speed string) error
 }
 
 // NewJobSyncService 创建任务同步服务
@@ -79,9 +81,39 @@ func (s *JobSyncService) syncRunningJobs() {
 
 	logger.Debug("发现运行中的任务", zap.Int("count", len(runs)))
 
+	// 获取全局统计信息（包含当前传输进度）
+	stats, err := s.rc.CoreStats(context.Background())
+	if err != nil {
+		logger.Debug("获取rclone统计信息失败", zap.Error(err))
+	}
+
+	// 解析全局统计
+	var totalBytes, bytes int64
+	var speed string
+	if stats != nil {
+		if b, ok := stats["bytes"].(float64); ok {
+			bytes = int64(b)
+		}
+		if tb, ok := stats["totalBytes"].(float64); ok {
+			totalBytes = int64(tb)
+		}
+		if sp, ok := stats["speed"].(float64); ok {
+			speed = formatSpeed(int64(sp))
+		}
+	}
+
 	for _, run := range runs {
 		if run.RcJobID <= 0 {
 			continue
+		}
+
+		// 更新传输进度（即使任务状态没变）
+		if bytes > 0 || totalBytes > 0 {
+			if err := s.db.UpdateRunProgress(run.ID, bytes, speed); err != nil {
+				logger.Debug("更新任务进度失败",
+					zap.Int64("run_id", run.ID),
+					zap.Error(err))
+			}
 		}
 
 		// 调用 rclone job API 获取任务状态
@@ -108,7 +140,7 @@ func (s *JobSyncService) syncRunningJobs() {
 		// 解析 rclone 返回的状态
 		newStatus := "running"
 		errorMsg := ""
-		
+
 		if finished, ok := status["finished"].(bool); ok && finished {
 			newStatus = "finished"
 		}
@@ -134,4 +166,21 @@ func (s *JobSyncService) syncRunningJobs() {
 			}
 		}
 	}
+}
+
+// formatSpeed 格式化速度为可读字符串
+func formatSpeed(bytesPerSec int64) string {
+	if bytesPerSec <= 0 {
+		return "0 B/s"
+	}
+	const unit = 1024
+	if bytesPerSec < unit {
+		return fmt.Sprintf("%d B/s", bytesPerSec)
+	}
+	div, exp := int64(unit), 0
+	for n := bytesPerSec / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f %cB/s", float64(bytesPerSec)/float64(div), "KMGTPE"[exp])
 }

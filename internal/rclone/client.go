@@ -198,3 +198,10 @@ func (c *Client) RunTask(ctx context.Context, taskID int64, mode, srcRemote, src
 	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
 	return c.cli.StartJob(ctx, mode, src, dst, opts)
 }
+
+// CoreStats 获取 rclone 核心统计信息
+func (c *Client) CoreStats(ctx context.Context) (map[string]any, error) {
+	var resp map[string]any
+	err := c.cli.Call(ctx, "core/stats", nil, &resp)
+	return resp, err
+}

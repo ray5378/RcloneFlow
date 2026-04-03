@@ -663,6 +663,18 @@ func (db *DB) UpdateRunStatus(id int64, status, errorMsg string, summary map[str
 	return err
 }
 
+// UpdateRunProgress 更新运行进度（bytes和speed）
+func (db *DB) UpdateRunProgress(id int64, bytesTransferred int64, speed string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	_, err := db.db.Exec(`
+		UPDATE runs SET bytes_transferred = ?, speed = ?, updated_at = ?
+		WHERE id = ?`,
+		bytesTransferred, speed, time.Now(), id)
+	return err
+}
+
 // ===== 用户相关操作 =====
 
 // CreateUser 创建用户

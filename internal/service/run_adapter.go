@@ -197,3 +197,8 @@ func (a *storeRunAdapter) DeleteRunsByTask(taskId int64) error {
 func (a *storeRunAdapter) CleanOldRuns(days int) (int64, error) {
 	return a.db.CleanOldRuns(days)
 }
+
+// UpdateRunProgress 更新运行进度（bytes和speed）
+func (a *storeRunAdapter) UpdateRunProgress(id int64, bytesTransferred int64, speed string) error {
+	return a.db.UpdateRunProgress(id, bytesTransferred, speed)
+}
