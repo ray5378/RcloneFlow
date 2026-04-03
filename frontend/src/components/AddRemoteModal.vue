@@ -97,13 +97,12 @@ function selectProvider(provider: Provider) {
     }
   }
   
-  // SMB 存储特殊默认配置
+  // SMB 存储特殊默认配置（仅设置 API 未提供默认值的选项）
   if (provider.Name === 'smb') {
-    remoteOptions.value['use_kerberos'] = 'false'
-    remoteOptions.value['idle_timeout'] = '1m0s'
-    remoteOptions.value['hide_special_share'] = 'true'
-    remoteOptions.value['case_insensitive'] = 'true'
-    remoteOptions.value['encoding'] = 'Slash,LtGt,DoubleQuote,Question,Asterisk,Pipe,BackSlash,Ctl,RightSpace,RightPeriod,InvalidUtf8,Dot'
+    // encoding 需要明确设置以支持中文路径
+    if (!remoteOptions.value['encoding']) {
+      remoteOptions.value['encoding'] = 'Slash,LtGt,DoubleQuote,Question,Asterisk,Pipe,BackSlash,Ctl,RightSpace,RightPeriod,InvalidUtf8,Dot'
+    }
   }
 }
 
