@@ -196,6 +196,7 @@ export interface ProviderOption {
   Hide: 0 | 2 | 3
   Advanced: boolean
   DefaultStr: string
+  ValueStr?: string
   Examples?: ProviderExample[]
 }
 

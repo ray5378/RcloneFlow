@@ -28,7 +28,7 @@ let redirectTimer: number | null = null
  * 处理401未授权
  */
 function handleUnauthorized() {
-  // 防抖：5秒内只提示一次
+  // 防抖：5秒内只处理一次
   if (redirectTimer) return
   
   redirectCount++
@@ -38,7 +38,13 @@ function handleUnauthorized() {
   }, 5000)
   
   if (redirectCount <= 1) {
-    showErrorToast('登录已过期，请刷新页面重新登录', 5000)
+    // 清除本地存储的认证信息
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('user')
+    
+    // 强制跳转到登录页
+    window.location.href = '/'
   }
 }
 

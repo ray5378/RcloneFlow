@@ -260,6 +260,8 @@ type OptionBlock struct {
 	Provider   string      `json:"Provider,omitempty"`
 	Default    any         `json:"Default"`
 	Value      any         `json:"Value,omitempty"`
+	DefaultStr string      `json:"DefaultStr,omitempty"`
+	ValueStr   string      `json:"ValueStr,omitempty"`
 	Examples   []Example   `json:"Examples,omitempty"`
 	ShortOpt   string      `json:"ShortOpt,omitempty"`
 	Hide       int         `json:"Hide"`
