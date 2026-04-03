@@ -136,3 +136,13 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 
 	WriteJSON(w, 200, activeRuns)
 }
+
+// HandleGlobalStats 处理获取全局实时统计信息
+func (c *RunController) HandleGlobalStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := c.rc.CoreStats(r.Context())
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+	WriteJSON(w, 200, stats)
+}

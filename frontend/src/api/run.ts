@@ -40,6 +40,21 @@ export async function getActiveRuns(): Promise<ActiveRun[]> {
   return get<ActiveRun[]>('/api/runs/active')
 }
 
+/** 获取全局实时统计信息 */
+export async function getGlobalStats(): Promise<GlobalStats> {
+  return get<GlobalStats>('/api/stats/global')
+}
+
+/** 全局实时统计 */
+export interface GlobalStats {
+  bytes: number        // 已传输字节
+  totalBytes: number   // 总字节
+  speed: number        // 当前速度 (bytes/s)
+  speedAvg: number     // 平均速度 (bytes/s)
+  eta: number | null  // 预计剩余时间 (秒)
+  percentage: number  // 进度百分比 (0-100)
+}
+
 /** 运行中任务的实时状态 */
 export interface ActiveRun {
   runRecord: {

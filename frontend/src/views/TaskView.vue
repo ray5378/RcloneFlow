@@ -27,6 +27,8 @@ const showDetailModal = ref(false)
 const runDetail = ref<any>({})
 const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
+const showGlobalStatsModal = ref(false)
+const globalStats = ref<any>({})
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
   title: '',
@@ -105,6 +107,22 @@ async function loadData() {
   } catch (e) {
     console.error(e)
   }
+}
+
+// 加载全局实时统计
+async function loadGlobalStats() {
+  try {
+    const stats = await api.getGlobalStats()
+    globalStats.value = stats || {}
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+// 打开全局实时数据弹窗
+function openGlobalStats() {
+  showGlobalStatsModal.value = true
+  loadGlobalStats()
 }
 
 function formatTime(time: string | undefined) {
@@ -466,6 +484,25 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
+function formatBytesPerSec(bytesPerSec: number): string {
+  if (!bytesPerSec || bytesPerSec === 0) return '-'
+  return formatBytes(bytesPerSec) + '/s'
+}
+
+function formatEta(seconds: number | null): string {
+  if (!seconds || seconds <= 0) return '-'
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const secs = Math.floor(seconds % 60)
+  if (hours > 0) {
+    return `${hours}小时${minutes}分${secs}秒`
+  }
+  if (minutes > 0) {
+    return `${minutes}分${secs}秒`
+  }
+  return `${secs}秒`
+}
+
 async function clearRun(id: number) {
   try {
     await api.clearRun(id)
@@ -629,6 +666,7 @@ function goBackTarget() {
       <div class="title">任务列表</div>
       <div class="header-actions">
         <input v-model="taskSearch" type="text" placeholder="搜索任务..." class="search-input" />
+        <button class="secondary small" @click="openGlobalStats">全局实时数据</button>
         <button class="primary small" @click="goToAddTask">+ 添加任务</button>
       </div>
     </div>
@@ -1103,6 +1141,45 @@ function goBackTarget() {
           <template v-else-if="editingTask">保存修改</template>
           <template v-else>创建任务</template>
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 全局实时数据弹窗 -->
+  <div v-if="showGlobalStatsModal" class="modal-overlay" @click.self="showGlobalStatsModal = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>全局实时数据</h3>
+        <button class="close-btn" @click="showGlobalStatsModal = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-item">
+          <label>已传输：</label>
+          <span>{{ formatBytes(globalStats.bytes) || '-' }}</span>
+        </div>
+        <div class="detail-item">
+          <label>总大小：</label>
+          <span>{{ formatBytes(globalStats.totalBytes) || '-' }}</span>
+        </div>
+        <div class="detail-item">
+          <label>当前速度：</label>
+          <span>{{ formatBytesPerSec(globalStats.speed) || '-' }}</span>
+        </div>
+        <div class="detail-item">
+          <label>平均速度：</label>
+          <span>{{ formatBytesPerSec(globalStats.speedAvg) || '-' }}</span>
+        </div>
+        <div class="detail-item">
+          <label>预计剩余时间：</label>
+          <span>{{ formatEta(globalStats.eta) || '-' }}</span>
+        </div>
+        <div class="detail-item">
+          <label>进度：</label>
+          <span>{{ globalStats.percentage !== undefined ? globalStats.percentage.toFixed(2) + '%' : '-' }}</span>
+        </div>
+        <div class="progress-bar-container">
+          <div class="progress-bar" :style="{ width: (globalStats.percentage || 0) + '%' }"></div>
+        </div>
       </div>
     </div>
   </div>
