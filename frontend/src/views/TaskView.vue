@@ -308,6 +308,7 @@ async function createTask() {
     targetCurrentPath.value = ''
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
     await loadData()
+    currentModule.value = 'add'
     creatingState.value = 'done'
   } catch (e) {
     creatingState.value = 'idle'
