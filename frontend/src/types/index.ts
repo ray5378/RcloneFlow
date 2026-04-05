@@ -12,6 +12,7 @@ export interface Task {
 
 // 高级任务选项
 export interface TaskOptions {
+  enableStreaming?: boolean
   // 过滤参数
   exclude?: string[]           // --exclude
   excludeFrom?: string[]       // --exclude-from

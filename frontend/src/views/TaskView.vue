@@ -251,6 +251,7 @@ async function createTask() {
       sourcePath: createForm.value.sourcePath,
       targetRemote: createForm.value.targetRemote,
       targetPath: createForm.value.targetPath,
+      options: normalizeTaskOptions(createForm.value.options),
     }
 
     if (editingTask.value) {
@@ -413,7 +414,7 @@ function editTask(task: Task) {
       scheduleDay: '',
       scheduleHour: '00',
       scheduleMinute: '00',
-      options: task.options || {},
+      options: normalizeTaskOptions(task.options as Record<string, any>),
     }
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
   }
@@ -1053,6 +1054,14 @@ function goBackTarget() {
         {{ showAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}
       </button>
       <div v-if="showAdvancedOptions" class="advanced-section">
+        <div class="advanced-group">
+          <div class="advanced-group-title">传输策略</div>
+          <div class="advanced-row inline">
+            <label>开启流式传输（推荐）</label>
+            <input type="checkbox" v-model="createForm.options.enableStreaming" />
+          </div>
+        </div>
+
         <div class="advanced-group">
           <div class="advanced-group-title">过滤参数</div>
           <div class="advanced-row">

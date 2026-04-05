@@ -4,6 +4,7 @@ import "strings"
 
 // TaskOptions rclone任务选项
 type TaskOptions struct {
+	EnableStreaming *bool `json:"enableStreaming,omitempty"` // 是否启用默认流式传输优化（nil 视为开启）
 	// 过滤参数 (Filtering)
 	Exclude            []string `json:"exclude,omitempty"`            // --exclude
 	ExcludeFrom        []string `json:"excludeFrom,omitempty"`        // --exclude-from
@@ -242,7 +243,12 @@ func MergeTaskOptions(user *TaskOptions) *TaskOptions {
 	if user == nil {
 		return base
 	}
+	if user.EnableStreaming != nil && !*user.EnableStreaming {
+		merged := *user
+		return &merged
+	}
 	merged := *base
+	merged.EnableStreaming = user.EnableStreaming
 
 	if user.Transfers > 0 {
 		merged.Transfers = user.Transfers
