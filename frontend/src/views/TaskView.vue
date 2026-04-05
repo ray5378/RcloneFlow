@@ -1253,6 +1253,7 @@ function goBackTarget() {
           @click="createTask"
         >
           <template v-if="creatingState === 'loading'">创建中...</template>
+          <template v-else-if="creatingState === 'done'">完成（点击返回任务列表）</template>
           <template v-else-if="editingTask">保存修改</template>
           <template v-else>创建任务</template>
         </button>
