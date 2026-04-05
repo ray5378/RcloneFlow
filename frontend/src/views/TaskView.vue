@@ -155,7 +155,7 @@ function getTaskRealtimeProgress(taskId: number) {
   if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) {
     percentage = (bytes / totalBytes) * 100
   }
-  return { bytes, totalBytes, speed, eta, percentage, raw: rt, derived, globalStats, run: active.runRecord }
+  return { bytes, totalBytes, speed, eta, percentage, raw: rt, derived, groupStats, globalStats, run: active.runRecord }
 }
 
 // 加载全局实时统计

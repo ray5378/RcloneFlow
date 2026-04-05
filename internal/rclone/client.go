@@ -206,6 +206,12 @@ func (c *Client) CoreStats(ctx context.Context) (map[string]any, error) {
 	return resp, err
 }
 
+func (c *Client) CoreStatsGroup(ctx context.Context, group string) (map[string]any, error) {
+	var resp map[string]any
+	err := c.cli.Call(ctx, "core/stats", map[string]any{"group": group}, &resp)
+	return resp, err
+}
+
 // JobStop 停止指定的 Job
 func (c *Client) JobStop(ctx context.Context, jobID int64) error {
 	params := map[string]any{"jobid": jobID}
