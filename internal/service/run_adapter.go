@@ -137,6 +137,38 @@ func (a *storeRunAdapter) ListActiveRuns() ([]RunRecord, error) {
 	return result, nil
 }
 
+// GetActiveRunByTaskID 获取任务当前运行中的记录
+func (a *storeRunAdapter) GetActiveRunByTaskID(taskID int64) (RunRecord, error) {
+	r, err := a.db.GetActiveRunByTaskID(taskID)
+	if err != nil {
+		return RunRecord{}, err
+	}
+	summaryStr := ""
+	if r.Summary != nil {
+		bs, _ := json.Marshal(r.Summary)
+		summaryStr = string(bs)
+	}
+	return RunRecord{
+		ID:               r.ID,
+		TaskID:           r.TaskID,
+		RcJobID:          r.RcJobID,
+		Status:           r.Status,
+		Trigger:         r.Trigger,
+		StartedAt:        formatTime(r.CreatedAt),
+		FinishedAt:       formatOptTime(r.FinishedAt),
+		TaskName:         r.TaskName,
+		TaskMode:         r.TaskMode,
+		SourceRemote:     r.SourceRemote,
+		SourcePath:       r.SourcePath,
+		TargetRemote:     r.TargetRemote,
+		TargetPath:       r.TargetPath,
+		BytesTransferred: r.BytesTransferred,
+		Speed:            r.Speed,
+		Error:            r.Error,
+		Summary:          summaryStr,
+	}, nil
+}
+
 // UpdateRun 更新运行记录
 func (a *storeRunAdapter) UpdateRun(id int64, updateFn func(*RunRecord)) {
 	a.db.UpdateRun(id, func(r *store.Run) {

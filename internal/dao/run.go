@@ -126,6 +126,31 @@ func (d *RunDAO) GetByTaskID(taskID int64) ([]store.Run, error) {
 	return runs, nil
 }
 
+// GetActiveRunByTaskID 获取任务当前运行中的记录
+func (d *RunDAO) GetActiveRunByTaskID(taskID int64) (store.Run, error) {
+	var r store.Run
+	var summaryJSON string
+	var finishedAt sql.NullTime
+	err := d.db.QueryRow(`
+		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
+		FROM runs WHERE task_id = ? AND status = 'running' AND rc_job_id > 0
+		ORDER BY created_at DESC LIMIT 1`, taskID).Scan(
+		&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
+		&r.TaskName, &r.TaskMode, &r.SourceRemote, &r.SourcePath, &r.TargetRemote, &r.TargetPath,
+		&finishedAt, &r.BytesTransferred, &r.Speed)
+	if err != nil {
+		return store.Run{}, err
+	}
+	if summaryJSON != "" && summaryJSON != "{}" {
+		json.Unmarshal([]byte(summaryJSON), &r.Summary)
+	}
+	if finishedAt.Valid {
+		r.FinishedAt = &finishedAt.Time
+	}
+	return r, nil
+}
+
 // GetRunning 获取运行中的任务
 func (d *RunDAO) GetRunning() ([]store.JobStatus, error) {
 	rows, err := d.db.Query(`
