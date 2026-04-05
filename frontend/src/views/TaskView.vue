@@ -134,14 +134,28 @@ function getTaskRealtimeProgress(taskId: number) {
   const active = getActiveRunByTaskId(taskId)
   if (!active) return null
   const rt = active.realtimeStatus || {}
+  const derived = (active.derivedProgress && typeof active.derivedProgress === 'object') ? active.derivedProgress : {}
+  const globalStats = (active.globalStats && typeof active.globalStats === 'object') ? active.globalStats : {}
   const progress = (rt.progress && typeof rt.progress === 'object') ? rt.progress : {}
   const group = (progress.group && typeof progress.group === 'object') ? progress.group : {}
-  const bytes = Number(progress.bytes ?? group.bytes ?? 0)
-  const totalBytes = Number(progress.totalBytes ?? progress.total_bytes ?? group.totalBytes ?? group.total_bytes ?? 0)
-  const speed = Number(progress.speed ?? group.speed ?? 0)
-  const eta = progress.eta ?? group.eta ?? null
-  const percentage = Number(progress.percentage ?? group.percentage ?? (totalBytes > 0 ? (bytes / totalBytes) * 100 : 0))
-  return { bytes, totalBytes, speed, eta, percentage, raw: rt, run: active.runRecord }
+
+  const bytes = Number(
+    derived.bytes ?? progress.bytes ?? group.bytes ?? globalStats.bytes ?? active.runRecord?.bytesTransferred ?? 0,
+  )
+  const totalBytes = Number(
+    derived.totalBytes ?? derived.total_bytes ?? progress.totalBytes ?? progress.total_bytes ?? group.totalBytes ?? group.total_bytes ?? globalStats.totalBytes ?? globalStats.total_bytes ?? 0,
+  )
+  const speed = Number(
+    derived.speed ?? progress.speed ?? group.speed ?? globalStats.speed ?? 0,
+  )
+  const eta = derived.eta ?? progress.eta ?? group.eta ?? globalStats.eta ?? null
+  let percentage = Number(
+    derived.percentage ?? progress.percentage ?? group.percentage ?? globalStats.percentage ?? 0,
+  )
+  if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) {
+    percentage = (bytes / totalBytes) * 100
+  }
+  return { bytes, totalBytes, speed, eta, percentage, raw: rt, derived, globalStats, run: active.runRecord }
 }
 
 // 加载全局实时统计

@@ -112,15 +112,20 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// 获取一次全局统计（对上传中字节/速度/ETA 更稳定）
+	globalStats, _ := c.rc.CoreStats(r.Context())
+
 	// 同步每个运行中任务的实时状态
 	type ActiveRun struct {
-		RunRecord service.RunRecord `json:"runRecord"`
-		RealTimeStatus map[string]any `json:"realtimeStatus,omitempty"`
+		RunRecord      service.RunRecord `json:"runRecord"`
+		RealTimeStatus map[string]any    `json:"realtimeStatus,omitempty"`
+		GlobalStats    map[string]any    `json:"globalStats,omitempty"`
+		DerivedProgress map[string]any   `json:"derivedProgress,omitempty"`
 	}
 
 	activeRuns := make([]ActiveRun, 0, len(runs))
 	for _, run := range runs {
-		active := ActiveRun{RunRecord: run}
+		active := ActiveRun{RunRecord: run, GlobalStats: globalStats}
 
 		// 如果有rcJobID，获取实时状态
 		if run.RcJobID > 0 {
@@ -131,6 +136,29 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				c.runSvc.UpdateRunStatus(run.ID, st)
 			}
 		}
+
+		// 派生一个更稳定的前端进度对象：优先 job/status，其次全局 stats
+		derived := map[string]any{}
+		if active.RealTimeStatus != nil {
+			for _, key := range []string{"bytes", "totalBytes", "total_bytes", "speed", "speedAvg", "speed_avg", "eta", "percentage", "group"} {
+				if v, ok := active.RealTimeStatus[key]; ok {
+					derived[key] = v
+				}
+			}
+		}
+		if globalStats != nil {
+			for _, key := range []string{"bytes", "totalBytes", "total_bytes", "speed", "speedAvg", "speed_avg", "eta", "percentage"} {
+				if _, exists := derived[key]; !exists {
+					if v, ok := globalStats[key]; ok {
+						derived[key] = v
+					}
+				}
+			}
+		}
+		if len(derived) > 0 {
+			active.DerivedProgress = derived
+		}
+
 		activeRuns = append(activeRuns, active)
 	}
 
