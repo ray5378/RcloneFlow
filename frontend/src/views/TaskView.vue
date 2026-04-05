@@ -296,17 +296,6 @@ async function createTask() {
         await api.createSchedule({ taskId: task.id, spec, enabled: true })
       }
     }
-    createForm.value = { 
-      name: '', mode: 'copy', sourceRemote: '', sourcePath: '', targetRemote: '', targetPath: '',
-      enableSchedule: false,
-      scheduleMonth: '*', scheduleWeek: '*', scheduleDay: '*', scheduleHour: '*', scheduleMinute: '00',
-      options: { enableStreaming: true }
-    }
-    sourcePathOptions.value = []
-    targetPathOptions.value = []
-    sourceCurrentPath.value = ''
-    targetCurrentPath.value = ''
-    tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
     await loadData()
     currentModule.value = 'add'
     creatingState.value = 'done'
