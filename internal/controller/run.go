@@ -173,6 +173,18 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			}
 		}
 		if len(derived) > 0 {
+			// 检测异常重复重传：累计 bytes 明显大于当前正在传输文件大小
+			if transferring, ok := active.GroupStats["transferring"].([]any); ok && len(transferring) > 0 {
+				if first, ok := transferring[0].(map[string]any); ok {
+					size, _ := first["size"].(float64)
+					bytesV, _ := derived["bytes"].(float64)
+					if size > 0 && bytesV > size*2 {
+						derived["anomaly"] = "possible_restart_loop"
+						derived["anomalyMessage"] = "检测到累计传输量已明显超过文件本身大小，疑似重复重传或目标端缓存重试。"
+						derived["currentFileSize"] = size
+					}
+				}
+			}
 			active.DerivedProgress = derived
 		}
 

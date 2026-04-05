@@ -1334,6 +1334,10 @@ function goBackTarget() {
           <label>错误信息：</label>
           <span class="error-text">{{ taskProgressData.error }}</span>
         </div>
+        <div class="detail-item" v-if="taskProgressData.anomalyMessage">
+          <label>异常提示：</label>
+          <span class="error-text">{{ taskProgressData.anomalyMessage }}</span>
+        </div>
         <div class="progress-bar-container">
           <div class="progress-bar" :style="{ width: (taskProgressData.percentage || 0) + '%' }"></div>
         </div>
@@ -1538,4 +1542,7 @@ body.light .tile-menu { background: #fff; border-color: #ddd; }
 .tile-menu button { width: 100%; text-align: left; padding: 8px 12px; }
 .tile-menu button:hover { background: #444; }
 body.light .tile-menu button:hover { background: #f0f0f0; }
+
+.error-text { color: #ff6b6b; white-space: pre-wrap; }
+.danger-hint { color: #ff6b6b; font-size: 13px; line-height: 1.5; }
 </style>
