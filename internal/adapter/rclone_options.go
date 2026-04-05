@@ -230,7 +230,7 @@ func DefaultStreamingTaskOptions() *TaskOptions {
 		MultiThreadWriteBufferSize: 128,
 		Retries:                  3,
 		LowLevelRetries:          10,
-		Timeout:                  14400,
+		Timeout:                  43200,
 		ConnTimeout:              60,
 		ExpectContinueTimeout:    10,
 		ServerSideAcrossConfigs:  false,
