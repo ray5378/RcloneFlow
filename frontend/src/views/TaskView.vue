@@ -92,6 +92,14 @@ function confirmField(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
   }
 }
 
+function normalizeTaskOptions(raw: Record<string, any> | undefined | null) {
+  const options = { ...(raw || {}) }
+  if (typeof options.enableStreaming === 'undefined') {
+    options.enableStreaming = true
+  }
+  return options
+}
+
 onMounted(async () => {
   await loadData()
   await loadActiveRuns()
