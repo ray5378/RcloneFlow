@@ -135,22 +135,23 @@ function getTaskRealtimeProgress(taskId: number) {
   if (!active) return null
   const rt = active.realtimeStatus || {}
   const derived = (active.derivedProgress && typeof active.derivedProgress === 'object') ? active.derivedProgress : {}
+  const groupStats = (active.groupStats && typeof active.groupStats === 'object') ? active.groupStats : {}
   const globalStats = (active.globalStats && typeof active.globalStats === 'object') ? active.globalStats : {}
   const progress = (rt.progress && typeof rt.progress === 'object') ? rt.progress : {}
   const group = (progress.group && typeof progress.group === 'object') ? progress.group : {}
 
   const bytes = Number(
-    derived.bytes ?? progress.bytes ?? group.bytes ?? globalStats.bytes ?? active.runRecord?.bytesTransferred ?? 0,
+    derived.bytes ?? groupStats.bytes ?? progress.bytes ?? group.bytes ?? globalStats.bytes ?? active.runRecord?.bytesTransferred ?? 0,
   )
   const totalBytes = Number(
-    derived.totalBytes ?? derived.total_bytes ?? progress.totalBytes ?? progress.total_bytes ?? group.totalBytes ?? group.total_bytes ?? globalStats.totalBytes ?? globalStats.total_bytes ?? 0,
+    derived.totalBytes ?? derived.total_bytes ?? groupStats.totalBytes ?? groupStats.total_bytes ?? progress.totalBytes ?? progress.total_bytes ?? group.totalBytes ?? group.total_bytes ?? globalStats.totalBytes ?? globalStats.total_bytes ?? 0,
   )
   const speed = Number(
-    derived.speed ?? progress.speed ?? group.speed ?? globalStats.speed ?? 0,
+    derived.speed ?? groupStats.speed ?? progress.speed ?? group.speed ?? globalStats.speed ?? 0,
   )
-  const eta = derived.eta ?? progress.eta ?? group.eta ?? globalStats.eta ?? null
+  const eta = derived.eta ?? groupStats.eta ?? progress.eta ?? group.eta ?? globalStats.eta ?? null
   let percentage = Number(
-    derived.percentage ?? progress.percentage ?? group.percentage ?? globalStats.percentage ?? 0,
+    derived.percentage ?? groupStats.percentage ?? progress.percentage ?? group.percentage ?? globalStats.percentage ?? 0,
   )
   if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) {
     percentage = (bytes / totalBytes) * 100
@@ -320,7 +321,7 @@ async function stopTaskTransfer(taskId: number) {
   showConfirm('停止传输', '确定停止该任务的当前传输？', async () => {
     try {
       await api.stopTaskTransfer(taskId)
-      await loadData()
+      await refreshTaskViewData()
     } catch (e) {
       alert((e as Error).message)
     }
@@ -790,6 +791,19 @@ function goBackTarget() {
             <span class="path-label">目标:</span>
             <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
           </div>
+          <template v-if="getTaskRealtimeProgress(task.id)">
+            <div class="path-row">
+              <span class="path-label">实时:</span>
+              <span class="path-value">运行中 · Job #{{ getTaskRealtimeProgress(task.id)?.run?.rcJobId }}</span>
+            </div>
+            <div class="path-row">
+              <span class="path-label">进度:</span>
+              <span class="path-value">{{ (getTaskRealtimeProgress(task.id)?.percentage || 0).toFixed(2) }}% · {{ formatBytes(getTaskRealtimeProgress(task.id)?.bytes || 0) }} / {{ formatBytes(getTaskRealtimeProgress(task.id)?.totalBytes || 0) }} · {{ formatBytesPerSec(getTaskRealtimeProgress(task.id)?.speed || 0) }} · ETA {{ formatEta(getTaskRealtimeProgress(task.id)?.eta || null) }}</span>
+            </div>
+            <div class="progress-bar-container" style="margin-top:8px">
+              <div class="progress-bar" :style="{ width: ((getTaskRealtimeProgress(task.id)?.percentage || 0)) + '%' }"></div>
+            </div>
+          </template>
         </div>
       </div>
       <div v-if="!filteredTasks.length" class="empty">暂无任务</div>
