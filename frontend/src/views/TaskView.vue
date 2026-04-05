@@ -53,7 +53,7 @@ const createForm = ref({
   scheduleDay: '',       // 空 = 不设置, 或 "1,15,28"
   scheduleHour: '00',   // "00,12,18"
   scheduleMinute: '00', // "00,30,59"
-  options: {} as Record<string, any>,
+  options: { enableStreaming: true } as Record<string, any>,
 })
 
 const openMenuId = ref<number | null>(null)
