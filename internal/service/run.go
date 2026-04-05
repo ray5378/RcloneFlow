@@ -28,6 +28,7 @@ type RunServiceInterface interface {
 	ListRuns() ([]RunRecord, error)
 	ListRunsByTask(taskId int64) ([]RunRecord, error)
 	ListActiveRuns() ([]RunRecord, error)
+	GetActiveRunByTaskID(taskID int64) (RunRecord, error)
 	UpdateRun(id int64, updateFn func(*RunRecord))
 	DeleteRun(id int64) error
 	DeleteAllRuns() error
@@ -60,15 +61,27 @@ func (s *RunService) ListActiveRuns() ([]RunRecord, error) {
 	return s.db.ListActiveRuns()
 }
 
+// GetActiveRunByTaskID 获取任务当前运行中的记录
+func (s *RunService) GetActiveRunByTaskID(taskID int64) (RunRecord, error) {
+	return s.db.GetActiveRunByTaskID(taskID)
+}
+
 // UpdateRunStatus 更新运行状态
 func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
 	s.db.UpdateRun(id, func(r *RunRecord) {
 		r.Summary = fmt.Sprintf("%v", summary)
-		if finished, ok := summary["finished"].(bool); ok && finished {
-			r.Status = "finished"
-		}
-		if success, ok := summary["success"].(bool); ok && !success {
-			r.Status = "failed"
+		finished, _ := summary["finished"].(bool)
+		success, _ := summary["success"].(bool)
+		if finished {
+			if success {
+				r.Status = "finished"
+				r.Error = ""
+			} else {
+				r.Status = "failed"
+				if errMsg, ok := summary["error"].(string); ok {
+					r.Error = errMsg
+				}
+			}
 		}
 	})
 }
