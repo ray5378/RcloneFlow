@@ -30,11 +30,6 @@ export async function clearRunsByTask(taskId: number): Promise<void> {
   return del(`/api/runs/task/${taskId}`)
 }
 
-/** 获取Job状态 (直接调用rclone job API) */
-export async function getJobStatus(jobId: number): Promise<Record<string, unknown>> {
-  return get<Record<string, unknown>>(`/api/fs/jobStatus?jobId=${jobId}`)
-}
-
 /** 获取所有运行中的任务及其实时状态 */
 export async function getActiveRuns(): Promise<ActiveRun[]> {
   return get<ActiveRun[]>('/api/runs/active')

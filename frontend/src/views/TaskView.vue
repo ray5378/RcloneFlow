@@ -92,6 +92,17 @@ function confirmField(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
 
 onMounted(async () => {
   await loadData()
+  await loadActiveRuns()
+  activeRunsTimer = window.setInterval(() => {
+    loadActiveRuns().catch(console.error)
+  }, 3000)
+})
+
+onUnmounted(() => {
+  if (activeRunsTimer) {
+    window.clearInterval(activeRunsTimer)
+    activeRunsTimer = null
+  }
 })
 
 async function loadData() {
@@ -109,6 +120,33 @@ async function loadData() {
   } catch (e) {
     console.error(e)
   }
+}
+
+async function loadActiveRuns() {
+  try {
+    const data = await api.getActiveRuns()
+    activeRuns.value = data || []
+  } catch (e) {
+    console.error(e)
+  }
+}
+
+function getActiveRunByTaskId(taskId: number) {
+  return activeRuns.value.find(item => item.runRecord?.taskId === taskId)
+}
+
+function getTaskRealtimeProgress(taskId: number) {
+  const active = getActiveRunByTaskId(taskId)
+  if (!active) return null
+  const rt = active.realtimeStatus || {}
+  const progress = (rt.progress && typeof rt.progress === 'object') ? rt.progress : {}
+  const group = (progress.group && typeof progress.group === 'object') ? progress.group : {}
+  const bytes = Number(progress.bytes ?? group.bytes ?? 0)
+  const totalBytes = Number(progress.totalBytes ?? progress.total_bytes ?? group.totalBytes ?? group.total_bytes ?? 0)
+  const speed = Number(progress.speed ?? group.speed ?? 0)
+  const eta = progress.eta ?? group.eta ?? null
+  const percentage = Number(progress.percentage ?? group.percentage ?? (totalBytes > 0 ? (bytes / totalBytes) * 100 : 0))
+  return { bytes, totalBytes, speed, eta, percentage, raw: rt, run: active.runRecord }
 }
 
 // 加载全局实时统计
@@ -267,6 +305,27 @@ const filteredRuns = computed(() => {
 function viewTaskHistory(taskId: number) {
   historyFilterTaskId.value = taskId
   currentModule.value = 'history'
+}
+
+async function stopTaskTransfer(taskId: number) {
+  showConfirm('停止传输', '确定停止该任务的当前传输？', async () => {
+    try {
+      await api.stopTaskTransfer(taskId)
+      await loadData()
+    } catch (e) {
+      alert((e as Error).message)
+    }
+  })
+}
+
+async function viewTaskProgress(taskId: number) {
+  try {
+    const data = await api.getTaskProgress(taskId)
+    taskProgressData.value = data || {}
+    showTaskProgressModal.value = true
+  } catch (e) {
+    alert((e as Error).message)
+  }
 }
 
 async function runTask(taskId: number) {
@@ -695,6 +754,8 @@ function goBackTarget() {
           </div>
           <div class="item-actions">
             <button class="ghost small" @click.stop="viewTaskHistory(task.id)">📋 历史</button>
+            <button class="ghost small" :disabled="!getActiveRunByTaskId(task.id)" @click.stop="stopTaskTransfer(task.id)">⏹ 停止传输</button>
+            <button class="ghost small" @click.stop="viewTaskProgress(task.id)">📊 实时进度</button>
             <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
               {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}
             </button>
@@ -1425,4 +1486,3 @@ body.light .tile-menu { background: #fff; border-color: #ddd; }
 .tile-menu button:hover { background: #444; }
 body.light .tile-menu button:hover { background: #f0f0f0; }
 </style>
-// DEBUG LINE

@@ -29,3 +29,76 @@ export async function runTask(taskId: number): Promise<{ jobId: number }> {
 export async function deleteTask(taskId: number): Promise<void> {
   return del(`/api/tasks/${taskId}`)
 }
+
+/** 停止指定任务当前传输 */
+export async function stopTaskTransfer(taskId: number): Promise<void> {
+  const activeRuns = await getActiveRuns()
+  const active = activeRuns.find(item => item.runRecord?.taskId === taskId && item.runRecord?.rcJobId)
+  if (!active?.runRecord?.rcJobId) {
+    throw new Error('当前任务没有正在运行的传输')
+  }
+  await stopJob(active.runRecord.rcJobId)
+}
+
+/** 获取指定任务实时进度 */
+export async function getTaskProgress(taskId: number): Promise<Record<string, any>> {
+  const activeRuns = await getActiveRuns()
+  const active = activeRuns.find(item => item.runRecord?.taskId === taskId)
+  if (active?.runRecord) {
+    const rt = active.realtimeStatus || {}
+    const progress = (rt.progress && typeof rt.progress === 'object') ? rt.progress as Record<string, any> : {}
+    const group = (progress.group && typeof progress.group === 'object') ? progress.group as Record<string, any> : {}
+    const bytes = Number(progress.bytes ?? group.bytes ?? 0)
+    const totalBytes = Number(progress.totalBytes ?? progress.total_bytes ?? group.totalBytes ?? group.total_bytes ?? 0)
+    const speed = Number(progress.speed ?? group.speed ?? 0)
+    const eta = progress.eta ?? group.eta ?? null
+    const percentage = Number(progress.percentage ?? group.percentage ?? (totalBytes > 0 ? (bytes / totalBytes) * 100 : 0))
+
+    return {
+      taskId,
+      jobId: active.runRecord.rcJobId,
+      status: active.runRecord.status || (rt.finished ? 'finished' : 'running'),
+      bytes,
+      totalBytes,
+      speed: speed ? `${(speed / 1024 / 1024).toFixed(2)} MB/s` : '',
+      eta,
+      percentage,
+      error: (rt.error as string) || active.runRecord.error || '',
+      raw: rt,
+    }
+  }
+
+  const runs = await getRuns()
+  const latest = (runs || [])
+    .filter(run => run.taskId === taskId)
+    .sort((a, b) => new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime())[0]
+
+  if (!latest) {
+    return { taskId, status: 'no_runs', percentage: 0 }
+  }
+
+  if (latest.rcJobId) {
+    try {
+      const status = await getJobStatus(latest.rcJobId)
+      return {
+        taskId,
+        jobId: latest.rcJobId,
+        status: status.finished ? (status.success ? 'finished' : 'failed') : 'running',
+        percentage: Number(status.progress || 0),
+        error: status.error || latest.error || '',
+        raw: status,
+      }
+    } catch {
+      // ignore and fallback to latest run record
+    }
+  }
+
+  return {
+    taskId,
+    jobId: latest.rcJobId,
+    status: latest.status || 'unknown',
+    percentage: 0,
+    error: latest.error || '',
+    raw: latest,
+  }
+}

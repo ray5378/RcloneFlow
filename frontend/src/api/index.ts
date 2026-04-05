@@ -13,7 +13,7 @@ export type { ResponseInterceptor } from './client'
 export { default as apiRequest } from './client'
 
 // ============ Task API ============
-export { getTasks, createTask, updateTask, runTask, deleteTask } from './task'
+export { getTasks, createTask, updateTask, runTask, deleteTask, stopTaskTransfer, getTaskProgress } from './task'
 export { getTasks as listTasks } from './task'
 
 // ============ Schedule API ============
@@ -21,7 +21,7 @@ export { getSchedules, createSchedule, updateSchedule, deleteSchedule } from './
 export { getSchedules as listSchedules } from './schedule'
 
 // ============ Run API ============
-export { getRuns, getRun, clearRun, clearAllRuns, clearRunsByTask, getJobStatus, getActiveRuns } from './run'
+export { getRuns, getRun, clearRun, clearAllRuns, clearRunsByTask, getJobStatus, getActiveRuns, getGlobalStats, stopJob } from './run'
 export { getRuns as listRuns } from './run'
 
 // ============ Remote API ============
