@@ -141,13 +141,16 @@ func (s *JobSyncService) syncRunningJobs() {
 		newStatus := "running"
 		errorMsg := ""
 
-		if finished, ok := status["finished"].(bool); ok && finished {
-			newStatus = "finished"
-		}
-		if success, ok := status["success"].(bool); ok && !success {
-			newStatus = "failed"
-			if errStr, ok := status["error"].(string); ok {
-				errorMsg = errStr
+		finished, _ := status["finished"].(bool)
+		success, _ := status["success"].(bool)
+		if finished {
+			if success {
+				newStatus = "finished"
+			} else {
+				newStatus = "failed"
+				if errStr, ok := status["error"].(string); ok {
+					errorMsg = errStr
+				}
 			}
 		}
 
