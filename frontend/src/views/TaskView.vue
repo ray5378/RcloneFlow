@@ -31,6 +31,8 @@ const showGlobalStatsModal = ref(false)
 const globalStats = ref<any>({})
 const showTaskProgressModal = ref(false)
 const taskProgressData = ref<any>({})
+const activeRuns = ref<any[]>([])
+let activeRunsTimer: number | null = null
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
   title: '',
