@@ -55,6 +55,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		}
 	}
 
+	// 所有任务默认使用流式/大文件友好的传输配置，用户显式选项覆盖默认值
+	opts = adapter.MergeTaskOptions(opts)
+
 	// 通过runner启动任务
 	jobID, err := s.runner.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger, opts)
 	if err != nil {
