@@ -292,7 +292,7 @@ async function createTask() {
       name: '', mode: 'copy', sourceRemote: '', sourcePath: '', targetRemote: '', targetPath: '',
       enableSchedule: false,
       scheduleMonth: '*', scheduleWeek: '*', scheduleDay: '*', scheduleHour: '*', scheduleMinute: '00',
-      options: {}
+      options: { enableStreaming: true }
     }
     sourcePathOptions.value = []
     targetPathOptions.value = []
