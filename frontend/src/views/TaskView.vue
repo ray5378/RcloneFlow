@@ -553,6 +553,19 @@ function formatSummary(summary: any): string {
   if (summary.success !== undefined) {
     parts.push(`成功: ${summary.success ? '是' : '否'}`)
   }
+  if (summary.streamingEnabled !== undefined) {
+    parts.push(`流式传输: ${summary.streamingEnabled ? '开启' : '关闭'}`)
+  }
+  if (summary.effectiveOptions && typeof summary.effectiveOptions === 'object') {
+    const opts = summary.effectiveOptions
+    const keyParts:string[] = []
+    if (opts.transfers !== undefined) keyParts.push(`transfers=${opts.transfers}`)
+    if (opts.multiThreadStreams !== undefined) keyParts.push(`multiThreadStreams=${opts.multiThreadStreams}`)
+    if (opts.multiThreadCutoff !== undefined) keyParts.push(`multiThreadCutoff=${opts.multiThreadCutoff}`)
+    if (opts.bufferSize !== undefined) keyParts.push(`bufferSize=${opts.bufferSize}`)
+    if (opts.timeout !== undefined) keyParts.push(`timeout=${opts.timeout}`)
+    if (keyParts.length) parts.push(`生效参数: ${keyParts.join(', ')}`)
+  }
   return parts.length > 0 ? parts.join('\n') : JSON.stringify(summary, null, 2)
 }
 

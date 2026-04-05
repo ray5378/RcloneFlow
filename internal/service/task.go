@@ -58,6 +58,16 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	// 所有任务默认使用流式/大文件友好的传输配置，用户显式选项覆盖默认值
 	opts = adapter.MergeTaskOptions(opts)
 
+	effectiveOptions := map[string]any{}
+	if bs, err := json.Marshal(opts); err == nil {
+		_ = json.Unmarshal(bs, &effectiveOptions)
+	}
+
+	streamingEnabled := true
+	if v, ok := effectiveOptions["enableStreaming"].(bool); ok {
+		streamingEnabled = v
+	}
+
 	// 通过runner启动任务
 	jobID, err := s.runner.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger, opts)
 	if err != nil {
@@ -69,13 +79,17 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		TaskID:       taskID,
 		RcJobID:      jobID,
 		Status:       "running",
-		Trigger:     trigger,
-		TaskName:    t.Name,
-		TaskMode:    t.Mode,
+		Trigger:      trigger,
+		Summary: map[string]any{
+			"streamingEnabled": streamingEnabled,
+			"effectiveOptions": effectiveOptions,
+		},
+		TaskName:     t.Name,
+		TaskMode:     t.Mode,
 		SourceRemote: t.SourceRemote,
-		SourcePath:  t.SourcePath,
+		SourcePath:   t.SourcePath,
 		TargetRemote: t.TargetRemote,
-		TargetPath:  t.TargetPath,
+		TargetPath:   t.TargetPath,
 	})
 	return err
 }
