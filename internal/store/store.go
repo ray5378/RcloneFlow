@@ -471,7 +471,8 @@ func (db *DB) ListActiveRuns() ([]Run, error) {
 	defer db.mu.Unlock()
 	
 	rows, err := db.db.Query(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
+		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
 		FROM runs WHERE status = 'running' ORDER BY id DESC`)
 	if err != nil {
 		return nil, err
@@ -479,6 +480,61 @@ func (db *DB) ListActiveRuns() ([]Run, error) {
 	defer rows.Close()
 	
 	return db.scanRuns(rows)
+}
+
+// GetActiveRunByTaskID 获取任务当前运行中的记录
+func (db *DB) GetActiveRunByTaskID(taskID int64) (Run, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	var r Run
+	var summaryJSON string
+	var finishedAt sql.NullTime
+	var speed sql.NullString
+	var taskName, taskMode, sourceRemote, sourcePath, targetRemote, targetPath sql.NullString
+	var bytesTransferred sql.NullInt64
+	err := db.db.QueryRow(`
+		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
+		FROM runs WHERE task_id = ? AND status = 'running' AND rc_job_id > 0
+		ORDER BY created_at DESC LIMIT 1`, taskID).Scan(
+		&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
+		&taskName, &taskMode, &sourceRemote, &sourcePath, &targetRemote, &targetPath,
+		&finishedAt, &bytesTransferred, &speed)
+	if err != nil {
+		return Run{}, err
+	}
+	if err := json.Unmarshal([]byte(summaryJSON), &r.Summary); err != nil {
+		r.Summary = make(map[string]any)
+	}
+	if finishedAt.Valid {
+		r.FinishedAt = &finishedAt.Time
+	}
+	if taskName.Valid {
+		r.TaskName = taskName.String
+	}
+	if taskMode.Valid {
+		r.TaskMode = taskMode.String
+	}
+	if sourceRemote.Valid {
+		r.SourceRemote = sourceRemote.String
+	}
+	if sourcePath.Valid {
+		r.SourcePath = sourcePath.String
+	}
+	if targetRemote.Valid {
+		r.TargetRemote = targetRemote.String
+	}
+	if targetPath.Valid {
+		r.TargetPath = targetPath.String
+	}
+	if bytesTransferred.Valid {
+		r.BytesTransferred = bytesTransferred.Int64
+	}
+	if speed.Valid {
+		r.Speed = speed.String
+	}
+	return r, nil
 }
 
 func (db *DB) scanRuns(rows *sql.Rows) ([]Run, error) {
