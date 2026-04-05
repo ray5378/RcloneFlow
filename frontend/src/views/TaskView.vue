@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
 import type { Task, Schedule, Run } from '../types'
 
@@ -98,13 +98,6 @@ onMounted(async () => {
   activeRunsTimer = window.setInterval(() => {
     loadActiveRuns().catch(console.error)
   }, 3000)
-})
-
-onUnmounted(() => {
-  if (activeRunsTimer) {
-    window.clearInterval(activeRunsTimer)
-    activeRunsTimer = null
-  }
 })
 
 async function loadData() {
