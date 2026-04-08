@@ -96,7 +96,6 @@ func Run(cfg *config.Config) error {
 	mux := http.NewServeMux()
 	r.Setup(mux)
 	// 挂载 CLI 运行器的最小路由（临时接入，后续统一风格并替换 RC 实现）
-	attachCLIRoutes(mux)
 
 	// 添加中间件
 	handler := withCORS(mux)
