@@ -42,6 +42,16 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	cmdName := strings.ToLower(mode)
 	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" { cmdName = "copy" }
 	args := []string{cmdName, src, dst, "--use-json-log", "--log-format", "json", "--stats", "5s"}
+	// attach advanced task options if present in run.Summary.effectiveOptions
+	var eff map[string]any
+	if run.Summary != nil {
+		if v, ok := run.Summary["effectiveOptions"]; ok {
+			if m, ok := v.(map[string]any); ok { eff = m }
+		}
+	}
+	if len(eff) > 0 {
+		args = append(args, buildFlagsFromOptions(eff)...)
+	}
 
 	// logs dir and files
 	dataDir := os.Getenv("APP_DATA_DIR"); if dataDir == "" { dataDir = "./data" }
