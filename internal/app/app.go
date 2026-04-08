@@ -43,6 +43,24 @@ func Run(cfg *config.Config) error {
 	// 创建默认管理员账户
 	createDefaultAdmin(db)
 
+	// 确保事件采样表存在（用于 CLI 进度落库，可幂等）
+	if _, err := db.Raw().Exec(`CREATE TABLE IF NOT EXISTS run_events (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		run_id INTEGER NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		bytes REAL DEFAULT 0,
+		total_bytes REAL DEFAULT 0,
+		percent REAL DEFAULT 0,
+		speed_bps REAL DEFAULT 0,
+		eta_sec INTEGER DEFAULT 0,
+		FOREIGN KEY (run_id) REFERENCES runs(id) ON DELETE CASCADE
+	)`); err != nil {
+		logger.Warn("run_events 创建失败（不影响主流程）", zap.Error(err))
+	} else {
+		_, _ = db.Raw().Exec(`CREATE INDEX IF NOT EXISTS idx_run_events_run_id ON run_events(run_id)`) 
+		_, _ = db.Raw().Exec(`CREATE INDEX IF NOT EXISTS idx_run_events_created_at ON run_events(created_at)`) 
+	}
+
 	// 初始化rclone客户端
 	rc := rclone.NewFromEnv()
 
