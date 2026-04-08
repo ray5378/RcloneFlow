@@ -19,7 +19,7 @@
 ## 系统要求
 
 - Go 1.22+
-- Rclone (需要开启 RC 模式)
+- Rclone（镜像内置，CLI 直控，无需 RC）
 - Git
 - Node.js 18+ (前端开发)
 
@@ -36,11 +36,9 @@ cd RcloneFlow
 
 确保已安装 Rclone 并配置好存储。配置文件通常在 `~/.config/rclone/rclone.conf`。
 
-### 3. 启动 Rclone RC 服务器
+### 3. 直接运行（AIO，CLI 直控）
 
-```bash
-rclone rcd --rc-user=your_user --rc-pass=your_pass --rc-addr=localhost:5572
-```
+无需单独启动 RC 服务。项目内置 rclone，并以 CLI 子进程直控复制/同步/移动。
 
 ### 4. 构建并运行
 
@@ -86,10 +84,9 @@ sync:
 |------|------|--------|
 | `APP_ADDR` | 服务器地址 | `:17870` |
 | `APP_DATA_DIR` | 数据目录 | `./data` |
-| `RCLONE_RC_URL` | Rclone RC 地址 | `http://127.0.0.1:5572` |
-| `RCLONE_RC_USER` | Rclone RC 用户名 | - |
-| `RCLONE_RC_PASS` | Rclone RC 密码 | - |
-| `RCLONE_RC_TIMEOUT` | RC 超时时间 | `120s` |
+| `RCLONE_MAX_PROCS` | 同时运行任务数上限 | `2` |
+| `LOG_LEVEL` | 日志级别 | `info` |
+| `LOG_OUTPUT` | 日志输出 | `stdout` |
 
 ## 项目结构
 

@@ -1,24 +1,5 @@
 version: "3.8"
 services:
-  rclone:
-    image: rclone/rclone:latest
-    container_name: rclone
-    restart: always
-    command:
-      - rcd
-      - --rc-addr=:5572
-      - --rc-user=你的用户名
-      - --rc-pass=你的密码
-      - --config=/config/rclone/rclone.conf
-      - --log-level=INFO
-    ports:
-      - "5572:5572"
-    volumes:
-      - /path/to/rclone/config:/config/rclone
-      - /path/to/rclone/cache:/root/.cache/rclone
-    environment:
-      - TZ=Asia/Shanghai
-
   rcloneflow:
     image: ray5378/rcloneflow:latest
     container_name: rcloneflow
@@ -30,8 +11,15 @@ services:
     environment:
       - TZ=Asia/Shanghai
       - APP_ADDR=:17870
-      - RCLONE_RC_URL=http://rclone:5572
-      - RCLONE_RC_USER=你的用户名
-      - RCLONE_RC_PASS=你的密码
-    depends_on:
-      - rclone
+      # CLI 直控 rclone，无需独立 RC 服务
+      # 并发上限（默认 2）
+      - RCLONE_MAX_PROCS=2
+      # 日志级别（info/debug/warn/error）
+      - LOG_LEVEL=info
+      - LOG_OUTPUT=stdout
+    # 可选：本地时区与内核限制
+    # privileged: false
+    # ulimits:
+    #   nofile:
+    #     soft: 65536
+    #     hard: 65536
