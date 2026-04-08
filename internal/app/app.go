@@ -42,6 +42,8 @@ func Run(cfg *config.Config) error {
 	// 创建默认管理员账户
 	createDefaultAdmin(db)
 
+	// 启动内置 RC（默认启用，可用 EMBED_RC=false 关闭），仅用于配置/元数据
+	maybeStartEmbeddedRC()
 	// 初始化rclone客户端
 	rc := rclone.NewFromEnv()
 
