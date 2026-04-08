@@ -13,6 +13,7 @@ import (
 	"rcloneflow/internal/scheduler"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
+	clirunner "rcloneflow/internal/runner/cli"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
