@@ -129,8 +129,8 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 	for _, run := range runs {
 		active := ActiveRun{RunRecord: run, GlobalStats: globalStats}
 
-		// CLI 改造：从内存态获取 DerivedProgress，不再依赖 rcJobID
-		if p := (service.NewCLIRunAdapter()).GetDerivedProgress(run.ID); p != nil {
+		// CLI 改造：从内存态获取 DerivedProgress，使用 RcJobID 作为运行标识
+		if p := (service.NewCLIRunAdapter()).GetDerivedProgress(run.RcJobID); p != nil {
 			active.DerivedProgress = p
 		}
 
