@@ -56,8 +56,8 @@ func Run(cfg *config.Config) error {
 	taskCtrl := controller.NewTaskController(taskSvc, rc)
 	browserCtrl := controller.NewBrowserController(rc)
 	
-	// 初始化调度器(需要在controller之前,以便传递)
-	sched := scheduler.New(db, rc)
+	// 初始化调度器（改为注入 CLI Runner）
+	sched := scheduler.New(db, scheduler.NewTaskRunner(db, clirunner.NewTaskRunnerAdapter()))
 	if err := sched.Start(); err != nil {
 		logger.Error("调度器初始化失败", zap.Error(err))
 		return err
