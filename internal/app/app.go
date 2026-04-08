@@ -45,8 +45,8 @@ func Run(cfg *config.Config) error {
 	// 初始化rclone客户端
 	rc := rclone.NewFromEnv()
 
-	// 初始化服务层
-	taskSvc := service.NewTaskService(db, rc)
+	// 初始化服务层（任务运行切到 CLI 直控）
+	taskSvc := service.NewTaskService(db, clirunner.NewTaskRunnerAdapter())
 	scheduleSvc := service.NewScheduleService(db)
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
 

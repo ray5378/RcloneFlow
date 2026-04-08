@@ -198,8 +198,9 @@ func (s *Scheduler) AddSchedule(schedule store.Schedule) error {
 				zap.Int64("task_id", taskID),
 				zap.String("spec", cronSpec),
 				zap.Error(err))
+			return
 		}
-		// 执行后更新下次触发时间
+		// 执行成功后，更新下次触发时间
 		nextTime, err := CalcNextRun(cronSpec)
 		if err == nil {
 			s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
