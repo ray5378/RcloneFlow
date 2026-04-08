@@ -68,16 +68,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		streamingEnabled = v
 	}
 
-	// 通过runner启动任务
-	jobID, err := s.runner.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger, opts)
-	if err != nil {
-		return err
-	}
-
-	// 记录运行
-	_, err = s.db.AddRun(store.Run{
+	// 切换为 CLI：先记录运行，再异步启动（可中断/进度）
+	run, err := s.db.AddRun(store.Run{
 		TaskID:       taskID,
-		RcJobID:      jobID,
 		Status:       "running",
 		Trigger:      trigger,
 		Summary: map[string]any{
@@ -91,7 +84,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		TargetRemote: t.TargetRemote,
 		TargetPath:   t.TargetPath,
 	})
-	return err
+	if err != nil { return err }
+	go func(){ _ = NewRunner(s.db).Start(ctx, run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath) }()
+	return nil
 }
 
 // GetTask 获取单个任务

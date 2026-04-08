@@ -89,10 +89,15 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/runs", r.runCtrl.HandleRuns)
 	apiMux.HandleFunc("/api/runs/active", r.runCtrl.HandleActiveRuns)
 	apiMux.HandleFunc("/api/stats/global", r.runCtrl.HandleGlobalStats)
+	// CLI 扩展接口：停止与日志下载
+	apiMux.HandleFunc("/api/runs/", func(w http.ResponseWriter, req *http.Request){
+		if strings.HasSuffix(req.URL.Path, "/stop") { r.runCtrl.HandleRunStopCLI(w, req); return }
+		if strings.HasSuffix(req.URL.Path, "/log") { r.runCtrl.HandleRunLog(w, req); return }
+		r.runCtrl.HandleRunStatus(w, req)
+	})
 	apiMux.HandleFunc("/api/jobs/{jobId}/status", r.runCtrl.HandleJobStatus)
 	apiMux.HandleFunc("/api/jobs/{jobId}/stop", r.runCtrl.HandleJobStop)
 	apiMux.HandleFunc("/api/runs/task/", r.runCtrl.HandleRunsByTask)
-	apiMux.HandleFunc("/api/runs/", r.runCtrl.HandleRunStatus)
 
 	// 应用JWT中间件保护API路由
 	protectedMux := auth.JWTMiddleware(apiMux)
