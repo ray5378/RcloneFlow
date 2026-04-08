@@ -63,6 +63,8 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/config/", r.remoteCtrl.HandleConfigActions)
 	apiMux.HandleFunc("/api/usage/", r.remoteCtrl.HandleUsage)
 	apiMux.HandleFunc("/api/fsinfo/", r.remoteCtrl.HandleFsInfo)
+	// 诊断（仅管理员）：返回 rclone -vv 的 stdout/stderr，便于定位 exit status 3
+	apiMux.HandleFunc("/api/diag/rclone", r.remoteCtrl.DiagRcloneHandler)
 
 	// 文件浏览器
 	apiMux.HandleFunc("/api/browser/list", r.browserCtrl.HandleList)
