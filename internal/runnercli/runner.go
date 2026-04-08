@@ -54,9 +54,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			}
 		}
 	}
-	// Write a header for diagnostics
-	_ , _ = stdoutFile.WriteString("[runner] rclone " + strings.Join(args, " ") + "\n")
-	if _, err := os.Stat(cfg); err != nil { _, _ = stderrFile.WriteString("[runner] warn: config not found: " + cfg + "\n") }
+	// header will be written after files are opened below
+	startLine := "[runner] rclone " + strings.Join(args, " ") + "\n"
+	missingCfg := ""
+	if _, err := os.Stat(cfg); err != nil { missingCfg = "[runner] warn: config not found: " + cfg + "\n" }
 
 	dataDir := os.Getenv("APP_DATA_DIR"); if dataDir == "" { dataDir = "./data" }
 	logsDir := filepath.Join(dataDir, "logs"); _ = os.MkdirAll(logsDir, 0o755)
@@ -69,6 +70,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	// fan-out: write to file and to parser via io.Pipe
 	outR, outW := io.Pipe()
 	errR, errW := io.Pipe()
+	// write headers once files are open
+	_, _ = stdoutFile.WriteString(startLine)
+	if missingCfg != "" { _, _ = stderrFile.WriteString(missingCfg) }
 	cmd.Stdout = io.MultiWriter(stdoutFile, outW)
 	cmd.Stderr = io.MultiWriter(stderrFile, errW)
 	if err := cmd.Start(); err != nil { return err }
