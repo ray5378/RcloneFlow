@@ -12,7 +12,9 @@ import (
 type CleanupService struct {
 	runSvc    *RunService
 	interval  time.Duration
-	retention int // 保留天数
+	retention int // 保留天数（任务运行记录）
+	// 预留：日志文件/事件表等的独立保留天数，可从环境变量读取，默认与 retention 一致
+	// logRetention int
 	stopCh    chan struct{}
 }
 
