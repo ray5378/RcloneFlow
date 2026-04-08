@@ -35,8 +35,10 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
-		version, _ := c.rc.Version(r.Context())
-		WriteJSON(w, 200, map[string]any{"remotes": names, "version": version})
+		// CLI 版本号（容器内置 rclone）
+		ver := ""
+		if v, err := rclone.VersionCLI(); err == nil { ver = v }
+		WriteJSON(w, 200, map[string]any{"remotes": names, "version": ver})
 
 	case http.MethodPost, http.MethodPut:
 		var req struct {
