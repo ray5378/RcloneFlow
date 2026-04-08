@@ -39,6 +39,8 @@ RUN chmod +x /entrypoint.sh
 EXPOSE 17870
 ENV APP_ADDR=:17870
 ENV APP_DATA_DIR=/app/data
+# Force rclone to use a persistent, writable config file path inside the container
+ENV RCLONE_CONFIG=/app/data/rclone.conf
 
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -q -O- http://127.0.0.1:17870/healthz || exit 1
 
