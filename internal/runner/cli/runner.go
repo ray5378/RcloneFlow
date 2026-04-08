@@ -87,8 +87,11 @@ func (r *Runner) Start(opts StartOptions) (*RunHandle, error) {
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil { cancel(); _ = stdoutFile.Close(); _ = stderrFile.Close(); return nil, err }
 
+	// 并发控制
+	acquire()
 	// 启动
 	if err := cmd.Start(); err != nil {
+		release()
 		_ = stdoutFile.Close(); _ = stderrFile.Close(); cancel()
 		return nil, err
 	}
@@ -102,6 +105,7 @@ func (r *Runner) Start(opts StartOptions) (*RunHandle, error) {
 	// 后台：等待退出并清理资源
 	go func(runID int64) {
 		_ = cmd.Wait()
+		release()
 		stdoutFile.Close()
 		stderrFile.Close()
 		RemoveRun(runID)
