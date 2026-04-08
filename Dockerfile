@@ -3,11 +3,11 @@ FROM alpine:3.19 AS rclone-fetch
 ARG RCLONE_VERSION=latest
 RUN apk add --no-cache ca-certificates curl unzip && \
     if [ "$RCLONE_VERSION" = "latest" ] || [ "$RCLONE_VERSION" = "current" ]; then \
-      URL=$(curl -fsSL https://downloads.rclone.org/current/ | sed -n 's#.*href="\(rclone-.*-linux-amd64.zip\)".*#https://downloads.rclone.org/current/\1#p' | head -n1); \
-      curl -fsSL "$URL" -o /tmp/rclone.zip; \
+      URL="https://downloads.rclone.org/rclone-current-linux-amd64.zip"; \
     else \
-      curl -fsSL "https://downloads.rclone.org/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip" -o /tmp/rclone.zip; \
+      URL="https://downloads.rclone.org/${RCLONE_VERSION}/rclone-${RCLONE_VERSION}-linux-amd64.zip"; \
     fi && \
+    curl -fsSL "$URL" -o /tmp/rclone.zip && \
     unzip /tmp/rclone.zip -d /tmp && \
     mv /tmp/rclone-*-linux-amd64/rclone /usr/local/bin/rclone && \
     chmod +x /usr/local/bin/rclone
