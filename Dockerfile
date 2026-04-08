@@ -24,14 +24,14 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o
 # Stage 3: final runtime
 FROM alpine:3.19
 WORKDIR /app
-RUN apk add --no-cache ca-certificates tzdata wget && \
+RUN apk add --no-cache ca-certificates tzdata wget su-exec && \
     adduser -D -u 1000 appuser
 
 COPY --from=builder /out/server /app/server
 COPY --chown=appuser:appuser web /app/web
 COPY --from=rclone-fetch /usr/local/bin/rclone /usr/local/bin/rclone
-
-USER appuser
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 EXPOSE 17870
 ENV APP_ADDR=:17870
@@ -39,4 +39,4 @@ ENV APP_DATA_DIR=/app/data
 
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 CMD wget -q -O- http://127.0.0.1:17870/healthz || exit 1
 
-CMD ["/app/server"]
+ENTRYPOINT ["/entrypoint.sh"]
