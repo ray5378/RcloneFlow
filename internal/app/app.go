@@ -101,6 +101,7 @@ func Run(cfg *config.Config) error {
 	if cfg.GetCleanupInterval() > 0 && cfg.GetCleanupRetention() > 0 {
 		cleanupSvc := service.NewCleanupService(
 			runSvc,
+			db,
 			time.Duration(cfg.GetCleanupInterval())*time.Hour,
 			cfg.GetCleanupRetention(),
 		)
