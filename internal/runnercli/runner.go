@@ -59,8 +59,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	missingCfg := ""
 	if _, err := os.Stat(cfg); err != nil { missingCfg = "[runner] warn: config not found: " + cfg + "\n" }
 
-	dataDir := os.Getenv("APP_DATA_DIR"); if dataDir == "" { dataDir = "./data" }
-	logsDir := filepath.Join(dataDir, "logs"); _ = os.MkdirAll(logsDir, 0o755)
+	logsBase := os.Getenv("APP_DATA_DIR"); if logsBase == "" { logsBase = "./data" }
+	logsDir := filepath.Join(logsBase, "logs"); _ = os.MkdirAll(logsDir, 0o755)
 	stdoutPath := filepath.Join(logsDir, fmt.Sprintf("run-%d-stdout.log", run.ID))
 	stderrPath := filepath.Join(logsDir, fmt.Sprintf("run-%d-stderr.log", run.ID))
 	stdoutFile, _ := os.OpenFile(stdoutPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
