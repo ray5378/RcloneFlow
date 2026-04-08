@@ -41,8 +41,11 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
 	cmdName := strings.ToLower(mode)
 	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" { cmdName = "copy" }
-	// Use one-line JSON stats for reliable machine-readable progress
-	args := []string{cmdName, src, dst, "-vv", "--progress", "--stats", "5s", "--stats-one-line", "--stats-one-line-json", "--log-format", "json"}
+	// Resolve config path
+	dataDir := os.Getenv("APP_DATA_DIR"); if dataDir == "" { dataDir = "./data" }
+	cfg := os.Getenv("RCLONE_CONFIG"); if cfg == "" { cfg = filepath.Join(dataDir, "rclone.conf") }
+	// One-line JSON stats + JSON log records
+	args := []string{cmdName, src, dst, "-vv", "--progress", "--stats", "5s", "--stats-one-line", "--stats-one-line-json", "--log-format", "json", "--config", cfg}
 	// attach advanced options if present
 	if run.Summary != nil {
 		if v, ok := run.Summary["effectiveOptions"]; ok {
@@ -51,6 +54,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			}
 		}
 	}
+	// Write a header for diagnostics
+	_ , _ = stdoutFile.WriteString("[runner] rclone " + strings.Join(args, " ") + "\n")
+	if _, err := os.Stat(cfg); err != nil { _, _ = stderrFile.WriteString("[runner] warn: config not found: " + cfg + "\n") }
 
 	dataDir := os.Getenv("APP_DATA_DIR"); if dataDir == "" { dataDir = "./data" }
 	logsDir := filepath.Join(dataDir, "logs"); _ = os.MkdirAll(logsDir, 0o755)
