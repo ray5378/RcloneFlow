@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"time"
 
 	"rcloneflow/internal/logger"
@@ -11,17 +13,19 @@ import (
 // CleanupService 自动清理服务
 type CleanupService struct {
 	runSvc    *RunService
+	dataDB    *store.DB
 	interval  time.Duration
-	retention int // 保留天数（任务运行记录）
+	retention int // 保留天数（任务运行记录 + 事件采样）
 	// 预留：日志文件/事件表等的独立保留天数，可从环境变量读取，默认与 retention 一致
 	// logRetention int
 	stopCh    chan struct{}
 }
 
 // NewCleanupService 创建自动清理服务
-func NewCleanupService(runSvc *RunService, interval time.Duration, retentionDays int) *CleanupService {
+func NewCleanupService(runSvc *RunService, dataDB *store.DB, interval time.Duration, retentionDays int) *CleanupService {
 	return &CleanupService{
 		runSvc:    runSvc,
+		dataDB:   dataDB,
 		interval:  interval,
 		retention: retentionDays,
 		stopCh:    make(chan struct{}),
@@ -39,11 +43,14 @@ func (s *CleanupService) Start(ctx context.Context) {
 
 	// 启动时立即执行一次清理
 	s.cleanup()
+	// 清理历史 run_events（若表存在）
+	s.cleanupEvents()
 
 	for {
 		select {
 		case <-ticker.C:
 			s.cleanup()
+			s.cleanupEvents()
 		case <-s.stopCh:
 			logger.Info("停止历史记录清理服务")
 			return
