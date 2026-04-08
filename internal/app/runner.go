@@ -1,5 +1,7 @@
 package app
 
+import "rcloneflow/internal/store"
+
 // exported constructor for other packages
 func NewCLIRunner(db *store.DB) *Runner { return NewRunner(db) }
 
