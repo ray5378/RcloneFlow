@@ -84,9 +84,15 @@ sync:
 |------|------|--------|
 | `APP_ADDR` | 服务器地址 | `:17870` |
 | `APP_DATA_DIR` | 数据目录 | `./data` |
-| `RCLONE_MAX_PROCS` | 同时运行任务数上限 | `2` |
+| `RCLONE_MAX_PROCS` | 同时运行任务数上限（CLI 并发） | `2` |
 | `LOG_LEVEL` | 日志级别 | `info` |
 | `LOG_OUTPUT` | 日志输出 | `stdout` |
+| `POOL_INTERVAL_SECONDS` | 旧 RC 任务状态同步间隔（兼容保留） | `30` |
+| `SCHEDULE_INTERVAL_MINUTES` | 定时任务检查间隔（分钟） | `1` |
+| `CLEANUP_INTERVAL_HOURS` | 历史记录清理的周期（小时） | `24` |
+| `CLEANUP_RETENTION_DAYS` | 历史记录与事件采样保留天数 | `15` |
+
+> 说明：本项目已采用 CLI 子进程直控 rclone，默认无需 RC 服务；上述 PoolInterval 仅用于兼容旧数据状态同步。
 
 ## 项目结构
 
