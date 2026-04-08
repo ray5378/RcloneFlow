@@ -6,6 +6,7 @@ import (
 
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/store"
+	"rcloneflow/internal/app"
 )
 
 // TaskService 任务服务层
@@ -85,7 +86,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		TargetPath:   t.TargetPath,
 	})
 	if err != nil { return err }
-	go func(){ _ = NewRunner(s.db).Start(ctx, run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath) }()
+	go func(){ _ = app.NewCLIRunner(s.db).Start(ctx, run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath) }()
 	return nil
 }
 

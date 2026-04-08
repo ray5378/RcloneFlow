@@ -1,5 +1,9 @@
 package app
 
+// exported constructor for other packages
+func NewCLIRunner(db *store.DB) *Runner { return NewRunner(db) }
+
+
 import (
 	"bufio"
 	"context"
@@ -30,6 +34,9 @@ type Runner struct {
 }
 
 func NewRunner(db *store.DB) *Runner { return &Runner{procs: map[int64]*exec.Cmd{}, db: db} }
+
+// NewCLIRunner exported for cross-package use
+func NewCLIRunner(db *store.DB) *Runner { return NewRunner(db) }
 
 func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcPath, dstRemote, dstPath string) error {
 	r.mu.Lock()
