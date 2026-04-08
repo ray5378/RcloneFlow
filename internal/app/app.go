@@ -70,7 +70,8 @@ func Run(cfg *config.Config) error {
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
 
 	// 初始化控制器
-	remoteCtrl := controller.NewRemoteController(rc)
+	configPath := db.PathJoin("rclone.conf")
+	remoteCtrl := controller.NewRemoteController(rc, configPath)
 	taskCtrl := controller.NewTaskController(taskSvc, rc)
 	browserCtrl := controller.NewBrowserController(rc)
 	

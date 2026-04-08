@@ -12,12 +12,13 @@ import (
 
 // RemoteController 远程存储控制器
 type RemoteController struct {
-	rc *rclone.Client
+	rc         *rclone.Client
+	configPath string // 指向受控的 rclone.conf（如 <dataDir>/rclone.conf）
 }
 
 // NewRemoteController 创建远程存储控制器
-func NewRemoteController(rc *rclone.Client) *RemoteController {
-	return &RemoteController{rc: rc}
+func NewRemoteController(rc *rclone.Client, configPath string) *RemoteController {
+	return &RemoteController{rc: rc, configPath: configPath}
 }
 
 // Healthz 健康检查
