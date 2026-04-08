@@ -27,7 +27,7 @@ func (c *CLIConfig) Dump(configPath string) (string, error) {
 	args := []string{"config", "dump"}
 	args = addConfigFlag(args, configPath)
 	if configPath != "" { _ = os.Setenv("RCLONE_CONFIG", configPath) }
-	cmd := exec.Command("rclone", args...)
+	cmd := RcloneCmd(args...)
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
@@ -44,7 +44,7 @@ func (c *CLIConfig) Create(configPath, name, typ string, params map[string]any) 
 	}
 	args = addConfigFlag(args, configPath)
 	if configPath != "" { _ = os.Setenv("RCLONE_CONFIG", configPath) }
-	cmd := exec.Command("rclone", args...)
+	cmd := RcloneCmd(args...)
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
@@ -56,7 +56,7 @@ func (c *CLIConfig) Delete(configPath, name string) error {
 	args := []string{"config", "delete", name}
 	args = addConfigFlag(args, configPath)
 	if configPath != "" { _ = os.Setenv("RCLONE_CONFIG", configPath) }
-	cmd := exec.Command("rclone", args...)
+	cmd := RcloneCmd(args...)
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
@@ -68,7 +68,7 @@ func (c *CLIConfig) TestRemote(name, configPath string) error {
 	args := []string{"lsd", name + ":"}
 	args = addConfigFlag(args, configPath)
 	if configPath != "" { _ = os.Setenv("RCLONE_CONFIG", configPath) }
-	cmd := exec.Command("rclone", args...)
+	cmd := RcloneCmd(args...)
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf

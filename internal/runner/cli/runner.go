@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	rclone "rcloneflow/internal/rclone"
 	"os/signal"
 	"path/filepath"
 	"sync"
@@ -67,7 +68,7 @@ func (r *Runner) Start(opts StartOptions) (*RunHandle, error) {
 	args := BuildCopyArgs(opts.CLI)
 	// 建议上层确保 StatsInterval 或 JSONLog 被启用，便于进度解析
 	ctx, cancel := context.WithCancel(context.Background())
-	cmd := exec.CommandContext(ctx, "rclone", args...)
+	cmd := exec.CommandContext(ctx, rclone.RclonePath(), args...)
 
 	// 工作目录
 	if opts.WorkDir == "" { opts.WorkDir = filepath.Join(os.TempDir(), fmt.Sprintf("rcloneflow-run-%d", opts.RunID)) }

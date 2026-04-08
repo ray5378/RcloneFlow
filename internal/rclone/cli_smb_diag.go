@@ -13,7 +13,7 @@ func TestSMBRoot(host string, share string, user string) (string, string, error)
 	if host != "" { args = append(args, "--smb-host", host) }
 	if share != "" { args = append(args, "--smb-share", share) }
 	if user != "" { args = append(args, "--smb-user", user) }
-	cmd := exec.Command("rclone", args...)
+	cmd := RcloneCmd(args...)
 	var out, errb bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stderr = &errb

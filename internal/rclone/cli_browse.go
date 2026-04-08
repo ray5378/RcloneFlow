@@ -21,7 +21,7 @@ func LsJSON(fs string, path string, extraArgs ...string) ([]ListEntry, error) {
 	if path != "" { full = fmt.Sprintf("%s:%s", fs, path) }
 	args := []string{"lsjson", full}
 	args = append(args, extraArgs...)
-	cmd := exec.Command("rclone", args...)
+	cmd := RcloneCmd(args...)
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
