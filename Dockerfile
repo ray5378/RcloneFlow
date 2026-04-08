@@ -12,14 +12,17 @@ RUN apk add --no-cache ca-certificates curl unzip && \
     mv /tmp/rclone-*-linux-amd64/rclone /usr/local/bin/rclone && \
     chmod +x /usr/local/bin/rclone
 
-# Stage 2: build server (static, linux/amd64)
+# Stage 2: build server (CGO ON for sqlite3 driver)
 FROM golang:1.22-alpine AS builder
 WORKDIR /src
-RUN apk add --no-cache ca-certificates tzdata git
+# build-base provides gcc/make etc. Needed for mattn/go-sqlite3 (CGO)
+RUN apk add --no-cache ca-certificates tzdata git build-base
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o /out/server ./cmd/server
+# Enable CGO to compile sqlite3 driver
+ENV CGO_ENABLED=1
+RUN GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o /out/server ./cmd/server
 
 # Stage 3: final runtime
 FROM alpine:3.19
