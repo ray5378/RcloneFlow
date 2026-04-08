@@ -54,7 +54,25 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			WriteJSON(w, 400, map[string]any{"error": "name/type required"})
 			return
 		}
-		if err := rclone.NewCLIConfig().Create("", req.Name, req.Type, req.Parameters); err != nil {
+		// 规范化与缺省项
+		params := map[string]any{}
+		for k, v := range req.Parameters { params[k] = v }
+		switch req.Type {
+		case "webdav":
+			// 默认 vendor=other；校验 url 前缀
+			if _, ok := params["vendor"]; !ok { params["vendor"] = "other" }
+			if url, _ := params["url"].(string); url == "" {
+				WriteJSON(w, 400, map[string]any{"error": "webdav.url required"}); return
+			}
+		case "smb":
+			// 移除与配置无关的 share；默认 port=445
+			delete(params, "share")
+			if _, ok := params["port"]; !ok { params["port"] = "445" }
+			if host, _ := params["host"].(string); host == "" {
+				WriteJSON(w, 400, map[string]any{"error": "smb.host required"}); return
+			}
+		}
+		if err := rclone.NewCLIConfig().Create("", req.Name, req.Type, params); err != nil {
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
