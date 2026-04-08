@@ -21,7 +21,10 @@ func ConfigDeleteCLIHandler(w http.ResponseWriter, r *http.Request) {
 	name := r.URL.Query().Get("name")
 	configPath := r.URL.Query().Get("configPath")
 	if name == "" { WriteJSON(w, 400, map[string]any{"error": "name required"}); return }
-	cli := rclone.NewCLIConfig()
-	// 延迟实现 Delete（如未实现，返回 501）
-	WriteJSON(w, 501, map[string]any{"error": "not implemented", "name": name, "configPath": configPath})
+	// 直接调用 CLI 删除
+	if err := rclone.NewCLIConfig().Delete(configPath, name); err != nil {
+		WriteJSON(w, 400, map[string]any{"error": err.Error()})
+		return
+	}
+	WriteJSON(w, 200, map[string]any{"deleted": true})
 }
