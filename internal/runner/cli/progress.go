@@ -21,8 +21,8 @@ var (
 
 // DerivedProgress 为上层消费的统一结构。
 type DerivedProgress struct {
-	Bytes            int64      `json:"bytes"`
-	TotalBytes       int64      `json:"totalBytes"`
+	Bytes            float64    `json:"bytes"`
+	TotalBytes       float64    `json:"totalBytes"`
 	Percent          float64    `json:"percent"`
 	SpeedBytesPerSec float64    `json:"speedBps"`
 	EtaSeconds       int64      `json:"etaSec"`
