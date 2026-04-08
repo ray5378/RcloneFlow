@@ -64,7 +64,14 @@ func ensureConfigPath() string {
 	_ = os.MkdirAll(dataDir, 0o755)
 	p := filepath.Join(dataDir, "rclone.conf")
 	if _, err := os.Stat(p); os.IsNotExist(err) {
-		_ = os.WriteFile(p, []byte("{}\n"), 0o644)
+		// rclone.conf 使用 INI 语法，不能写成 JSON “{}”；空文件即可
+		_ = os.WriteFile(p, []byte("\n"), 0o644)
+	} else if b, err := os.ReadFile(p); err == nil {
+		trim := strings.TrimSpace(string(b))
+		if trim == "{}" || strings.HasPrefix(trim, "{") {
+			// 如果误写为 JSON，重置为空避免 rclone 解析报错
+			_ = os.WriteFile(p, []byte("\n"), 0o644)
+		}
 	}
 	return p
 }
