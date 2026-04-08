@@ -90,12 +90,82 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		err := cmd.Wait()
 		outW.Close(); errW.Close()
 		stdoutFile.Close(); stderrFile.Close()
-		status := "finished"
-		if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) { status = "failed" }
-		_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = status })
+		if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) {
+			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "failed" })
+			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
+			return
+		}
+		// Post-Verify (optional)
+		en := os.Getenv("POST_VERIFY_ENABLED")
+		if strings.ToLower(en) == "true" || en == "1" || en == "on" || en == "yes" {
+			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finalizing" })
+			mode := strings.ToLower(os.Getenv("POST_VERIFY_MATCH"))
+			if mode == "" { mode = "size" }
+			interval := 5 * time.Second
+			if v := os.Getenv("POST_VERIFY_INTERVAL"); v != "" { if d, e := time.ParseDuration(v); e == nil { interval = d } }
+			timeout := 30 * time.Minute
+			if v := os.Getenv("POST_VERIFY_TIMEOUT"); v != "" { if d, e := time.ParseDuration(v); e == nil { timeout = d } }
+			deadline := time.Now().Add(timeout)
+			vr := &adapter.CmdRunner{}
+			ok := false
+			var lastSrcBytes, lastDstBytes int64
+			for time.Now().Before(deadline) {
+				if mode == "size" {
+					sb, sc, sErr := sizeOf(vr, cfg, src)
+					db, dc, dErr := sizeOf(vr, cfg, dst)
+					if sErr == nil && dErr == nil {
+						lastSrcBytes, lastDstBytes = sb, db
+						if sb == db && sc == dc { ok = true; break }
+					}
+				}
+				time.Sleep(interval)
+			}
+			if ok {
+				_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
+			} else {
+				_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
+					rr.Status = "finalizing_timeout"
+					if rr.Summary == nil { rr.Summary = map[string]any{} }
+					rr.Summary["postVerify"] = map[string]any{"match":"size","timeout": timeout.String(), "srcBytes": lastSrcBytes, "dstBytes": lastDstBytes}
+				})
+			}
+		} else {
+			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
+		}
 		r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 	}()
 	return nil
+}
+
+func sizeOf(r *adapter.CmdRunner, cfg, target string) (bytes int64, count int64, err error) {
+	// Prefer JSON when available. Fallback to parsing text if needed.
+	args := []string{"size", target, "--config", cfg, "--json"}
+	out, _, e := r.Run(context.Background(), args...)
+	if e == nil {
+		var m map[string]any
+		if json.Unmarshal([]byte(out), &m) == nil {
+			if v, ok := m["bytes"].(float64); ok { bytes = int64(v) }
+			if v, ok := m["count"].(float64); ok { count = int64(v) }
+			return bytes, count, nil
+		}
+	}
+	// Fallback: text parse
+	args = []string{"size", target, "--config", cfg}
+	out, _, e = r.Run(context.Background(), args...)
+	if e != nil { return 0, 0, e }
+	// look for lines: "Total objects: X" and "Total size: Y"
+	scanner := bufio.NewScanner(strings.NewReader(out))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "Total objects:") {
+			fmt.Sscanf(line, "Total objects: %d", &count)
+		}
+		if strings.HasPrefix(line, "Total size:") {
+			var human string
+			fmt.Sscanf(line, "Total size: %s (%d)", &human, &bytes)
+		}
+	}
+	return bytes, count, nil
 }
 
 func (r *Runner) Stop(runID int64) error {
