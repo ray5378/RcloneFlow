@@ -239,3 +239,8 @@ func (a *storeRunAdapter) UpdateRunProgress(id int64, bytesTransferred int64, sp
 func (a *storeRunAdapter) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error {
 	return a.db.UpdateRunStatusByJobId(jobId, status, errorMsg)
 }
+
+// UpdateRunProgressByJobId 根据 JobID 更新运行进度
+func (a *storeRunAdapter) UpdateRunProgressByJobId(jobId int64, bytesTransferred int64, speed string) error {
+	return a.db.UpdateRunProgressByJobId(jobId, bytesTransferred, speed)
+}
