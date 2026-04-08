@@ -1,10 +1,19 @@
-# Stage 1: build
-FROM golang:1.22-bookworm AS builder
+# Stage 1: build (avoid Docker Hub golang by installing Go from tarball)
+FROM debian:bookworm-slim AS builder
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates tzdata curl git build-essential \
+ && rm -rf /var/lib/apt/lists/*
+ARG GO_VERSION=1.22.2
+RUN curl -fsSL -o /tmp/go.tgz https://dl.google.com/go/go${GO_VERSION}.linux-amd64.tar.gz \
+ && tar -C /usr/local -xzf /tmp/go.tgz \
+ && rm -f /tmp/go.tgz
+ENV PATH=/usr/local/go/bin:${PATH}
 WORKDIR /app
 COPY go.mod ./
-RUN go mod download || true
+RUN /usr/local/go/bin/go mod download || true
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/server ./cmd/server
+ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64
+RUN /usr/local/go/bin/go build -o /out/server ./cmd/server
 
 # Stage 2: runtime
 FROM debian:bookworm-slim
