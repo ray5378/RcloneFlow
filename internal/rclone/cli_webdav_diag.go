@@ -7,7 +7,6 @@ import (
 
 // prefer resolved rclone binary
 func rcloneCmd(args ...string) *exec.Cmd { return RcloneCmd(args...) }
-)
 
 // TestWebDAV 以 -vv 测试 webdav 根目录连通性（不传密码，防止泄漏）。
 func TestWebDAV(url, user string) (string, string, error) {
