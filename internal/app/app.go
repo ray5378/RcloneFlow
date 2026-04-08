@@ -125,7 +125,6 @@ func Run(cfg *config.Config) error {
 	addr := cfg.GetServerAddr()
 	candidates := []string{addr, ":17871", ":17872", ":17873", ":17874", ":17875", ":17876", ":17877", ":17878", ":17879"}
 	var ln net.Listener
-	var err error
 	var bound string
 	for i, cand := range candidates {
 		ln, err = net.Listen("tcp", cand)
