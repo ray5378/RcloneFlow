@@ -7,5 +7,8 @@ var defaultRunner = NewRunner()
 // StartRun 启动一次运行（封装 defaultRunner）。
 func StartRun(opts StartOptions) (*RunHandle, error) { return defaultRunner.Start(opts) }
 
-// StopRun 通过句柄停止（占位，后续可根据 runID 查句柄）。
+// StopRun 通过句柄停止。
 func StopRun(h *RunHandle) error { return defaultRunner.Stop(h) }
+
+// StopRunByID 通过 RunID 查找句柄并停止。
+func StopRunByID(runID int64) error { return defaultRunner.StopByRunID(runID) }

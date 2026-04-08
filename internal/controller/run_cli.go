@@ -1,28 +1,29 @@
 package controller
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
-	"github.com/gin-gonic/gin"
-	clirunner "github.com/xxcheng123/rcloneflow/internal/runner/cli"
+	clirunner "rcloneflow/internal/runner/cli"
 )
 
-// RunControllerCLI 提供基于 CLI 运行器的最小接口接入：
-// - POST /api/runs/:id/start_cli 启动
-// - POST /api/runs/:id/stop_cli 停止
-// - GET  /api/runs/:id/progress_cli 进度
+// 最小 CLI 运行器接入（临时）：
+// - POST /api/cli/runs/start/{id}
+// - POST /api/cli/runs/stop/{id}
+// - GET  /api/cli/runs/progress/{id}
 
-var cliRunner = clirunner.NewRunner()
-
-func StartRunCLI(c *gin.Context) {
-	idStr := c.Param("id")
+func StartRunCLIHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost { http.Error(w, "method not allowed", http.StatusMethodNotAllowed); return }
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/cli/runs/start/")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 	var req struct {
-		Src string `json:"src" binding:"required"`
-		Dst string `json:"dst" binding:"required"`
+		Src string `json:"src"`
+		Dst string `json:"dst"`
 	}
-	if err := c.ShouldBindJSON(&req); err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return }
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil { WriteJSON(w, 400, map[string]any{"error": err.Error()}); return }
+	if req.Src == "" || req.Dst == "" { WriteJSON(w, 400, map[string]any{"error": "src/dst 不能为空"}); return }
 	opts := clirunner.StartOptions{
 		RunID: id,
 		WorkDir: "",
@@ -35,22 +36,23 @@ func StartRunCLI(c *gin.Context) {
 			LogLevel: "NOTICE",
 		},
 	}
-	if _, err := cliRunner.Start(opts); err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}); return }
-	c.JSON(http.StatusOK, gin.H{"ok": true})
+	if _, err := clirunner.StartRun(opts); err != nil { WriteJSON(w, 400, map[string]any{"error": err.Error()}); return }
+	WriteJSON(w, 200, map[string]any{"ok": true})
 }
 
-func StopRunCLI(c *gin.Context) {
-	idStr := c.Param("id")
+func StopRunCLIHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost { http.Error(w, "method not allowed", http.StatusMethodNotAllowed); return }
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/cli/runs/stop/")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
-	// 直接从 runner 的内部表取（后续接入 service/dao），此处只做最小可用
-	c.JSON(http.StatusOK, gin.H{"ok": true, "msg": "stop dispatched (use /jobs/:id/stop in正式接入)"})
-	_ = id
+	if err := clirunner.StopRunByID(id); err != nil { WriteJSON(w, 400, map[string]any{"error": err.Error()}); return }
+	WriteJSON(w, 200, map[string]any{"ok": true})
 }
 
-func ProgressRunCLI(c *gin.Context) {
-	idStr := c.Param("id")
+func ProgressRunCLIHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet { http.Error(w, "method not allowed", http.StatusMethodNotAllowed); return }
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/cli/runs/progress/")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 	p, ok := clirunner.GetProgress(id)
-	if !ok { c.JSON(http.StatusOK, gin.H{"ok": true, "progress": nil}); return }
-	c.JSON(http.StatusOK, gin.H{"ok": true, "progress": p})
+	if !ok { WriteJSON(w, 200, map[string]any{"ok": true, "progress": nil}); return }
+	WriteJSON(w, 200, map[string]any{"ok": true, "progress": p})
 }
