@@ -48,6 +48,14 @@ type RunHandle struct {
 // NewRunner 创建运行器。
 func NewRunner() *Runner { return &Runner{procs: make(map[int64]*RunHandle)} }
 
+// GetHandle 通过 RunID 获取句柄。
+func (r *Runner) GetHandle(runID int64) (*RunHandle, bool) {
+	r.mu.Lock()
+	h, ok := r.procs[runID]
+	r.mu.Unlock()
+	return h, ok
+}
+
 // Start 启动 rclone 子进程（默认 copy）。
 // 说明：
 // - 后续会根据任务类型选择 copy/sync 等；此处先用 copy 做最小可用实现
@@ -92,12 +100,15 @@ func (r *Runner) Start(opts StartOptions) (*RunHandle, error) {
 	go r.consumeOnly(stderrPipe, stderrFile)
 
 	// 后台：等待退出并清理资源
-	go func() {
+	go func(runID int64) {
 		_ = cmd.Wait()
 		stdoutFile.Close()
 		stderrFile.Close()
-		RemoveRun(opts.RunID)
-	}()
+		RemoveRun(runID)
+		r.mu.Lock()
+		delete(r.procs, runID)
+		r.mu.Unlock()
+	}(opts.RunID)
 
 	r.mu.Lock()
 	r.procs[opts.RunID] = h
@@ -154,6 +165,13 @@ func (r *Runner) Stop(h *RunHandle) error {
 	if waitExited(h.Cmd, 10*time.Second) { return nil }
 	_ = h.Cmd.Process.Kill()
 	return nil
+}
+
+// StopByRunID 通过 RunID 查句柄并停止。
+func (r *Runner) StopByRunID(runID int64) error {
+	h, ok := r.GetHandle(runID)
+	if !ok { return errors.New("未找到运行句柄") }
+	return r.Stop(h)
 }
 
 func waitExited(cmd *exec.Cmd, d time.Duration) bool {
