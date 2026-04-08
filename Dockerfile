@@ -12,13 +12,22 @@ RUN apk add --no-cache ca-certificates curl unzip && \
     mv /tmp/rclone-*-linux-amd64/rclone /usr/local/bin/rclone && \
     chmod +x /usr/local/bin/rclone
 
-# Stage 2: final runtime
+# Stage 2: build server (static, linux/amd64)
+FROM golang:1.22-alpine AS builder
+WORKDIR /src
+RUN apk add --no-cache ca-certificates tzdata git
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w" -o /out/server ./cmd/server
+
+# Stage 3: final runtime
 FROM alpine:3.19
 WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata wget && \
     adduser -D -u 1000 appuser
 
-COPY --chown=appuser:appuser server /app/server
+COPY --from=builder /out/server /app/server
 COPY --chown=appuser:appuser web /app/web
 COPY --from=rclone-fetch /usr/local/bin/rclone /usr/local/bin/rclone
 
