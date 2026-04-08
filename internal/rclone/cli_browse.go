@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"os/exec"
 )
 
 // ListEntry 与 rclone lsjson 输出字段对齐的最小子集。

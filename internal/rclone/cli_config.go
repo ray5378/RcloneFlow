@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
+
 )
 
 // CLIConfig 封装 rclone config 的最小等价操作。

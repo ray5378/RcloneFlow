@@ -2,7 +2,6 @@ package rclone
 
 import (
 	"bytes"
-	"os/exec"
 )
 
 // TestSMBRoot 尝试列举 smb 根（匿名/无密码），用于快速诊断 SMB exit status 3。
