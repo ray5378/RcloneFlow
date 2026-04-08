@@ -51,4 +51,6 @@ func UpdateProgress(runID int64, p DerivedProgress) {
 		lastSample[runID] = time.Now()
 	}
 	lastSampleMu.Unlock()
+	// 对外广播（用于后续持久化/前端 SSE 等）
+	notifyListeners(runID, p)
 }
