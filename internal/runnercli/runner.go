@@ -41,7 +41,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
 	cmdName := strings.ToLower(mode)
 	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" { cmdName = "copy" }
-	args := []string{cmdName, src, dst, "--use-json-log", "--log-format", "json", "--stats", "5s"}
+	// Use one-line JSON stats for reliable machine-readable progress
+	args := []string{cmdName, src, dst, "--stats", "5s", "--stats-one-line", "--stats-one-line-json", "--log-level", "INFO"}
 	// attach advanced options if present
 	if run.Summary != nil {
 		if v, ok := run.Summary["effectiveOptions"]; ok {
@@ -61,6 +62,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	cmd := runner.CmdContext(ctx, args...)
 	outPipe, _ := cmd.StdoutPipe()
 	errPipe, _ := cmd.StderrPipe()
+	cmd.Stdout = io.MultiWriter(stdoutFile)
+	cmd.Stderr = io.MultiWriter(stderrFile)
 	if err := cmd.Start(); err != nil { return err }
 
 	r.mu.Lock(); r.procs[run.ID] = cmd; r.mu.Unlock()
@@ -70,6 +73,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		rr.Summary["stderrFile"] = stderrPath
 	})
 
+	// concurrently parse progress from both streams (one-line JSON preferred on stderr)
 	go r.consume(run.ID, outPipe, stdoutFile)
 	go r.consume(run.ID, errPipe, stderrFile)
 	go func(){
