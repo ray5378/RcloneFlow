@@ -121,20 +121,33 @@ func Run(cfg *config.Config) error {
 	// 添加中间件
 	handler := withCORS(mux)
 
-	// 启动服务器（带端口占用回退）
+	// 启动服务器（智能端口选择：原端口 → 17871..17879 → :0）
 	addr := cfg.GetServerAddr()
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
-		fallback := ":17871"
-		logger.Warn("监听失败，尝试备用端口", zap.String("addr", addr), zap.Error(err), zap.String("fallback", fallback))
-		ln, err = net.Listen("tcp", fallback)
+	candidates := []string{addr, ":17871", ":17872", ":17873", ":17874", ":17875", ":17876", ":17877", ":17878", ":17879"}
+	var ln net.Listener
+	var err error
+	var bound string
+	for i, cand := range candidates {
+		ln, err = net.Listen("tcp", cand)
+		if err == nil {
+			bound = cand
+			if i > 0 {
+				logger.Warn("监听端口被占用，已切换备用端口", zap.String("requested", addr), zap.String("bound", bound))
+			}
+			break
+		}
+	}
+	if ln == nil {
+		// 让内核分配一个可用端口
+		ln, err = net.Listen("tcp", ":0")
 		if err != nil {
-			logger.Error("备用端口监听失败", zap.String("fallback", fallback), zap.Error(err))
+			logger.Error("无法绑定任何端口", zap.Error(err))
 			return err
 		}
-		addr = fallback
+		bound = ln.Addr().String()
+		logger.Warn("端口占用严重，使用随机端口", zap.String("bound", bound))
 	}
-	logger.Info("服务监听中", zap.String("addr", addr))
+	logger.Info("服务监听中", zap.String("addr", bound))
 	return http.Serve(ln, handler)
 }
 
