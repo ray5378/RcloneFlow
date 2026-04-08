@@ -7,6 +7,7 @@ import (
 
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/service"
+	clirunner "rcloneflow/internal/runner/cli"
 )
 
 // RunController 运行记录控制器
@@ -112,8 +113,8 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// 获取一次全局统计（作为最后兜底）
-	globalStats, _ := c.rc.CoreStats(r.Context())
+	// CLI 改造后：不再依赖 RC 的全局统计；此处置空或后续以 CLI 聚合替代
+	var globalStats map[string]any
 
 	// 同步每个运行中任务的实时状态
 	type ActiveRun struct {
@@ -128,18 +129,9 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 	for _, run := range runs {
 		active := ActiveRun{RunRecord: run, GlobalStats: globalStats}
 
-		// 如果有rcJobID，获取实时状态和该任务自己的 group stats
-		if run.RcJobID > 0 {
-			st, err := c.rc.JobStatus(r.Context(), run.RcJobID)
-			if err == nil {
-				active.RealTimeStatus = st
-				// 更新数据库状态
-				c.runSvc.UpdateRunStatus(run.ID, st)
-			}
-			groupName := "job/" + strconv.FormatInt(run.RcJobID, 10)
-			if gs, err := c.rc.CoreStatsGroup(r.Context(), groupName); err == nil {
-				active.GroupStats = gs
-			}
+		// CLI 改造：从内存态获取 DerivedProgress，不再依赖 rcJobID
+		if p := (service.NewCLIRunAdapter()).GetDerivedProgress(run.ID); p != nil {
+			active.DerivedProgress = p
 		}
 
 		// 派生一个更稳定的前端进度对象：优先 job/group stats，其次 job/status，最后兜底全局 stats
@@ -173,18 +165,6 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			}
 		}
 		if len(derived) > 0 {
-			// 检测异常重复重传：累计 bytes 明显大于当前正在传输文件大小
-			if transferring, ok := active.GroupStats["transferring"].([]any); ok && len(transferring) > 0 {
-				if first, ok := transferring[0].(map[string]any); ok {
-					size, _ := first["size"].(float64)
-					bytesV, _ := derived["bytes"].(float64)
-					if size > 0 && bytesV > size*2 {
-						derived["anomaly"] = "possible_restart_loop"
-						derived["anomalyMessage"] = "检测到累计传输量已明显超过文件本身大小，疑似重复重传或目标端缓存重试。"
-						derived["currentFileSize"] = size
-					}
-				}
-			}
 			active.DerivedProgress = derived
 		}
 
@@ -196,47 +176,27 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 
 // HandleGlobalStats 处理获取全局实时统计信息
 func (c *RunController) HandleGlobalStats(w http.ResponseWriter, r *http.Request) {
-	stats, err := c.rc.CoreStats(r.Context())
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
-		return
-	}
-	WriteJSON(w, 200, stats)
+	// CLI 改造后暂无全局统计，返回空结构或后续聚合实现
+	WriteJSON(w, 200, map[string]any{"ok": true})
 }
 
 // HandleJobStatus 处理获取指定 Job 的状态
 func (c *RunController) HandleJobStatus(w http.ResponseWriter, r *http.Request) {
+	// CLI 改造：job 概念由 runID 代替，这里保持兼容，返回内存态 DerivedProgress
 	jobIdStr := r.PathValue("jobId")
-	jobId, err := strconv.ParseInt(jobIdStr, 10, 64)
-	if err != nil {
-		WriteJSON(w, 400, map[string]any{"error": "invalid job id"})
-		return
-	}
-
-	status, err := c.rc.JobStatus(r.Context(), jobId)
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
-		return
-	}
-	WriteJSON(w, 200, status)
+	runID, err := strconv.ParseInt(jobIdStr, 10, 64)
+	if err != nil { WriteJSON(w, 400, map[string]any{"error": "invalid id"}); return }
+	p, ok := service.NewCLIRunAdapter().GetDerivedProgress(runID), true
+	if !ok || p == nil { WriteJSON(w, 200, map[string]any{"progress": nil}); return }
+	WriteJSON(w, 200, p)
 }
 
 // HandleJobStop 处理停止指定的 Job
 func (c *RunController) HandleJobStop(w http.ResponseWriter, r *http.Request) {
 	jobIdStr := r.PathValue("jobId")
-	jobId, err := strconv.ParseInt(jobIdStr, 10, 64)
-	if err != nil {
-		WriteJSON(w, 400, map[string]any{"error": "invalid job id"})
-		return
-	}
-
-	if err := c.rc.JobStop(r.Context(), jobId); err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
-		return
-	}
-
-	// 更新数据库中该任务的状态为 stopped
-	c.runSvc.UpdateRunStatusByJobId(jobId, "stopped", "用户手动停止")
-
+	runID, err := strconv.ParseInt(jobIdStr, 10, 64)
+	if err != nil { WriteJSON(w, 400, map[string]any{"error": "invalid id"}); return }
+	if err := clirunner.StopRunByID(runID); err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	c.runSvc.UpdateRunStatusByJobId(runID, "stopped", "用户手动停止")
 	WriteJSON(w, 200, map[string]any{"success": true})
 }
