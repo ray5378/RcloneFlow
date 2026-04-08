@@ -1,8 +1,6 @@
 package controller
 
-import (
-	"net/http"
-)
+import ()
 
 // FsController 文件系统操作控制器
 // 注意：FS 传输类操作均已切换为 CLI，在 fs_cli.go 实现。
