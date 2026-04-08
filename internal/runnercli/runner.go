@@ -42,7 +42,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	cmdName := strings.ToLower(mode)
 	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" { cmdName = "copy" }
 	// Use one-line JSON stats for reliable machine-readable progress
-	args := []string{cmdName, src, dst, "--stats", "5s", "--stats-one-line", "--stats-one-line-json", "--log-level", "INFO"}
+	args := []string{cmdName, src, dst, "-vv", "--progress", "--stats", "5s", "--stats-one-line", "--stats-one-line-json", "--log-format", "json"}
 	// attach advanced options if present
 	if run.Summary != nil {
 		if v, ok := run.Summary["effectiveOptions"]; ok {
@@ -60,10 +60,11 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	stderrFile, _ := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 
 	cmd := runner.CmdContext(ctx, args...)
-	outPipe, _ := cmd.StdoutPipe()
-	errPipe, _ := cmd.StderrPipe()
-	cmd.Stdout = io.MultiWriter(stdoutFile)
-	cmd.Stderr = io.MultiWriter(stderrFile)
+	// fan-out: write to file and to parser via io.Pipe
+	outR, outW := io.Pipe()
+	errR, errW := io.Pipe()
+	cmd.Stdout = io.MultiWriter(stdoutFile, outW)
+	cmd.Stderr = io.MultiWriter(stderrFile, errW)
 	if err := cmd.Start(); err != nil { return err }
 
 	r.mu.Lock(); r.procs[run.ID] = cmd; r.mu.Unlock()
@@ -73,14 +74,14 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		rr.Summary["stderrFile"] = stderrPath
 	})
 
-	// concurrently parse progress from both streams (one-line JSON preferred on stderr)
-	go r.consume(run.ID, outPipe, stdoutFile)
-	go r.consume(run.ID, errPipe, stderrFile)
+	go r.consume(run.ID, outR, stdoutFile)
+	go r.consume(run.ID, errR, stderrFile)
 	go func(){
-		_ = cmd.Wait()
+		err := cmd.Wait()
+		outW.Close(); errW.Close()
 		stdoutFile.Close(); stderrFile.Close()
 		status := "finished"
-		if !cmd.ProcessState.Success() { status = "failed" }
+		if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) { status = "failed" }
 		_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = status })
 		r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 	}()
