@@ -107,91 +107,28 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 // HandleActiveRuns 处理获取所有运行中的任务及其实时状态
 func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request) {
 	runs, err := c.runSvc.ListActiveRuns()
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
-		return
-	}
-
-	// 获取一次全局统计（作为最后兜底）
-	globalStats, _ := c.rc.CoreStats(r.Context())
-
-	// 同步每个运行中任务的实时状态
-	type ActiveRun struct {
-		RunRecord       service.RunRecord `json:"runRecord"`
-		RealTimeStatus  map[string]any    `json:"realtimeStatus,omitempty"`
-		GroupStats      map[string]any    `json:"groupStats,omitempty"`
-		GlobalStats     map[string]any    `json:"globalStats,omitempty"`
-		DerivedProgress map[string]any    `json:"derivedProgress,omitempty"`
-	}
-
-	activeRuns := make([]ActiveRun, 0, len(runs))
+	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	// 扁平化关键字段：bytes/totalBytes/speed/eta，从 run.Summary.progress 提取
+	items := make([]map[string]any, 0, len(runs))
 	for _, run := range runs {
-		active := ActiveRun{RunRecord: run, GlobalStats: globalStats}
-
-		// 如果有rcJobID，获取实时状态和该任务自己的 group stats
-		if run.RcJobID > 0 {
-			st, err := c.rc.JobStatus(r.Context(), run.RcJobID)
-			if err == nil {
-				active.RealTimeStatus = st
-				// 更新数据库状态
-				c.runSvc.UpdateRunStatus(run.ID, st)
-			}
-			groupName := "job/" + strconv.FormatInt(run.RcJobID, 10)
-			if gs, err := c.rc.CoreStatsGroup(r.Context(), groupName); err == nil {
-				active.GroupStats = gs
+		item := map[string]any{"id": run.ID, "taskId": run.TaskID, "status": run.Status}
+		var progress map[string]any
+		if run.Summary != "" {
+			// run.Summary 在 service 层可能是字符串化的；这里容错解析
+			if m, ok := any(run.Summary).(map[string]any); ok {
+				if p, ok := m["progress"].(map[string]any); ok { progress = p }
 			}
 		}
-
-		// 派生一个更稳定的前端进度对象：优先 job/group stats，其次 job/status，最后兜底全局 stats
-		derived := map[string]any{}
-		if active.GroupStats != nil {
-			for _, key := range []string{"bytes", "totalBytes", "total_bytes", "speed", "speedAvg", "speed_avg", "eta", "percentage", "checks", "transfers", "totalTransfers", "group"} {
-				if v, ok := active.GroupStats[key]; ok {
-					derived[key] = v
-				}
-			}
+		if progress != nil {
+			item["progress"] = progress
+			if v, ok := progress["bytes"]; ok { item["bytes"] = v }
+			if v, ok := progress["totalBytes"]; ok { item["totalBytes"] = v }
+			if v, ok := progress["speed"]; ok { item["speed"] = v }
+			if v, ok := progress["eta"]; ok { item["eta"] = v }
 		}
-		if active.RealTimeStatus != nil {
-			for _, key := range []string{"bytes", "totalBytes", "total_bytes", "speed", "speedAvg", "speed_avg", "eta", "percentage", "group"} {
-				if _, exists := derived[key]; !exists {
-					if v, ok := active.RealTimeStatus[key]; ok {
-						derived[key] = v
-					}
-				}
-			}
-			if progress, ok := active.RealTimeStatus["progress"]; ok {
-				derived["progress"] = progress
-			}
-		}
-		if globalStats != nil {
-			for _, key := range []string{"bytes", "totalBytes", "total_bytes", "speed", "speedAvg", "speed_avg", "eta", "percentage"} {
-				if _, exists := derived[key]; !exists {
-					if v, ok := globalStats[key]; ok {
-						derived[key] = v
-					}
-				}
-			}
-		}
-		if len(derived) > 0 {
-			// 检测异常重复重传：累计 bytes 明显大于当前正在传输文件大小
-			if transferring, ok := active.GroupStats["transferring"].([]any); ok && len(transferring) > 0 {
-				if first, ok := transferring[0].(map[string]any); ok {
-					size, _ := first["size"].(float64)
-					bytesV, _ := derived["bytes"].(float64)
-					if size > 0 && bytesV > size*2 {
-						derived["anomaly"] = "possible_restart_loop"
-						derived["anomalyMessage"] = "检测到累计传输量已明显超过文件本身大小，疑似重复重传或目标端缓存重试。"
-						derived["currentFileSize"] = size
-					}
-				}
-			}
-			active.DerivedProgress = derived
-		}
-
-		activeRuns = append(activeRuns, active)
+		items = append(items, item)
 	}
-
-	WriteJSON(w, 200, activeRuns)
+	WriteJSON(w, 200, map[string]any{"runs": items})
 }
 
 // HandleGlobalStats 处理获取全局实时统计信息
