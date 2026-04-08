@@ -3,13 +3,12 @@ package rclone
 import (
 	"bufio"
 	"bytes"
-	"os/exec"
 	"strings"
 )
 
 // VersionCLI returns `rclone version` first line, e.g., "rclone v1.73.3"
 func VersionCLI() (string, error) {
-	cmd := exec.Command("rclone", "version")
+	cmd := RcloneCmd("version")
 	var buf bytes.Buffer
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
