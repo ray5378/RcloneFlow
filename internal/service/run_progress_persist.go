@@ -1,7 +1,6 @@
 package service
 
 import (
-	"database/sql"
 	"fmt"
 
 	clirunner "rcloneflow/internal/runner/cli"
@@ -14,7 +13,7 @@ func AttachProgressPersistence(db RunServiceInterface, sdb *store.DB) (detach fu
 	hasEventsTable := func() bool {
 		if sdb == nil { return false }
 		var name string
-		err := sdb.DB().QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='run_events'").Scan(&name)
+		err := sdb.Raw().QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='run_events'").Scan(&name)
 		return err == nil && name == "run_events"
 	}()
 
@@ -27,9 +26,9 @@ func AttachProgressPersistence(db RunServiceInterface, sdb *store.DB) (detach fu
 			// 将采样写入 run_events（按 runs.id，对应 rc_job_id=runID 的记录）
 			// 找到 run 记录 id
 			var id int64
-			err := sdb.DB().QueryRow("SELECT id FROM runs WHERE rc_job_id = ? ORDER BY id DESC LIMIT 1", runID).Scan(&id)
+			err := sdb.Raw().QueryRow("SELECT id FROM runs WHERE rc_job_id = ? ORDER BY id DESC LIMIT 1", runID).Scan(&id)
 			if err == nil && id > 0 {
-				_, _ = sdb.DB().Exec(
+				_, _ = sdb.Raw().Exec(
 					"INSERT INTO run_events(run_id, bytes, total_bytes, percent, speed_bps, eta_sec) VALUES(?,?,?,?,?,?)",
 					id, p.Bytes, p.TotalBytes, p.Percent, p.SpeedBytesPerSec, p.EtaSeconds,
 				)
@@ -37,6 +36,3 @@ func AttachProgressPersistence(db RunServiceInterface, sdb *store.DB) (detach fu
 		}
 	})
 }
-
-// DB 方法暴露（轻量封装）
-func (db *store.DB) DB() *sql.DB { return db.Raw() }
