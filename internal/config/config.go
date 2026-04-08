@@ -170,6 +170,20 @@ func loadFromEnv(cfg *Config) {
 	if v := os.Getenv("LOG_OUTPUT"); v != "" {
 		cfg.Log.Output = v
 	}
+
+	// 同步/清理配置（可选环境变量覆盖）
+	if v := os.Getenv("POOL_INTERVAL_SECONDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 { cfg.Sync.PoolInterval = n }
+	}
+	if v := os.Getenv("SCHEDULE_INTERVAL_MINUTES"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 { cfg.Sync.ScheduleInterval = n }
+	}
+	if v := os.Getenv("CLEANUP_INTERVAL_HOURS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 { cfg.Sync.CleanupInterval = n }
+	}
+	if v := os.Getenv("CLEANUP_RETENTION_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 { cfg.Sync.CleanupRetention = n }
+	}
 }
 
 // GetRcloneAddr 返回rclone地址（用于环境变量）
