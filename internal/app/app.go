@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"time"
 
@@ -120,10 +121,21 @@ func Run(cfg *config.Config) error {
 	// 添加中间件
 	handler := withCORS(mux)
 
-	// 启动服务器
+	// 启动服务器（带端口占用回退）
 	addr := cfg.GetServerAddr()
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		fallback := ":17871"
+		logger.Warn("监听失败，尝试备用端口", zap.String("addr", addr), zap.Error(err), zap.String("fallback", fallback))
+		ln, err = net.Listen("tcp", fallback)
+		if err != nil {
+			logger.Error("备用端口监听失败", zap.String("fallback", fallback), zap.Error(err))
+			return err
+		}
+		addr = fallback
+	}
 	logger.Info("服务监听中", zap.String("addr", addr))
-	return http.ListenAndServe(addr, handler)
+	return http.Serve(ln, handler)
 }
 
 // withCORS CORS中间件
