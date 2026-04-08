@@ -10,8 +10,7 @@ import (
 func ConfigDumpCLIHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet { http.Error(w, "method not allowed", http.StatusMethodNotAllowed); return }
 	configPath := r.URL.Query().Get("configPath")
-	cli := rclone.NewCLIConfig()
-	out, err := cli.Dump(configPath)
+	out, err := rclone.NewCLIConfig().Dump(configPath)
 	if err != nil { WriteJSON(w, 400, map[string]any{"error": err.Error()}); return }
 	WriteJSON(w, 200, map[string]any{"dump": out})
 }
