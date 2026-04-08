@@ -111,24 +111,44 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 	// 扁平化关键字段：bytes/totalBytes/speed/eta，从 run.Summary.progress 提取
 	items := make([]map[string]any, 0, len(runs))
 	for _, run := range runs {
-		item := map[string]any{"id": run.ID, "taskId": run.TaskID, "status": run.Status}
+		// 兼容前端旧形状：每项包含 runRecord + realtimeStatus + derivedProgress
 		var progress map[string]any
-		if run.Summary != "" {
-			// run.Summary 在 service 层可能是字符串化的；这里容错解析
-			if m, ok := any(run.Summary).(map[string]any); ok {
-				if p, ok := m["progress"].(map[string]any); ok { progress = p }
-			}
+		if m, ok := any(run.Summary).(map[string]any); ok {
+			if p, ok := m["progress"].(map[string]any); ok { progress = p }
 		}
-		if progress != nil {
-			item["progress"] = progress
-			if v, ok := progress["bytes"]; ok { item["bytes"] = v }
-			if v, ok := progress["totalBytes"]; ok { item["totalBytes"] = v }
-			if v, ok := progress["speed"]; ok { item["speed"] = v }
-			if v, ok := progress["eta"]; ok { item["eta"] = v }
+		bytes := int64(0)
+		if v, ok := progress["bytes"].(float64); ok { bytes = int64(v) }
+		total := int64(0)
+		if v, ok := progress["totalBytes"].(float64); ok { total = int64(v) }
+		speed := int64(0)
+		if v, ok := progress["speed"].(float64); ok { speed = int64(v) }
+		var eta any
+		if v, ok := progress["eta"]; ok { eta = v }
+		percentage := 0.0
+		if total > 0 { percentage = float64(bytes) / float64(total) * 100 }
+
+		item := map[string]any{
+			"runRecord": map[string]any{
+				"id": run.ID,
+				"taskId": run.TaskID,
+				"status": run.Status,
+				"rcJobId": 0,
+				"bytesTransferred": run.BytesTransferred,
+				"error": run.Error,
+			},
+			"realtimeStatus": map[string]any{"progress": progress, "error": run.Error},
+			"derivedProgress": map[string]any{
+				"bytes": bytes,
+				"totalBytes": total,
+				"speed": speed,
+				"eta": eta,
+				"percentage": percentage,
+			},
 		}
 		items = append(items, item)
 	}
-	WriteJSON(w, 200, map[string]any{"runs": items})
+	// 前端期望返回数组
+	WriteJSON(w, 200, items)
 }
 
 // HandleGlobalStats 处理获取全局实时统计信息
