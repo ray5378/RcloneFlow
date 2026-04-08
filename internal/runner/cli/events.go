@@ -43,9 +43,7 @@ var (
 )
 
 func UpdateProgress(runID int64, p DerivedProgress) {
-	stMu.Lock()
-	stProg[runID] = p
-	stMu.Unlock()
+	setProgress(runID, p)
 	// 采样：至少 1s 才写一条事件
 	lastSampleMu.Lock()
 	if t, ok := lastSample[runID]; !ok || time.Since(t) >= time.Second {

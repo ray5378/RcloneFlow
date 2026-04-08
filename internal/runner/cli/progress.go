@@ -56,11 +56,11 @@ func parseJSONProgress(line string) (DerivedProgress, bool) {
 	stat, _ := m["stats"].(map[string]any)
 	if stat == nil { return DerivedProgress{}, false }
 	p := DerivedProgress{UpdatedAt: time.Now()}
-	p.Bytes = toInt64(stat["bytes"]) 
-	if p.TotalBytes = toInt64(stat["totalBytes"]); p.TotalBytes == 0 {
+	p.Bytes = float64(toInt64(stat["bytes"]))
+	if p.TotalBytes = float64(toInt64(stat["totalBytes"])); p.TotalBytes == 0 {
 		// 某些版本字段名不同，兼容 total / total_bytes
-		if v := toInt64(stat["total"]); v > 0 { p.TotalBytes = v }
-		if v := toInt64(stat["total_bytes"]); v > 0 { p.TotalBytes = v }
+		if v := toInt64(stat["total"]); v > 0 { p.TotalBytes = float64(v) }
+		if v := toInt64(stat["total_bytes"]); v > 0 { p.TotalBytes = float64(v) }
 	}
 	if v := toFloat64(stat["percentage"]); v > 0 { p.Percent = v }
 	// 速度字段可能为 speed / speedAvg / bytesPerSecond

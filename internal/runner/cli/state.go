@@ -10,8 +10,8 @@ var (
 	stProg    = make(map[int64]DerivedProgress) // runID -> progress
 )
 
-// UpdateProgress 更新某个运行的最新进度。
-func UpdateProgress(runID int64, p DerivedProgress) {
+// setProgress 更新某个运行的最新进度（内部）。
+func setProgress(runID int64, p DerivedProgress) {
 	stMu.Lock()
 	stProg[runID] = p
 	stMu.Unlock()
