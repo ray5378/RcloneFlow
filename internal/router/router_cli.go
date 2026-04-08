@@ -19,6 +19,9 @@ func SetupCLI(mux *http.ServeMux) {
 	mux.HandleFunc("/api/cli/remotes/dump", controller.RemoteDumpCLIHandler)
 	// browser
 	mux.HandleFunc("/api/cli/browser/list", controller.BrowserListCLIHandler)
+	// config
+	mux.HandleFunc("/api/cli/config/dump", controller.ConfigDumpCLIHandler)
+	mux.HandleFunc("/api/cli/config/delete", controller.ConfigDeleteCLIHandler)
 	// events
 	mux.HandleFunc("/api/cli/runs/events/", controller.RunEventsCLIHandler)
 }
