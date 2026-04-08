@@ -731,6 +731,16 @@ func (db *DB) UpdateRunProgress(id int64, bytesTransferred int64, speed string) 
 	return err
 }
 
+// UpdateRunProgressByJobId 根据 JobID 更新进度（bytes/speed）
+func (db *DB) UpdateRunProgressByJobId(jobId int64, bytesTransferred int64, speed string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	_, err := db.db.Exec(`
+		UPDATE runs SET bytes_transferred = ?, speed = ?, updated_at = ?
+		WHERE rc_job_id = ?`, bytesTransferred, speed, time.Now(), jobId)
+	return err
+}
+
 // UpdateRunStatusByJobId 根据 JobID 更新运行状态
 func (db *DB) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error {
 	db.mu.Lock()

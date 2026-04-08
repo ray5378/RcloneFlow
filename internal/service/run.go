@@ -35,6 +35,7 @@ type RunServiceInterface interface {
 	DeleteRunsByTask(taskId int64) error
 	CleanOldRuns(days int) (int64, error)
 	UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error
+	UpdateRunProgressByJobId(jobId int64, bytesTransferred int64, speed string) error
 }
 
 // RunService 运行记录服务层

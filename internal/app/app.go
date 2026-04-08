@@ -71,11 +71,13 @@ func Run(cfg *config.Config) error {
 	// 初始化路由
 	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl)
 
-	// 启动任务状态同步服务
+	// 启动任务状态同步服务（RC 同步仍保留以兼容老数据；CLI 路径通过内存事件主动回写 DB）
 	jobSync := service.NewJobSyncService(db, rc, cfg.GetPoolInterval())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go jobSync.Start(ctx)
+	// 附加 CLI 进度持久化监听器
+	_ = service.AttachProgressPersistence(service.NewStoreRunAdapter(db))
 
 	// 启动历史记录清理服务
 	if cfg.GetCleanupInterval() > 0 && cfg.GetCleanupRetention() > 0 {
