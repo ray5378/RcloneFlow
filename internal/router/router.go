@@ -88,6 +88,7 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	// 运行记录
 	apiMux.HandleFunc("/api/runs", r.runCtrl.HandleRuns)
 	apiMux.HandleFunc("/api/runs/active", r.runCtrl.HandleActiveRuns)
+	apiMux.HandleFunc("/api/runs/events/", r.runCtrl.HandleRunEvents)
 	apiMux.HandleFunc("/api/stats/global", r.runCtrl.HandleGlobalStats)
 	apiMux.HandleFunc("/api/jobs/{jobId}/status", r.runCtrl.HandleJobStatus)
 	apiMux.HandleFunc("/api/jobs/{jobId}/stop", r.runCtrl.HandleJobStop)
