@@ -1,3 +1,12 @@
+# Stage 1: build
+FROM golang:1.22-bookworm AS builder
+WORKDIR /app
+COPY go.mod ./
+RUN go mod download || true
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/server ./cmd/server
+
+# Stage 2: runtime
 FROM debian:bookworm-slim
 WORKDIR /app
 
@@ -17,8 +26,8 @@ RUN curl -fsSL -o /tmp/rclone.zip https://downloads.rclone.org/rclone-current-li
  && rm -rf /tmp/rclone.zip /tmp/rclone-*-linux-amd64
 
 # Copy server and web assets
-COPY --chown=appuser:appuser server /app/server
-COPY --chown=appuser:appuser web /app/web
+COPY --from=builder /out/server /app/server
+COPY web /app/web
 
 USER appuser
 
