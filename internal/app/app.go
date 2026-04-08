@@ -76,8 +76,8 @@ func Run(cfg *config.Config) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	go jobSync.Start(ctx)
-	// 附加 CLI 进度持久化监听器
-	_ = service.AttachProgressPersistence(service.NewStoreRunAdapter(db))
+	// 附加 CLI 进度持久化监听器（写回 runs.bytes/speed + 事件表）
+	_ = service.AttachProgressPersistence(service.NewStoreRunAdapter(db), db)
 
 	// 启动历史记录清理服务
 	if cfg.GetCleanupInterval() > 0 && cfg.GetCleanupRetention() > 0 {
