@@ -7,6 +7,7 @@ import (
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/store"
 	runnercli "rcloneflow/internal/runnercli"
+	"rcloneflow/internal/settings"
 )
 
 // TaskService 任务服务层
@@ -85,6 +86,13 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		TargetRemote: t.TargetRemote,
 		TargetPath:   t.TargetPath,
 	})
+	// 合并全局传输设置（用于 Runner 默认值回退）
+	if ts, err := settings.Load(); err == nil {
+		_ = s.db.UpdateRun(run.ID, func(rr *store.Run){
+			if rr.Summary == nil { rr.Summary = map[string]any{} }
+			rr.Summary["transferDefaults"] = ts
+		})
+	}
 	if err != nil { return err }
 	go func(){ _ = runnercli.New(s.db).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath) }()
 	return nil

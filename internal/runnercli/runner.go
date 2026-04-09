@@ -95,38 +95,57 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 			return
 		}
-		// Post-Verify (optional)
-		en := os.Getenv("POST_VERIFY_ENABLED")
-		if strings.ToLower(en) == "true" || en == "1" || en == "on" || en == "yes" {
+		// Post-Verify（读取任务级/全局设置）
+		pvEnabled := true
+		pvMode := "mount"
+		pvMatch := "size"
+		pvInterval := 5 * time.Second
+		pvTimeout := 30 * time.Minute
+		// 从 run.Summary.effectiveOptions 读取任务覆盖
+		_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
+			// 仅为了读 summary，不改变状态
+		})
+		cur, _ := r.db.GetRun(run.ID)
+		if cur.Summary != nil {
+			if eff, ok := cur.Summary["effectiveOptions"].(map[string]any); ok {
+				if v, ok := eff["postVerify.enabled"].(bool); ok { pvEnabled = v }
+				if v, ok := eff["postVerify.mode"].(string); ok && v != "" { pvMode = v }
+				if v, ok := eff["postVerify.match"].(string); ok && v != "" { pvMatch = v }
+				if v, ok := eff["postVerify.interval"].(string); ok { if d, e := time.ParseDuration(v); e == nil { pvInterval = d } }
+				if v, ok := eff["postVerify.timeout"].(string); ok { if d, e := time.ParseDuration(v); e == nil { pvTimeout = d } }
+			}
+			// 再从 transferDefaults 读取全局默认
+			if def, ok := cur.Summary["transferDefaults"].(map[string]any); ok {
+				if !existsBool(eff(cur), "postVerify.enabled") { if b, ok := def["postVerifyEnabled"].(bool); ok { pvEnabled = b } }
+				if !existsStr(eff(cur), "postVerify.mode") { if s, ok := def["postVerifyMode"].(string); ok && s != "" { pvMode = s } }
+				if !existsStr(eff(cur), "postVerify.match") { if s, ok := def["postVerifyMatch"].(string); ok && s != "" { pvMatch = s } }
+				if !existsStr(eff(cur), "postVerify.interval") { if s, ok := def["postVerifyInterval"].(string); ok { if d, e := time.ParseDuration(s); e == nil { pvInterval = d } } }
+				if !existsStr(eff(cur), "postVerify.timeout") { if s, ok := def["postVerifyTimeout"].(string); ok { if d, e := time.ParseDuration(s); e == nil { pvTimeout = d } } }
+			}
+		}
+		if pvEnabled && pvMode == "mount" {
 			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finalizing" })
-			mode := strings.ToLower(os.Getenv("POST_VERIFY_MATCH"))
-			if mode == "" { mode = "size" }
-			interval := 5 * time.Second
-			if v := os.Getenv("POST_VERIFY_INTERVAL"); v != "" { if d, e := time.ParseDuration(v); e == nil { interval = d } }
-			timeout := 30 * time.Minute
-			if v := os.Getenv("POST_VERIFY_TIMEOUT"); v != "" { if d, e := time.ParseDuration(v); e == nil { timeout = d } }
-			deadline := time.Now().Add(timeout)
+			deadline := time.Now().Add(pvTimeout)
 			vr := &adapter.CmdRunner{}
 			ok := false
 			var lastSrcBytes, lastDstBytes int64
 			for time.Now().Before(deadline) {
-				if mode == "size" {
+				if pvMatch == "size" {
 					sb, sc, sErr := sizeOf(vr, cfg, src)
-					db, dc, dErr := sizeOf(vr, cfg, dst)
+					db2, dc, dErr := sizeOf(vr, cfg, dst)
 					if sErr == nil && dErr == nil {
-						lastSrcBytes, lastDstBytes = sb, db
-						if sb == db && sc == dc { ok = true; break }
+						lastSrcBytes, lastDstBytes = sb, db2
+						if sb == db2 && sc == dc { ok = true; break }
 					}
 				}
-				time.Sleep(interval)
+				time.Sleep(pvInterval)
 			}
-			if ok {
-				_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
-			} else {
+			if ok { _ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" }) } 
+			else {
 				_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
 					rr.Status = "finalizing_timeout"
 					if rr.Summary == nil { rr.Summary = map[string]any{} }
-					rr.Summary["postVerify"] = map[string]any{"match":"size","timeout": timeout.String(), "srcBytes": lastSrcBytes, "dstBytes": lastDstBytes}
+					rr.Summary["postVerify"] = map[string]any{"match": pvMatch, "timeout": pvTimeout.String(), "srcBytes": lastSrcBytes, "dstBytes": lastDstBytes}
 				})
 			}
 		} else {
