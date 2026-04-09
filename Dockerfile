@@ -28,7 +28,7 @@ WORKDIR /app
 
 # Copy server, web, and rclone
 COPY --from=gobuilder /out/server /app/server
-COPY --from=webbuilder /fe/dist /app/web
+COPY --from=webbuilder /web /app/web
 COPY --from=gobuilder /go/bin/rclone /usr/bin/rclone
 
 USER appuser
