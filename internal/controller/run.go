@@ -141,7 +141,16 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				"bytesTransferred": run.BytesTransferred,
 				"error": run.Error,
 			},
-			"realtimeStatus": map[string]any{"progress": progress, "error": run.Error},
+			// 兼容旧前端：在 realtimeStatus 中也提供扁平字段
+			"realtimeStatus": map[string]any{
+				"progress": progress,
+				"error": run.Error,
+				"bytes": bytes,
+				"totalBytes": total,
+				"speed": speed,
+				"eta": eta,
+				"percentage": percentage,
+			},
 			"derivedProgress": map[string]any{
 				"bytes": bytes,
 				"totalBytes": total,
