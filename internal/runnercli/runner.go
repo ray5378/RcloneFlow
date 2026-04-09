@@ -95,8 +95,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		rr.Summary["stderrFile"] = stderrPath
 	})
 
-	go r.consume(run.ID, outR, stdoutFile, false)
-	// 在 stderr 同时写入并解析 one-line 进度
+	// 同时在 stdout/stderr 中解析 one-line 进度，兼容不同输出流
+	go r.consume(run.ID, outR, stdoutFile, true)
 	go r.consume(run.ID, errR, stderrFile, true)
 	go func(){
 		err := cmd.Wait()
