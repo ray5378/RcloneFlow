@@ -25,6 +25,8 @@ const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const historyFilterTaskId = ref<number | null>(null)
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
+const runDetailProgress = ref<any>(null)
+let runDetailTimer: any = null
 const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
 const showGlobalStatsModal = ref(false)
@@ -1003,8 +1005,41 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span>{{ formatDuration(runDetail.startedAt, runDetail.finishedAt) }}</span>
           </div>
           <div class="detail-item">
-            <label>传输速度：</label>
-            <span>{{ runDetail.speed || '-' }}</span>
+            <label>进度：</label>
+            <span>
+              <template v-if="historyProgressFromSummary(runDetail.summary)">
+                {{ (historyProgressFromSummary(runDetail.summary)?.percentage || 0).toFixed(2) }}%
+              </template>
+              <template v-else>-</template>
+            </span>
+          </div>
+          <div class="detail-item">
+            <label>当前速度：</label>
+            <span>
+              <template v-if="historyProgressFromSummary(runDetail.summary)">
+                {{ formatBytesPerSec(historyProgressFromSummary(runDetail.summary)?.speed || 0) }}
+              </template>
+              <template v-else>{{ runDetail.speed || '-' }}</template>
+            </span>
+          </div>
+          <div class="detail-item">
+            <label>已传输/总大小：</label>
+            <span>
+              <template v-if="historyProgressFromSummary(runDetail.summary)">
+                {{ formatBytes(historyProgressFromSummary(runDetail.summary)?.bytes || 0) }} /
+                {{ formatBytes(historyProgressFromSummary(runDetail.summary)?.totalBytes || 0) }}
+              </template>
+              <template v-else>-</template>
+            </span>
+          </div>
+          <div class="detail-item">
+            <label>预计剩余时间：</label>
+            <span>
+              <template v-if="historyProgressFromSummary(runDetail.summary)">
+                {{ formatEta(historyProgressFromSummary(runDetail.summary)?.eta || 0) }}
+              </template>
+              <template v-else>-</template>
+            </span>
           </div>
           <div class="detail-item full-width">
             <label>传输统计：</label>
