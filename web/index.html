@@ -184,13 +184,79 @@
           (b.parentElement||card||document.body).appendChild(btn);
         });
       }
-      const mo=new MutationObserver(()=>{ try{hookSettingsMenu(); hookTaskCards();}catch(e){} });
+      // 在顶层窗口监听来自子文档的“打开弹窗”请求
+      window.addEventListener('message', (ev)=>{
+        if(!ev || !ev.data) return;
+        if(ev.data.kind === 'rf:open-transfer'){
+          if(ev.data.taskId){ setTab('task'); setTaskId(ev.data.taskId); }
+          open();
+        }
+      });
+
+      function eachContext(fn){
+        const ctxs = [document];
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(f=>{ try{ if(f.contentDocument) ctxs.push(f.contentDocument); }catch(e){} });
+        ctxs.forEach(fn);
+      }
+
+      function hookAll(){
+        eachContext((doc)=>{
+          try{ hookSettingsMenuCtx(doc); hookTaskCardsCtx(doc); }catch(e){}
+        });
+      }
+
+      function hookSettingsMenuCtx(doc){
+        if(doc.getElementById('rfSettingsLink')) return;
+        const btn = [...doc.querySelectorAll('button, a, [role="button"]')]
+          .find(b=>/(修改密码|保存设置|保存)/.test(((b.textContent||'')+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('aria-label')||'')).trim()));
+        if(btn && !doc.getElementById('rfSettingsLink')){
+          const link=doc.createElement('button');
+          link.id='rfSettingsLink'; link.className=btn.className||'rf-btn ghost'; link.style.marginLeft='8px'; link.textContent='传输选项';
+          link.onclick=()=>{ window.postMessage({kind:'rf:open-transfer'}, '*'); };
+          (btn.parentElement||btn).appendChild(link);
+          return;
+        }
+        const candidates=[...doc.querySelectorAll('*')].filter(el=>{
+          const t=(el.textContent||'').replace(/\s+/g,'').trim();
+          const aLabel=(el.getAttribute('aria-label')||'')+(el.getAttribute('title')||'');
+          return /设置/.test(t) || /设置/.test(aLabel);
+        });
+        for(const el of candidates){
+          const host= el.closest('button, a, [role="button"], [role="menuitem"], li, div');
+          if(!host || host.querySelector && host.querySelector('#rfSettingsLink')) continue;
+          const link=doc.createElement('button');
+          link.id='rfSettingsLink'; link.className='rf-btn ghost'; link.style.marginLeft='8px'; link.textContent='传输选项';
+          link.onclick=()=>{ window.postMessage({kind:'rf:open-transfer'}, '*'); };
+          (host.parentElement||host).appendChild(link);
+          return;
+        }
+      }
+
+      function hookTaskCardsCtx(doc){
+        const runBtns=[...doc.querySelectorAll('button, a, [role="button"]')]
+          .filter(b=>/(^|[^一-龥A-Za-z])(运行|执行|Run)([^一-龥A-Za-z]|$)/.test(((b.textContent||'')+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('aria-label')||'')).trim()));
+        runBtns.forEach(b=>{
+          const parent = b.parentElement || b;
+          if(parent.querySelector && parent.querySelector('button[data-rf-task-btn]')) return;
+          let card = b; for(let i=0;i<5 && card;i++) card = card.parentElement;
+          let taskId = NaN; let p = b.parentElement;
+          while(p && p !== doc){ const v = p.getAttribute?.('data-task-id') || p.getAttribute?.('data-taskId'); if(v && /^\d+$/.test(v)){ taskId=parseInt(v,10); break; } p = p.parentElement; }
+          if(isNaN(taskId)){
+            const m = (card?.textContent || '').match(/(?:任务|Task)?[#：: ](\d{1,12})/);
+            if(m) taskId = parseInt(m[1],10);
+          }
+          const btn = doc.createElement('button'); btn.textContent='传输选项'; btn.dataset.rfTaskBtn='1'; btn.style.marginLeft='8px'; btn.className=b.className||'';
+          btn.onclick=()=>{ window.postMessage({kind:'rf:open-transfer', taskId: isNaN(taskId)? undefined : taskId}, '*'); };
+          parent.appendChild(btn);
+        });
+      }
+
+      const mo=new MutationObserver(()=>{ hookAll(); });
       mo.observe(document.documentElement,{childList:true,subtree:true});
-      // 周期性重试，容错路由切换与异步渲染
-      let retries=0; const timer=setInterval(()=>{ if(retries++>60){ clearInterval(timer); return;} try{hookSettingsMenu(); hookTaskCards();}catch(e){} }, 2000);
-      // 初始执行一次
-      try{hookSettingsMenu(); hookTaskCards();}catch(e){}
-      // 深链接支持：/#transfer 或 /#transfer?taskId=123
+      let retries=0; const timer=setInterval(()=>{ if(retries++>90){ clearInterval(timer); return;} hookAll(); }, 1500);
+      hookAll();
+
       function openFromHash(){
         if(location.hash && location.hash.startsWith('#transfer')){
           const m=location.hash.match(/taskId=(\d+)/);
