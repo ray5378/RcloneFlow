@@ -286,6 +286,57 @@
       window.addEventListener('hashchange', openFromHash);
       openFromHash();
     })();
+    // —— 终极注入：穿透 shadow DOM/同源 iframe，锚定“深色模式”和“手动运行” ——
+    (function attachTransferButtons(){
+      function* allRoots(){
+        const roots=[document];
+        const walk=root=>{ const tw=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT); for(let n=tw.currentNode;n;n=tw.nextNode()){ if(n.shadowRoot){ roots.push(n.shadowRoot); walk(n.shadowRoot);} } };
+        walk(document);
+        document.querySelectorAll('iframe').forEach(f=>{ try{ if(f.contentDocument) roots.push(f.contentDocument);}catch(e){} });
+        yield* roots;
+      }
+      function openModal(taskId){
+        const mask=document.querySelector('#rfMask'); const modal=document.querySelector('#rfModal');
+        if(!mask || !modal) return;
+        if(taskId){ const tabTask=document.querySelector('#tabTask'); tabTask&&tabTask.click&&tabTask.click(); const idInput=document.querySelector('#t_id'); if(idInput) idInput.value=String(taskId); }
+        mask.style.display='block'; modal.style.display='block';
+      }
+      let tries=0; const timer=setInterval(()=>{
+        let injected=0;
+        for(const root of allRoots()){
+          const doc=root.ownerDocument||document;
+          // 设置页：.settings-item “深色模式”后一项插入“传输选项”
+          const items = root.querySelectorAll? root.querySelectorAll('.settings-item') : [];
+          items && items.forEach(it=>{
+            if(doc.getElementById('rfSettingsItem')) return;
+            const t=(it.querySelector('.settings-text')?.textContent||'').trim();
+            if(/深色模式|Dark/i.test(t)){
+              const clone=it.cloneNode(true); clone.id='rfSettingsItem';
+              const icon=clone.querySelector('.settings-icon'); if(icon) icon.textContent='⚙️';
+              const tx=clone.querySelector('.settings-text'); if(tx) tx.textContent='传输选项';
+              clone.addEventListener('click',()=>openModal());
+              it.parentNode && it.parentNode.insertBefore(clone, it.nextSibling);
+              injected++;
+            }
+          });
+          // 任务卡片：button.ghost.small 或含“手动运行/运行/执行/Run”
+          const btns = root.querySelectorAll? root.querySelectorAll('button.ghost.small, button, a, [role="button"]') : [];
+          btns && btns.forEach(b=>{
+            const txt = ((b.textContent||'')+' '+(b.getAttribute?.('title')||'')+' '+(b.getAttribute?.('aria-label')||'')).trim();
+            const isRun = /手动运行|(^|[^一-龥A-Za-z])(运行|执行|Run)([^一-龥A-Za-z]|$)/.test(txt);
+            if(!isRun) return;
+            const parent=b.parentElement||b; if(parent.querySelector&&parent.querySelector('button[data-rf-task-btn]')) return;
+            let taskId=NaN, p=b.parentElement, depth=0;
+            while(p && depth++<6){ const v=p.getAttribute?.('data-task-id')||p.getAttribute?.('data-taskId'); if(v && /^\d+$/.test(v)){ taskId=parseInt(v,10); break;} p=p.parentElement; }
+            if(isNaN(taskId)){ const m=(parent?.textContent||'').match(/(?:任务|Task)?[#：: ](\d{1,12})/); if(m) taskId=parseInt(m[1],10); }
+            const nb=doc.createElement('button'); nb.textContent='传输选项'; nb.dataset.rfTaskBtn='1'; nb.className=b.className||'ghost small'; nb.style.marginLeft='8px';
+            nb.onclick=()=>openModal(isNaN(taskId)?undefined:taskId);
+            parent.appendChild(nb); injected++;
+          });
+        }
+        if(++tries>90 || injected>0) clearInterval(timer);
+      }, 1000);
+    })();
   </script>
 </body>
 </html>
