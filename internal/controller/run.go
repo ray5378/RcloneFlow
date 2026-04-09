@@ -187,12 +187,23 @@ func (c *RunController) HandleGlobalStats(w http.ResponseWriter, r *http.Request
 	}
 	var bytesSum, totalSum, speedSum float64
 	for _, run := range runs {
-		if m, ok := any(run.Summary).(map[string]any); ok {
-			if p, ok := m["progress"].(map[string]any); ok {
-				if v, ok := p["bytes"].(float64); ok { bytesSum += v }
-				if v, ok := p["totalBytes"].(float64); ok { totalSum += v }
-				if v, ok := p["speed"].(float64); ok { speedSum += v }
+		// 兼容 summary 为 map 或 string
+		var p map[string]any
+		switch v := any(run.Summary).(type) {
+		case map[string]any:
+			if pp, ok := v["progress"].(map[string]any); ok { p = pp }
+		case string:
+			if v != "" {
+				var m map[string]any
+				if json.Unmarshal([]byte(v), &m) == nil {
+					if pp, ok := m["progress"].(map[string]any); ok { p = pp }
+				}
 			}
+		}
+		if p != nil {
+			if v, ok := p["bytes"].(float64); ok { bytesSum += v }
+			if v, ok := p["totalBytes"].(float64); ok { totalSum += v }
+			if v, ok := p["speed"].(float64); ok { speedSum += v }
 		}
 	}
 	percentage := 0.0
