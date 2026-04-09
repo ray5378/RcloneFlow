@@ -1505,7 +1505,8 @@ body.light .item { border-color: #f0f0f0; }
 }
 .cmd-textarea{ width:100%; min-height:120px; padding:12px 14px; border-radius:10px; border:1px solid #333; background:#252525; color:#e0e0e0; font-size:14px; box-sizing:border-box; resize:vertical; }
 body.light .cmd-textarea{ background:#fff; border-color:#ddd; color:#333 }
-.inline-label{ display:flex; align-items:center; gap:8px; }
+.form-content label.inline-label{ display:flex !important; align-items:center; gap:8px; margin:0 0 6px 0; }
+.form-content label.inline-label input[type="checkbox"]{ width:16px; height:16px; }
 body.light .form-content input,
 body.light .form-content select { background: #fff; border-color: #ddd; color: #333; }
 .path-selector { display: flex; gap: 8px; align-items: flex-start; }
