@@ -9,5 +9,128 @@
 </head>
 <body>
   <div id="app"></div>
+  <style>
+    .rf-fab{position:fixed;right:18px;bottom:18px;z-index:9999;background:#2563eb;color:#fff;border-radius:22px;border:none;padding:10px 14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3);font-weight:600}
+    .rf-modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:saturate(60%) blur(4px);z-index:9998;display:none}
+    .rf-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:680px;max-width:92vw;background:#151923;color:#e5e7eb;border:1px solid #1f2430;border-radius:12px;z-index:9999;display:none}
+    .rf-modal .hd{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #1f2430}
+    .rf-modal .bd{padding:16px}
+    .rf-modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .rf-modal label{font-size:13px;color:#c9d1d9}
+    .rf-modal input[type=text], .rf-modal select{background:#0f1320;border:1px solid #273042;color:#e5e7eb;padding:8px 10px;border-radius:10px;font:inherit}
+    .rf-modal .row{display:flex;flex-direction:column;gap:6px}
+    .rf-modal .ft{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #1f2430;padding:12px 16px}
+    .rf-btn{padding:8px 12px;border:none;border-radius:10px;cursor:pointer;font-weight:600}
+    .rf-btn.primary{background:#2563eb;color:#fff}
+    .rf-btn.ghost{background:#263043;color:#d1d5db}
+    .rf-tabs{display:flex;gap:8px;padding:8px 12px}
+    .rf-tab{padding:6px 10px;border-radius:8px;cursor:pointer;background:#0f1320;border:1px solid #273042;color:#c9d1d9}
+    .rf-tab.active{background:#2563eb;border-color:#2563eb;color:#fff}
+    @media (max-width:640px){.rf-modal{width:96vw}}
+  </style>
+  <button id="rfOpen" class="rf-fab">传输选项</button>
+  <div id="rfMask" class="rf-modal-mask"></div>
+  <div id="rfModal" class="rf-modal" role="dialog" aria-modal="true">
+    <div class="hd"><div>传输选项</div><button id="rfClose" class="rf-btn ghost">关闭</button></div>
+    <div class="rf-tabs">
+      <div id="tabGlobal" class="rf-tab active">全局</div>
+      <div id="tabTask" class="rf-tab">任务</div>
+    </div>
+    <div class="bd">
+      <div id="paneGlobal">
+        <div class="grid">
+          <div class="row"><label><input id="g_pvEnabled" type="checkbox" /> 启用收尾校验</label></div>
+          <div class="row"><label>校验模式</label><select id="g_pvMode"><option value="mount">挂载路径</option></select></div>
+          <div class="row"><label>轮询间隔</label><input id="g_pvInterval" type="text" placeholder="5s" /></div>
+          <div class="row"><label>超时时间</label><input id="g_pvTimeout" type="text" placeholder="30m" /></div>
+          <div class="row"><label>mtime 稳定期</label><input id="g_pvMtime" type="text" placeholder="60s" /></div>
+          <div class="row"><label>匹配方式</label><select id="g_pvMatch"><option value="size">按大小</option></select></div>
+          <div class="row"><label>最短重跑间隔</label><input id="g_minRerun" type="text" placeholder="30m" /></div>
+        </div>
+      </div>
+      <div id="paneTask" style="display:none">
+        <div class="grid">
+          <div class="row"><label>任务 ID</label><input id="t_id" type="text" placeholder="例如 1" /></div>
+          <div class="row"><label><input id="t_pvEnabled" type="checkbox" /> 启用收尾校验</label></div>
+          <div class="row"><label>校验模式</label><select id="t_pvMode"><option value="mount">挂载路径</option></select></div>
+          <div class="row"><label>轮询间隔</label><input id="t_pvInterval" type="text" placeholder="5s" /></div>
+          <div class="row"><label>超时时间</label><input id="t_pvTimeout" type="text" placeholder="30m" /></div>
+          <div class="row"><label>mtime 稳定期</label><input id="t_pvMtime" type="text" placeholder="60s" /></div>
+          <div class="row"><label>匹配方式</label><select id="t_pvMatch"><option value="size">按大小</option></select></div>
+          <div class="row"><label>最短重跑间隔</label><input id="t_minRerun" type="text" placeholder="30m" /></div>
+        </div>
+      </div>
+      <div id="rfMsg" style="padding:8px 0;color:#9aa4b2"></div>
+    </div>
+    <div class="ft">
+      <button id="rfSave" class="rf-btn primary">保存</button>
+      <button id="rfReload" class="rf-btn ghost">重新载入</button>
+    </div>
+  </div>
+  <script>
+    (function(){
+      const $ = s=>document.querySelector(s);
+      const open = ()=>{ $('#rfMask').style.display='block'; $('#rfModal').style.display='block'; loadGlobal(); };
+      const close= ()=>{ $('#rfMask').style.display='none'; $('#rfModal').style.display='none'; };
+      const token= ()=>{ try{return localStorage.getItem('authToken')||''}catch(e){return ''} };
+      const setTab=(k)=>{
+        if(k==='global'){ $('#tabGlobal').classList.add('active'); $('#tabTask').classList.remove('active'); $('#paneGlobal').style.display='block'; $('#paneTask').style.display='none'; }
+        else { $('#tabTask').classList.add('active'); $('#tabGlobal').classList.remove('active'); $('#paneTask').style.display='block'; $('#paneGlobal').style.display='none'; }
+      };
+      async function loadGlobal(){
+        $('#rfMsg').textContent='';
+        try{
+          const res=await fetch('/api/settings/transfer',{headers:{Authorization:'Bearer '+token()}});
+          if(!res.ok) throw new Error('HTTP '+res.status);
+          const d=await res.json();
+          $('#g_pvEnabled').checked=!!d.postVerifyEnabled;
+          $('#g_pvMode').value=d.postVerifyMode||'mount';
+          $('#g_pvInterval').value=d.postVerifyInterval||'5s';
+          $('#g_pvTimeout').value=d.postVerifyTimeout||'30m';
+          $('#g_pvMtime').value=d.postVerifyMtimeGrace||'60s';
+          $('#g_pvMatch').value=d.postVerifyMatch||'size';
+          $('#g_minRerun').value=d.minRerunInterval||'30m';
+        }catch(e){ $('#rfMsg').textContent='读取失败：'+(e.message||e); }
+      }
+      async function saveGlobal(){
+        const body={
+          postVerifyEnabled: $('#g_pvEnabled').checked,
+          postVerifyMode: $('#g_pvMode').value,
+          postVerifyInterval: $('#g_pvInterval').value.trim(),
+          postVerifyTimeout: $('#g_pvTimeout').value.trim(),
+          postVerifyMtimeGrace: $('#g_pvMtime').value.trim(),
+          postVerifyMatch: $('#g_pvMatch').value,
+          minRerunInterval: $('#g_minRerun').value.trim(),
+        };
+        const res=await fetch('/api/settings/transfer',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify(body)});
+        const d=await res.json().catch(()=>({})); if(!res.ok||d.error) throw new Error(d.error||('HTTP '+res.status));
+      }
+      async function saveTask(){
+        const id=parseInt($('#t_id').value.trim(),10); if(!id) throw new Error('请填写任务ID');
+        const opts={
+          'postVerify.enabled': $('#t_pvEnabled').checked,
+          'postVerify.mode': $('#t_pvMode').value,
+          'postVerify.interval': $('#t_pvInterval').value.trim(),
+          'postVerify.timeout': $('#t_pvTimeout').value.trim(),
+          'postVerify.mtimeGrace': $('#t_pvMtime').value.trim(),
+          'postVerify.match': $('#t_pvMatch').value,
+          'minRerunInterval': $('#t_minRerun').value.trim(),
+        };
+        const res=await fetch('/api/tasks',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify({id,options:opts})});
+        const d=await res.json().catch(()=>({})); if(!res.ok||d.error) throw new Error(d.error||('HTTP '+res.status));
+      }
+      $('#rfOpen').addEventListener('click', open);
+      $('#rfClose').addEventListener('click', close);
+      $('#rfMask').addEventListener('click', close);
+      $('#tabGlobal').addEventListener('click', ()=>setTab('global'));
+      $('#tabTask').addEventListener('click', ()=>setTab('task'));
+      $('#rfReload').addEventListener('click', ()=>{ if($('#tabGlobal').classList.contains('active')) loadGlobal(); else $('#rfMsg').textContent=''; });
+      $('#rfSave').addEventListener('click', async ()=>{
+        $('#rfMsg').style.color='#9aa4b2'; $('#rfMsg').textContent='保存中...';
+        try{ if($('#tabGlobal').classList.contains('active')) await saveGlobal(); else await saveTask(); $('#rfMsg').style.color='#22c55e'; $('#rfMsg').textContent='已保存'; }
+        catch(e){ $('#rfMsg').style.color='#ef4444'; $('#rfMsg').textContent='保存失败：'+(e.message||e); }
+      });
+    })();
+  </script>
 </body>
 </html>
