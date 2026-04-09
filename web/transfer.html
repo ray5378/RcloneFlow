@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>传输选项（全局设置） - RcloneFlow</title>
+  <style>
+    body { font-family: -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,Helvetica,Arial; margin: 0; background: #0f1115; color: #e5e7eb; }
+    .wrap { max-width: 720px; margin: 24px auto; padding: 16px; }
+    .card { background: #151923; border: 1px solid #1f2430; border-radius: 12px; padding: 20px; }
+    h1 { font-size: 18px; margin: 0 0 8px; }
+    p.desc { margin: 0 0 16px; color: #9aa4b2; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .row { display: flex; flex-direction: column; gap: 8px; }
+    label { font-size: 14px; color: #c9d1d9; }
+    input[type="text"], select { background: #0f1320; border: 1px solid #273042; color: #e5e7eb; padding: 10px 12px; border-radius: 10px; font: inherit; }
+    input[type="checkbox"] { transform: scale(1.2); }
+    .hint { font-size: 12px; color: #8b98a5; }
+    .actions { display: flex; gap: 12px; margin-top: 20px; }
+    button { padding: 10px 14px; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-secondary { background: #263043; color: #d1d5db; }
+    .ok { color: #22c55e; font-size: 13px; }
+    .err { color: #ef4444; font-size: 13px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>传输选项（全局默认）</h1>
+      <p class="desc">用于控制任务完成判定与重跑行为。任务级设置优先于全局默认；未配置时使用以下默认值。</p>
+      <div class="grid">
+        <div class="row">
+          <label><input id="pvEnabled" type="checkbox" /> 启用收尾校验（Post-Verify）</label>
+          <div class="hint">开启后，rclone 结束后进入“收尾校验”，等待目标在挂载路径上稳定可见后再标记完成。</div>
+        </div>
+        <div class="row">
+          <label for="pvMode">校验模式</label>
+          <select id="pvMode">
+            <option value="mount">挂载路径（推荐）</option>
+          </select>
+          <div class="hint">基于挂载路径做 size/count/mtime 稳定性判断。</div>
+        </div>
+        <div class="row">
+          <label for="pvInterval">轮询间隔</label>
+          <input id="pvInterval" type="text" placeholder="5s" />
+          <div class="hint">检查频率，建议 3–10 秒，例如 5s / 10s / 1m。</div>
+        </div>
+        <div class="row">
+          <label for="pvTimeout">超时时间</label>
+          <input id="pvTimeout" type="text" placeholder="30m" />
+          <div class="hint">超过该时长仍未满足“稳定可见”则标记为“收尾超时（finalizing_timeout）”。</div>
+        </div>
+        <div class="row">
+          <label for="pvMtime">mtime 稳定期</label>
+          <input id="pvMtime" type="text" placeholder="60s" />
+          <div class="hint">目标文件在最近该时长内的修改时间不再变化，视为“写回已稳定”。</div>
+        </div>
+        <div class="row">
+          <label for="pvMatch">匹配方式</label>
+          <select id="pvMatch">
+            <option value="size">按大小</option>
+          </select>
+          <div class="hint">目前仅支持按大小；后续可增加“大小+时间”或“哈希”。</div>
+        </div>
+        <div class="row">
+          <label for="minRerun">最短重跑间隔</label>
+          <input id="minRerun" type="text" placeholder="30m" />
+          <div class="hint">同一任务完成后至少间隔该时长才允许再次自动触发，避免过早重跑。</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn-primary" id="btnSave">保存</button>
+        <button class="btn-secondary" id="btnReload">重新载入</button>
+        <span id="msg"></span>
+      </div>
+    </div>
+  </div>
+  <script>
+    function token() { try { return localStorage.getItem('authToken') || ''; } catch(e){ return ''; } }
+    async function load() {
+      const msg = document.getElementById('msg'); msg.textContent = '';
+      try {
+        const res = await fetch('/api/settings/transfer', { headers: { 'Authorization': 'Bearer ' + token() } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const d = await res.json();
+        document.getElementById('pvEnabled').checked = !!d.postVerifyEnabled;
+        document.getElementById('pvMode').value = d.postVerifyMode || 'mount';
+        document.getElementById('pvInterval').value = d.postVerifyInterval || '5s';
+        document.getElementById('pvTimeout').value = d.postVerifyTimeout || '30m';
+        document.getElementById('pvMtime').value = d.postVerifyMtimeGrace || '60s';
+        document.getElementById('pvMatch').value = d.postVerifyMatch || 'size';
+        document.getElementById('minRerun').value = d.minRerunInterval || '30m';
+      } catch (e) { msg.innerHTML = '<span class="err">读取失败：'+(e.message||e)+'</span>'; }
+    }
+    async function save() {
+      const msg = document.getElementById('msg'); msg.textContent = '';
+      const body = {
+        postVerifyEnabled: document.getElementById('pvEnabled').checked,
+        postVerifyMode: document.getElementById('pvMode').value,
+        postVerifyInterval: document.getElementById('pvInterval').value.trim(),
+        postVerifyTimeout: document.getElementById('pvTimeout').value.trim(),
+        postVerifyMtimeGrace: document.getElementById('pvMtime').value.trim(),
+        postVerifyMatch: document.getElementById('pvMatch').value,
+        minRerunInterval: document.getElementById('minRerun').value.trim(),
+      };
+      try {
+        const res = await fetch('/api/settings/transfer', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token() },
+          body: JSON.stringify(body)
+        });
+        const d = await res.json().catch(()=>({}));
+        if (!res.ok || d.error) throw new Error(d.error || ('HTTP '+res.status));
+        msg.innerHTML = '<span class="ok">已保存</span>';
+      } catch (e) { msg.innerHTML = '<span class="err">保存失败：'+(e.message||e)+'</span>'; }
+    }
+    document.getElementById('btnSave').addEventListener('click', save);
+    document.getElementById('btnReload').addEventListener('click', load);
+    load();
+  </script>
+</body>
+</html>
