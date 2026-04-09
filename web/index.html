@@ -207,7 +207,8 @@
       }
 
       function hookSettingsMenuCtx(doc){
-        if(doc.getElementById('rfSettingsLink')) return;
+        if(doc.getElementById('rfSettingsLink') || doc.getElementById('rfSettingsItem')) return;
+        // 方案一：和“保存/修改密码”同一行
         const btn = [...doc.querySelectorAll('button, a, [role="button"]')]
           .find(b=>/(修改密码|保存设置|保存)/.test(((b.textContent||'')+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('aria-label')||'')).trim()));
         if(btn && !doc.getElementById('rfSettingsLink')){
@@ -217,6 +218,24 @@
           (btn.parentElement||btn).appendChild(link);
           return;
         }
+        // 方案二：列表式设置项（你的示例：div.settings-item > span.settings-text: 深色模式）
+        const listItems = [...doc.querySelectorAll('.settings-item')];
+        for(const it of listItems){
+          const labelEl = it.querySelector('.settings-text');
+          const text = (labelEl?.textContent||'').trim();
+          if(/深色模式|Dark/i.test(text)){
+            if(!doc.getElementById('rfSettingsItem')){
+              const newItem = it.cloneNode(true);
+              newItem.id = 'rfSettingsItem';
+              const icon = newItem.querySelector('.settings-icon'); if(icon) icon.textContent = '⚙️';
+              const t = newItem.querySelector('.settings-text'); if(t) t.textContent = '传输选项';
+              newItem.addEventListener('click', ()=>{ window.postMessage({kind:'rf:open-transfer'}, '*'); });
+              it.parentNode && it.parentNode.insertBefore(newItem, it.nextSibling);
+              return;
+            }
+          }
+        }
+        // 方案三：回退到“设置”文字附近
         const candidates=[...doc.querySelectorAll('*')].filter(el=>{
           const t=(el.textContent||'').replace(/\s+/g,'').trim();
           const aLabel=(el.getAttribute('aria-label')||'')+(el.getAttribute('title')||'');
