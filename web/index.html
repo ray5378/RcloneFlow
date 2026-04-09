@@ -121,7 +121,7 @@
         const res=await fetch('/api/tasks',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify({id,options:opts})});
         const d=await res.json().catch(()=>({})); if(!res.ok||d.error) throw new Error(d.error||('HTTP '+res.status));
       }
-      $('#rfOpen').addEventListener('click', open);
+      const rfOpenEl = document.querySelector('#rfOpen'); if (rfOpenEl) rfOpenEl.addEventListener('click', open);
       $('#rfClose').addEventListener('click', close);
       $('#rfMask').addEventListener('click', close);
       $('#tabGlobal').addEventListener('click', ()=>setTab('global'));
