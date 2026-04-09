@@ -43,12 +43,9 @@ const showTransferModal = ref(false)
 const transferTaskId = ref<number | undefined>(undefined)
 
 // 运行详情 - 文件列表分页
-const runDetail = ref<any>({})
-const showDetailModal = ref(false)
 const runFiles = ref<any[]>([])
 const runFilesPage = ref(1)
 const runFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 380) / 32)))
-let runDetailTimer:any = null
 
 function pickFilesFromRun(run:any){
   // 优先从实时数据
