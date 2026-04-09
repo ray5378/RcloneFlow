@@ -29,7 +29,7 @@ RUN go build -o /out/server ./cmd/server
 
 # Stage 3: runtime (Alpine)
 FROM alpine:3.19
-RUN apk add --no-cache ca-certificates tzdata sqlite-libs \
+RUN apk add --no-cache ca-certificates tzdata sqlite-libs wget \
  && adduser -D -u 1000 appuser \
  && mkdir -p /app/data /app/web \
  && chown -R appuser:appuser /app
@@ -46,5 +46,9 @@ EXPOSE 17870
 ENV APP_ADDR=:17870
 ENV APP_DATA_DIR=/app/data
 ENV RCLONE_CONFIG=/app/data/rclone.conf
+
+# Built-in healthcheck using wget
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:17870/healthz >/dev/null 2>&1 || exit 1
 
 CMD ["/app/server"]
