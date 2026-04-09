@@ -113,8 +113,12 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 	for _, run := range runs {
 		// 兼容前端旧形状：每项包含 runRecord + realtimeStatus + derivedProgress
 		var progress map[string]any
-		if m, ok := any(run.Summary).(map[string]any); ok {
-			if p, ok := m["progress"].(map[string]any); ok { progress = p }
+		// run.Summary 在 RunService 层是 string，这里需要先反序列化
+		if s, ok := any(run.Summary).(string); ok && s != "" {
+			var m map[string]any
+			if json.Unmarshal([]byte(s), &m) == nil {
+				if p, ok := m["progress"].(map[string]any); ok { progress = p }
+			}
 		}
 		bytes := int64(0)
 		if v, ok := progress["bytes"].(float64); ok { bytes = int64(v) }
