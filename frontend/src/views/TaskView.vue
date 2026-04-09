@@ -995,12 +995,11 @@ import TransferOptions from '../components/TransferOptions.vue'
     <div class="card-header"><div class="title">添加任务</div></div>
     <div class="form-content">
       <div class="field-item">
-        <label>命令行模式（可粘贴 rclone 命令）</label>
-        <div class="inline-flex">
+        <label class="inline-label">
           <input type="checkbox" v-model="commandMode" />
-          <span style="margin-left:8px">启用命令行解析</span>
-        </div>
-        <textarea v-if="commandMode" v-model="commandText" rows="3" placeholder='例如: rclone copy FNOS:/HDD/media openlist:/影音媒体/天翼5050 --bwlimit "07:30,2M;17:40,2M;23:00,2M" --use-server-modtime --size-only --verbose --transfers 2'></textarea>
+          <span style="margin-left:8px">命令行模式（可粘贴 rclone 命令）</span>
+        </label>
+        <textarea v-if="commandMode" v-model="commandText" class="cmd-textarea" rows="4" placeholder='例如: rclone copy FNOS:/HDD/media openlist:/影音媒体/天翼5050 --bwlimit "07:30,2M;17:40,2M;23:00,2M" --use-server-modtime --size-only --verbose --transfers 2'></textarea>
         <p v-if="commandMode" class="hint">保存时将自动解析命令，填充“模式/源/目标/选项”。任务名称仍需手动填写。</p>
       </div>
       <div class="field-item">
@@ -1504,6 +1503,9 @@ body.light .item { border-color: #f0f0f0; }
   font-size: 14px;
   box-sizing: border-box;
 }
+.cmd-textarea{ width:100%; min-height:120px; padding:12px 14px; border-radius:10px; border:1px solid #333; background:#252525; color:#e0e0e0; font-size:14px; box-sizing:border-box; resize:vertical; }
+body.light .cmd-textarea{ background:#fff; border-color:#ddd; color:#333 }
+.inline-label{ display:flex; align-items:center; gap:8px; }
 body.light .form-content input,
 body.light .form-content select { background: #fff; border-color: #ddd; color: #333; }
 .path-selector { display: flex; gap: 8px; align-items: flex-start; }
