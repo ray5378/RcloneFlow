@@ -46,8 +46,17 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	}
 	if s, ok := asStr(opt["compareDest"]); ok { push("--compare-dest", s) }
 	if s, ok := asStr(opt["copyDest"]); ok { push("--copy-dest", s) }
-	if arr, ok := asArr(opt["include"]); ok { for _, p := range arr { push("--include", p) } }
-	if arr, ok := asArr(opt["exclude"]); ok { for _, p := range arr { push("--exclude", p) } }
+	// include/exclude：既支持数组，也支持单字符串；对以".ext"开头的字符串自动转为 "*.ext"
+	norm := func(s string) string {
+		s = strings.TrimSpace(s)
+		if s == "" { return s }
+		if strings.HasPrefix(s, ".") && !strings.ContainsAny(s, "*?[") { return "*"+s }
+		return s
+	}
+	if arr, ok := asArr(opt["include"]); ok { for _, p := range arr { push("--include", norm(p)) } }
+	if s, ok := asStr(opt["include"]); ok { push("--include", norm(s)) }
+	if arr, ok := asArr(opt["exclude"]); ok { for _, p := range arr { push("--exclude", norm(p)) } }
+	if s, ok := asStr(opt["exclude"]); ok { push("--exclude", norm(s)) }
 	// 按你的要求：不再强制追加 --timeout；仅在需要时可后续单独支持显式字段
 	// if s, ok := asInt(opt["timeout"]); ok { push("--timeout", s+"s") }
 	if s, ok := asInt(opt["connTimeout"]); ok { push("--contimeout", s+"s") }
