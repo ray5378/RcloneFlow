@@ -15,7 +15,16 @@ COPY . .
 ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto
 # rclone v1.73.4
 ARG RCLONE_VERSION=v1.73.4
-RUN go install github.com/rclone/rclone@${RCLONE_VERSION}
+# fallback to downloads.rclone.org to avoid Go proxy/TLS issues
+RUN set -eux; apk add --no-cache curl unzip; \
+    arch="amd64"; \
+    url="https://downloads.rclone.org/v1.73.4/rclone-v1.73.4-linux-${arch}.zip"; \
+    curl -fSL --retry 5 --retry-connrefused -o /tmp/rclone.zip "$url"; \
+    rm -rf /tmp/rclone-extract && mkdir -p /tmp/rclone-extract; \
+    unzip -q /tmp/rclone.zip -d /tmp/rclone-extract; \
+    cp /tmp/rclone-extract/rclone-*/rclone /out/rclone; \
+    chmod +x /out/rclone; \
+    rm -rf /tmp/rclone.zip /tmp/rclone-extract
 RUN go build -o /out/server ./cmd/server
 
 # Stage 3: runtime (Alpine)
@@ -29,7 +38,7 @@ WORKDIR /app
 # Copy server, web, and rclone
 COPY --from=gobuilder /out/server /app/server
 COPY --from=webbuilder /web /app/web
-COPY --from=gobuilder /go/bin/rclone /usr/bin/rclone
+COPY --from=gobuilder /out/rclone /usr/bin/rclone
 
 USER appuser
 
