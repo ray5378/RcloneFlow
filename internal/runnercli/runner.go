@@ -267,7 +267,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats ...
 	}
 }
 
-var oneLineRe = regexp.MustCompile(`(?i)^(?:transferred:)?\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s\s*,\s*ETA\s*([0-9hms:.-]+)`) 
+var oneLineRe = regexp.MustCompile(`(?i)^\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s\s*,\s*(?:ETA\s*([0-9hms:.-]+)|ETA\s*-|([0-9]{1,3})%)`) 
 
 func unitToMul(u string) float64 {
 	u = strings.ToUpper(u)
@@ -313,9 +313,9 @@ func parseETA(s string) int {
 }
 
 func parseOneLineProgress(line string) (map[string]any, bool) {
-	m := oneLineRe.FindStringSubmatch(strings.TrimSpace(line))
+	l := strings.TrimSpace(line)
+	m := oneLineRe.FindStringSubmatch(l)
 	if len(m) == 0 { return nil, false }
-	// m[1]=cur, m[2]=curUnit, m[3]=total, m[4]=totalUnit, m[5]=speed, m[6]=speedUnit, m[7]=eta
 	var cur, tot, sp float64
 	fmt.Sscanf(m[1], "%f", &cur)
 	fmt.Sscanf(m[3], "%f", &tot)
@@ -323,7 +323,14 @@ func parseOneLineProgress(line string) (map[string]any, bool) {
 	curBytes := cur * unitToMul(m[2])
 	totBytes := tot * unitToMul(m[4])
 	spBytes := sp * unitToMul(m[6])
-	eta := parseETA(m[7])
+	eta := 0
+	if m[7] != "" { eta = parseETA(m[7]) }
 	prog := map[string]any{"bytes": curBytes, "totalBytes": totBytes, "speed": spBytes, "eta": float64(eta)}
+	// 可选：匹配 m[8] 百分比时，直接附带 percentage
+	if len(m) >= 9 && m[8] != "" {
+		var pct float64
+		fmt.Sscanf(m[8], "%f", &pct)
+		prog["percentage"] = pct
+	}
 	return prog, true
 }
