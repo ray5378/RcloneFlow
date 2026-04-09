@@ -131,39 +131,63 @@
         try{ if($('#tabGlobal').classList.contains('active')) await saveGlobal(); else await saveTask(); $('#rfMsg').style.color='#22c55e'; $('#rfMsg').textContent='已保存'; }
         catch(e){ $('#rfMsg').style.color='#ef4444'; $('#rfMsg').textContent='保存失败：'+(e.message||e); }
       });
-      // 将入口放到“设置”菜单：发现“设置”字样的菜单/按钮，旁边加“传输选项”子按钮
+      // 设置菜单：更稳健的注入（支持“齿轮+设置”图标/文字）
       function hookSettingsMenu(){
-        const anchors=$$('a,button');
-        for(const a of anchors){
-          const txt=(a.textContent||'').trim();
-          if(txt.includes('设置')){
-            if(document.getElementById('rfSettingsLink')) return;
-            const link=document.createElement('button'); link.id='rfSettingsLink'; link.className='rf-btn ghost'; link.style.marginLeft='8px'; link.textContent='传输选项';
-            link.onclick=()=>{ setTab('global'); open(); };
-            a.parentElement&&a.parentElement.appendChild(link);
-            break;
-          }
+        if(document.getElementById('rfSettingsLink')) return;
+        const candidates=[...$$('*')].filter(el=>{
+          const t=(el.textContent||'').replace(/\s+/g,'').trim();
+          const aLabel=(el.getAttribute('aria-label')||'')+(el.getAttribute('title')||'');
+          // 包含“设置”字样，且是按钮/链接或其父容器
+          return /设置/.test(t) || /设置/.test(aLabel);
+        });
+        for(const el of candidates){
+          // 找到最近的可点击容器
+          const host= el.closest('button, a, [role="button"], [role="menuitem"], li, div');
+          if(!host || host.querySelector('#rfSettingsLink')) continue;
+          const link=document.createElement('button');
+          link.id='rfSettingsLink'; link.className='rf-btn ghost'; link.style.marginLeft='8px'; link.textContent='传输选项';
+          link.onclick=()=>{ setTab('global'); open(); };
+          (host.parentElement||host).appendChild(link);
+          return;
+        }
+        // 兜底：在顶栏（或 app 根）右上角追加一个设置入口
+        const toolbar=document.querySelector('header, nav, #app');
+        if(toolbar && !document.getElementById('rfSettingsLink')){
+          const wrap=document.createElement('div'); wrap.style.position='fixed'; wrap.style.right='16px'; wrap.style.top='12px'; wrap.style.zIndex='9999';
+          const link=document.createElement('button'); link.id='rfSettingsLink'; link.className='rf-btn ghost'; link.textContent='传输选项';
+          link.onclick=()=>{ setTab('global'); open(); };
+          wrap.appendChild(link); document.body.appendChild(wrap);
         }
       }
-      // 每个任务卡片各自一个“传输选项”按钮：贴近“运行”按钮
+      // 每个任务卡片：更稳健的注入（支持 icon 按钮，“运行/Run/执行”以及 data-task-id）
       function hookTaskCards(){
-        const runBtns=$$('button, a');
-        for(const b of runBtns){
-          const txt=(b.textContent||'').trim();
-          if(txt==='传输选项' && b.dataset.rfTaskBtn) continue;
-          if(txt.includes('运行')){
-            const card=b.closest('[data-task-id], .task-card, .card, li, div');
-            const idAttr=card&&card.getAttribute&&card.getAttribute('data-task-id');
-            const id=idAttr?parseInt(idAttr,10):NaN;
-            const btn=document.createElement('button'); btn.className='rf-btn ghost'; btn.textContent='传输选项'; btn.dataset.rfTaskBtn='1'; btn.style.marginLeft='8px';
-            btn.onclick=()=>{ if(!isNaN(id)) openTask(id); else { setTab('task'); open(); } };
-            b.parentElement&&b.parentElement.appendChild(btn);
+        const cards=[...document.querySelectorAll('[data-task-id], .task-card, .card')];
+        // 若没有明显卡片结构，尝试列表项 li/div 中包含“运行/Run/执行”字样的区域
+        if(cards.length===0){
+          const rows=[...$$('li, div')].filter(x=>/(运行|执行|Run)/.test((x.textContent||'')));
+          rows.forEach(row=>injectBtn(row));
+          return;
+        }
+        cards.forEach(card=>injectBtn(card));
+        function injectBtn(card){
+          if(card.querySelector && card.querySelector('button[data-rf-task-btn]')) return;
+          const idAttr=card.getAttribute && card.getAttribute('data-task-id');
+          let taskId=idAttr?parseInt(idAttr,10):NaN;
+          // 尝试在卡片内查找“运行/Run/执行”按钮的父容器作为挂载点
+          let ops = card.querySelector('.actions, .op, footer, header, .toolbar');
+          if(!ops){
+            const runBtn=[...card.querySelectorAll('button, a')].find(b=>/(运行|执行|Run)/.test((b.textContent||'')));
+            ops = (runBtn && runBtn.parentElement) || card;
           }
+          const btn=document.createElement('button'); btn.className='rf-btn ghost'; btn.textContent='传输选项'; btn.dataset.rfTaskBtn='1'; btn.style.marginLeft='8px';
+          btn.onclick=()=>{ if(!isNaN(taskId)) openTask(taskId); else { setTab('task'); open(); } };
+          ops.appendChild(btn);
         }
       }
-      const mo=new MutationObserver(()=>{ hookSettingsMenu(); hookTaskCards(); });
+      const mo=new MutationObserver(()=>{ try{hookSettingsMenu(); hookTaskCards();}catch(e){} });
       mo.observe(document.documentElement,{childList:true,subtree:true});
-      hookSettingsMenu(); hookTaskCards();
+      // 初始执行一次
+      try{hookSettingsMenu(); hookTaskCards();}catch(e){}
     })();
   </script>
 </body>
