@@ -925,6 +925,7 @@ import TransferOptions from '../components/TransferOptions.vue'
         <span class="time">{{ formatTime(run.startedAt) }}</span>
         <span class="time">{{ formatDuration(run.startedAt, run.finishedAt) }}</span>
         <button class="ghost small" @click="showRunDetail(run)">详情</button>
+        <a class="ghost small" :href="'/api/runs/' + run.id + '/log'" target="_blank">下载日志</a>
         <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
       </div>
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>

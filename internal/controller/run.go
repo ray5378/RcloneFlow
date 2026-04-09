@@ -105,6 +105,33 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 	WriteJSON(w, 404, map[string]any{"error": "run not found"})
 }
 
+// HandleRunLog 统一提供 stderr 单文件下载
+func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/log")
+	id, _ := strconv.ParseInt(idStr, 10, 64)
+	runs, err := c.runSvc.ListRuns()
+	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	for _, run := range runs {
+		if run.ID == id {
+			// Summary 里优先取 stderrFile
+			if s, ok := any(run.Summary).(string); ok && s != "" {
+				var m map[string]any
+				if json.Unmarshal([]byte(s), &m) == nil {
+					if p, ok := m["stderrFile"].(string); ok && p != "" { http.ServeFile(w, r, p); return }
+				}
+			}
+			if m, ok := any(run.Summary).(map[string]any); ok {
+				if p, ok := m["stderrFile"].(string); ok && p != "" { http.ServeFile(w, r, p); return }
+			}
+			// 回退路径（标准位置）
+			base := "/app/data/logs"
+			http.ServeFile(w, r, base+"/run-"+idStr+"-stderr.log")
+			return
+		}
+	}
+	WriteJSON(w, 404, map[string]any{"error": "log not found"})
+}
+
 // HandleActiveRuns 处理获取所有运行中的任务及其实时状态
 func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request) {
 	runs, err := c.runSvc.ListActiveRuns()
