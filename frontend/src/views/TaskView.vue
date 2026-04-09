@@ -574,6 +574,24 @@ function showRunDetail(run: any) {
   showDetailModal.value = true
 }
 
+function historyProgressFromSummary(summary: any){
+  try{
+    if (!summary) return null
+    if (typeof summary === 'string') summary = JSON.parse(summary)
+    if (summary && typeof summary === 'object'){
+      const p = summary.progress || {}
+      const bytes = Number(p.bytes || 0)
+      const totalBytes = Number(p.totalBytes || 0)
+      const speed = Number(p.speed || 0)
+      const eta = typeof p.eta === 'number' ? p.eta : null
+      let percentage = Number(p.percentage || 0)
+      if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) percentage = (bytes/totalBytes)*100
+      return { bytes, totalBytes, speed, eta, percentage }
+    }
+  }catch{}
+  return null
+}
+
 function formatSummary(summary: any): string {
   if (!summary) return '-'
   if (typeof summary === 'string') {
@@ -586,8 +604,12 @@ function formatSummary(summary: any): string {
   if (typeof summary !== 'object') return String(summary)
   
   const parts: string[] = []
-  if (summary.bytes !== undefined) {
-    parts.push(`传输量: ${formatBytes(summary.bytes)}`)
+  const hp = historyProgressFromSummary(summary)
+  if (hp){
+    parts.push(`进度: ${(hp.percentage||0).toFixed(2)}%`)
+    parts.push(`速度: ${formatBytesPerSec(hp.speed||0)}`)
+    parts.push(`已传输/总大小: ${formatBytes(hp.bytes||0)} / ${formatBytes(hp.totalBytes||0)}`)
+    parts.push(`ETA: ${formatEta(hp.eta||0)}`)
   }
   if (summary.transferred !== undefined) {
     parts.push(`文件数: ${summary.transferred}`)
@@ -597,9 +619,6 @@ function formatSummary(summary: any): string {
   }
   if (summary.errors !== undefined) {
     parts.push(`错误: ${summary.errors}`)
-  }
-  if (summary.speed !== undefined) {
-    parts.push(`速度: ${summary.speed}`)
   }
   if (summary.elapsedTime !== undefined) {
     parts.push(`耗时: ${summary.elapsedTime}`)
@@ -924,6 +943,14 @@ import TransferOptions from '../components/TransferOptions.vue'
         </div>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
         <span class="time">{{ formatDuration(run.startedAt, run.finishedAt) }}</span>
+        <div class="info" v-if="historyProgressFromSummary(run.summary)">
+          <span>
+            {{ (historyProgressFromSummary(run.summary)?.percentage || 0).toFixed(0) }}% ·
+            {{ formatBytes(historyProgressFromSummary(run.summary)?.bytes || 0) }} /
+            {{ formatBytes(historyProgressFromSummary(run.summary)?.totalBytes || 0) }} ·
+            {{ formatBytesPerSec(historyProgressFromSummary(run.summary)?.speed || 0) }}
+          </span>
+        </div>
         <button class="ghost small" @click="showRunDetail(run)">详情</button>
         <a class="ghost small" :href="'/api/runs/' + run.id + '/log'" target="_blank">下载日志</a>
         <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
