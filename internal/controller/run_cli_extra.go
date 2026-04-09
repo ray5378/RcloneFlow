@@ -4,8 +4,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"os"
-	"path/filepath"
 )
 
 // HandleRunStopCLI POST /api/runs/{id}/stop
