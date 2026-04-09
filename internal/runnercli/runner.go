@@ -15,6 +15,7 @@ import (
 	"sync"
 	"syscall"
 	"time"
+	"regexp"
 
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/logger"
@@ -96,6 +97,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 
 	go r.consume(run.ID, outR, stdoutFile)
 	go r.consume(run.ID, errR, stderrFile)
+	// 额外：解析 --stats-one-line 文本行，提取 bytes/total/speed/eta
+	go r.parseOneLine(run.ID, errR)
 	go func(){
 		err := cmd.Wait()
 		outW.Close(); errW.Close()
@@ -245,5 +248,43 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File){
 	}
 	if err := s.Err(); err != nil {
 		logger.Debug("progress scanner error", zap.Error(err))
+	}
+}
+
+var oneLineRe = regexp.MustCompile(`(?i)(?:(\d+(?:\.\d+)?)([KMGTP]?)[b]?)\/\s*(\d+(?:\.\d+)?)([KMGTP]?)\s*[, ]+([\d\.]+)\s*([KMGTP]?)[b]?/s.*?ETA\s*(\d+h)?(?::?(\d+)m)?(?::?(\d+)s)?`)
+func humanToBytes(num, unit string) int64 {
+	f := 0.0; fmt.Sscanf(num, "%f", &f)
+	switch strings.ToUpper(unit) {
+	case "K": return int64(f * 1024)
+	case "M": return int64(f * 1024 * 1024)
+	case "G": return int64(f * 1024 * 1024 * 1024)
+	case "T": return int64(f * 1024 * 1024 * 1024 * 1024)
+	case "P": return int64(f * 1024 * 1024 * 1024 * 1024 * 1024)
+	default: return int64(f)
+	}
+}
+
+func (r *Runner) parseOneLine(runID int64, rd io.Reader){
+	s := bufio.NewScanner(rd)
+	s.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	for s.Scan(){
+		line := s.Text()
+		m := oneLineRe.FindStringSubmatch(line)
+		if len(m) > 0 {
+			bytes := humanToBytes(m[1], m[2])
+			total := humanToBytes(m[3], m[4])
+			speed := humanToBytes(m[5], m[6])
+			etaSec := 0
+			if m[7] != "" { var h int; fmt.Sscanf(m[7], "%dh", &h); etaSec += h*3600 }
+			if m[8] != "" { var mm int; fmt.Sscanf(m[8], "%dm", &mm); etaSec += mm*60 }
+			if m[9] != "" { var ss int; fmt.Sscanf(m[9], "%ds", &ss); etaSec += ss }
+			prog := map[string]any{"bytes": float64(bytes), "totalBytes": float64(total), "speed": float64(speed), "eta": float64(etaSec)}
+			_ = r.db.UpdateRun(runID, func(rr *store.Run){
+				if rr.Summary == nil { rr.Summary = map[string]any{} }
+				rr.Summary["progress"] = prog
+				rr.BytesTransferred = bytes
+				rr.Speed = fmt.Sprintf("%d B/s", speed)
+			})
+		}
 	}
 }
