@@ -6,13 +6,13 @@ RUN npm ci --silent || npm install
 RUN npm run build
 
 # Stage 2: go build (Alpine)
-FROM golang:1.22-alpine AS gobuilder
+FROM golang:1.25-alpine AS gobuilder
 RUN apk add --no-cache build-base git sqlite-dev ca-certificates
 WORKDIR /app
 COPY go.mod ./
 RUN go mod download || true
 COPY . .
-ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64
+ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto
 # rclone v1.73.4
 ARG RCLONE_VERSION=v1.73.4
 RUN go install github.com/rclone/rclone@${RCLONE_VERSION}
