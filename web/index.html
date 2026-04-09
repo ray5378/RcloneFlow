@@ -27,7 +27,9 @@
     .rf-tab{padding:6px 10px;border-radius:8px;cursor:pointer;background:#0f1320;border:1px solid #273042;color:#c9d1d9}
     .rf-tab.active{background:#2563eb;border-color:#2563eb;color:#fff}
     @media (max-width:640px){.rf-modal{width:96vw}}
+    .rf-fixed{position:fixed;right:16px;top:12px;z-index:100000;background:#2563eb;color:#fff;border:none;border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:600}
   </style>
+  <button id="rfFixed" class="rf-fixed">传输选项</button>
   <div id="rfMask" class="rf-modal-mask"></div>
   <div id="rfModal" class="rf-modal" role="dialog" aria-modal="true">
     <div class="hd"><div>传输选项</div><button id="rfClose" class="rf-btn ghost">关闭</button></div>
@@ -131,6 +133,9 @@
         try{ if($('#tabGlobal').classList.contains('active')) await saveGlobal(); else await saveTask(); $('#rfMsg').style.color='#22c55e'; $('#rfMsg').textContent='已保存'; }
         catch(e){ $('#rfMsg').style.color='#ef4444'; $('#rfMsg').textContent='保存失败：'+(e.message||e); }
       });
+      // 固定一个右上角按钮——无条件可见，点击即弹窗（兜底）
+      const fixedBtn=document.getElementById('rfFixed');
+      if(fixedBtn){ fixedBtn.onclick=()=>{ setTab('global'); open(); }; }
       // 设置菜单：更稳健的注入（支持“齿轮+设置”图标/文字）
       function hookSettingsMenu(){
         if(document.getElementById('rfSettingsLink')) return;
