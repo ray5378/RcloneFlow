@@ -312,25 +312,41 @@ func parseETA(s string) int {
 	return sec
 }
 
+var bytesPairRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?`)
+var speedTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s`)
+var pctTokenRe   = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)%`)
+var etaTokenRe   = regexp.MustCompile(`(?i)ETA\s*([0-9hms:.-]+|-)`)
+
 func parseOneLineProgress(line string) (map[string]any, bool) {
 	l := strings.TrimSpace(line)
-	m := oneLineRe.FindStringSubmatch(l)
-	if len(m) == 0 { return nil, false }
-	var cur, tot, sp float64
-	fmt.Sscanf(m[1], "%f", &cur)
-	fmt.Sscanf(m[3], "%f", &tot)
-	fmt.Sscanf(m[5], "%f", &sp)
-	curBytes := cur * unitToMul(m[2])
-	totBytes := tot * unitToMul(m[4])
-	spBytes := sp * unitToMul(m[6])
+	// 去掉尾部 (xfr#...)
+	if i := strings.Index(l, "("); i >= 0 {
+		l = strings.TrimSpace(l[:i])
+	}
+	bp := bytesPairRe.FindStringSubmatch(l)
+	if len(bp) == 0 { return nil, false }
+	var cur, tot float64
+	fmt.Sscanf(bp[1], "%f", &cur)
+	fmt.Sscanf(bp[3], "%f", &tot)
+	curBytes := cur * unitToMul(bp[2])
+	totBytes := tot * unitToMul(bp[4])
+	// 速度
+	var sp float64
+	spm := speedTokenRe.FindStringSubmatch(l)
+	if len(spm) > 0 { fmt.Sscanf(spm[1], "%f", &sp) }
+	spBytes := sp * unitToMul(spmValue(spm, 2))
+	// ETA / 百分比（任选其一存在即可）
 	eta := 0
-	if m[7] != "" { eta = parseETA(m[7]) }
+	if em := etaTokenRe.FindStringSubmatch(l); len(em) > 0 {
+		if em[1] != "-" { eta = parseETA(em[1]) }
+	}
 	prog := map[string]any{"bytes": curBytes, "totalBytes": totBytes, "speed": spBytes, "eta": float64(eta)}
-	// 可选：匹配 m[8] 百分比时，直接附带 percentage
-	if len(m) >= 9 && m[8] != "" {
+	if pm := pctTokenRe.FindStringSubmatch(l); len(pm) > 0 {
 		var pct float64
-		fmt.Sscanf(m[8], "%f", &pct)
+		fmt.Sscanf(pm[1], "%f", &pct)
 		prog["percentage"] = pct
 	}
 	return prog, true
 }
+
+func spmValue(m []string, i int) string { if len(m) > i { return m[i] }; return "" }
