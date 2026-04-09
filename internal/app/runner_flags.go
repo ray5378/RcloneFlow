@@ -25,7 +25,13 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	// common scalars
 	if v, ok := asInt(opt["transfers"]); ok { push("--transfers", v) }
 	if v, ok := asInt(opt["checkers"]); ok { push("--checkers", v) }
-	if v, ok := asInt(opt["bufferSize"]); ok { push("--buffer-size", v) }
+	// bufferSize 支持无单位数字（默认 M）或显式字符串
+	if v, ok := asInt(opt["bufferSize"]); ok {
+		// 如果是纯数字，按 MiB 追加单位；若已是字符串则走下面分支
+		push("--buffer-size", v+"M")
+	} else if s, ok := asStr(opt["bufferSize"]); ok {
+		push("--buffer-size", s)
+	}
 	if s, ok := asStr(opt["bwLimit"]); ok { push("--bwlimit", s) }
 	if s, ok := asStr(opt["bwlimit"]); ok { push("--bwlimit", s) }
 	// flags
