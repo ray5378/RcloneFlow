@@ -64,6 +64,21 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 		}
 		WriteJSON(w, 200, nil)
 
+	case http.MethodPatch:
+		// PATCH /api/tasks { id, options }
+		var req struct{
+			ID int64 `json:"id"`
+			Options map[string]any `json:"options"`
+		}
+		if err := DecodeRequest(r, &req); err != nil {
+			WriteJSON(w, 400, map[string]any{"error":"invalid body"}); return
+		}
+		if req.ID == 0 { WriteJSON(w, 400, map[string]any{"error":"missing id"}); return }
+		if err := c.taskSvc.UpdateTaskOptions(req.ID, req.Options); err != nil {
+			WriteJSON(w, 500, map[string]any{"error": err.Error()}); return
+		}
+		WriteJSON(w, 200, map[string]any{"ok": true})
+
 	default:
 		w.WriteHeader(405)
 	}

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>任务传输选项 - RcloneFlow</title>
+  <link rel="stylesheet" href="./transfer.html" onload="this.remove()">
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>任务传输选项（仅覆盖本任务）</h1>
+      <div class="row">
+        <label for="taskId">任务 ID</label>
+        <input id="taskId" type="text" placeholder="例如 1" />
+      </div>
+      <div class="grid" style="margin-top:12px">
+        <div class="row">
+          <label><input id="pvEnabled" type="checkbox" /> 启用收尾校验（Post-Verify）</label>
+        </div>
+        <div class="row">
+          <label for="pvMode">校验模式</label>
+          <select id="pvMode"><option value="mount">挂载路径</option></select>
+        </div>
+        <div class="row">
+          <label for="pvInterval">轮询间隔</label>
+          <input id="pvInterval" type="text" placeholder="5s" />
+        </div>
+        <div class="row">
+          <label for="pvTimeout">超时时间</label>
+          <input id="pvTimeout" type="text" placeholder="30m" />
+        </div>
+        <div class="row">
+          <label for="pvMtime">mtime 稳定期</label>
+          <input id="pvMtime" type="text" placeholder="60s" />
+        </div>
+        <div class="row">
+          <label for="pvMatch">匹配方式</label>
+          <select id="pvMatch"><option value="size">按大小</option></select>
+        </div>
+        <div class="row">
+          <label for="minRerun">最短重跑间隔</label>
+          <input id="minRerun" type="text" placeholder="30m" />
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn-primary" id="btnSave">保存到任务</button>
+        <span id="msg"></span>
+      </div>
+    </div>
+  </div>
+  <script>
+    function token() { try { return localStorage.getItem('authToken') || ''; } catch(e){ return ''; } }
+    async function save(){
+      const id = parseInt(document.getElementById('taskId').value.trim(),10);
+      if(!id){ document.getElementById('msg').innerHTML='<span class="err">请填写任务ID</span>'; return }
+      const opts = {
+        "postVerify.enabled": document.getElementById('pvEnabled').checked,
+        "postVerify.mode": document.getElementById('pvMode').value,
+        "postVerify.interval": document.getElementById('pvInterval').value.trim(),
+        "postVerify.timeout": document.getElementById('pvTimeout').value.trim(),
+        "postVerify.mtimeGrace": document.getElementById('pvMtime').value.trim(),
+        "postVerify.match": document.getElementById('pvMatch').value,
+        "minRerunInterval": document.getElementById('minRerun').value.trim(),
+      };
+      try{
+        const res = await fetch('/api/tasks', {
+          method:'PATCH',
+          headers:{'Content-Type':'application/json','Authorization':'Bearer '+token()},
+          body: JSON.stringify({ id, options: opts })
+        });
+        const d = await res.json().catch(()=>({}));
+        if(!res.ok || d.error){ throw new Error(d.error || ('HTTP '+res.status)) }
+        document.getElementById('msg').innerHTML='<span class="ok">已保存到任务</span>';
+      }catch(e){ document.getElementById('msg').innerHTML='<span class="err">保存失败：'+(e.message||e)+'</span>'; }
+    }
+    document.getElementById('btnSave').addEventListener('click', save);
+  </script>
+</body>
+</html>

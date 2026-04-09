@@ -36,6 +36,17 @@ func (s *TaskService) UpdateTask(id int64, task store.Task) error {
 	return s.db.UpdateTask(id, task)
 }
 
+// UpdateTaskOptions 仅更新任务的 Options 字段（用于“传输选项”任务级覆盖）
+func (s *TaskService) UpdateTaskOptions(id int64, opts map[string]any) error {
+	// 读出任务再回写 Options
+	t, ok := s.db.GetTask(id)
+	if !ok { return ErrTaskNotFound }
+	b, err := json.Marshal(opts)
+	if err != nil { return err }
+	t.Options = b
+	return s.db.UpdateTask(id, t)
+}
+
 // DeleteTask 删除任务
 func (s *TaskService) DeleteTask(id int64) error {
 	return s.db.DeleteTask(id)
