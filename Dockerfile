@@ -20,7 +20,7 @@ RUN set -eux; apk add --no-cache curl unzip; \
     arch="amd64"; \
     url="https://downloads.rclone.org/v1.73.4/rclone-v1.73.4-linux-${arch}.zip"; \
     curl -fSL --retry 5 --retry-connrefused -o /tmp/rclone.zip "$url"; \
-    rm -rf /tmp/rclone-extract && mkdir -p /tmp/rclone-extract; \
+    rm -rf /tmp/rclone-extract && mkdir -p /tmp/rclone-extract /out; \
     unzip -q /tmp/rclone.zip -d /tmp/rclone-extract; \
     cp /tmp/rclone-extract/rclone-*/rclone /out/rclone; \
     chmod +x /out/rclone; \
