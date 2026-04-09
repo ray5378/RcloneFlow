@@ -324,25 +324,31 @@ func parseOneLineProgress(line string) (map[string]any, bool) {
 	if i := strings.Index(l, "("); i >= 0 {
 		l = strings.TrimSpace(l[:i])
 	}
-	bp := bytesPairRe.FindStringSubmatch(l)
-	if len(bp) == 0 { return nil, false }
+	// 按多段拼接处理：取最后一个匹配片段作为当前进度
+	bps := bytesPairRe.FindAllStringSubmatch(l, -1)
+	if len(bps) == 0 { return nil, false }
+	bp := bps[len(bps)-1]
 	var cur, tot float64
 	fmt.Sscanf(bp[1], "%f", &cur)
 	fmt.Sscanf(bp[3], "%f", &tot)
 	curBytes := cur * unitToMul(bp[2])
 	totBytes := tot * unitToMul(bp[4])
-	// 速度
+	// 速度：取最后一个 token
 	var sp float64
-	spm := speedTokenRe.FindStringSubmatch(l)
+	spmAll := speedTokenRe.FindAllStringSubmatch(l, -1)
+	var spm []string
+	if len(spmAll) > 0 { spm = spmAll[len(spmAll)-1] }
 	if len(spm) > 0 { fmt.Sscanf(spm[1], "%f", &sp) }
 	spBytes := sp * unitToMul(spmValue(spm, 2))
-	// ETA / 百分比（任选其一存在即可）
+	// ETA / 百分比（取最后一个）
 	eta := 0
-	if em := etaTokenRe.FindStringSubmatch(l); len(em) > 0 {
+	if emAll := etaTokenRe.FindAllStringSubmatch(l, -1); len(emAll) > 0 {
+		em := emAll[len(emAll)-1]
 		if em[1] != "-" { eta = parseETA(em[1]) }
 	}
 	prog := map[string]any{"bytes": curBytes, "totalBytes": totBytes, "speed": spBytes, "eta": float64(eta)}
-	if pm := pctTokenRe.FindStringSubmatch(l); len(pm) > 0 {
+	if pmAll := pctTokenRe.FindAllStringSubmatch(l, -1); len(pmAll) > 0 {
+		pm := pmAll[len(pmAll)-1]
 		var pct float64
 		fmt.Sscanf(pm[1], "%f", &pct)
 		prog["percentage"] = pct
