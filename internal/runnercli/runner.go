@@ -47,9 +47,11 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	// One-line JSON stats + JSON log records
 	args := []string{cmdName, src, dst, "-vv", "--progress", "--stats", "5s", "--stats-one-line", "--config", cfg}
 	// attach advanced options if present
+	var effOpt map[string]any
 	if run.Summary != nil {
 		if v, ok := run.Summary["effectiveOptions"]; ok {
 			if m, ok := v.(map[string]any); ok {
+				effOpt = m
 				args = append(args, buildFlagsFromOptions(m)...)
 			}
 		}
@@ -67,14 +69,22 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	stderrFile, _ := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 
 	cmd := runner.CmdContext(ctx, args...)
-	// fan-out: write to file and to parser via io.Pipe
+	// fan-out: write to parser via io.Pipe（再由 consumer 单点写入文件，避免重复行）
 	outR, outW := io.Pipe()
 	errR, errW := io.Pipe()
-	// write headers once files are open
+	// write headers once files are open（同时写入 stdout/stderr 便于查看）
 	_, _ = stdoutFile.WriteString(startLine)
-	if missingCfg != "" { _, _ = stderrFile.WriteString(missingCfg) }
-	cmd.Stdout = io.MultiWriter(stdoutFile, outW)
-	cmd.Stderr = io.MultiWriter(stderrFile, errW)
+	_, _ = stderrFile.WriteString(startLine)
+	if effOpt != nil {
+		if b, _ := json.Marshal(effOpt); len(b) > 0 {
+			optsLine := "[runner] effectiveOptions " + string(b) + "\n"
+			_, _ = stdoutFile.WriteString(optsLine)
+			_, _ = stderrFile.WriteString(optsLine)
+		}
+	}
+	if missingCfg != "" { _, _ = stdoutFile.WriteString(missingCfg); _, _ = stderrFile.WriteString(missingCfg) }
+	cmd.Stdout = outW
+	cmd.Stderr = errW
 	if err := cmd.Start(); err != nil { return err }
 
 	r.mu.Lock(); r.procs[run.ID] = cmd; r.mu.Unlock()
