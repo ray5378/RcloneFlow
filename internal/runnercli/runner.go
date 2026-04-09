@@ -68,26 +68,23 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 
 	logsBase := os.Getenv("APP_DATA_DIR"); if logsBase == "" { logsBase = "./data" }
 	logsDir := filepath.Join(logsBase, "logs"); _ = os.MkdirAll(logsDir, 0o755)
-	stdoutPath := filepath.Join(logsDir, fmt.Sprintf("run-%d-stdout.log", run.ID))
+	// 仅保留单一日志文件（stderr）；stdout 也合并写入该文件
 	stderrPath := filepath.Join(logsDir, fmt.Sprintf("run-%d-stderr.log", run.ID))
-	stdoutFile, _ := os.OpenFile(stdoutPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 	stderrFile, _ := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 
 	cmd := runner.CmdContext(ctx, args...)
-	// fan-out: write to parser via io.Pipe（再由 consumer 单点写入文件，避免重复行）
+	// fan-out: write to parser via io.Pipe（由 consumer 单点写入同一文件）
 	outR, outW := io.Pipe()
 	errR, errW := io.Pipe()
-	// write headers once files are open（同时写入 stdout/stderr 便于查看）
-	_, _ = stdoutFile.WriteString(startLine)
+	// 写入头信息到单一日志文件
 	_, _ = stderrFile.WriteString(startLine)
 	if effOpt != nil {
 		if b, _ := json.Marshal(effOpt); len(b) > 0 {
 			optsLine := "[runner] effectiveOptions " + string(b) + "\n"
-			_, _ = stdoutFile.WriteString(optsLine)
 			_, _ = stderrFile.WriteString(optsLine)
 		}
 	}
-	if missingCfg != "" { _, _ = stdoutFile.WriteString(missingCfg); _, _ = stderrFile.WriteString(missingCfg) }
+	if missingCfg != "" { _, _ = stderrFile.WriteString(missingCfg) }
 	cmd.Stdout = outW
 	cmd.Stderr = errW
 	if err := cmd.Start(); err != nil { return err }
@@ -95,17 +92,16 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	r.mu.Lock(); r.procs[run.ID] = cmd; r.mu.Unlock()
 	_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
 		if rr.Summary == nil { rr.Summary = map[string]any{} }
-		rr.Summary["stdoutFile"] = stdoutPath
 		rr.Summary["stderrFile"] = stderrPath
 	})
 
-	// 同时在 stdout/stderr 中解析 one-line 进度，兼容不同输出流
-	go r.consume(run.ID, outR, stdoutFile, true)
+	// 两路都写入同一日志文件，并启用 one-line 解析
+	go r.consume(run.ID, outR, stderrFile, true)
 	go r.consume(run.ID, errR, stderrFile, true)
 	go func(){
 		err := cmd.Wait()
 		outW.Close(); errW.Close()
-		stdoutFile.Close(); stderrFile.Close()
+		stderrFile.Close()
 		if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) {
 			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "failed" })
 			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
