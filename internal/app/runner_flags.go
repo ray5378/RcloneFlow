@@ -25,12 +25,21 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	// common scalars
 	if v, ok := asInt(opt["transfers"]); ok { push("--transfers", v) }
 	if v, ok := asInt(opt["checkers"]); ok { push("--checkers", v) }
-	// bufferSize 支持无单位数字（默认 M）或显式字符串
-	if v, ok := asInt(opt["bufferSize"]); ok {
-		// 如果是纯数字，按 MiB 追加单位；若已是字符串则走下面分支
-		push("--buffer-size", v+"M")
-	} else if s, ok := asStr(opt["bufferSize"]); ok {
-		push("--buffer-size", s)
+	// bufferSize：数字→自动补 M；字符串→纯数字则补 M，带单位则原样
+	if raw, ok := opt["bufferSize"]; ok {
+		switch vv := raw.(type) {
+		case float64:
+			push("--buffer-size", fmt.Sprintf("%dM", int64(vv)))
+		case int64:
+			push("--buffer-size", fmt.Sprintf("%dM", vv))
+		case string:
+			s := strings.TrimSpace(vv)
+			if s != "" {
+				pureNum := true
+				for _, ch := range s { if ch < '0' || ch > '9' { pureNum = false; break } }
+				if pureNum { push("--buffer-size", s+"M") } else { push("--buffer-size", s) }
+			}
+		}
 	}
 	if s, ok := asStr(opt["bwLimit"]); ok { push("--bwlimit", s) }
 	if s, ok := asStr(opt["bwlimit"]); ok { push("--bwlimit", s) }
