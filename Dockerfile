@@ -47,8 +47,8 @@ ENV APP_ADDR=:17870
 ENV APP_DATA_DIR=/app/data
 ENV RCLONE_CONFIG=/app/data/rclone.conf
 
-# Built-in healthcheck using wget
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:17870/healthz >/dev/null 2>&1 || exit 1
+# Built-in healthcheck using wget (use homepage, more robust than /healthz)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:17870/ >/dev/null 2>&1 || exit 1
 
 CMD ["/app/server"]
