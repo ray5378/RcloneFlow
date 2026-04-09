@@ -161,22 +161,49 @@
       }
       // 每个任务卡片：更稳健的注入（支持 icon 按钮，“运行/Run/执行”以及 data-task-id）
       function hookTaskCards(){
-        const cards=[...document.querySelectorAll('[data-task-id], .task-card, .card')];
-        // 若没有明显卡片结构，尝试列表项 li/div 中包含“运行/Run/执行”字样的区域
+        const cards=[...document.querySelectorAll('[data-task-id], [data-taskId], [data-taskID], .task-card, .taskItem, .card')];
         if(cards.length===0){
-          const rows=[...$$('li, div')].filter(x=>/(运行|执行|Run)/.test((x.textContent||'')));
+          const rows=[...$$('li, div, article, section')].filter(x=>/(运行|执行|Run)/.test((x.textContent||'')));
           rows.forEach(row=>injectBtn(row));
           return;
         }
         cards.forEach(card=>injectBtn(card));
+        function extractIdFromAttrs(el){
+          if(!el || !el.getAttribute) return NaN;
+          const attrs=el.getAttributeNames?el.getAttributeNames():[];
+          for(const k of attrs){
+            const v=el.getAttribute(k)||'';
+            if(/task/i.test(k) && /id/i.test(k) && /^\d+$/.test(v)) return parseInt(v,10);
+            if((/id$/i.test(k)||/Id$/.test(k)) && /^\d+$/.test(v)) return parseInt(v,10);
+          }
+          return NaN;
+        }
+        function extractIdFromText(el){
+          const t=(el.textContent||'');
+          const m = t.match(/(?:任务|Task)?[#：: ](\d{1,12})/);
+          return m?parseInt(m[1],10):NaN;
+        }
+        function extractTaskId(card){
+          let id=extractIdFromAttrs(card);
+          if(!isNaN(id)) return id;
+          // 尝试在后代中找
+          const nodes=[...card.querySelectorAll('*')];
+          for(const n of nodes){
+            id=extractIdFromAttrs(n);
+            if(!isNaN(id)) return id;
+          }
+          // 文本兜底
+          id=extractIdFromText(card);
+          if(!isNaN(id)) return id;
+          return NaN;
+        }
         function injectBtn(card){
           if(card.querySelector && card.querySelector('button[data-rf-task-btn]')) return;
-          const idAttr=card.getAttribute && card.getAttribute('data-task-id');
-          let taskId=idAttr?parseInt(idAttr,10):NaN;
-          // 尝试在卡片内查找“运行/Run/执行”按钮的父容器作为挂载点
-          let ops = card.querySelector('.actions, .op, footer, header, .toolbar');
+          const taskId=extractTaskId(card);
+          // 查找操作区域
+          let ops = card.querySelector('.actions, .op, .ops, footer, header, .toolbar, .btn-group');
           if(!ops){
-            const runBtn=[...card.querySelectorAll('button, a')].find(b=>/(运行|执行|Run)/.test((b.textContent||'')));
+            const runBtn=[...card.querySelectorAll('button, a, [role="button"]')].find(b=>/(运行|执行|Run)/.test((b.textContent||b.getAttribute('title')||b.getAttribute('aria-label')||'')));
             ops = (runBtn && runBtn.parentElement) || card;
           }
           const btn=document.createElement('button'); btn.className='rf-btn ghost'; btn.textContent='传输选项'; btn.dataset.rfTaskBtn='1'; btn.style.marginLeft='8px';
