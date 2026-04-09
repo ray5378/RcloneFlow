@@ -48,7 +48,8 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	if s, ok := asStr(opt["copyDest"]); ok { push("--copy-dest", s) }
 	if arr, ok := asArr(opt["include"]); ok { for _, p := range arr { push("--include", p) } }
 	if arr, ok := asArr(opt["exclude"]); ok { for _, p := range arr { push("--exclude", p) } }
-	if s, ok := asInt(opt["timeout"]); ok { push("--timeout", s+"s") }
+	// 按你的要求：不再强制追加 --timeout；仅在需要时可后续单独支持显式字段
+	// if s, ok := asInt(opt["timeout"]); ok { push("--timeout", s+"s") }
 	if s, ok := asInt(opt["connTimeout"]); ok { push("--contimeout", s+"s") }
 	if s, ok := asInt(opt["expectContinueTimeout"]); ok { push("--expect-continue-timeout", s+"s") }
 	return flags
