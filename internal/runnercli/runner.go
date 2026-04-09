@@ -62,6 +62,14 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			}
 		}
 	}
+	// 二次兜底：如 --buffer-size 后是纯数字，自动补 M
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--buffer-size" {
+			n := strings.TrimSpace(args[i+1])
+			pureNum := n != ""; for _, ch := range n { if ch < '0' || ch > '9' { pureNum = false; break } }
+			if pureNum { args[i+1] = n + "M" }
+		}
+	}
 	// header will be written after files are opened below
 	startLine := "[runner] rclone " + strings.Join(args, " ") + "\n"
 	missingCfg := ""
