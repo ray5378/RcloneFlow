@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 	"regexp"
+	"sync/atomic"
 
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/logger"
@@ -95,9 +96,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		rr.Summary["stderrFile"] = stderrPath
 	})
 
-	// 两路都写入同一日志文件，并启用 one-line 解析
-	go r.consume(run.ID, outR, stderrFile, true)
-	go r.consume(run.ID, errR, stderrFile, true)
+	// 两路都写入同一日志文件，并启用 one-line 解析 + 按文件统计
+	fileStats := &fileProgress{m: map[string]*fileProg{}}
+	go r.consume(run.ID, outR, stderrFile, true, fileStats)
+	go r.consume(run.ID, errR, stderrFile, true, fileStats)
 	go func(){
 		err := cmd.Wait()
 		outW.Close(); errW.Close()
@@ -222,8 +224,45 @@ func wait(cmd *exec.Cmd, d time.Duration) bool {
 	}
 }
 
-func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats ...bool){
-	wantParse := len(parseStats) > 0 && parseStats[0]
+type fileProg struct {
+	Name string  `json:"name"`
+	Bytes float64 `json:"bytes"`
+	Total float64 `json:"totalBytes"`
+	Pct   float64 `json:"percentage"`
+	Speed float64 `json:"speed"`
+}
+
+type fileProgress struct {
+	m   map[string]*fileProg
+	mu  sync.Mutex
+	ver uint64
+}
+
+func (fp *fileProgress) update(name string, bytes, total, speed, pct float64){
+	fp.mu.Lock()
+	p, ok := fp.m[name]
+	if !ok { p = &fileProg{Name:name}; fp.m[name] = p }
+	if total > 0 { p.Total = total }
+	if bytes >= 0 { p.Bytes = bytes }
+	if speed >= 0 { p.Speed = speed }
+	if pct >= 0 { p.Pct = pct }
+	fp.mu.Unlock()
+	atomic.AddUint64(&fp.ver, 1)
+}
+
+func (fp *fileProgress) snapshot(limit int) []fileProg {
+	fp.mu.Lock(); defer fp.mu.Unlock()
+	out := make([]fileProg, 0, len(fp.m))
+	for _, v := range fp.m { out = append(out, *v) }
+	if limit > 0 && len(out) > limit { out = out[len(out)-limit:] }
+	return out
+}
+
+var fileLineRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B,\s*(\d+(?:\.\d+)?)%?,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B/s`)
+var fileCopiedRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*Copied\s*\(new\)`) 
+
+func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress){
+	wantParse := parseStats
 	s := bufio.NewScanner(rd)
 	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
 	for s.Scan(){
@@ -255,7 +294,28 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats ...
 					rr.Summary["progress"] = prog
 					rr.BytesTransferred = int64(prog["bytes"].(float64))
 					rr.Speed = fmt.Sprintf("%d B/s", int64(prog["speed"].(float64)))
+					// 同步部分文件列表快照（最近 100 条）
+					if fp != nil {
+						rr.Summary["files"] = fp.snapshot(100)
+					}
 				})
+			}
+			// 解析文件级进度（INFO: name: cur/total, pct, speed）
+			if fp != nil {
+				if m := fileLineRe.FindStringSubmatch(line); len(m) > 0 {
+					name := strings.TrimSpace(m[1])
+					var cb, tb, pct, sp float64
+					fmt.Sscanf(m[2], "%f", &cb)
+					fmt.Sscanf(m[4], "%f", &tb)
+					fmt.Sscanf(m[6], "%f", &pct)
+					fmt.Sscanf(m[7], "%f", &sp)
+					fp.update(name, cb*unitToMul(m[3]), tb*unitToMul(m[5]), sp*unitToMul(m[8]), pct)
+					continue
+				}
+				if m := fileCopiedRe.FindStringSubmatch(line); len(m) > 0 {
+					name := strings.TrimSpace(m[1])
+					fp.update(name, -1, -1, -1, 100)
+				}
 			}
 		}
 	}
