@@ -46,7 +46,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	dataDir := os.Getenv("APP_DATA_DIR"); if dataDir == "" { dataDir = "./data" }
 	cfg := os.Getenv("RCLONE_CONFIG"); if cfg == "" { cfg = filepath.Join(dataDir, "rclone.conf") }
 	// One-line JSON stats + JSON log records
-	args := []string{cmdName, src, dst, "-vv", "--progress", "--stats", "5s", "--stats-one-line", "--config", cfg}
+	args := []string{cmdName, src, dst, "-vv", "--progress", "--stats", "5s", "--stats-one-line", "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO", "--config", cfg}
 	// attach advanced options if present
 	var effOpt map[string]any
 	if run.Summary != nil {
