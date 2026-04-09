@@ -21,6 +21,8 @@ func (r *CmdRunner) bin() string {
 func (r *CmdRunner) CmdContext(ctx context.Context, args ...string) *exec.Cmd {
 	cmd := exec.CommandContext(ctx, r.bin(), args...)
 	cmd.Env = os.Environ()
+	// 强制英文日志，避免本地化导致进度行关键字变化
+	cmd.Env = append(cmd.Env, "LC_ALL=C", "LANG=C")
 	if _, ok := os.LookupEnv("RCLONE_CONFIG"); !ok {
 		if _, err := os.Stat("./data/rclone.conf"); err == nil {
 			cmd.Env = append(cmd.Env, "RCLONE_CONFIG=./data/rclone.conf")
