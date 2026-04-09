@@ -153,12 +153,39 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 
 // HandleGlobalStats 处理获取全局实时统计信息
 func (c *RunController) HandleGlobalStats(w http.ResponseWriter, r *http.Request) {
+	// 先尝试从 RC 获取
 	stats, err := c.rc.CoreStats(r.Context())
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+	if err == nil {
+		// 如果 RC 可用直接返回
+		WriteJSON(w, 200, stats)
 		return
 	}
-	WriteJSON(w, 200, stats)
+	// 回退：聚合本地 CLI Runner 的活动任务进度
+	runs, e2 := c.runSvc.ListActiveRuns()
+	if e2 != nil {
+		WriteJSON(w, 500, map[string]any{"error": e2.Error()})
+		return
+	}
+	var bytesSum, totalSum, speedSum float64
+	for _, run := range runs {
+		if m, ok := any(run.Summary).(map[string]any); ok {
+			if p, ok := m["progress"].(map[string]any); ok {
+				if v, ok := p["bytes"].(float64); ok { bytesSum += v }
+				if v, ok := p["totalBytes"].(float64); ok { totalSum += v }
+				if v, ok := p["speed"].(float64); ok { speedSum += v }
+			}
+		}
+	}
+	percentage := 0.0
+	if totalSum > 0 { percentage = (bytesSum / totalSum) * 100 }
+	WriteJSON(w, 200, map[string]any{
+		"bytes": bytesSum,
+		"totalBytes": totalSum,
+		"speed": speedSum,
+		"speedAvg": speedSum, // 简化：无历史窗口，先返回当前合计
+		"eta": nil, // CLI 模式无法可靠聚合 ETA，这里暂置空
+		"percentage": percentage,
+	})
 }
 
 // HandleJobStatus 处理获取指定 Job 的状态
