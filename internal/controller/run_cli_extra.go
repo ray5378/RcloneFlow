@@ -21,15 +21,5 @@ func (c *RunController) HandleRunStopCLI(w http.ResponseWriter, r *http.Request)
 	WriteJSON(w, 200, map[string]any{"stopped": true})
 }
 
-// HandleRunLog GET /api/runs/{id}/log?kind=stdout|stderr
-func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet { w.WriteHeader(405); return }
-	idStr := strings.TrimPrefix(r.URL.Path, "/api/runs/")
-	idStr = strings.TrimSuffix(idStr, "/log")
-	id, _ := strconv.ParseInt(strings.Trim(idStr, "/"), 10, 64)
-	if id <= 0 { w.WriteHeader(400); return }
-	kind := r.URL.Query().Get("kind"); if kind != "stderr" { kind = "stdout" }
-	dir := os.Getenv("APP_DATA_DIR"); if dir == "" { dir = "./data" }
-	path := filepath.Join(dir, "logs", "run-"+strconv.FormatInt(id,10)+"-"+kind+".log")
-	http.ServeFile(w, r, path)
-}
+// (deprecated) 旧版 /api/runs/{id}/log 接口已移至 run.go，仅保留占位避免编译错误
+// func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {}
