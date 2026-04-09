@@ -95,10 +95,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		rr.Summary["stderrFile"] = stderrPath
 	})
 
-	go r.consume(run.ID, outR, stdoutFile)
-	go r.consume(run.ID, errR, stderrFile)
-	// 额外：解析 --stats-one-line 文本行，提取 bytes/total/speed/eta
-	go r.parseOneLine(run.ID, errR)
+	go r.consume(run.ID, outR, stdoutFile, false)
+	// 在 stderr 同时写入并解析 one-line 进度
+	go r.consume(run.ID, errR, stderrFile, true)
 	go func(){
 		err := cmd.Wait()
 		outW.Close(); errW.Close()
@@ -223,12 +222,14 @@ func wait(cmd *exec.Cmd, d time.Duration) bool {
 	}
 }
 
-func (r *Runner) consume(runID int64, rd io.Reader, out *os.File){
+func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats ...bool){
+	wantParse := len(parseStats) > 0 && parseStats[0]
 	s := bufio.NewScanner(rd)
 	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
 	for s.Scan(){
 		line := s.Text()
 		if len(line) > 0 { _, _ = out.WriteString(line+"\n") }
+		// 1) JSON 行（极少数情况下）
 		var rec map[string]any
 		if json.Unmarshal([]byte(line), &rec) == nil {
 			prog := map[string]any{}
@@ -243,6 +244,18 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File){
 					if b, ok := prog["bytes"].(float64); ok { rr.BytesTransferred = int64(b) }
 					if sp, ok := prog["speed"].(float64); ok { rr.Speed = fmt.Sprintf("%d B/s", int64(sp)) }
 				})
+				continue
+			}
+		}
+		// 2) 文本 one-line 解析（仅在需要时）
+		if wantParse {
+			if prog, ok := parseOneLineProgress(line); ok {
+				_ = r.db.UpdateRun(runID, func(rr *store.Run){
+					if rr.Summary == nil { rr.Summary = map[string]any{} }
+					rr.Summary["progress"] = prog
+					rr.BytesTransferred = int64(prog["bytes"].(float64))
+					rr.Speed = fmt.Sprintf("%d B/s", int64(prog["speed"].(float64)))
+				})
 			}
 		}
 	}
@@ -251,40 +264,63 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File){
 	}
 }
 
-var oneLineRe = regexp.MustCompile(`(?i)(?:(\d+(?:\.\d+)?)([KMGTP]?)[b]?)\/\s*(\d+(?:\.\d+)?)([KMGTP]?)\s*[, ]+([\d\.]+)\s*([KMGTP]?)[b]?/s.*?ETA\s*(\d+h)?(?::?(\d+)m)?(?::?(\d+)s)?`)
-func humanToBytes(num, unit string) int64 {
-	f := 0.0; fmt.Sscanf(num, "%f", &f)
-	switch strings.ToUpper(unit) {
-	case "K": return int64(f * 1024)
-	case "M": return int64(f * 1024 * 1024)
-	case "G": return int64(f * 1024 * 1024 * 1024)
-	case "T": return int64(f * 1024 * 1024 * 1024 * 1024)
-	case "P": return int64(f * 1024 * 1024 * 1024 * 1024 * 1024)
-	default: return int64(f)
+var oneLineRe = regexp.MustCompile(`(?i)^(?:transferred:)?\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s\s*,\s*ETA\s*([0-9hms:.-]+)`) 
+
+func unitToMul(u string) float64 {
+	u = strings.ToUpper(u)
+	switch u {
+	case "K", "KI": return 1024
+	case "M", "MI": return 1024 * 1024
+	case "G", "GI": return 1024 * 1024 * 1024
+	case "T", "TI": return 1024 * 1024 * 1024 * 1024
+	case "P", "PI": return 1024 * 1024 * 1024 * 1024 * 1024
+	default: return 1
 	}
 }
 
-func (r *Runner) parseOneLine(runID int64, rd io.Reader){
-	s := bufio.NewScanner(rd)
-	s.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-	for s.Scan(){
-		line := s.Text()
-		m := oneLineRe.FindStringSubmatch(line)
-		if len(m) > 0 {
-			bytes := humanToBytes(m[1], m[2])
-			total := humanToBytes(m[3], m[4])
-			speed := humanToBytes(m[5], m[6])
-			etaSec := 0
-			if m[7] != "" { var h int; fmt.Sscanf(m[7], "%dh", &h); etaSec += h*3600 }
-			if m[8] != "" { var mm int; fmt.Sscanf(m[8], "%dm", &mm); etaSec += mm*60 }
-			if m[9] != "" { var ss int; fmt.Sscanf(m[9], "%ds", &ss); etaSec += ss }
-			prog := map[string]any{"bytes": float64(bytes), "totalBytes": float64(total), "speed": float64(speed), "eta": float64(etaSec)}
-			_ = r.db.UpdateRun(runID, func(rr *store.Run){
-				if rr.Summary == nil { rr.Summary = map[string]any{} }
-				rr.Summary["progress"] = prog
-				rr.BytesTransferred = bytes
-				rr.Speed = fmt.Sprintf("%d B/s", speed)
-			})
+func parseETA(s string) int {
+	s = strings.TrimSpace(s)
+	if s == "-" || s == "" { return 0 }
+	// formats: 1h2m3s | 2m3s | 45s | 01:23:45 | 12:34
+	if strings.Contains(s, ":") {
+		parts := strings.Split(s, ":")
+		if len(parts) == 3 { // hh:mm:ss
+			var h, m, sec int
+			fmt.Sscanf(s, "%d:%d:%d", &h, &m, &sec)
+			return h*3600 + m*60 + sec
+		}
+		if len(parts) == 2 { // mm:ss
+			var m, sec int
+			fmt.Sscanf(s, "%d:%d", &m, &sec)
+			return m*60 + sec
 		}
 	}
+	// h/m/s suffix
+	sec := 0
+	var h, m, ss int
+	fmt.Sscanf(s, "%dh%dm%ds", &h, &m, &ss)
+	if h == 0 && m == 0 && ss == 0 {
+		fmt.Sscanf(s, "%dm%ds", &m, &ss)
+		if m == 0 && ss == 0 {
+			fmt.Sscanf(s, "%ds", &ss)
+		}
+	}
+	sec += h*3600 + m*60 + ss
+	return sec
+}
+
+func parseOneLineProgress(line string) (map[string]any, bool) {
+	m := oneLineRe.FindStringSubmatch(strings.TrimSpace(line))
+	if len(m) == 0 { return nil, false }
+	// m[1]=cur, m[2]=curUnit, m[3]=total, m[4]=totalUnit, m[5]=speed, m[6]=speedUnit, m[7]=eta
+	var cur, tot, sp float64
+	fmt.Sscanf(m[1], "%f", &cur)
+	fmt.Sscanf(m[3], "%f", &tot)
+	fmt.Sscanf(m[5], "%f", &sp)
+	curBytes := cur * unitToMul(m[2])
+	totBytes := tot * unitToMul(m[4])
+	spBytes := sp * unitToMul(m[6])
+	eta := parseETA(m[7])
+	prog := map[string]any{"bytes": curBytes, "totalBytes": totBytes, "speed": spBytes, "eta": float64(eta)}
+	return prog, true
 }
