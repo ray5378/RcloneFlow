@@ -140,8 +140,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				}
 				time.Sleep(pvInterval)
 			}
-			if ok { _ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" }) } 
-			else {
+			if ok {
+				_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
+			} else {
 				_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
 					rr.Status = "finalizing_timeout"
 					if rr.Summary == nil { rr.Summary = map[string]any{} }
