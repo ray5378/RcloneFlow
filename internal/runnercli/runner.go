@@ -107,20 +107,22 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		})
 		cur, _ := r.db.GetRun(run.ID)
 		if cur.Summary != nil {
-			if eff, ok := cur.Summary["effectiveOptions"].(map[string]any); ok {
-				if v, ok := eff["postVerify.enabled"].(bool); ok { pvEnabled = v }
-				if v, ok := eff["postVerify.mode"].(string); ok && v != "" { pvMode = v }
-				if v, ok := eff["postVerify.match"].(string); ok && v != "" { pvMatch = v }
-				if v, ok := eff["postVerify.interval"].(string); ok { if d, e := time.ParseDuration(v); e == nil { pvInterval = d } }
-				if v, ok := eff["postVerify.timeout"].(string); ok { if d, e := time.ParseDuration(v); e == nil { pvTimeout = d } }
+			if effm, ok := cur.Summary["effectiveOptions"].(map[string]any); ok {
+				if v, ok := effm["postVerify.enabled"].(bool); ok { pvEnabled = v }
+				if v, ok := effm["postVerify.mode"].(string); ok && v != "" { pvMode = v }
+				if v, ok := effm["postVerify.match"].(string); ok && v != "" { pvMatch = v }
+				if v, ok := effm["postVerify.interval"].(string); ok { if d, e := time.ParseDuration(v); e == nil { pvInterval = d } }
+				if v, ok := effm["postVerify.timeout"].(string); ok { if d, e := time.ParseDuration(v); e == nil { pvTimeout = d } }
 			}
-			// 再从 transferDefaults 读取全局默认
+			// 再从 transferDefaults 读取全局默认（仅在任务未覆盖时）
 			if def, ok := cur.Summary["transferDefaults"].(map[string]any); ok {
-				if !existsBool(eff(cur), "postVerify.enabled") { if b, ok := def["postVerifyEnabled"].(bool); ok { pvEnabled = b } }
-				if !existsStr(eff(cur), "postVerify.mode") { if s, ok := def["postVerifyMode"].(string); ok && s != "" { pvMode = s } }
-				if !existsStr(eff(cur), "postVerify.match") { if s, ok := def["postVerifyMatch"].(string); ok && s != "" { pvMatch = s } }
-				if !existsStr(eff(cur), "postVerify.interval") { if s, ok := def["postVerifyInterval"].(string); ok { if d, e := time.ParseDuration(s); e == nil { pvInterval = d } } }
-				if !existsStr(eff(cur), "postVerify.timeout") { if s, ok := def["postVerifyTimeout"].(string); ok { if d, e := time.ParseDuration(s); e == nil { pvTimeout = d } } }
+				if effm := eff(cur.Summary); effm != nil {
+					if !existsBool(effm, "postVerify.enabled") { if b, ok := def["postVerifyEnabled"].(bool); ok { pvEnabled = b } }
+					if !existsStr(effm, "postVerify.mode") { if s, ok := def["postVerifyMode"].(string); ok && s != "" { pvMode = s } }
+					if !existsStr(effm, "postVerify.match") { if s, ok := def["postVerifyMatch"].(string); ok && s != "" { pvMatch = s } }
+					if !existsStr(effm, "postVerify.interval") { if s, ok := def["postVerifyInterval"].(string); ok { if d, e := time.ParseDuration(s); e == nil { pvInterval = d } } }
+					if !existsStr(effm, "postVerify.timeout") { if s, ok := def["postVerifyTimeout"].(string); ok { if d, e := time.ParseDuration(s); e == nil { pvTimeout = d } } }
+				}
 			}
 		}
 		if pvEnabled && pvMode == "mount" {

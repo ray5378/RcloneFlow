@@ -20,10 +20,10 @@ func existsBool(m anyMap, key string) bool {
 	return false
 }
 
-func eff(cur anyMap) anyMap {
-	if cur == nil { return nil }
-	if v, ok := cur["effectiveOptions"]; ok {
-		if m, ok2 := v.(map[string]any); ok2 { return m }
+func eff(m anyMap) anyMap {
+	if m == nil { return nil }
+	if v, ok := m["effectiveOptions"]; ok {
+		if mm, ok2 := v.(map[string]any); ok2 { return mm }
 	}
 	return nil
 }
