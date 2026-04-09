@@ -28,7 +28,6 @@
     .rf-tab.active{background:#2563eb;border-color:#2563eb;color:#fff}
     @media (max-width:640px){.rf-modal{width:96vw}}
   </style>
-  <button id="rfOpen" class="rf-fab">传输选项</button>
   <div id="rfMask" class="rf-modal-mask"></div>
   <div id="rfModal" class="rf-modal" role="dialog" aria-modal="true">
     <div class="hd"><div>传输选项</div><button id="rfClose" class="rf-btn ghost">关闭</button></div>
@@ -70,7 +69,9 @@
   <script>
     (function(){
       const $ = s=>document.querySelector(s);
+      const $$ = s=>Array.from(document.querySelectorAll(s));
       const open = ()=>{ $('#rfMask').style.display='block'; $('#rfModal').style.display='block'; loadGlobal(); };
+      const openTask = (taskId)=>{ setTab('task'); if(taskId){ $('#t_id').value=String(taskId); } $('#rfMask').style.display='block'; $('#rfModal').style.display='block'; };
       const close= ()=>{ $('#rfMask').style.display='none'; $('#rfModal').style.display='none'; };
       const token= ()=>{ try{return localStorage.getItem('authToken')||''}catch(e){return ''} };
       const setTab=(k)=>{
@@ -130,6 +131,39 @@
         try{ if($('#tabGlobal').classList.contains('active')) await saveGlobal(); else await saveTask(); $('#rfMsg').style.color='#22c55e'; $('#rfMsg').textContent='已保存'; }
         catch(e){ $('#rfMsg').style.color='#ef4444'; $('#rfMsg').textContent='保存失败：'+(e.message||e); }
       });
+      // 将入口放到“设置”菜单：发现“设置”字样的菜单/按钮，旁边加“传输选项”子按钮
+      function hookSettingsMenu(){
+        const anchors=$$('a,button');
+        for(const a of anchors){
+          const txt=(a.textContent||'').trim();
+          if(txt.includes('设置')){
+            if(document.getElementById('rfSettingsLink')) return;
+            const link=document.createElement('button'); link.id='rfSettingsLink'; link.className='rf-btn ghost'; link.style.marginLeft='8px'; link.textContent='传输选项';
+            link.onclick=()=>{ setTab('global'); open(); };
+            a.parentElement&&a.parentElement.appendChild(link);
+            break;
+          }
+        }
+      }
+      // 每个任务卡片各自一个“传输选项”按钮：贴近“运行”按钮
+      function hookTaskCards(){
+        const runBtns=$$('button, a');
+        for(const b of runBtns){
+          const txt=(b.textContent||'').trim();
+          if(txt==='传输选项' && b.dataset.rfTaskBtn) continue;
+          if(txt.includes('运行')){
+            const card=b.closest('[data-task-id], .task-card, .card, li, div');
+            const idAttr=card&&card.getAttribute&&card.getAttribute('data-task-id');
+            const id=idAttr?parseInt(idAttr,10):NaN;
+            const btn=document.createElement('button'); btn.className='rf-btn ghost'; btn.textContent='传输选项'; btn.dataset.rfTaskBtn='1'; btn.style.marginLeft='8px';
+            btn.onclick=()=>{ if(!isNaN(id)) openTask(id); else { setTab('task'); open(); } };
+            b.parentElement&&b.parentElement.appendChild(btn);
+          }
+        }
+      }
+      const mo=new MutationObserver(()=>{ hookSettingsMenu(); hookTaskCards(); });
+      mo.observe(document.documentElement,{childList:true,subtree:true});
+      hookSettingsMenu(); hookTaskCards();
     })();
   </script>
 </body>
