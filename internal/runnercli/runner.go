@@ -45,8 +45,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	// Resolve config path
 	dataDir := os.Getenv("APP_DATA_DIR"); if dataDir == "" { dataDir = "./data" }
 	cfg := os.Getenv("RCLONE_CONFIG"); if cfg == "" { cfg = filepath.Join(dataDir, "rclone.conf") }
-	// Base args（启用 one-line；JSON 日志可通过环境变量开启）
-	args := []string{cmdName, src, dst, "-vv", "--progress", "--stats", "5s", "--stats-one-line", "--config", cfg}
+	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
+	args := []string{cmdName, src, dst, "-vv", "--stats", "5s", "--stats-one-line", "--config", cfg}
+	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
 	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
 		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	}
