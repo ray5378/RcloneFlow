@@ -27,6 +27,11 @@ const showDetailModal = ref(false)
 const runDetail = ref<any>({})
 const runDetailProgress = ref<any>(null)
 let runDetailTimer: any = null
+
+// 运行详情 - 文件列表分页
+const runFiles = ref<any[]>([])
+const runFilesPage = ref(1)
+const runFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 380) / 32)))
 const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
 const showGlobalStatsModal = ref(false)
@@ -36,6 +41,60 @@ const taskProgressData = ref<any>({})
 const activeRuns = ref<any[]>([])
 const showTransferModal = ref(false)
 const transferTaskId = ref<number | undefined>(undefined)
+
+// 运行详情 - 文件列表分页
+const runDetail = ref<any>({})
+const showDetailModal = ref(false)
+const runFiles = ref<any[]>([])
+const runFilesPage = ref(1)
+const runFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 380) / 32)))
+let runDetailTimer:any = null
+
+function pickFilesFromRun(run:any){
+  // 优先从实时数据
+  if (run?.realtimeStatus?.files && Array.isArray(run.realtimeStatus.files)) return run.realtimeStatus.files
+  // 其次从 summary.files
+  try{
+    const sum = typeof run.summary === 'string' ? JSON.parse(run.summary) : run.summary
+    if (sum?.files && Array.isArray(sum.files)) return sum.files
+  }catch{}
+  return []
+}
+
+function showRunDetail(run:any){
+  runDetail.value = run
+  showDetailModal.value = true
+  runFilesPage.value = 1
+  runFiles.value = pickFilesFromRun(run)
+  if (run.status === 'running'){
+    if (runDetailTimer) clearInterval(runDetailTimer)
+    runDetailTimer = setInterval(async ()=>{
+      try{
+        const actives:any[] = await api.getActiveRuns()
+        const cur = actives.find(a => a?.runRecord?.taskId === run.taskId)
+        if (cur){
+          runFiles.value = pickFilesFromRun({
+            realtimeStatus: cur.realtimeStatus,
+            summary: cur.runRecord?.summary || run.summary
+          })
+        }
+      }catch{}
+    }, 2000)
+  }
+}
+
+function closeRunDetail(){
+  showDetailModal.value = false
+  if (runDetailTimer) { clearInterval(runDetailTimer); runDetailTimer = null }
+}
+
+const pagedRunFiles = computed(()=>{
+  const start = (runFilesPage.value-1) * runFilesPageSize.value
+  return runFiles.value.slice(start, start + runFilesPageSize.value)
+})
+const totalRunFilesPages = computed(()=> Math.max(1, Math.ceil((runFiles.value.length||0)/runFilesPageSize.value)))
+function goPrevFilesPage(){ if (runFilesPage.value>1) runFilesPage.value-- }
+function goNextFilesPage(){ if (runFilesPage.value<totalRunFilesPages.value) runFilesPage.value++ }
 let activeRunsTimer: number | null = null
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
