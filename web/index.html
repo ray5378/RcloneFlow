@@ -329,13 +329,15 @@
             let taskId=NaN, p=b.parentElement, depth=0;
             while(p && depth++<6){ const v=p.getAttribute?.('data-task-id')||p.getAttribute?.('data-taskId'); if(v && /^\d+$/.test(v)){ taskId=parseInt(v,10); break;} p=p.parentElement; }
             if(isNaN(taskId)){ const m=(parent?.textContent||'').match(/(?:任务|Task)?[#：: ](\d{1,12})/); if(m) taskId=parseInt(m[1],10); }
-            const nb=doc.createElement('button'); nb.textContent='传输选项'; nb.dataset.rfTaskBtn='1'; nb.className=b.className||'ghost small'; nb.style.marginLeft='8px';
-            nb.onclick=()=>openModal(isNaN(taskId)?undefined:taskId);
-            parent.appendChild(nb); injected++;
+            // 克隆现有按钮，保留 data-v 与样式，修改文案与事件，插在原按钮右侧
+            const nb=b.cloneNode(true); nb.removeAttribute('href'); nb.dataset.rfTaskBtn='1';
+            nb.textContent='传输选项';
+            nb.onclick=(e)=>{ e.preventDefault&&e.preventDefault(); openModal(isNaN(taskId)?undefined:taskId); };
+            parent.insertBefore(nb, b.nextSibling); injected++;
           });
         }
-        if(++tries>90 || injected>0) clearInterval(timer);
-      }, 1000);
+        if(++tries>100 || injected>0) clearInterval(timer);
+      }, 300);
     })();
   </script>
 </body>
