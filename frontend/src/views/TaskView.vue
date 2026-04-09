@@ -32,6 +32,8 @@ const globalStats = ref<any>({})
 const showTaskProgressModal = ref(false)
 const taskProgressData = ref<any>({})
 const activeRuns = ref<any[]>([])
+const showTransferModal = ref(false)
+const transferTaskId = ref<number | undefined>(undefined)
 let activeRunsTimer: number | null = null
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
@@ -741,6 +743,7 @@ function goBackTarget() {
   const parentPath = parts.join('/')
   loadTargetPath(createForm.value.targetRemote, parentPath)
 }
+import TransferOptions from '../components/TransferOptions.vue'
 </script>
 
 <template>
@@ -790,6 +793,7 @@ function goBackTarget() {
               <template v-if="runningTaskId === task.id">运行成功</template>
               <template v-else>▶ 手动运行</template>
             </button>
+            <button class="ghost small" @click.stop="() => { transferTaskId = task.id; showTransferModal = true }">⚙️ 传输选项</button>
             <button class="ghost small" @click.stop="editTask(task)">✏️</button>
             <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
           </div>
@@ -1289,6 +1293,9 @@ function goBackTarget() {
       </div>
     </div>
   </div>
+
+  <!-- 任务传输选项弹窗（任务级） -->
+  <TransferOptions v-model="showTransferModal" :taskId="transferTaskId" />
 
   <!-- 任务实时进度弹窗 -->
   <div v-if="showTaskProgressModal" class="modal-overlay" @click.self="showTaskProgressModal = false">

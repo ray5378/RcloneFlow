@@ -3,6 +3,7 @@ import { ref, onMounted, reactive } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
 import LoginView from './views/LoginView.vue'
+import TransferOptions from './components/TransferOptions.vue'
 import * as api from './api'
 import { isLoggedIn as checkAuth, getUser, logout, changePassword } from './api/auth'
 
@@ -14,6 +15,7 @@ const isAuth = ref(false)
 const authChecked = ref(false)
 const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
+const showTransferModal = ref(false)
 
 const user = getUser()
 
@@ -160,6 +162,11 @@ onMounted(async () => {
               <span class="settings-text">{{ isLight ? '深色模式' : '浅色模式' }}</span>
               <span class="settings-arrow">›</span>
             </div>
+            <div class="settings-item" @click="showTransferModal = true">
+              <span class="settings-icon">⚙️</span>
+              <span class="settings-text">传输选项</span>
+              <span class="settings-arrow">›</span>
+            </div>
             <div class="settings-item" @click="openGitHub">
               <span class="settings-icon">⭐</span>
               <span class="settings-text">给项目点个Star</span>
@@ -205,6 +212,8 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+      <!-- 全局传输选项弹窗 -->
+      <TransferOptions v-model="showTransferModal" />
     </template>
   </div>
 </template>
