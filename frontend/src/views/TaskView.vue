@@ -58,6 +58,10 @@ const createForm = ref({
   options: { enableStreaming: true } as Record<string, any>,
 })
 
+// 命令行模式
+const commandMode = ref(false)
+const commandText = ref('')
+
 const openMenuId = ref<number | null>(null)
 const editingTask = ref<Task | null>(null)
 const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
@@ -246,6 +250,23 @@ async function createTask() {
     alert('请输入任务名称')
     return
   }
+
+  // 命令行模式：解析 rclone 命令
+  if (commandMode.value) {
+    try {
+      const parsed = parseRcloneCommand(commandText.value)
+      createForm.value.mode = parsed.mode
+      createForm.value.sourceRemote = parsed.src.remote
+      createForm.value.sourcePath = parsed.src.path
+      createForm.value.targetRemote = parsed.dst.remote
+      createForm.value.targetPath = parsed.dst.path
+      createForm.value.options = { ...normalizeTaskOptions(createForm.value.options), ...parsed.options }
+    } catch (e) {
+      alert('命令解析失败：' + (e as Error).message)
+      return
+    }
+  }
+
   if (!createForm.value.sourceRemote || !createForm.value.targetRemote) {
     alert('请选择源和目标存储')
     return
@@ -306,6 +327,50 @@ async function createTask() {
     alert((e as Error).message)
   }
 }
+
+function parseRcloneCommand(cmd: string) {
+  if (!cmd) throw new Error('命令为空')
+  // 简单分词（支持引号包裹）
+  const tokens = cmd.match(/(?:"[^"]*"|'[^']*'|\S)+/g) || []
+  if (tokens.length < 3) throw new Error('缺少源/目标')
+  // 查找子命令
+  const sub = tokens[1]
+  const mode = sub === 'sync' ? 'sync' : sub === 'move' ? 'move' : 'copy'
+  // 源/目标
+  const src = parseRemotePath(tokens[2])
+  const dst = parseRemotePath(tokens[3])
+  // 解析 flags
+  const options: Record<string, any> = {}
+  for (let i = 4; i < tokens.length; i++) {
+    const t = tokens[i]
+    if (t.startsWith('--')) {
+      const key = t.replace(/^--/, '')
+      const next = tokens[i + 1]
+      switch (key) {
+        case 'bwlimit': options.bwLimit = stripQuotes(next); i++; break
+        case 'transfers': options.transfers = Number(next); i++; break
+        case 'use-server-modtime': options.useServerModtime = true; break
+        case 'size-only': options.sizeOnly = true; break
+        case 'verbose': /* ignore */ break
+        default:
+          // 其他 boolean 开关
+          if (!next || next.startsWith('--')) {
+            options[toCamel(key)] = true
+          } else {
+            options[toCamel(key)] = stripQuotes(next); i++
+          }
+      }
+    }
+  }
+  return { mode, src, dst, options }
+}
+function parseRemotePath(s: string){
+  const m = s.split(':')
+  if (m.length < 2) throw new Error('路径格式错误：'+s)
+  return { remote: m[0], path: m.slice(1).join(':') || '' }
+}
+function stripQuotes(s?: string){ return s ? s.replace(/^['\"]|['\"]$/g, '') : s }
+function toCamel(s: string){ return s.replace(/-([a-z])/g, (_,c)=>c.toUpperCase()) }
 
 // 过滤后的历史记录
 const filteredRuns = computed(() => {
@@ -929,6 +994,15 @@ import TransferOptions from '../components/TransferOptions.vue'
     <div v-if="currentModule === 'add'" class="card">
     <div class="card-header"><div class="title">添加任务</div></div>
     <div class="form-content">
+      <div class="field-item">
+        <label>命令行模式（可粘贴 rclone 命令）</label>
+        <div class="inline-flex">
+          <input type="checkbox" v-model="commandMode" />
+          <span style="margin-left:8px">启用命令行解析</span>
+        </div>
+        <textarea v-if="commandMode" v-model="commandText" rows="3" placeholder='例如: rclone copy FNOS:/HDD/media openlist:/影音媒体/天翼5050 --bwlimit "07:30,2M;17:40,2M;23:00,2M" --use-server-modtime --size-only --verbose --transfers 2'></textarea>
+        <p v-if="commandMode" class="hint">保存时将自动解析命令，填充“模式/源/目标/选项”。任务名称仍需手动填写。</p>
+      </div>
       <div class="field-item">
         <label>任务名称 <span style="color: #dc2626">*</span></label>
         <input v-model="createForm.name" type="text" placeholder="输入任务名称" />
