@@ -215,8 +215,20 @@
       }
       const mo=new MutationObserver(()=>{ try{hookSettingsMenu(); hookTaskCards();}catch(e){} });
       mo.observe(document.documentElement,{childList:true,subtree:true});
+      // 周期性重试，容错路由切换与异步渲染
+      let retries=0; const timer=setInterval(()=>{ if(retries++>60){ clearInterval(timer); return;} try{hookSettingsMenu(); hookTaskCards();}catch(e){} }, 2000);
       // 初始执行一次
       try{hookSettingsMenu(); hookTaskCards();}catch(e){}
+      // 深链接支持：/#transfer 或 /#transfer?taskId=123
+      function openFromHash(){
+        if(location.hash && location.hash.startsWith('#transfer')){
+          const m=location.hash.match(/taskId=(\d+)/);
+          if(m){ setTab('task'); setTaskId(m[1]); }
+          open();
+        }
+      }
+      window.addEventListener('hashchange', openFromHash);
+      openFromHash();
     })();
   </script>
 </body>
