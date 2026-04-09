@@ -624,10 +624,7 @@ async function deleteSchedule(id: number) {
   }
 }
 
-function showRunDetail(run: any) {
-  runDetail.value = run
-  showDetailModal.value = true
-}
+// duplicate old implementation removed (showRunDetail)
 
 function historyProgressFromSummary(summary: any){
   try{
