@@ -96,6 +96,17 @@ services:
   - 按 run 强制终止：`POST /api/runs/{id}/kill`（CLI 子进程：SIGINT→SIGTERM→SIGKILL）
   - 按任务一键终止：`POST /api/tasks/{id}/kill`（内部定位最近 run 并终止）
   - RC 停止 Job：`GET /api/jobs/{jobId}/stop`
+  - 示例：
+    ```bash
+    # 按任务ID一键终止（推荐）
+    curl -X POST http://localhost:17870/api/tasks/12/kill 
+
+    # 已知 runId 时终止该次运行
+    curl -X POST http://localhost:17870/api/runs/345/kill 
+
+    # 如果该任务通过 RC 运行，停止 RC Job（需已知 jobId）
+    curl "http://localhost:17870/api/jobs/789/stop"
+    ```
 - 历史与日志保留：`GET/PUT /api/settings/housekeeping`（runRetentionDays/logRetentionDays）
 - 日志下载：`GET /api/runs/{id}/log`（仅 stderr 单文件）
 
