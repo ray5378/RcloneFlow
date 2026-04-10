@@ -53,7 +53,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
 		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	}
-	// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)
+	// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)，并对 WebDAV 目标注入稳态默认（未显式配置时）
 	var effOpt map[string]any
 	if run.Summary != nil {
 		var merged = map[string]any{}
@@ -66,6 +66,18 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			if m, ok := v.(map[string]any); ok {
 				for k, val := range m { merged[k] = val }
 			}
+		}
+		// WebDAV 稳态参数（仅当 dst 为 WebDAV 且用户未显式配置时注入）
+		isWebdav := strings.EqualFold(strings.ToLower(dstRemote), "webdav") || strings.Contains(strings.ToLower(dstRemote), "webdav")
+		if isWebdav {
+			if _, ok := merged["timeout"]; !ok { merged["timeout"] = 24*3600 }
+			if _, ok := merged["connTimeout"]; !ok { merged["connTimeout"] = 60 }
+			if _, ok := merged["expectContinueTimeout"]; !ok { merged["expectContinueTimeout"] = 30 }
+			if _, ok := merged["retries"]; !ok { merged["retries"] = 5 }
+			if _, ok := merged["lowLevelRetries"]; !ok { merged["lowLevelRetries"] = 20 }
+			if _, ok := merged["disableHttp2"]; !ok { merged["disableHttp2"] = true }
+			if _, ok := merged["transfers"]; !ok { merged["transfers"] = 1 }
+			if _, ok := merged["multiThreadStreams"]; !ok { merged["multiThreadStreams"] = 1 }
 		}
 		if len(merged) > 0 {
 			effOpt = merged
