@@ -67,9 +67,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				for k, val := range m { merged[k] = val }
 			}
 		}
-		// WebDAV 稳态参数（仅当 dst 为 WebDAV 且用户未显式配置时注入）
-		isWebdav := strings.EqualFold(strings.ToLower(dstRemote), "webdav") || strings.Contains(strings.ToLower(dstRemote), "webdav")
-		if isWebdav {
+		// WebDAV 稳态参数（当目标底层是 WebDAV 且用户未显式配置时注入）
+		if isWebDAVUnderlying(cfg, dstRemote) {
 			if _, ok := merged["timeout"]; !ok { merged["timeout"] = 24*3600 }
 			if _, ok := merged["connTimeout"]; !ok { merged["connTimeout"] = 60 }
 			if _, ok := merged["expectContinueTimeout"]; !ok { merged["expectContinueTimeout"] = 30 }
@@ -180,6 +179,33 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 	}()
 	return nil
+}
+
+func isWebDAVUnderlying(cfgPath, remote string) bool {
+	// 调用 `rclone config dump --config cfg` 并解析 remote 链；判断底层是否 webdav
+	cr := &adapter.CmdRunner{}
+	out, _, err := cr.Run(context.Background(), []string{"config", "dump", "--config", cfgPath}...)
+	if err != nil { return false }
+	var dump map[string]any
+	if json.Unmarshal([]byte(out), &dump) != nil { return false }
+	name := remote
+	// 直接命中远端名
+	for depth := 0; depth < 4; depth++ {
+		sec, _ := dump[name].(map[string]any)
+		if sec == nil { break }
+		// type 命中 webdav
+		if t, _ := sec["type"].(string); strings.EqualFold(t, "webdav") { return true }
+		// crypt/alias 等 wrapper：跟随 remote 指向
+		if base, _ := sec["remote"].(string); base != "" {
+			// remote 形如 "webdav:root" 或 "other:"，取冒号前的 remote 名
+			if i := strings.Index(base, ":"); i > 0 {
+				name = base[:i]
+				continue
+			}
+		}
+		break
+	}
+	return false
 }
 
 func sizeOf(r *adapter.CmdRunner, cfg, target string) (bytes int64, count int64, err error) {
