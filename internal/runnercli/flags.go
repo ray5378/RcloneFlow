@@ -18,6 +18,20 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 			for _, e := range vv { if s, ok := e.(string); ok && s!="" { arr = append(arr, s) } }
 		case []string:
 			arr = vv
+		case string:
+			s := strings.TrimSpace(vv)
+			if s != "" {
+				// 支持换行或逗号分隔的多条规则
+				s = strings.ReplaceAll(s, "\r", "")
+				for _, line := range strings.Split(s, "\n") {
+					line = strings.TrimSpace(line)
+					if line == "" { continue }
+					for _, part := range strings.Split(line, ",") {
+						p := strings.TrimSpace(part)
+						if p != "" { arr = append(arr, p) }
+					}
+				}
+			}
 		}
 		return arr, len(arr)>0
 	}
