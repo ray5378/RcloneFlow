@@ -64,8 +64,11 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		if v, ok := run.Summary["effectiveOptions"]; ok {
 			if m, ok := v.(map[string]any); ok { effm = m; for k, val := range m { merged[k] = val } }
 		}
-		// WebDAV 稳态参数（当目标底层是 WebDAV 且“任务未显式设置”时，覆盖掉 transferDefaults 的弱默认）
+		// WebDAV 稳态参数（当目标底层是 WebDAV）
+		// 1) 未显式设置时注入建议默认
+		// 2) 下限兜底：对显式或弱默认过低的数值提升到建议值
 		if isWebDAVUnderlying(cfg, dstRemote) {
+			// 注入（未显式设置）
 			if _, ok := effm["timeout"]; !ok { merged["timeout"] = 24*3600 }
 			if _, ok := effm["connTimeout"]; !ok { merged["connTimeout"] = 60 }
 			if _, ok := effm["expectContinueTimeout"]; !ok { merged["expectContinueTimeout"] = 30 }
@@ -74,6 +77,30 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			if _, ok := effm["disableHttp2"]; !ok { merged["disableHttp2"] = true }
 			if _, ok := effm["transfers"]; !ok { merged["transfers"] = 1 }
 			if _, ok := effm["multiThreadStreams"]; !ok { merged["multiThreadStreams"] = 1 }
+
+			// 下限兜底（无论来自弱默认还是显式低值，都提升到建议下限）
+			getInt := func(v any) (int, bool) {
+				switch t := v.(type) {
+				case float64: return int(t), true
+				case int: return t, true
+				case int64: return int(t), true
+				case string:
+					s := strings.TrimSpace(t)
+					if s == "" { return 0, false }
+					if n, err := strconv.Atoi(s); err == nil { return n, true }
+				}
+				return 0, false
+			}
+			if n, ok := getInt(merged["timeout"]); !ok || n < 24*3600 { merged["timeout"] = 24*3600 }
+			if n, ok := getInt(merged["connTimeout"]); !ok || n < 60 { merged["connTimeout"] = 60 }
+			if n, ok := getInt(merged["expectContinueTimeout"]); !ok || n < 30 { merged["expectContinueTimeout"] = 30 }
+			if n, ok := getInt(merged["retries"]); !ok || n < 5 { merged["retries"] = 5 }
+			if n, ok := getInt(merged["lowLevelRetries"]); !ok || n < 20 { merged["lowLevelRetries"] = 20 }
+			// 布尔强制：禁用 HTTP/2
+			merged["disableHttp2"] = true
+			// 传输并发：最大 1（过高容易导致 WebDAV 代理/后端拥塞）
+			if n, ok := getInt(merged["transfers"]); !ok || n > 1 { merged["transfers"] = 1 }
+			if n, ok := getInt(merged["multiThreadStreams"]); ok && n > 1 { merged["multiThreadStreams"] = 1 }
 		}
 		if len(merged) > 0 {
 			effOpt = merged
