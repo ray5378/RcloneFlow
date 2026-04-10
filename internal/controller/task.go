@@ -17,6 +17,8 @@ type TaskController struct {
 	rc      *rclone.Client
 }
 
+func (c *TaskController) Service() *service.TaskService { return c.taskSvc }
+
 // NewTaskController 创建任务控制器
 func NewTaskController(taskSvc *service.TaskService, rc *rclone.Client) *TaskController {
 	return &TaskController{
@@ -63,6 +65,21 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		WriteJSON(w, 200, nil)
+
+	case http.MethodPatch:
+		// PATCH /api/tasks { id, options }
+		var req struct{
+			ID int64 `json:"id"`
+			Options map[string]any `json:"options"`
+		}
+		if err := DecodeRequest(r, &req); err != nil {
+			WriteJSON(w, 400, map[string]any{"error":"invalid body"}); return
+		}
+		if req.ID == 0 { WriteJSON(w, 400, map[string]any{"error":"missing id"}); return }
+		if err := c.taskSvc.UpdateTaskOptions(req.ID, req.Options); err != nil {
+			WriteJSON(w, 500, map[string]any{"error": err.Error()}); return
+		}
+		WriteJSON(w, 200, map[string]any{"ok": true})
 
 	default:
 		w.WriteHeader(405)

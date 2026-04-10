@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"strings"
 
 	"rcloneflow/internal/auth"
 	"rcloneflow/internal/controller"
@@ -44,6 +45,9 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	// 健康检查（公开）
 	mux.HandleFunc("/healthz", r.remoteCtrl.Healthz)
 
+	// Webhook 触发（公开）
+	mux.HandleFunc("/webhook/", controller.NewWebhookController(r.taskCtrl.Service()).HandleTrigger)
+
 	// 认证相关（公开）
 	mux.HandleFunc("/api/auth/login", r.authCtrl.Login)
 	mux.HandleFunc("/api/auth/refresh", r.authCtrl.Refresh)
@@ -79,7 +83,10 @@ func (r *Router) Setup(mux *http.ServeMux) {
 
 	// 任务管理
 	apiMux.HandleFunc("/api/tasks", r.taskCtrl.HandleTasks)
-	apiMux.HandleFunc("/api/tasks/", r.taskCtrl.HandleTaskActions)
+	apiMux.HandleFunc("/api/tasks/", func(w http.ResponseWriter, req *http.Request){
+		if strings.HasSuffix(req.URL.Path, "/kill") { r.runCtrl.HandleTaskKill(w, req); return }
+		r.taskCtrl.HandleTaskActions(w, req)
+	})
 
 	// 定时任务
 	apiMux.HandleFunc("/api/schedules", r.scheduleCtrl.HandleSchedules)
@@ -89,10 +96,19 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/runs", r.runCtrl.HandleRuns)
 	apiMux.HandleFunc("/api/runs/active", r.runCtrl.HandleActiveRuns)
 	apiMux.HandleFunc("/api/stats/global", r.runCtrl.HandleGlobalStats)
+
+	// 设置（全局传输选项）
+	apiMux.HandleFunc("/api/settings/transfer", controller.NewSettingsController().HandleTransfer)
+	// CLI 扩展接口：停止/强杀/日志下载
+	apiMux.HandleFunc("/api/runs/", func(w http.ResponseWriter, req *http.Request){
+		if strings.HasSuffix(req.URL.Path, "/stop") { r.runCtrl.HandleRunStopCLI(w, req); return }
+		if strings.HasSuffix(req.URL.Path, "/kill") { r.runCtrl.HandleRunKillCLI(w, req); return }
+		if strings.HasSuffix(req.URL.Path, "/log") { r.runCtrl.HandleRunLog(w, req); return }
+		r.runCtrl.HandleRunStatus(w, req)
+	})
 	apiMux.HandleFunc("/api/jobs/{jobId}/status", r.runCtrl.HandleJobStatus)
 	apiMux.HandleFunc("/api/jobs/{jobId}/stop", r.runCtrl.HandleJobStop)
 	apiMux.HandleFunc("/api/runs/task/", r.runCtrl.HandleRunsByTask)
-	apiMux.HandleFunc("/api/runs/", r.runCtrl.HandleRunStatus)
 
 	// 应用JWT中间件保护API路由
 	protectedMux := auth.JWTMiddleware(apiMux)

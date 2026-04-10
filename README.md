@@ -1,354 +1,202 @@
 # RcloneFlow
 
-基于 Web 的 Rclone 管理界面，用于多存储复制/同步/移动任务管理。
+基于 Web 的 Rclone 管理界面（Go + Vue 3）。支持创建/运行/调度任务、实时进度与日志、统一“传输选项”配置、JWT 登录。提供官方 Docker 镜像与 docker-compose 示例。
 
 [English](README_EN.md)
 
-## 功能特点
+## 最近变更（要点）
+- 镜像与构建
+  - 基础镜像切换为 Alpine，支持 linux/amd64；前端采用多阶段构建（Vite → /app/web）。
+  - 内置 rclone v1.73.4（构建阶段从 downloads.rclone.org 下载）。
+  - 仅发布 master 与 master-<sha> 标签；支持 --no-cache 重建。
+  - 健康检查内置 wget，请求首页 /（start-period 45s），容器更稳（不要在 compose 里用 curl /healthz）。
+- 运行与解析
+  - 统一 CLI Runner，命令行仅使用 --stats-one-line（兼容 v1.73.x）。
+  - 实时进度解析增强：同时解析 stdout/stderr，容忍 KiB/s/MiB/s、mm:ss/hh:mm:ss/"-" 等格式；多段拼接取最后一段。
+  - /api/runs/active 返回扁平实时字段：bytes/totalBytes/speed/eta/percentage（realtimeStatus 与 derivedProgress 均可读）。
+  - 仅保留单一日志文件 run-<id>-stderr.log（stdout 合并写入）；下载统一 /api/runs/{id}/log。
+- 传输选项（可视化）
+  - 设置页与任务卡片提供“传输选项”弹窗（全局/任务级覆盖，中文）。
+  - buffer-size 智能补单位：数字或纯数字字符串自动补 M（例如 16 → 16M）。
+  - 不再默认拼接 --timeout；仅在你配置 connTimeout/expectContinueTimeout 时才拼接对应参数。
+- 历史与清理
+  - 历史详情页与实时卡片显示一致的速度/进度/已传/总大小。
+  - 新增“历史与日志保留”设置（默认 7 天）：自动清理过期 run 记录与 /app/data/logs/run-*-stderr.log。
 
-- **多存储管理** - 添加、编辑和管理多个 Rclone 存储，支持 SMB/CIFS 等协议
-- **文件浏览器** - 浏览和导航远程存储文件，支持右键菜单操作（复制/移动/删除/重命名）
-- **任务管理** - 创建和管理存储间的复制/同步/移动任务
-- **定时任务** - 使用 cron 风格的调度设置自动化同步
-- **运行记录** - 跟踪任务执行历史和实时状态
-- **实时状态同步** - 后台自动同步 rclone job 状态
-- **现代化界面** - 简洁、响应式的 Web 界面，支持深色/浅色模式
-- **统一错误处理** - Toast 通知，友好的错误提示
-- **单元测试** - 前后端完整的单元测试覆盖
+## 快速开始（Docker 推荐）
 
-## 系统要求
-
-- Go 1.22+
-- Rclone (需要开启 RC 模式)
-- Git
-- Node.js 18+ (前端开发)
-
-## 快速开始
-
-### 1. 克隆仓库
-
+### docker run（最短路径）
 ```bash
-git clone https://github.com/ray5378/RcloneFlow.git
-cd RcloneFlow
+# 数据目录（确保对 UID 1000 可写）
+mkdir -p ./data
+
+# 运行（仅 amd64）
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+docker run -d --name rcloneflow \
+  -p 17870:17870 \
+  -e TZ=Asia/Shanghai \
+  -e APP_ADDR=:17870 \
+  -e APP_DATA_DIR=/app/data \
+  -e RCLONE_CONFIG=/app/data/rclone.conf \
+  -e EMBED_RC=true \
+  -e RCLONE_RC_URL=http://127.0.0.1:5572 \
+  -e RCLONE_RC_USER=rc \
+  -e RCLONE_RC_PASS=rcpass \
+  -v $(pwd)/data:/app/data \
+  ray5378/rcloneflow:master
 ```
+访问 http://你的地址:17870，默认 JWT 登录（首次登录后请修改密码）。
 
-### 2. 配置 Rclone
-
-确保已安装 Rclone 并配置好存储。配置文件通常在 `~/.config/rclone/rclone.conf`。
-
-### 3. 启动 Rclone RC 服务器
-
-```bash
-rclone rcd --rc-user=your_user --rc-pass=your_pass --rc-addr=localhost:5572
-```
-
-### 4. 构建并运行
-
-```bash
-# 构建后端
-go build -o server ./cmd/server
-
-# 运行
-./server
-```
-
-服务器默认在 17870 端口启动，访问 http://localhost:17870
-
-### 5. 配置
-
-配置文件 `config.yaml`：
-```yaml
-server:
-  addr: ":17870"
-  static_dir: "./web"
-
-rclone:
-  rc_url: "http://127.0.0.1:5572"
-  rc_user: ""
-  rc_pass: ""
-  timeout: "120s"
-
-storage:
-  data_dir: "./data"
-
-log:
-  level: "info"
-  output: "stdout"
-
-sync:
-  pool_interval: 5      # 任务状态同步间隔（秒）
-  schedule_interval: 1   # 定时任务检查间隔（分钟）
-```
-
-### 6. 环境变量
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `APP_ADDR` | 服务器地址 | `:17870` |
-| `APP_DATA_DIR` | 数据目录 | `./data` |
-| `RCLONE_RC_URL` | Rclone RC 地址 | `http://127.0.0.1:5572` |
-| `RCLONE_RC_USER` | Rclone RC 用户名 | - |
-| `RCLONE_RC_PASS` | Rclone RC 密码 | - |
-| `RCLONE_RC_TIMEOUT` | RC 超时时间 | `120s` |
-
-## 项目结构
-
-```
-RcloneFlow/
-├── cmd/
-│   └── server/              # 主应用程序入口
-├── internal/
-│   ├── adapter/            # Rclone API 封装层
-│   ├── controller/         # HTTP 控制器
-│   ├── dao/                # 数据访问层
-│   ├── service/            # 业务逻辑层
-│   ├── scheduler/           # 任务调度器
-│   ├── router/             # 路由定义
-│   ├── store/              # 数据库封装 (SQLite)
-│   └── config/             # 配置管理
-├── frontend/               # 前端源码 (Vue 3 + TypeScript)
-│   └── src/
-│       ├── api/            # API 调用层 (统一封装)
-│       ├── components/      # Vue 组件
-│       └── views/           # 页面视图
-├── migrations/              # 数据库迁移文件 (goose)
-├── web/                    # 编译后的前端文件
-├── config.yaml             # 配置文件
-├── Dockerfile
-└── docker-compose.yml
-```
-
-## 技术架构
-
-### 后端 (Go)
-
-- **Router** - HTTP 路由层，处理请求分发
-- **Controller** - 控制器层，参数校验，调用 Service
-- **Service** - 业务逻辑层，核心业务处理
-- **DAO** - 数据访问层，数据库操作封装
-- **Adapter** - Rclone API 适配器封装
-
-### 前端 (Vue 3 + TypeScript)
-
-- **API 层** - 统一封装的 API 调用
-  - `api/client.ts` - HTTP 客户端，拦截器
-  - `api/errors.ts` - 统一错误处理，Toast 通知
-  - `api/task.ts` - 任务相关 API
-  - `api/run.ts` - 运行记录 API
-  - `api/remote.ts` - 远程存储 API
-  - `api/browser.ts` - 文件浏览器 API
-- **组件** - Toast、Modal 等 UI 组件
-- **视图** - TaskView、BrowserView 等页面
-
-## API 接口
-
-### 任务管理
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/tasks` | 列出所有任务 |
-| POST | `/api/tasks` | 创建任务 |
-| PUT | `/api/tasks` | 更新任务 |
-| DELETE | `/api/tasks/{id}` | 删除任务 |
-| POST | `/api/tasks/{id}/run` | 运行任务 |
-
-### 定时任务
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/schedules` | 列出所有定时任务 |
-| POST | `/api/schedules` | 创建定时任务 |
-| PUT | `/api/schedules/{id}` | 启用/禁用定时任务 |
-| DELETE | `/api/schedules/{id}` | 删除定时任务 |
-
-#### 定时规则格式
-定时规则使用标准 5 段式 cron 表达式，字段用 `|` 分隔，内部多值用 `,` 分隔。
-
-**格式：** `minute|hour|day|month|week`
-
-| 字段 | 说明 | 示例 |
-|------|------|------|
-| minute | 分钟 | `*` 每分, `00,30` 指定分钟 |
-| hour | 小时 | `*` 每时, `17,19` 指定小时 |
-| day | 日期 | `*` 每天, `1,15` 指定日期 |
-| month | 月份 | `*` 每月, `1,3,5` 指定月份 |
-| week | 周几 | `*` 每天, `1,3,5` 周一三五 |
-
-示例：
-- `43|17,19|*|*|*` = 每天 17时或19时 的 43分 → cron: `43 17,19 * * *`
-- `00|09|*|*|1,3,5` = 每周一三五 09:00 → cron: `0 00 09 * * 1,3,5`
-- `30|14|15|*|*` = 每月15日 14:30 → cron: `0 30 14 15 * *`
-
-### 运行记录
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/runs` | 列出运行历史 |
-| GET | `/api/runs/{id}` | 获取运行详情 |
-| DELETE | `/api/runs/{id}` | 清除运行记录 |
-| GET | `/api/runs/active` | 获取运行中的任务及实时状态 |
-
-### 远程存储
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/remotes` | 列出所有存储 |
-| POST | `/api/remotes` | 创建存储 |
-| PUT | `/api/remotes` | 更新存储 |
-| GET | `/api/remotes/config/{name}` | 获取存储配置 |
-| DELETE | `/api/config/{name}` | 删除存储 |
-| POST | `/api/remotes/test` | 测试存储连接 |
-| GET | `/api/providers` | 获取支持的存储类型 |
-
-### 文件浏览器
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/browser/list` | 列出目录内容 |
-| POST | `/api/fs/copy` | 复制文件 |
-| POST | `/api/fs/move` | 移动文件 |
-| POST | `/api/fs/copyDir` | 复制目录 |
-| POST | `/api/fs/moveDir` | 移动目录 |
-| POST | `/api/fs/delete` | 删除文件 |
-| POST | `/api/fs/purge` | 删除目录 |
-| POST | `/api/fs/mkdir` | 创建目录 |
-
-## 数据库迁移
-
-使用 goose 进行数据库版本化管理：
-
-```bash
-# 查看迁移状态
-goose status
-
-# 运行迁移
-goose up
-
-# 回滚一个版本
-goose down
-
-# 创建新迁移
-goose create add_new_field
-```
-
-迁移文件位于 `migrations/` 目录。
-
-## 开发
-
-### 前端开发
-
-```bash
-cd frontend
-
-# 安装依赖
-npm install
-
-# 开发模式 (热重载)
-npm run dev
-
-# 运行测试
-npm test
-
-# 测试覆盖率
-npm run test:coverage
-
-# 生产构建
-npm run build
-```
-
-### 后端开发
-
-```bash
-# 运行测试
-go test ./...
-
-# 测试覆盖率
-go test -cover ./...
-
-# 构建
-go build -o server ./cmd/server
-```
-
-### 测试覆盖率
-
-| 模块 | 覆盖率 |
-|------|--------|
-| adapter | ~80% |
-| dao | ~90% |
-| service | ~60% |
-| 前端 API | ~70% |
-
-## Docker 部署
-
-### 使用 Docker Compose（推荐）
-
+### docker-compose（建议）
 ```yaml
 version: "3.8"
 services:
-  rclone:
-    image: rclone/rclone:latest
-    container_name: rclone
-    restart: always
-    command:
-      - rcd
-      - --rc-addr=:5572
-      - --rc-user=你的用户名
-      - --rc-pass=你的密码
-      - --config=/config/rclone/rclone.conf
-      - --log-level=INFO
-    ports:
-      - "5572:5572"
-    volumes:
-      - /path/to/rclone/config:/config/rclone
-      - /path/to/rclone/cache:/root/.cache/rclone
-    environment:
-      - TZ=Asia/Shanghai
-
   rcloneflow:
-    image: ray5378/rcloneflow:latest
+    image: ray5378/rcloneflow:master
+    platform: linux/amd64
     container_name: rcloneflow
-    restart: always
-    user: "0:0"
-    ports:
-      - "17870:17870"
-    volumes:
-      - ./data:/app/data
     environment:
       - TZ=Asia/Shanghai
       - APP_ADDR=:17870
-      - RCLONE_RC_URL=http://rclone:5572
-      - RCLONE_RC_USER=你的用户名
-      - RCLONE_RC_PASS=你的密码
-    depends_on:
-      - rclone
+      - APP_DATA_DIR=/app/data
+      - RCLONE_CONFIG=/app/data/rclone.conf
+      # 可选嵌入 RC（用于 remotes/providers/browser）
+      - EMBED_RC=true
+      - RCLONE_RC_URL=http://127.0.0.1:5572
+      - RCLONE_RC_USER=rc
+      - RCLONE_RC_PASS=rcpass
+    volumes:
+      - ./data:/app/data
+    ports:
+      - 17870:17870
+    restart: unless-stopped
 ```
 
-**部署步骤：**
+> 注意：请不要在 compose 中使用 curl /healthz 作为检查；镜像内置 wget + 首页 / 更稳。
 
+## 主要功能
+- 多存储管理（SMB/WebDAV 等），文件浏览与基础操作
+- 任务管理：复制/同步/移动，支持定时任务（cron 风格）
+- JWT 登录与权限校验
+- 统一“传输选项”配置（全局/任务级）：
+  - 常用项：transfers、checkers、buffer-size、include/exclude 等
+  - 超时：仅在你设置时拼接 --contimeout/--expect-continue-timeout；默认不拼接 --timeout
+  - buffer-size 智能补单位（16 → 16M；"64Mi" 原样透传）
+- 实时进度：bytes/totalBytes/speed/eta/percentage（卡片/全局/历史详情一致）
+- 日志：仅 run-<id>-stderr.log；首行包含完整命令 + effectiveOptions，下载接口统一
+- 历史与日志保留：默认 7 天，可在设置修改；自动清理过期数据
+
+## API 速览（新增/调整）
+- 实时运行：`GET /api/runs/active`
+  - 兼容旧结构，并提供扁平实时字段：realtimeStatus.bytes/totalBytes/speed/eta/percentage
+- 传输选项：
+  - 全局：`GET/PUT /api/settings/transfer`（持久化到 APP_DATA_DIR/transfer_settings.json）
+  - 任务：`PATCH /api/tasks`（仅更新 Options）
+- 运行控制：
+  - 按 run 强制终止：`POST /api/runs/{id}/kill`（CLI 子进程：SIGINT→SIGTERM→SIGKILL）
+  - 按任务一键终止：`POST /api/tasks/{id}/kill`（内部定位最近 run 并终止）
+  - RC 停止 Job：`GET /api/jobs/{jobId}/stop`
+  - 示例：
+    ```bash
+    # 按任务ID一键终止（推荐）
+    curl -X POST http://localhost:17870/api/tasks/12/kill 
+
+    # 已知 runId 时终止该次运行
+    curl -X POST http://localhost:17870/api/runs/345/kill 
+
+    # 如果该任务通过 RC 运行，停止 RC Job（需已知 jobId）
+    curl "http://localhost:17870/api/jobs/789/stop"
+    ```
+- 历史与日志保留：`GET/PUT /api/settings/housekeeping`（runRetentionDays/logRetentionDays）
+- 日志下载：`GET /api/runs/{id}/log`（仅 stderr 单文件）
+
+## 环境变量（常用）
+| 变量 | 说明 | 默认 |
+|------|------|------|
+| APP_ADDR | 服务监听地址 | :17870 |
+| APP_DATA_DIR | 数据目录 | /app/data |
+| RCLONE_CONFIG | rclone.conf 路径 | /app/data/rclone.conf |
+| EMBED_RC | 是否嵌入 RC | true |
+| RCLONE_RC_URL/USER/PASS | RC 地址与认证 | - |
+| LOG_LEVEL | 日志级别 | info |
+| LOG_RETENTION_DAYS | 日志保留天数 | 7 |
+| LOG_CLEANUP_INTERVAL_HOURS | 日志清理周期（小时） | 24 |
+| RCLONE_USE_JSON_LOG | 启用 rclone JSON 日志 | false |
+
+## 构建镜像（本地）
 ```bash
-# 1. 创建数据目录
-mkdir -p data
-
-# 2. 启动服务
-docker-compose up -d
-
-# 3. 查看日志
-docker logs -f rcloneflow
+export DOCKER_DEFAULT_PLATFORM=linux/amd64
+SHA=$(git rev-parse --short HEAD)
+docker build --no-cache \
+  -t ray5378/rcloneflow:master \
+  -t ray5378/rcloneflow:master-$SHA .
 ```
 
-访问 http://localhost:17870 即可使用。
+## Webhook 触发（外部调用）
+- 端点（公开，无需认证）
+  - 按任务ID：GET/POST /webhook/{taskId}
+  - 按自定义ID：GET/POST /webhook/{customId}（在任务卡片“Webhook”按钮设置 webhookId）
+- 返回示例：`{"started": true, "taskId": 12}`
+- 示例
+```bash
+curl -X POST http://localhost:17870/webhook/12
+curl http://localhost:17870/webhook/gate-front-01
+```
+- 注意
+  - 该端点无需认证；若暴露到公网，建议通过反向代理限制来源或路径前缀。
 
-### 注意事项
+## 迁移提示（老版本 → 本版）
+- 健康检查：改用 wget 请求首页 /；若 compose 里写了 curl /healthz，请改/删除。
+- 日志：仅保留 stderr.log；下载接口统一到 /api/runs/{id}/log。
+- 进度：仅 --stats-one-line；不再使用 --stats-one-line-json。
+- 超时：不再默认 --timeout；仅当你在“传输选项”里设置了 connTimeout/expectContinueTimeout 才拼接对应参数。
+- buffer-size：数字或纯数字字符串自动补 M；已带单位字符串原样保留。
 
-- **数据目录权限**：如果使用 bind mount 挂载数据目录，确保目录属主为 1000:1000，或使用 named volume
-- **Rclone RC 地址**：`RCLONE_RC_URL` 必须使用 `http://rclone:5572` 格式（容器内部域名）
-- **首次登录**：默认账号密码为 `admin` / `admin`，首次使用请修改密码
+## 项目结构（简要）
+```
+internal/
+  adapter/      # CLI/RC 适配
+  app/          # Runner flags 映射等
+  controller/   # /api 控制器（含 /api/runs/active, /api/settings/transfer 等）
+  router/       # 路由
+  scheduler/    # 定时/轮询
+  service/      # 业务
+  store/        # SQLite
+frontend/
+  src/components/TransferOptions.vue  # 传输选项弹窗（全局/任务）
+  src/views/TaskView.vue              # 任务/历史视图（含命令行模式与下载日志按钮）
+web/                                   # 生产静态资源（由 Vite 构建）
+```
 
-## 贡献
+## WebDAV 最佳实践（默认与兜底）
+- 自动识别 WebDAV（含 crypt:webdav/alias 包装），在启动任务时动态应用：
+  - 默认注入（仅当任务未显式设置时）：
+    - --timeout 24h
+    - --contimeout 60s
+    - --expect-continue-timeout 30s
+    - --retries 5
+    - --low-level-retries 20
+    - --disable-http2
+    - --transfers 1
+    - --multi-thread-streams 1
+  - 下限兜底（即使任务带低值也会提升到建议下限，仅 WebDAV）：
+    - timeout ≥ 24h、expect-continue-timeout ≥ 30s
+    - retries ≥ 5、low-level-retries ≥ 20
+    - transfers ≤ 1、multi-thread-streams ≤ 1
+    - 强制 --disable-http2
+- 完成后一致性确认（Finish-Wait）：仅 WebDAV
+  - 逻辑：对“本次 run 成功文件清单”按间隔 lsjson 轮询确认（默认每 60s，最长 5h）
+  - 命中即完成；超时标注 warning（不重传）
+  - 可调环境变量：FINISH_WAIT_INTERVAL=60s、FINISH_WAIT_TIMEOUT=5h
+  - 前端卡片会显示“收尾确认中：每 N s 检查一次 · 预计最晚 <时间>”
 
-欢迎提交 Pull Request！
+## 常见问题（FAQ）
+- 容器 Unhealthy？
+  - 请不要在 compose 里使用 curl /healthz；改为 wget + 首页 /，或直接删掉 compose 的 healthcheck 使用镜像内置检查。
+- 实时进度一直为 0？
+  - 使用 v1.73.x 的 --stats-one-line：我们已同时解析 stdout/stderr，并兼容 KiB/s/MiB/s/ETA 多种格式。如仍为 0，请提供一行日志样例。
+- buffer-size 仍然显示 16？
+  - 新版已做两道兜底（映射层 + 启动前二次校验），重建容器后会输出 16M。
 
-## 开源协议
-
-MIT License - 详见 LICENSE 文件。
-
-## 致谢
-
-- [Rclone](https://rclone.org/) - 强大的云存储同步工具
-- [Vue.js](https://vuejs.org/) - 渐进式 JavaScript 框架
-- [Vitest](https://vitest.dev/) - 快速的前端测试框架
+## 许可证
+MIT License

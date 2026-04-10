@@ -9,5 +9,336 @@
 </head>
 <body>
   <div id="app"></div>
+  <style>
+    .rf-fab{position:fixed;right:18px;bottom:18px;z-index:9999;background:#2563eb;color:#fff;border-radius:22px;border:none;padding:10px 14px;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,.3);font-weight:600}
+    .rf-modal-mask{position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:saturate(60%) blur(4px);z-index:9998;display:none}
+    .rf-modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:680px;max-width:92vw;background:#151923;color:#e5e7eb;border:1px solid #1f2430;border-radius:12px;z-index:9999;display:none}
+    .rf-modal .hd{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #1f2430}
+    .rf-modal .bd{padding:16px}
+    .rf-modal .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .rf-modal label{font-size:13px;color:#c9d1d9}
+    .rf-modal input[type=text], .rf-modal select{background:#0f1320;border:1px solid #273042;color:#e5e7eb;padding:8px 10px;border-radius:10px;font:inherit}
+    .rf-modal .row{display:flex;flex-direction:column;gap:6px}
+    .rf-modal .ft{display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #1f2430;padding:12px 16px}
+    .rf-btn{padding:8px 12px;border:none;border-radius:10px;cursor:pointer;font-weight:600}
+    .rf-btn.primary{background:#2563eb;color:#fff}
+    .rf-btn.ghost{background:#263043;color:#d1d5db}
+    .rf-tabs{display:flex;gap:8px;padding:8px 12px}
+    .rf-tab{padding:6px 10px;border-radius:8px;cursor:pointer;background:#0f1320;border:1px solid #273042;color:#c9d1d9}
+    .rf-tab.active{background:#2563eb;border-color:#2563eb;color:#fff}
+    @media (max-width:640px){.rf-modal{width:96vw}}
+    .rf-fixed{position:fixed;right:16px;top:12px;z-index:100000;background:#2563eb;color:#fff;border:none;border-radius:10px;padding:8px 12px;cursor:pointer;font-weight:600}
+  </style>
+  <div id="rfMask" class="rf-modal-mask"></div>
+  <div id="rfModal" class="rf-modal" role="dialog" aria-modal="true">
+    <div class="hd"><div>传输选项</div><button id="rfClose" class="rf-btn ghost">关闭</button></div>
+    <div class="rf-tabs">
+      <div id="tabGlobal" class="rf-tab active">全局</div>
+      <div id="tabTask" class="rf-tab">任务</div>
+    </div>
+    <div class="bd">
+      <div id="paneGlobal">
+        <div class="grid">
+          <div class="row"><label><input id="g_pvEnabled" type="checkbox" /> 启用收尾校验</label></div>
+          <div class="row"><label>校验模式</label><select id="g_pvMode"><option value="mount">挂载路径</option></select></div>
+          <div class="row"><label>轮询间隔</label><input id="g_pvInterval" type="text" placeholder="5s" /></div>
+          <div class="row"><label>超时时间</label><input id="g_pvTimeout" type="text" placeholder="30m" /></div>
+          <div class="row"><label>mtime 稳定期</label><input id="g_pvMtime" type="text" placeholder="60s" /></div>
+          <div class="row"><label>匹配方式</label><select id="g_pvMatch"><option value="size">按大小</option></select></div>
+          <div class="row"><label>最短重跑间隔</label><input id="g_minRerun" type="text" placeholder="30m" /></div>
+        </div>
+      </div>
+      <div id="paneTask" style="display:none">
+        <div class="grid">
+          <div class="row"><label>任务 ID</label><input id="t_id" type="text" placeholder="例如 1" /></div>
+          <div class="row"><label><input id="t_pvEnabled" type="checkbox" /> 启用收尾校验</label></div>
+          <div class="row"><label>校验模式</label><select id="t_pvMode"><option value="mount">挂载路径</option></select></div>
+          <div class="row"><label>轮询间隔</label><input id="t_pvInterval" type="text" placeholder="5s" /></div>
+          <div class="row"><label>超时时间</label><input id="t_pvTimeout" type="text" placeholder="30m" /></div>
+          <div class="row"><label>mtime 稳定期</label><input id="t_pvMtime" type="text" placeholder="60s" /></div>
+          <div class="row"><label>匹配方式</label><select id="t_pvMatch"><option value="size">按大小</option></select></div>
+          <div class="row"><label>最短重跑间隔</label><input id="t_minRerun" type="text" placeholder="30m" /></div>
+        </div>
+      </div>
+      <div id="rfMsg" style="padding:8px 0;color:#9aa4b2"></div>
+    </div>
+    <div class="ft">
+      <button id="rfSave" class="rf-btn primary">保存</button>
+      <button id="rfReload" class="rf-btn ghost">重新载入</button>
+    </div>
+  </div>
+  <script>
+    (function(){
+      const $ = s=>document.querySelector(s);
+      const $$ = s=>Array.from(document.querySelectorAll(s));
+      const open = ()=>{ $('#rfMask').style.display='block'; $('#rfModal').style.display='block'; loadGlobal(); };
+      const openTask = (taskId)=>{ setTab('task'); if(taskId){ $('#t_id').value=String(taskId); } $('#rfMask').style.display='block'; $('#rfModal').style.display='block'; };
+      const close= ()=>{ $('#rfMask').style.display='none'; $('#rfModal').style.display='none'; };
+      const token= ()=>{ try{return localStorage.getItem('authToken')||''}catch(e){return ''} };
+      const setTab=(k)=>{
+        if(k==='global'){ $('#tabGlobal').classList.add('active'); $('#tabTask').classList.remove('active'); $('#paneGlobal').style.display='block'; $('#paneTask').style.display='none'; }
+        else { $('#tabTask').classList.add('active'); $('#tabGlobal').classList.remove('active'); $('#paneTask').style.display='block'; $('#paneGlobal').style.display='none'; }
+      };
+      async function loadGlobal(){
+        $('#rfMsg').textContent='';
+        try{
+          const res=await fetch('/api/settings/transfer',{headers:{Authorization:'Bearer '+token()}});
+          if(!res.ok) throw new Error('HTTP '+res.status);
+          const d=await res.json();
+          $('#g_pvEnabled').checked=!!d.postVerifyEnabled;
+          $('#g_pvMode').value=d.postVerifyMode||'mount';
+          $('#g_pvInterval').value=d.postVerifyInterval||'5s';
+          $('#g_pvTimeout').value=d.postVerifyTimeout||'30m';
+          $('#g_pvMtime').value=d.postVerifyMtimeGrace||'60s';
+          $('#g_pvMatch').value=d.postVerifyMatch||'size';
+          $('#g_minRerun').value=d.minRerunInterval||'30m';
+        }catch(e){ $('#rfMsg').textContent='读取失败：'+(e.message||e); }
+      }
+      async function saveGlobal(){
+        const body={
+          postVerifyEnabled: $('#g_pvEnabled').checked,
+          postVerifyMode: $('#g_pvMode').value,
+          postVerifyInterval: $('#g_pvInterval').value.trim(),
+          postVerifyTimeout: $('#g_pvTimeout').value.trim(),
+          postVerifyMtimeGrace: $('#g_pvMtime').value.trim(),
+          postVerifyMatch: $('#g_pvMatch').value,
+          minRerunInterval: $('#g_minRerun').value.trim(),
+        };
+        const res=await fetch('/api/settings/transfer',{method:'PUT',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify(body)});
+        const d=await res.json().catch(()=>({})); if(!res.ok||d.error) throw new Error(d.error||('HTTP '+res.status));
+      }
+      async function saveTask(){
+        const id=parseInt($('#t_id').value.trim(),10); if(!id) throw new Error('请填写任务ID');
+        const opts={
+          'postVerify.enabled': $('#t_pvEnabled').checked,
+          'postVerify.mode': $('#t_pvMode').value,
+          'postVerify.interval': $('#t_pvInterval').value.trim(),
+          'postVerify.timeout': $('#t_pvTimeout').value.trim(),
+          'postVerify.mtimeGrace': $('#t_pvMtime').value.trim(),
+          'postVerify.match': $('#t_pvMatch').value,
+          'minRerunInterval': $('#t_minRerun').value.trim(),
+        };
+        const res=await fetch('/api/tasks',{method:'PATCH',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token()},body:JSON.stringify({id,options:opts})});
+        const d=await res.json().catch(()=>({})); if(!res.ok||d.error) throw new Error(d.error||('HTTP '+res.status));
+      }
+      const rfOpenEl = document.querySelector('#rfOpen'); if (rfOpenEl) rfOpenEl.addEventListener('click', open);
+      $('#rfClose').addEventListener('click', close);
+      $('#rfMask').addEventListener('click', close);
+      $('#tabGlobal').addEventListener('click', ()=>setTab('global'));
+      $('#tabTask').addEventListener('click', ()=>setTab('task'));
+      $('#rfReload').addEventListener('click', ()=>{ if($('#tabGlobal').classList.contains('active')) loadGlobal(); else $('#rfMsg').textContent=''; });
+      $('#rfSave').addEventListener('click', async ()=>{
+        $('#rfMsg').style.color='#9aa4b2'; $('#rfMsg').textContent='保存中...';
+        try{ if($('#tabGlobal').classList.contains('active')) await saveGlobal(); else await saveTask(); $('#rfMsg').style.color='#22c55e'; $('#rfMsg').textContent='已保存'; }
+        catch(e){ $('#rfMsg').style.color='#ef4444'; $('#rfMsg').textContent='保存失败：'+(e.message||e); }
+      });
+      // 取消固定右上角按钮（改为仅注入设置菜单和任务卡片）
+      // 设置菜单注入：优先贴在“修改密码/保存设置”按钮旁，确保同一操作区
+      function hookSettingsMenu(){
+        if(document.getElementById('rfSettingsLink')) return;
+        // 先找“修改密码/保存/保存设置”按钮
+        const btn = [...document.querySelectorAll('button, a, [role="button"]')]
+          .find(b=>/(修改密码|保存设置|保存)/.test((b.textContent||b.getAttribute('title')||b.getAttribute('aria-label')||'')));
+        if(btn && !document.getElementById('rfSettingsLink')){
+          const link=document.createElement('button');
+          link.id='rfSettingsLink'; link.className='rf-btn ghost'; link.style.marginLeft='8px'; link.textContent='传输选项';
+          link.onclick=()=>{ setTab('global'); open(); };
+          (btn.parentElement||btn).appendChild(link);
+          return;
+        }
+        // 再找“设置”文字
+        const candidates=[...$$('*')].filter(el=>{
+          const t=(el.textContent||'').replace(/\s+/g,'').trim();
+          const aLabel=(el.getAttribute('aria-label')||'')+(el.getAttribute('title')||'');
+          return /设置/.test(t) || /设置/.test(aLabel);
+        });
+        for(const el of candidates){
+          const host= el.closest('button, a, [role="button"], [role="menuitem"], li, div');
+          if(!host || host.querySelector('#rfSettingsLink')) continue;
+          const link=document.createElement('button');
+          link.id='rfSettingsLink'; link.className='rf-btn ghost'; link.style.marginLeft='8px'; link.textContent='传输选项';
+          link.onclick=()=>{ setTab('global'); open(); };
+          (host.parentElement||host).appendChild(link);
+          return;
+        }
+      }
+      // 任务卡片：与“运行/执行/Run”同一操作区，作为同级按钮追加
+      function hookTaskCards(){
+        const runBtns=[...document.querySelectorAll('button, a, [role="button"]')]
+          .filter(b=>/(运行|执行|Run)/.test((b.textContent||b.getAttribute('title')||b.getAttribute('aria-label')||'')));
+        runBtns.forEach(b=>{
+          // 已经有就跳过
+          if(b.parentElement && b.parentElement.querySelector && b.parentElement.querySelector('button[data-rf-task-btn]')) return;
+          // 解析任务ID：优先 data-*，其次文本
+          const card=b.closest('[data-task-id], [data-taskId], .task-card, .taskItem, .card, li, div');
+          let idAttr='';
+          if(card){ idAttr = (card.getAttribute && (card.getAttribute('data-task-id') || card.getAttribute('data-taskId'))) || ''; }
+          let taskId = idAttr && /^\d+$/.test(idAttr) ? parseInt(idAttr,10) : NaN;
+          if(isNaN(taskId)){
+            const m = (card && card.textContent && card.textContent.match(/(?:任务|Task)?[#：: ](\d{1,12})/));
+            if(m) taskId=parseInt(m[1],10);
+          }
+          // 同级追加按钮
+          const btn=document.createElement('button'); btn.className='rf-btn ghost'; btn.textContent='传输选项'; btn.dataset.rfTaskBtn='1'; btn.style.marginLeft='8px';
+          btn.onclick=()=>{ if(!isNaN(taskId)) openTask(taskId); else { setTab('task'); open(); } };
+          (b.parentElement||card||document.body).appendChild(btn);
+        });
+      }
+      // 在顶层窗口监听来自子文档的“打开弹窗”请求
+      window.addEventListener('message', (ev)=>{
+        if(!ev || !ev.data) return;
+        if(ev.data.kind === 'rf:open-transfer'){
+          if(ev.data.taskId){ setTab('task'); setTaskId(ev.data.taskId); }
+          open();
+        }
+      });
+
+      function eachContext(fn){
+        const ctxs = [document];
+        const iframes = document.querySelectorAll('iframe');
+        iframes.forEach(f=>{ try{ if(f.contentDocument) ctxs.push(f.contentDocument); }catch(e){} });
+        ctxs.forEach(fn);
+      }
+
+      function hookAll(){
+        eachContext((doc)=>{
+          try{ hookSettingsMenuCtx(doc); hookTaskCardsCtx(doc); }catch(e){}
+        });
+      }
+
+      function hookSettingsMenuCtx(doc){
+        if(doc.getElementById('rfSettingsLink') || doc.getElementById('rfSettingsItem')) return;
+        // 方案一：和“保存/修改密码”同一行
+        const btn = [...doc.querySelectorAll('button, a, [role="button"]')]
+          .find(b=>/(修改密码|保存设置|保存)/.test(((b.textContent||'')+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('aria-label')||'')).trim()));
+        if(btn && !doc.getElementById('rfSettingsLink')){
+          const link=doc.createElement('button');
+          link.id='rfSettingsLink'; link.className=btn.className||'rf-btn ghost'; link.style.marginLeft='8px'; link.textContent='传输选项';
+          link.onclick=()=>{ window.postMessage({kind:'rf:open-transfer'}, '*'); };
+          (btn.parentElement||btn).appendChild(link);
+          return;
+        }
+        // 方案二：列表式设置项（你的示例：div.settings-item > span.settings-text: 深色模式）
+        const listItems = [...doc.querySelectorAll('.settings-item')];
+        for(const it of listItems){
+          const labelEl = it.querySelector('.settings-text');
+          const text = (labelEl?.textContent||'').trim();
+          if(/深色模式|Dark/i.test(text)){
+            if(!doc.getElementById('rfSettingsItem')){
+              const newItem = it.cloneNode(true);
+              newItem.id = 'rfSettingsItem';
+              const icon = newItem.querySelector('.settings-icon'); if(icon) icon.textContent = '⚙️';
+              const t = newItem.querySelector('.settings-text'); if(t) t.textContent = '传输选项';
+              newItem.addEventListener('click', ()=>{ window.postMessage({kind:'rf:open-transfer'}, '*'); });
+              it.parentNode && it.parentNode.insertBefore(newItem, it.nextSibling);
+              return;
+            }
+          }
+        }
+        // 方案三：回退到“设置”文字附近
+        const candidates=[...doc.querySelectorAll('*')].filter(el=>{
+          const t=(el.textContent||'').replace(/\s+/g,'').trim();
+          const aLabel=(el.getAttribute('aria-label')||'')+(el.getAttribute('title')||'');
+          return /设置/.test(t) || /设置/.test(aLabel);
+        });
+        for(const el of candidates){
+          const host= el.closest('button, a, [role="button"], [role="menuitem"], li, div');
+          if(!host || host.querySelector && host.querySelector('#rfSettingsLink')) continue;
+          const link=doc.createElement('button');
+          link.id='rfSettingsLink'; link.className='rf-btn ghost'; link.style.marginLeft='8px'; link.textContent='传输选项';
+          link.onclick=()=>{ window.postMessage({kind:'rf:open-transfer'}, '*'); };
+          (host.parentElement||host).appendChild(link);
+          return;
+        }
+      }
+
+      function hookTaskCardsCtx(doc){
+        const runBtns=[...doc.querySelectorAll('button, a, [role="button"]')]
+          .filter(b=>/(^|[^一-龥A-Za-z])(运行|执行|Run)([^一-龥A-Za-z]|$)/.test(((b.textContent||'')+' '+(b.getAttribute('title')||'')+' '+(b.getAttribute('aria-label')||'')).trim()));
+        runBtns.forEach(b=>{
+          const parent = b.parentElement || b;
+          if(parent.querySelector && parent.querySelector('button[data-rf-task-btn]')) return;
+          let card = b; for(let i=0;i<5 && card;i++) card = card.parentElement;
+          let taskId = NaN; let p = b.parentElement;
+          while(p && p !== doc){ const v = p.getAttribute?.('data-task-id') || p.getAttribute?.('data-taskId'); if(v && /^\d+$/.test(v)){ taskId=parseInt(v,10); break; } p = p.parentElement; }
+          if(isNaN(taskId)){
+            const m = (card?.textContent || '').match(/(?:任务|Task)?[#：: ](\d{1,12})/);
+            if(m) taskId = parseInt(m[1],10);
+          }
+          const btn = doc.createElement('button'); btn.textContent='传输选项'; btn.dataset.rfTaskBtn='1'; btn.style.marginLeft='8px'; btn.className=b.className||'';
+          btn.onclick=()=>{ window.postMessage({kind:'rf:open-transfer', taskId: isNaN(taskId)? undefined : taskId}, '*'); };
+          parent.appendChild(btn);
+        });
+      }
+
+      const mo=new MutationObserver(()=>{ hookAll(); });
+      mo.observe(document.documentElement,{childList:true,subtree:true});
+      let retries=0; const timer=setInterval(()=>{ if(retries++>90){ clearInterval(timer); return;} hookAll(); }, 1500);
+      hookAll();
+
+      function openFromHash(){
+        if(location.hash && location.hash.startsWith('#transfer')){
+          const m=location.hash.match(/taskId=(\d+)/);
+          if(m){ setTab('task'); setTaskId(m[1]); }
+          open();
+        }
+      }
+      window.addEventListener('hashchange', openFromHash);
+      openFromHash();
+    })();
+    // —— 终极注入：穿透 shadow DOM/同源 iframe，锚定“深色模式”和“手动运行” ——
+    (function attachTransferButtons(){
+      function* allRoots(){
+        const roots=[document];
+        const walk=root=>{ const tw=document.createTreeWalker(root,NodeFilter.SHOW_ELEMENT); for(let n=tw.currentNode;n;n=tw.nextNode()){ if(n.shadowRoot){ roots.push(n.shadowRoot); walk(n.shadowRoot);} } };
+        walk(document);
+        document.querySelectorAll('iframe').forEach(f=>{ try{ if(f.contentDocument) roots.push(f.contentDocument);}catch(e){} });
+        yield* roots;
+      }
+      function openModal(taskId){
+        const mask=document.querySelector('#rfMask'); const modal=document.querySelector('#rfModal');
+        if(!mask || !modal) return;
+        if(taskId){ const tabTask=document.querySelector('#tabTask'); tabTask&&tabTask.click&&tabTask.click(); const idInput=document.querySelector('#t_id'); if(idInput) idInput.value=String(taskId); }
+        mask.style.display='block'; modal.style.display='block';
+      }
+      let tries=0; const timer=setInterval(()=>{
+        let injected=0;
+        for(const root of allRoots()){
+          const doc=root.ownerDocument||document;
+          // 设置页：.settings-item “深色模式”后一项插入“传输选项”
+          const items = root.querySelectorAll? root.querySelectorAll('.settings-item') : [];
+          items && items.forEach(it=>{
+            if(doc.getElementById('rfSettingsItem')) return;
+            const t=(it.querySelector('.settings-text')?.textContent||'').trim();
+            if(/深色模式|Dark/i.test(t)){
+              const clone=it.cloneNode(true); clone.id='rfSettingsItem';
+              const icon=clone.querySelector('.settings-icon'); if(icon) icon.textContent='⚙️';
+              const tx=clone.querySelector('.settings-text'); if(tx) tx.textContent='传输选项';
+              clone.addEventListener('click',()=>openModal());
+              it.parentNode && it.parentNode.insertBefore(clone, it.nextSibling);
+              injected++;
+            }
+          });
+          // 任务卡片：button.ghost.small 或含“手动运行/运行/执行/Run”
+          const btns = root.querySelectorAll? root.querySelectorAll('button.ghost.small, button, a, [role="button"]') : [];
+          btns && btns.forEach(b=>{
+            const txt = ((b.textContent||'')+' '+(b.getAttribute?.('title')||'')+' '+(b.getAttribute?.('aria-label')||'')).trim();
+            const isRun = /手动运行|(^|[^一-龥A-Za-z])(运行|执行|Run)([^一-龥A-Za-z]|$)/.test(txt);
+            if(!isRun) return;
+            const parent=b.parentElement||b; if(parent.querySelector&&parent.querySelector('button[data-rf-task-btn]')) return;
+            let taskId=NaN, p=b.parentElement, depth=0;
+            while(p && depth++<6){ const v=p.getAttribute?.('data-task-id')||p.getAttribute?.('data-taskId'); if(v && /^\d+$/.test(v)){ taskId=parseInt(v,10); break;} p=p.parentElement; }
+            if(isNaN(taskId)){ const m=(parent?.textContent||'').match(/(?:任务|Task)?[#：: ](\d{1,12})/); if(m) taskId=parseInt(m[1],10); }
+            // 克隆现有按钮，保留 data-v 与样式，修改文案与事件，插在原按钮右侧
+            const nb=b.cloneNode(true); nb.removeAttribute('href'); nb.dataset.rfTaskBtn='1';
+            nb.textContent='传输选项';
+            nb.onclick=(e)=>{ e.preventDefault&&e.preventDefault(); openModal(isNaN(taskId)?undefined:taskId); };
+            parent.insertBefore(nb, b.nextSibling); injected++;
+          });
+        }
+        if(++tries>100 || injected>0) clearInterval(timer);
+      }, 300);
+    })();
+  </script>
 </body>
 </html>

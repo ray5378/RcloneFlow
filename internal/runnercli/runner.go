@@ -1,0 +1,490 @@
+package runnercli
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
+	"syscall"
+	"time"
+	"regexp"
+	"sync/atomic"
+	"strconv"
+
+	"rcloneflow/internal/adapter"
+	"rcloneflow/internal/logger"
+	"rcloneflow/internal/store"
+	"go.uber.org/zap"
+)
+
+// Runner manages CLI transfers with progress/logs and stop control.
+type Runner struct {
+	mu    sync.Mutex
+	procs map[int64]*exec.Cmd
+	db    *store.DB
+}
+
+func New(db *store.DB) *Runner { return &Runner{procs: map[int64]*exec.Cmd{}, db: db} }
+
+func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcPath, dstRemote, dstPath string) error {
+	r.mu.Lock()
+	if _, ok := r.procs[run.ID]; ok { r.mu.Unlock(); return errors.New("run already exists") }
+	r.mu.Unlock()
+
+	runner := &adapter.CmdRunner{}
+	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
+	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
+	cmdName := strings.ToLower(mode)
+	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" { cmdName = "copy" }
+	// Resolve config path
+	dataDir := os.Getenv("APP_DATA_DIR"); if dataDir == "" { dataDir = "./data" }
+	cfg := os.Getenv("RCLONE_CONFIG"); if cfg == "" { cfg = filepath.Join(dataDir, "rclone.conf") }
+	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
+	// 降低默认日志级别：从 -vv 改为 -v，显著减少日志行数和解析/写库开销
+	args := []string{cmdName, src, dst, "-v", "--stats", "5s", "--stats-one-line", "--config", cfg}
+	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
+	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
+		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
+	}
+	// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)，并对 WebDAV 目标注入稳态默认（未显式配置时）
+	var effOpt map[string]any
+	if run.Summary != nil {
+		var merged = map[string]any{}
+		var effm map[string]any
+		if v, ok := run.Summary["transferDefaults"]; ok {
+			if m, ok := v.(map[string]any); ok { for k, val := range m { merged[k] = val } }
+		}
+		if v, ok := run.Summary["effectiveOptions"]; ok {
+			if m, ok := v.(map[string]any); ok { effm = m; for k, val := range m { merged[k] = val } }
+		}
+		// WebDAV 稳态参数（当目标底层是 WebDAV）
+		// 1) 未显式设置时注入建议默认
+		// 2) 下限兜底：对显式或弱默认过低的数值提升到建议值
+		if isWebDAVUnderlying(cfg, dstRemote) {
+			// 注入（未显式设置）
+			if _, ok := effm["timeout"]; !ok { merged["timeout"] = 24*3600 }
+			if _, ok := effm["connTimeout"]; !ok { merged["connTimeout"] = 60 }
+			if _, ok := effm["expectContinueTimeout"]; !ok { merged["expectContinueTimeout"] = 30 }
+			if _, ok := effm["retries"]; !ok { merged["retries"] = 5 }
+			if _, ok := effm["lowLevelRetries"]; !ok { merged["lowLevelRetries"] = 20 }
+			if _, ok := effm["disableHttp2"]; !ok { merged["disableHttp2"] = true }
+			if _, ok := effm["transfers"]; !ok { merged["transfers"] = 1 }
+			if _, ok := effm["multiThreadStreams"]; !ok { merged["multiThreadStreams"] = 1 }
+
+			// 下限兜底（无论来自弱默认还是显式低值，都提升到建议下限）
+			getInt := func(v any) (int, bool) {
+				switch t := v.(type) {
+				case float64: return int(t), true
+				case int: return t, true
+				case int64: return int(t), true
+				case string:
+					s := strings.TrimSpace(t)
+					if s == "" { return 0, false }
+					if n, err := strconv.Atoi(s); err == nil { return n, true }
+				}
+				return 0, false
+			}
+			if n, ok := getInt(merged["timeout"]); !ok || n < 24*3600 { merged["timeout"] = 24*3600 }
+			if n, ok := getInt(merged["connTimeout"]); !ok || n < 60 { merged["connTimeout"] = 60 }
+			if n, ok := getInt(merged["expectContinueTimeout"]); !ok || n < 30 { merged["expectContinueTimeout"] = 30 }
+			if n, ok := getInt(merged["retries"]); !ok || n < 5 { merged["retries"] = 5 }
+			if n, ok := getInt(merged["lowLevelRetries"]); !ok || n < 20 { merged["lowLevelRetries"] = 20 }
+			// 布尔强制：禁用 HTTP/2
+			merged["disableHttp2"] = true
+			// 传输并发：最大 1（过高容易导致 WebDAV 代理/后端拥塞）
+			if n, ok := getInt(merged["transfers"]); !ok || n > 1 { merged["transfers"] = 1 }
+			if n, ok := getInt(merged["multiThreadStreams"]); ok && n > 1 { merged["multiThreadStreams"] = 1 }
+		}
+		if len(merged) > 0 {
+			effOpt = merged
+			args = append(args, buildFlagsFromOptions(merged)...)
+		}
+	}
+	// 二次兜底：如 --buffer-size 后是纯数字，自动补 M
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--buffer-size" {
+			n := strings.TrimSpace(args[i+1])
+			pureNum := n != ""; for _, ch := range n { if ch < '0' || ch > '9' { pureNum = false; break } }
+			if pureNum { args[i+1] = n + "M" }
+		}
+	}
+	// header will be written after files are opened below
+	startLine := "[runner] rclone " + strings.Join(args, " ") + "\n"
+	missingCfg := ""
+	if _, err := os.Stat(cfg); err != nil { missingCfg = "[runner] warn: config not found: " + cfg + "\n" }
+
+	logsBase := os.Getenv("APP_DATA_DIR"); if logsBase == "" { logsBase = "./data" }
+	logsDir := filepath.Join(logsBase, "logs"); _ = os.MkdirAll(logsDir, 0o755)
+	// 仅保留单一日志文件（stderr）；stdout 也合并写入该文件
+	stderrPath := filepath.Join(logsDir, fmt.Sprintf("run-%d-stderr.log", run.ID))
+	stderrFile, _ := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+
+	cmd := runner.CmdContext(ctx, args...)
+	// fan-out: write to parser via io.Pipe（由 consumer 单点写入同一文件）
+	outR, outW := io.Pipe()
+	errR, errW := io.Pipe()
+	// 写入头信息到单一日志文件
+	_, _ = stderrFile.WriteString(startLine)
+	if effOpt != nil {
+		if b, _ := json.Marshal(effOpt); len(b) > 0 {
+			optsLine := "[runner] effectiveOptions " + string(b) + "\n"
+			_, _ = stderrFile.WriteString(optsLine)
+		}
+	}
+	if missingCfg != "" { _, _ = stderrFile.WriteString(missingCfg) }
+	cmd.Stdout = outW
+	cmd.Stderr = errW
+	if err := cmd.Start(); err != nil { return err }
+
+	r.mu.Lock(); r.procs[run.ID] = cmd; r.mu.Unlock()
+	_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
+		if rr.Summary == nil { rr.Summary = map[string]any{} }
+		rr.Summary["stderrFile"] = stderrPath
+		if cmd.Process != nil { rr.Summary["pid"] = cmd.Process.Pid }
+	})
+
+	// 两路都写入同一日志文件，并启用 one-line 解析 + 按文件统计
+	fileStats := &fileProgress{m: map[string]*fileProg{}}
+	// 仅解析 stderr（rclone 进度通常在 stderr），stdout 只写文件，减少重复解析/写库
+	go r.consume(run.ID, outR, stderrFile, false, fileStats)
+	go r.consume(run.ID, errR, stderrFile, true, fileStats)
+	go func(){
+		err := cmd.Wait()
+		outW.Close(); errW.Close()
+		stderrFile.Close()
+		if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) {
+			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "failed" })
+			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
+			return
+		}
+		// WebDAV 专用 Finish-Wait：对本次成功文件清单做 size 确认（默认 interval=60s, timeout=5h）
+		finishWait := strings.EqualFold(strings.ToLower(dstRemote), "webdav") || strings.Contains(strings.ToLower(dstRemote), "webdav")
+		if finishWait {
+			interval := 60 * time.Second
+			timeout := 5 * time.Hour
+			if s := strings.TrimSpace(os.Getenv("FINISH_WAIT_INTERVAL")); s != "" { if d, e := time.ParseDuration(s); e == nil { interval = d } }
+			if s := strings.TrimSpace(os.Getenv("FINISH_WAIT_TIMEOUT")); s != "" { if d, e := time.ParseDuration(s); e == nil { timeout = d } }
+			copied := fileStats.copiedList()
+			if len(copied) > 0 {
+				vr := &adapter.CmdRunner{}
+				deadline := time.Now().Add(timeout)
+				for time.Now().Before(deadline) {
+					allOk := true
+					for _, name := range copied {
+						// 通过 lsjson 获取目标文件 size
+						args := []string{"lsjson", dst, "--config", cfg, "--files-only"}
+						out, _, e := vr.Run(context.Background(), args...)
+						if e != nil { allOk = false; break }
+						var arr []map[string]any
+						if json.Unmarshal([]byte(out), &arr) == nil {
+							found := false
+							for _, it := range arr {
+								if it["Name"] == name || it["name"] == name {
+									found = true
+									break
+								}
+							}
+							if !found { allOk = false; break }
+						} else { allOk = false; break }
+					}
+					if allOk { break }
+					time.Sleep(interval)
+				}
+			}
+		}
+		_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
+		r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
+	}()
+	return nil
+}
+
+func isWebDAVUnderlying(cfgPath, remote string) bool {
+	// 调用 `rclone config dump --config cfg` 并解析 remote 链；判断底层是否 webdav
+	cr := &adapter.CmdRunner{}
+	out, _, err := cr.Run(context.Background(), []string{"config", "dump", "--config", cfgPath}...)
+	if err != nil { return false }
+	var dump map[string]any
+	if json.Unmarshal([]byte(out), &dump) != nil { return false }
+	name := remote
+	// 直接命中远端名
+	for depth := 0; depth < 4; depth++ {
+		sec, _ := dump[name].(map[string]any)
+		if sec == nil { break }
+		// type 命中 webdav
+		if t, _ := sec["type"].(string); strings.EqualFold(t, "webdav") { return true }
+		// crypt/alias 等 wrapper：跟随 remote 指向
+		if base, _ := sec["remote"].(string); base != "" {
+			// remote 形如 "webdav:root" 或 "other:"，取冒号前的 remote 名
+			if i := strings.Index(base, ":"); i > 0 {
+				name = base[:i]
+				continue
+			}
+		}
+		break
+	}
+	return false
+}
+
+func sizeOf(r *adapter.CmdRunner, cfg, target string) (bytes int64, count int64, err error) {
+	// Prefer JSON when available. Fallback to parsing text if needed.
+	args := []string{"size", target, "--config", cfg, "--json"}
+	out, _, e := r.Run(context.Background(), args...)
+	if e == nil {
+		var m map[string]any
+		if json.Unmarshal([]byte(out), &m) == nil {
+			if v, ok := m["bytes"].(float64); ok { bytes = int64(v) }
+			if v, ok := m["count"].(float64); ok { count = int64(v) }
+			return bytes, count, nil
+		}
+	}
+	// Fallback: text parse
+	args = []string{"size", target, "--config", cfg}
+	out, _, e = r.Run(context.Background(), args...)
+	if e != nil { return 0, 0, e }
+	// look for lines: "Total objects: X" and "Total size: Y"
+	scanner := bufio.NewScanner(strings.NewReader(out))
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "Total objects:") {
+			fmt.Sscanf(line, "Total objects: %d", &count)
+		}
+		if strings.HasPrefix(line, "Total size:") {
+			var human string
+			fmt.Sscanf(line, "Total size: %s (%d)", &human, &bytes)
+		}
+	}
+	return bytes, count, nil
+}
+
+func (r *Runner) Stop(runID int64) error {
+	r.mu.Lock(); cmd, ok := r.procs[runID]; r.mu.Unlock()
+	if !ok || cmd == nil || cmd.Process == nil { return errors.New("not running") }
+	_ = cmd.Process.Signal(syscall.SIGINT)
+	if wait(cmd, 10*time.Second) { return nil }
+	if runtime.GOOS != "windows" { _ = cmd.Process.Signal(syscall.SIGTERM) }
+	if wait(cmd, 10*time.Second) { return nil }
+	_ = cmd.Process.Kill()
+	return nil
+}
+
+func wait(cmd *exec.Cmd, d time.Duration) bool {
+	ch := make(chan struct{}, 1)
+	go func(){ _ = cmd.Wait(); close(ch) }()
+	select{
+	case <-ch: return true
+	case <-time.After(d): return false
+	}
+}
+
+type fileProg struct {
+	Name string  `json:"name"`
+	Bytes float64 `json:"bytes"`
+	Total float64 `json:"totalBytes"`
+	Pct   float64 `json:"percentage"`
+	Speed float64 `json:"speed"`
+}
+
+type fileProgress struct {
+	m   map[string]*fileProg
+	mu  sync.Mutex
+	ver uint64
+	copied []string
+}
+
+func (fp *fileProgress) update(name string, bytes, total, speed, pct float64){
+	fp.mu.Lock()
+	p, ok := fp.m[name]
+	if !ok { p = &fileProg{Name:name}; fp.m[name] = p }
+	if total > 0 { p.Total = total }
+	if bytes >= 0 { p.Bytes = bytes }
+	if speed >= 0 { p.Speed = speed }
+	if pct >= 0 { p.Pct = pct }
+	fp.mu.Unlock()
+	atomic.AddUint64(&fp.ver, 1)
+}
+
+func (fp *fileProgress) markCopied(name string){
+	fp.mu.Lock()
+	fp.copied = append(fp.copied, name)
+	fp.mu.Unlock()
+}
+
+func (fp *fileProgress) snapshot(limit int) []fileProg {
+	fp.mu.Lock(); defer fp.mu.Unlock()
+	out := make([]fileProg, 0, len(fp.m))
+	for _, v := range fp.m { out = append(out, *v) }
+	if limit > 0 && len(out) > limit { out = out[len(out)-limit:] }
+	return out
+}
+
+func (fp *fileProgress) copiedList() []string {
+	fp.mu.Lock(); defer fp.mu.Unlock()
+	out := make([]string, len(fp.copied))
+	copy(out, fp.copied)
+	return out
+}
+
+var fileLineRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B,\s*(\d+(?:\.\d+)?)%?,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B/s`)
+var fileCopiedRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*Copied\s*\(new\)`) 
+
+func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress){
+	wantParse := parseStats
+	s := bufio.NewScanner(rd)
+	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
+	for s.Scan(){
+		line := s.Text()
+		if len(line) > 0 { _, _ = out.WriteString(line+"\n") }
+		// 1) JSON 行（极少数情况下）
+		var rec map[string]any
+		if json.Unmarshal([]byte(line), &rec) == nil {
+			prog := map[string]any{}
+			if v, ok := rec["bytes"].(float64); ok { prog["bytes"] = v }
+			if v, ok := rec["totalBytes"].(float64); ok { prog["totalBytes"] = v }
+			if v, ok := rec["speed"].(float64); ok { prog["speed"] = v }
+			if v, ok := rec["eta"].(float64); ok { prog["eta"] = v }
+			if len(prog) > 0 {
+				_ = r.db.UpdateRun(runID, func(rr *store.Run){
+					if rr.Summary == nil { rr.Summary = map[string]any{} }
+					rr.Summary["progress"] = prog
+					if b, ok := prog["bytes"].(float64); ok { rr.BytesTransferred = int64(b) }
+					if sp, ok := prog["speed"].(float64); ok { rr.Speed = fmt.Sprintf("%d B/s", int64(sp)) }
+				})
+				continue
+			}
+		}
+		// 2) 文本 one-line 解析（仅在需要时）
+		if wantParse {
+			if prog, ok := parseOneLineProgress(line); ok {
+				_ = r.db.UpdateRun(runID, func(rr *store.Run){
+					if rr.Summary == nil { rr.Summary = map[string]any{} }
+					rr.Summary["progress"] = prog
+					rr.BytesTransferred = int64(prog["bytes"].(float64))
+					rr.Speed = fmt.Sprintf("%d B/s", int64(prog["speed"].(float64)))
+					// 同步部分文件列表快照（最近 100 条）
+					if fp != nil {
+						rr.Summary["files"] = fp.snapshot(100)
+					}
+				})
+			}
+			// 解析文件级进度（INFO: name: cur/total, pct, speed）
+			if fp != nil {
+				if m := fileLineRe.FindStringSubmatch(line); len(m) > 0 {
+					name := strings.TrimSpace(m[1])
+					var cb, tb, pct, sp float64
+					fmt.Sscanf(m[2], "%f", &cb)
+					fmt.Sscanf(m[4], "%f", &tb)
+					fmt.Sscanf(m[6], "%f", &pct)
+					fmt.Sscanf(m[7], "%f", &sp)
+					fp.update(name, cb*unitToMul(m[3]), tb*unitToMul(m[5]), sp*unitToMul(m[8]), pct)
+					continue
+				}
+				if m := fileCopiedRe.FindStringSubmatch(line); len(m) > 0 {
+					name := strings.TrimSpace(m[1])
+					fp.update(name, -1, -1, -1, 100)
+					fp.markCopied(name)
+				}
+			}
+		}
+	}
+	if err := s.Err(); err != nil {
+		logger.Debug("progress scanner error", zap.Error(err))
+	}
+}
+
+var oneLineRe = regexp.MustCompile(`(?i)^\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s\s*,\s*(?:ETA\s*([0-9hms:.-]+)|ETA\s*-|([0-9]{1,3})%)`) 
+
+func unitToMul(u string) float64 {
+	u = strings.ToUpper(u)
+	switch u {
+	case "K", "KI": return 1024
+	case "M", "MI": return 1024 * 1024
+	case "G", "GI": return 1024 * 1024 * 1024
+	case "T", "TI": return 1024 * 1024 * 1024 * 1024
+	case "P", "PI": return 1024 * 1024 * 1024 * 1024 * 1024
+	default: return 1
+	}
+}
+
+func parseETA(s string) int {
+	s = strings.TrimSpace(s)
+	if s == "-" || s == "" { return 0 }
+	// formats: 1h2m3s | 2m3s | 45s | 01:23:45 | 12:34
+	if strings.Contains(s, ":") {
+		parts := strings.Split(s, ":")
+		if len(parts) == 3 { // hh:mm:ss
+			var h, m, sec int
+			fmt.Sscanf(s, "%d:%d:%d", &h, &m, &sec)
+			return h*3600 + m*60 + sec
+		}
+		if len(parts) == 2 { // mm:ss
+			var m, sec int
+			fmt.Sscanf(s, "%d:%d", &m, &sec)
+			return m*60 + sec
+		}
+	}
+	// h/m/s suffix
+	sec := 0
+	var h, m, ss int
+	fmt.Sscanf(s, "%dh%dm%ds", &h, &m, &ss)
+	if h == 0 && m == 0 && ss == 0 {
+		fmt.Sscanf(s, "%dm%ds", &m, &ss)
+		if m == 0 && ss == 0 {
+			fmt.Sscanf(s, "%ds", &ss)
+		}
+	}
+	sec += h*3600 + m*60 + ss
+	return sec
+}
+
+var bytesPairRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?`)
+var speedTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s`)
+var pctTokenRe   = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)%`)
+var etaTokenRe   = regexp.MustCompile(`(?i)ETA\s*([0-9hms:.-]+|-)`)
+
+func parseOneLineProgress(line string) (map[string]any, bool) {
+	l := strings.TrimSpace(line)
+	// 去掉尾部 (xfr#...)
+	if i := strings.Index(l, "("); i >= 0 {
+		l = strings.TrimSpace(l[:i])
+	}
+	// 按多段拼接处理：取最后一个匹配片段作为当前进度
+	bps := bytesPairRe.FindAllStringSubmatch(l, -1)
+	if len(bps) == 0 { return nil, false }
+	bp := bps[len(bps)-1]
+	var cur, tot float64
+	fmt.Sscanf(bp[1], "%f", &cur)
+	fmt.Sscanf(bp[3], "%f", &tot)
+	curBytes := cur * unitToMul(bp[2])
+	totBytes := tot * unitToMul(bp[4])
+	// 速度：取最后一个 token
+	var sp float64
+	spmAll := speedTokenRe.FindAllStringSubmatch(l, -1)
+	var spm []string
+	if len(spmAll) > 0 { spm = spmAll[len(spmAll)-1] }
+	if len(spm) > 0 { fmt.Sscanf(spm[1], "%f", &sp) }
+	spBytes := sp * unitToMul(spmValue(spm, 2))
+	// ETA / 百分比（取最后一个）
+	eta := 0
+	if emAll := etaTokenRe.FindAllStringSubmatch(l, -1); len(emAll) > 0 {
+		em := emAll[len(emAll)-1]
+		if em[1] != "-" { eta = parseETA(em[1]) }
+	}
+	prog := map[string]any{"bytes": curBytes, "totalBytes": totBytes, "speed": spBytes, "eta": float64(eta)}
+	if pmAll := pctTokenRe.FindAllStringSubmatch(l, -1); len(pmAll) > 0 {
+		pm := pmAll[len(pmAll)-1]
+		var pct float64
+		fmt.Sscanf(pm[1], "%f", &pct)
+		prog["percentage"] = pct
+	}
+	return prog, true
+}
+
+func spmValue(m []string, i int) string { if len(m) > i { return m[i] }; return "" }

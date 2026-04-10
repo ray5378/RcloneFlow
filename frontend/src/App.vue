@@ -3,6 +3,7 @@ import { ref, onMounted, reactive } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
 import LoginView from './views/LoginView.vue'
+
 import * as api from './api'
 import { isLoggedIn as checkAuth, getUser, logout, changePassword } from './api/auth'
 
@@ -14,6 +15,7 @@ const isAuth = ref(false)
 const authChecked = ref(false)
 const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
+
 
 const user = getUser()
 
@@ -205,6 +207,7 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
     </template>
   </div>
 </template>

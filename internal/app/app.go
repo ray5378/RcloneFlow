@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"time"
 
 	"rcloneflow/internal/config"
@@ -42,6 +43,8 @@ func Run(cfg *config.Config) error {
 	// 创建默认管理员账户
 	createDefaultAdmin(db)
 
+	// 启动内置 RC（默认启用，可用 EMBED_RC=false 关闭），仅用于配置/元数据
+	maybeStartEmbeddedRC()
 	// 初始化rclone客户端
 	rc := rclone.NewFromEnv()
 
@@ -88,6 +91,13 @@ func Run(cfg *config.Config) error {
 			zap.Int("interval_hours", cfg.GetCleanupInterval()),
 			zap.Int("retention_days", cfg.GetCleanupRetention()))
 	}
+
+	// 启动日志清理服务（保留期默认 7 天，可用 LOG_RETENTION_DAYS 覆盖；周期默认 24 小时，可用 LOG_CLEANUP_INTERVAL_HOURS 覆盖）
+	logsDir := filepath.Join(cfg.GetDataDir(), "logs")
+	logRetention := service.EnvLogRetentionDays(7)
+	logInterval := service.EnvLogCleanupInterval(24)
+	logCleanup := service.NewLogCleanupService(logsDir, logInterval, logRetention)
+	go logCleanup.Start(ctx)
 
 	// 设置路由
 	mux := http.NewServeMux()

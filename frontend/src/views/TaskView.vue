@@ -25,6 +25,13 @@ const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const historyFilterTaskId = ref<number | null>(null)
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
+const runDetailProgress = ref<any>(null)
+let runDetailTimer: any = null
+
+// 运行详情 - 文件列表分页
+const runFiles = ref<any[]>([])
+const runFilesPage = ref(1)
+const runFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 380) / 32)))
 const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
 const showGlobalStatsModal = ref(false)
@@ -32,6 +39,69 @@ const globalStats = ref<any>({})
 const showTaskProgressModal = ref(false)
 const taskProgressData = ref<any>({})
 const activeRuns = ref<any[]>([])
+const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
+
+function setWebhook(task: Task){
+  webhookModal.value = { show: true, id: task.id, value: (task.options as any)?.webhookId || '' }
+}
+
+async function saveWebhook(){
+  const id = webhookModal.value.id
+  if(!id) return
+  const opts:any = {}
+  if (webhookModal.value.value) opts.webhookId = webhookModal.value.value
+  await api.updateTask(id, { options: opts } as any)
+  webhookModal.value.show = false
+  await loadData()
+}
+
+// （重复定义已移除）
+
+function pickFilesFromRun(run:any){
+  // 优先从实时数据
+  if (run?.realtimeStatus?.files && Array.isArray(run.realtimeStatus.files)) return run.realtimeStatus.files
+  // 其次从 summary.files
+  try{
+    const sum = typeof run.summary === 'string' ? JSON.parse(run.summary) : run.summary
+    if (sum?.files && Array.isArray(sum.files)) return sum.files
+  }catch{}
+  return []
+}
+
+function showRunDetail(run:any){
+  runDetail.value = run
+  showDetailModal.value = true
+  runFilesPage.value = 1
+  runFiles.value = pickFilesFromRun(run)
+  if (run.status === 'running'){
+    if (runDetailTimer) clearInterval(runDetailTimer)
+    runDetailTimer = setInterval(async ()=>{
+      try{
+        const actives:any[] = await api.getActiveRuns()
+        const cur = actives.find(a => a?.runRecord?.taskId === run.taskId)
+        if (cur){
+          runFiles.value = pickFilesFromRun({
+            realtimeStatus: cur.realtimeStatus,
+            summary: cur.runRecord?.summary || run.summary
+          })
+        }
+      }catch{}
+    }, 2000)
+  }
+}
+
+function closeRunDetail(){
+  showDetailModal.value = false
+  if (runDetailTimer) { clearInterval(runDetailTimer); runDetailTimer = null }
+}
+
+const pagedRunFiles = computed(()=>{
+  const start = (runFilesPage.value-1) * runFilesPageSize.value
+  return runFiles.value.slice(start, start + runFilesPageSize.value)
+})
+const totalRunFilesPages = computed(()=> Math.max(1, Math.ceil((runFiles.value.length||0)/runFilesPageSize.value)))
+function goPrevFilesPage(){ if (runFilesPage.value>1) runFilesPage.value-- }
+function goNextFilesPage(){ if (runFilesPage.value<totalRunFilesPages.value) runFilesPage.value++ }
 let activeRunsTimer: number | null = null
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
@@ -55,6 +125,10 @@ const createForm = ref({
   scheduleMinute: '00', // "00,30,59"
   options: { enableStreaming: true } as Record<string, any>,
 })
+
+// 命令行模式
+const commandMode = ref(false)
+const commandText = ref('')
 
 const openMenuId = ref<number | null>(null)
 const editingTask = ref<Task | null>(null)
@@ -244,6 +318,23 @@ async function createTask() {
     alert('请输入任务名称')
     return
   }
+
+  // 命令行模式：解析 rclone 命令
+  if (commandMode.value) {
+    try {
+      const parsed = parseRcloneCommand(commandText.value)
+      createForm.value.mode = parsed.mode
+      createForm.value.sourceRemote = parsed.src.remote
+      createForm.value.sourcePath = parsed.src.path
+      createForm.value.targetRemote = parsed.dst.remote
+      createForm.value.targetPath = parsed.dst.path
+      createForm.value.options = { ...normalizeTaskOptions(createForm.value.options), ...parsed.options }
+    } catch (e) {
+      alert('命令解析失败：' + (e as Error).message)
+      return
+    }
+  }
+
   if (!createForm.value.sourceRemote || !createForm.value.targetRemote) {
     alert('请选择源和目标存储')
     return
@@ -305,6 +396,50 @@ async function createTask() {
   }
 }
 
+function parseRcloneCommand(cmd: string) {
+  if (!cmd) throw new Error('命令为空')
+  // 简单分词（支持引号包裹）
+  const tokens = cmd.match(/(?:"[^"]*"|'[^']*'|\S)+/g) || []
+  if (tokens.length < 3) throw new Error('缺少源/目标')
+  // 查找子命令
+  const sub = tokens[1]
+  const mode = sub === 'sync' ? 'sync' : sub === 'move' ? 'move' : 'copy'
+  // 源/目标
+  const src = parseRemotePath(tokens[2])
+  const dst = parseRemotePath(tokens[3])
+  // 解析 flags
+  const options: Record<string, any> = {}
+  for (let i = 4; i < tokens.length; i++) {
+    const t = tokens[i]
+    if (t.startsWith('--')) {
+      const key = t.replace(/^--/, '')
+      const next = tokens[i + 1]
+      switch (key) {
+        case 'bwlimit': options.bwLimit = stripQuotes(next); i++; break
+        case 'transfers': options.transfers = Number(next); i++; break
+        case 'use-server-modtime': options.useServerModtime = true; break
+        case 'size-only': options.sizeOnly = true; break
+        case 'verbose': /* ignore */ break
+        default:
+          // 其他 boolean 开关
+          if (!next || next.startsWith('--')) {
+            options[toCamel(key)] = true
+          } else {
+            options[toCamel(key)] = stripQuotes(next); i++
+          }
+      }
+    }
+  }
+  return { mode, src, dst, options }
+}
+function parseRemotePath(s: string){
+  const m = s.split(':')
+  if (m.length < 2) throw new Error('路径格式错误：'+s)
+  return { remote: m[0], path: m.slice(1).join(':') || '' }
+}
+function stripQuotes(s?: string){ return s ? s.replace(/^['\"]|['\"]$/g, '') : s }
+function toCamel(s: string){ return s.replace(/-([a-z])/g, (_,c)=>c.toUpperCase()) }
+
 // 过滤后的历史记录
 const filteredRuns = computed(() => {
   if (historyFilterTaskId.value === null) return runs.value
@@ -316,10 +451,17 @@ function viewTaskHistory(taskId: number) {
   currentModule.value = 'history'
 }
 
-async function stopTaskTransfer(taskId: number) {
+async function stopTaskAny(taskId: number) {
   showConfirm('停止传输', '确定停止该任务的当前传输？', async () => {
     try {
-      await api.stopTaskTransfer(taskId)
+      // 直接按任务 ID kill（后端会定位最近 run 并发信号）
+      await api.killTask(taskId)
+      // 兼容 RC：如仍有 rcJobId，则再尝试停止
+      const active = await api.getActiveRuns().catch(()=>[])
+      const cur:any = Array.isArray(active) ? active.find(x => x?.runRecord?.taskId === taskId && x?.runRecord?.rcJobId) : null
+      if (cur?.runRecord?.rcJobId) {
+        await api.stopJob(cur.runRecord.rcJobId)
+      }
       await refreshTaskViewData()
     } catch (e) {
       alert((e as Error).message)
@@ -502,9 +644,24 @@ async function deleteSchedule(id: number) {
   }
 }
 
-function showRunDetail(run: any) {
-  runDetail.value = run
-  showDetailModal.value = true
+// duplicate old implementation removed (showRunDetail)
+
+function historyProgressFromSummary(summary: any){
+  try{
+    if (!summary) return null
+    if (typeof summary === 'string') summary = JSON.parse(summary)
+    if (summary && typeof summary === 'object'){
+      const p = summary.progress || {}
+      const bytes = Number(p.bytes || 0)
+      const totalBytes = Number(p.totalBytes || 0)
+      const speed = Number(p.speed || 0)
+      const eta = typeof p.eta === 'number' ? p.eta : null
+      let percentage = Number(p.percentage || 0)
+      if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) percentage = (bytes/totalBytes)*100
+      return { bytes, totalBytes, speed, eta, percentage }
+    }
+  }catch{}
+  return null
 }
 
 function formatSummary(summary: any): string {
@@ -519,8 +676,12 @@ function formatSummary(summary: any): string {
   if (typeof summary !== 'object') return String(summary)
   
   const parts: string[] = []
-  if (summary.bytes !== undefined) {
-    parts.push(`传输量: ${formatBytes(summary.bytes)}`)
+  const hp = historyProgressFromSummary(summary)
+  if (hp){
+    parts.push(`进度: ${(hp.percentage||0).toFixed(2)}%`)
+    parts.push(`速度: ${formatBytesPerSec(hp.speed||0)}`)
+    parts.push(`已传输/总大小: ${formatBytes(hp.bytes||0)} / ${formatBytes(hp.totalBytes||0)}`)
+    parts.push(`ETA: ${formatEta(hp.eta||0)}`)
   }
   if (summary.transferred !== undefined) {
     parts.push(`文件数: ${summary.transferred}`)
@@ -530,9 +691,6 @@ function formatSummary(summary: any): string {
   }
   if (summary.errors !== undefined) {
     parts.push(`错误: ${summary.errors}`)
-  }
-  if (summary.speed !== undefined) {
-    parts.push(`速度: ${summary.speed}`)
   }
   if (summary.elapsedTime !== undefined) {
     parts.push(`耗时: ${summary.elapsedTime}`)
@@ -741,6 +899,7 @@ function goBackTarget() {
   const parentPath = parts.join('/')
   loadTargetPath(createForm.value.targetRemote, parentPath)
 }
+import TransferOptions from '../components/TransferOptions.vue'
 </script>
 
 <template>
@@ -776,7 +935,7 @@ function goBackTarget() {
           </div>
           <div class="item-actions">
             <button class="ghost small" @click.stop="viewTaskHistory(task.id)">📋 历史</button>
-            <button class="ghost small" :disabled="!getActiveRunByTaskId(task.id)" @click.stop="stopTaskTransfer(task.id)">⏹ 停止传输</button>
+            <button class="ghost small" @click.stop="stopTaskAny(task.id)">⏹ 停止传输</button>
             <button class="ghost small" @click.stop="viewTaskProgress(task.id)">📊 实时进度</button>
             <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
               {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}
@@ -790,6 +949,7 @@ function goBackTarget() {
               <template v-if="runningTaskId === task.id">运行成功</template>
               <template v-else>▶ 手动运行</template>
             </button>
+            <button class="ghost small" @click.stop="() => setWebhook(task)">🔗 Webhook</button>
             <button class="ghost small" @click.stop="editTask(task)">✏️</button>
             <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
           </div>
@@ -855,7 +1015,16 @@ function goBackTarget() {
         </div>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
         <span class="time">{{ formatDuration(run.startedAt, run.finishedAt) }}</span>
+        <div class="info" v-if="historyProgressFromSummary(run.summary)">
+          <span>
+            {{ (historyProgressFromSummary(run.summary)?.percentage || 0).toFixed(0) }}% ·
+            {{ formatBytes(historyProgressFromSummary(run.summary)?.bytes || 0) }} /
+            {{ formatBytes(historyProgressFromSummary(run.summary)?.totalBytes || 0) }} ·
+            {{ formatBytesPerSec(historyProgressFromSummary(run.summary)?.speed || 0) }}
+          </span>
+        </div>
         <button class="ghost small" @click="showRunDetail(run)">详情</button>
+        <a class="ghost small" :href="'/api/runs/' + run.id + '/log'" target="_blank">下载日志</a>
         <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
       </div>
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>
@@ -906,8 +1075,41 @@ function goBackTarget() {
             <span>{{ formatDuration(runDetail.startedAt, runDetail.finishedAt) }}</span>
           </div>
           <div class="detail-item">
-            <label>传输速度：</label>
-            <span>{{ runDetail.speed || '-' }}</span>
+            <label>进度：</label>
+            <span>
+              <template v-if="historyProgressFromSummary(runDetail.summary)">
+                {{ (historyProgressFromSummary(runDetail.summary)?.percentage || 0).toFixed(2) }}%
+              </template>
+              <template v-else>-</template>
+            </span>
+          </div>
+          <div class="detail-item">
+            <label>当前速度：</label>
+            <span>
+              <template v-if="historyProgressFromSummary(runDetail.summary)">
+                {{ formatBytesPerSec(historyProgressFromSummary(runDetail.summary)?.speed || 0) }}
+              </template>
+              <template v-else>{{ runDetail.speed || '-' }}</template>
+            </span>
+          </div>
+          <div class="detail-item">
+            <label>已传输/总大小：</label>
+            <span>
+              <template v-if="historyProgressFromSummary(runDetail.summary)">
+                {{ formatBytes(historyProgressFromSummary(runDetail.summary)?.bytes || 0) }} /
+                {{ formatBytes(historyProgressFromSummary(runDetail.summary)?.totalBytes || 0) }}
+              </template>
+              <template v-else>-</template>
+            </span>
+          </div>
+          <div class="detail-item">
+            <label>预计剩余时间：</label>
+            <span>
+              <template v-if="historyProgressFromSummary(runDetail.summary)">
+                {{ formatEta(historyProgressFromSummary(runDetail.summary)?.eta || 0) }}
+              </template>
+              <template v-else>-</template>
+            </span>
           </div>
           <div class="detail-item full-width">
             <label>传输统计：</label>
@@ -925,6 +1127,14 @@ function goBackTarget() {
     <div v-if="currentModule === 'add'" class="card">
     <div class="card-header"><div class="title">添加任务</div></div>
     <div class="form-content">
+      <div class="field-item">
+        <label class="inline-label">
+          <input type="checkbox" v-model="commandMode" />
+          <span style="margin-left:8px">命令行模式（可粘贴 rclone 命令）</span>
+        </label>
+        <textarea v-if="commandMode" v-model="commandText" class="cmd-textarea" rows="4" placeholder='例如: rclone copy FNOS:/HDD/media openlist:/影音媒体/天翼5050 --bwlimit "07:30,2M;17:40,2M;23:00,2M" --use-server-modtime --size-only --verbose --transfers 2'></textarea>
+        <p v-if="commandMode" class="hint">保存时将自动解析命令，填充“模式/源/目标/选项”。任务名称仍需手动填写。</p>
+      </div>
       <div class="field-item">
         <label>任务名称 <span style="color: #dc2626">*</span></label>
         <input v-model="createForm.name" type="text" placeholder="输入任务名称" />
@@ -1290,6 +1500,31 @@ function goBackTarget() {
     </div>
   </div>
 
+
+  <!-- Webhook 设置弹窗 -->
+  <div v-if="webhookModal.show" class="modal-overlay" @click.self="webhookModal.show = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Webhook 触发设置</h3>
+        <button class="close-btn" @click="webhookModal.show = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-item">
+          <label>触发 ID（可选，留空则使用任务 ID）</label>
+          <input v-model="webhookModal.value" placeholder="例如：gate-front-01（可留空）" />
+        </div>
+        <div class="detail-item">
+          <label>触发 URL 示例</label>
+          <div class="hint">/webhook/&lt;任务ID&gt; 或 /webhook/{{ webhookModal.value || 'YOUR_ID' }}</div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" @click="webhookModal.show = false">取消</button>
+        <button class="primary" @click="saveWebhook">保存</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 任务实时进度弹窗 -->
   <div v-if="showTaskProgressModal" class="modal-overlay" @click.self="showTaskProgressModal = false">
     <div class="modal-content">
@@ -1423,6 +1658,10 @@ body.light .item { border-color: #f0f0f0; }
   font-size: 14px;
   box-sizing: border-box;
 }
+.cmd-textarea{ width:100%; min-height:120px; padding:12px 14px; border-radius:10px; border:1px solid #333; background:#252525; color:#e0e0e0; font-size:14px; box-sizing:border-box; resize:vertical; }
+body.light .cmd-textarea{ background:#fff; border-color:#ddd; color:#333 }
+.form-content label.inline-label{ display:flex !important; align-items:center; gap:8px; margin:0 0 6px 0; }
+.form-content label.inline-label input[type="checkbox"]{ width:16px; height:16px; }
 body.light .form-content input,
 body.light .form-content select { background: #fff; border-color: #ddd; color: #333; }
 .path-selector { display: flex; gap: 8px; align-items: flex-start; }
