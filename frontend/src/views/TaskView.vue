@@ -453,10 +453,21 @@ function viewTaskHistory(taskId: number) {
   currentModule.value = 'history'
 }
 
-async function stopTaskTransfer(taskId: number) {
+async function stopTaskAny(taskId: number) {
   showConfirm('停止传输', '确定停止该任务的当前传输？', async () => {
     try {
-      await api.stopTaskTransfer(taskId)
+      // 优先 kill 最近的 run（即使不在 active 列表）
+      const runsList = await api.getRuns()
+      const latest = (runsList || []).filter(r => r.taskId === taskId).sort((a,b)=> new Date(b.startedAt||0).getTime() - new Date(a.startedAt||0).getTime())[0]
+      if (latest) {
+        try { await api.killRun(latest.id) } catch {}
+      }
+      // 再尝试 RC 停止活跃 Job（兼容 RC 模式）
+      const active = await api.getActiveRuns().catch(()=>[])
+      const cur:any = Array.isArray(active) ? active.find(x => x?.runRecord?.taskId === taskId && x?.runRecord?.rcJobId) : null
+      if (cur?.runRecord?.rcJobId) {
+        await api.stopJob(cur.runRecord.rcJobId)
+      }
       await refreshTaskViewData()
     } catch (e) {
       alert((e as Error).message)
@@ -930,7 +941,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           </div>
           <div class="item-actions">
             <button class="ghost small" @click.stop="viewTaskHistory(task.id)">📋 历史</button>
-            <button class="ghost small" :disabled="!getActiveRunByTaskId(task.id)" @click.stop="stopTaskTransfer(task.id)">⏹ 停止传输</button>
+            <button class="ghost small" @click.stop="stopTaskAny(task.id)">⏹ 停止传输</button>
             <button class="ghost small" @click.stop="viewTaskProgress(task.id)">📊 实时进度</button>
             <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
               {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}

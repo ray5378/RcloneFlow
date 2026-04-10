@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"syscall"
+	"time"
 
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/service"
@@ -103,6 +105,45 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	WriteJSON(w, 404, map[string]any{"error": "run not found"})
+}
+
+// HandleRunKillCLI 强制终止指定 run（优先内部 runner；否则按 PID 逐级信号）
+func (c *RunController) HandleRunKillCLI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost { w.WriteHeader(405); return }
+	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/kill")
+	id, _ := strconv.ParseInt(idStr, 10, 64)
+
+	// 读出 run，尝试从 summary 取 pid
+	runs, err := c.runSvc.ListRuns()
+	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	for _, run := range runs {
+		if run.ID != id { continue }
+		// 优先 SIGINT → SIGTERM → SIGKILL 到 PID
+		var pid int
+		// Summary 兼容 map 或 string
+		var sum map[string]any
+		switch v := any(run.Summary).(type) {
+		case map[string]any:
+			sum = v
+		case string:
+			if v != "" { _ = json.Unmarshal([]byte(v), &sum) }
+		}
+		if sum != nil {
+			if p, ok := sum["pid"].(float64); ok { pid = int(p) }
+			if p2, ok := sum["pid"].(int); ok { pid = p2 }
+		}
+		if pid > 0 {
+			// 逐级发送信号
+			_ = syscall.Kill(pid, syscall.SIGINT); time.Sleep(2*time.Second)
+			_ = syscall.Kill(pid, syscall.SIGTERM); time.Sleep(2*time.Second)
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+			c.runSvc.UpdateRunStatus(run.ID, map[string]any{"finished": true, "success": false, "error": "killed by user"})
+			WriteJSON(w, 200, map[string]any{"killed": true, "pid": pid})
+			return
+		}
+		break
+	}
+	WriteJSON(w, 404, map[string]any{"error": "run not found or no pid"})
 }
 
 // HandleRunLog 统一提供 stderr 单文件下载

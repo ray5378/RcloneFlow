@@ -2,7 +2,7 @@
  * Run API 模块
  * 对应后端 RunService
  */
-import { get, del } from './client'
+import { get, del, post } from './client'
 import type { Run } from '../types'
 
 /** 获取所有运行记录 */
@@ -18,6 +18,11 @@ export async function getRun(runId: number): Promise<Run> {
 /** 清除运行记录 */
 export async function clearRun(runId: number): Promise<void> {
   return del(`/api/runs/${runId}`)
+}
+
+/** 强制终止指定 run（无论是否正在传输） */
+export async function killRun(runId: number): Promise<{ killed: boolean; pid?: number }> {
+  return post<{ killed: boolean; pid?: number }>(`/api/runs/${runId}/kill`, {})
 }
 
 /** 清除所有历史记录 */

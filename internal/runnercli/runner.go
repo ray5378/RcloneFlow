@@ -111,6 +111,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
 		if rr.Summary == nil { rr.Summary = map[string]any{} }
 		rr.Summary["stderrFile"] = stderrPath
+		if cmd.Process != nil { rr.Summary["pid"] = cmd.Process.Pid }
 	})
 
 	// 两路都写入同一日志文件，并启用 one-line 解析 + 按文件统计
