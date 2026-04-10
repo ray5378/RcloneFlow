@@ -7,7 +7,7 @@ RUN npm run build
 
 # Stage 2: go build (Alpine)
 FROM golang:1.25-alpine AS gobuilder
-RUN apk add --no-cache build-base git sqlite-dev ca-certificates
+RUN apk add --no-cache build-base git sqlite-dev ca-certificates tzdata wget
 WORKDIR /app
 COPY go.mod ./
 RUN go mod download || true
@@ -29,11 +29,18 @@ RUN go build -o /out/server ./cmd/server
 
 # Stage 3: runtime (Alpine)
 FROM alpine:3.19
-RUN apk add --no-cache ca-certificates tzdata sqlite-libs wget \
- && adduser -D -u 1000 appuser \
- && mkdir -p /app/data /app/web \
+# 避免运行期访问外网：不再 apk add，改为从 gobuilder 复制所需文件
+RUN adduser -D -u 1000 appuser \
+ && mkdir -p /app/data /app/web /etc/ssl/certs /usr/share/zoneinfo \
  && chown -R appuser:appuser /app
 WORKDIR /app
+
+# Copy runtime deps from builder (certs, tz, wget, sqlite libs)
+COPY --from=gobuilder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=gobuilder /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=gobuilder /usr/bin/wget /usr/bin/wget
+# sqlite shared libs
+COPY --from=gobuilder /usr/lib/libsqlite3.so* /usr/lib/
 
 # Copy server, web, and rclone
 COPY --from=gobuilder /out/server /app/server
