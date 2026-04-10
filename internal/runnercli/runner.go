@@ -57,10 +57,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	var effOpt map[string]any
 	if run.Summary != nil {
 		var merged = map[string]any{}
-		var defm map[string]any
 		var effm map[string]any
 		if v, ok := run.Summary["transferDefaults"]; ok {
-			if m, ok := v.(map[string]any); ok { defm = m; for k, val := range m { merged[k] = val } }
+			if m, ok := v.(map[string]any); ok { for k, val := range m { merged[k] = val } }
 		}
 		if v, ok := run.Summary["effectiveOptions"]; ok {
 			if m, ok := v.(map[string]any); ok { effm = m; for k, val := range m { merged[k] = val } }
