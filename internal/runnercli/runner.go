@@ -57,26 +57,24 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	var effOpt map[string]any
 	if run.Summary != nil {
 		var merged = map[string]any{}
+		var defm map[string]any
+		var effm map[string]any
 		if v, ok := run.Summary["transferDefaults"]; ok {
-			if m, ok := v.(map[string]any); ok {
-				for k, val := range m { merged[k] = val }
-			}
+			if m, ok := v.(map[string]any); ok { defm = m; for k, val := range m { merged[k] = val } }
 		}
 		if v, ok := run.Summary["effectiveOptions"]; ok {
-			if m, ok := v.(map[string]any); ok {
-				for k, val := range m { merged[k] = val }
-			}
+			if m, ok := v.(map[string]any); ok { effm = m; for k, val := range m { merged[k] = val } }
 		}
-		// WebDAV 稳态参数（当目标底层是 WebDAV 且用户未显式配置时注入）
+		// WebDAV 稳态参数（当目标底层是 WebDAV 且“任务未显式设置”时，覆盖掉 transferDefaults 的弱默认）
 		if isWebDAVUnderlying(cfg, dstRemote) {
-			if _, ok := merged["timeout"]; !ok { merged["timeout"] = 24*3600 }
-			if _, ok := merged["connTimeout"]; !ok { merged["connTimeout"] = 60 }
-			if _, ok := merged["expectContinueTimeout"]; !ok { merged["expectContinueTimeout"] = 30 }
-			if _, ok := merged["retries"]; !ok { merged["retries"] = 5 }
-			if _, ok := merged["lowLevelRetries"]; !ok { merged["lowLevelRetries"] = 20 }
-			if _, ok := merged["disableHttp2"]; !ok { merged["disableHttp2"] = true }
-			if _, ok := merged["transfers"]; !ok { merged["transfers"] = 1 }
-			if _, ok := merged["multiThreadStreams"]; !ok { merged["multiThreadStreams"] = 1 }
+			if _, ok := effm["timeout"]; !ok { merged["timeout"] = 24*3600 }
+			if _, ok := effm["connTimeout"]; !ok { merged["connTimeout"] = 60 }
+			if _, ok := effm["expectContinueTimeout"]; !ok { merged["expectContinueTimeout"] = 30 }
+			if _, ok := effm["retries"]; !ok { merged["retries"] = 5 }
+			if _, ok := effm["lowLevelRetries"]; !ok { merged["lowLevelRetries"] = 20 }
+			if _, ok := effm["disableHttp2"]; !ok { merged["disableHttp2"] = true }
+			if _, ok := effm["transfers"]; !ok { merged["transfers"] = 1 }
+			if _, ok := effm["multiThreadStreams"]; !ok { merged["multiThreadStreams"] = 1 }
 		}
 		if len(merged) > 0 {
 			effOpt = merged
