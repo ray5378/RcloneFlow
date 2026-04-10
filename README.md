@@ -92,6 +92,10 @@ services:
 - 传输选项：
   - 全局：`GET/PUT /api/settings/transfer`（持久化到 APP_DATA_DIR/transfer_settings.json）
   - 任务：`PATCH /api/tasks`（仅更新 Options）
+- 运行控制：
+  - 按 run 强制终止：`POST /api/runs/{id}/kill`（CLI 子进程：SIGINT→SIGTERM→SIGKILL）
+  - 按任务一键终止：`POST /api/tasks/{id}/kill`（内部定位最近 run 并终止）
+  - RC 停止 Job：`GET /api/jobs/{jobId}/stop`
 - 历史与日志保留：`GET/PUT /api/settings/housekeeping`（runRetentionDays/logRetentionDays）
 - 日志下载：`GET /api/runs/{id}/log`（仅 stderr 单文件）
 
