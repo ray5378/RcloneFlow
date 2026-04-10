@@ -129,65 +129,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 			return
 		}
-		// Post-Verify（读取任务级/全局设置）
-		pvEnabled := true
-		pvMode := "mount"
-		pvMatch := "size"
-		pvInterval := 5 * time.Second
-		pvTimeout := 30 * time.Minute
-		// 从 run.Summary.effectiveOptions 读取任务覆盖
-		_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
-			// 仅为了读 summary，不改变状态
-		})
-		cur, _ := r.db.GetRun(run.ID)
-		if cur.Summary != nil {
-			if effm, ok := cur.Summary["effectiveOptions"].(map[string]any); ok {
-				if v, ok := effm["postVerify.enabled"].(bool); ok { pvEnabled = v }
-				if v, ok := effm["postVerify.mode"].(string); ok && v != "" { pvMode = v }
-				if v, ok := effm["postVerify.match"].(string); ok && v != "" { pvMatch = v }
-				if v, ok := effm["postVerify.interval"].(string); ok { if d, e := time.ParseDuration(v); e == nil { pvInterval = d } }
-				if v, ok := effm["postVerify.timeout"].(string); ok { if d, e := time.ParseDuration(v); e == nil { pvTimeout = d } }
-			}
-			// 再从 transferDefaults 读取全局默认（仅在任务未覆盖时）
-			if def, ok := cur.Summary["transferDefaults"].(map[string]any); ok {
-				if effm := eff(cur.Summary); effm != nil {
-					if !existsBool(effm, "postVerify.enabled") { if b, ok := def["postVerifyEnabled"].(bool); ok { pvEnabled = b } }
-					if !existsStr(effm, "postVerify.mode") { if s, ok := def["postVerifyMode"].(string); ok && s != "" { pvMode = s } }
-					if !existsStr(effm, "postVerify.match") { if s, ok := def["postVerifyMatch"].(string); ok && s != "" { pvMatch = s } }
-					if !existsStr(effm, "postVerify.interval") { if s, ok := def["postVerifyInterval"].(string); ok { if d, e := time.ParseDuration(s); e == nil { pvInterval = d } } }
-					if !existsStr(effm, "postVerify.timeout") { if s, ok := def["postVerifyTimeout"].(string); ok { if d, e := time.ParseDuration(s); e == nil { pvTimeout = d } } }
-				}
-			}
-		}
-		if pvEnabled && pvMode == "mount" {
-			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finalizing" })
-			deadline := time.Now().Add(pvTimeout)
-			vr := &adapter.CmdRunner{}
-			ok := false
-			var lastSrcBytes, lastDstBytes int64
-			for time.Now().Before(deadline) {
-				if pvMatch == "size" {
-					sb, sc, sErr := sizeOf(vr, cfg, src)
-					db2, dc, dErr := sizeOf(vr, cfg, dst)
-					if sErr == nil && dErr == nil {
-						lastSrcBytes, lastDstBytes = sb, db2
-						if sb == db2 && sc == dc { ok = true; break }
-					}
-				}
-				time.Sleep(pvInterval)
-			}
-			if ok {
-				_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
-			} else {
-				_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
-					rr.Status = "finalizing_timeout"
-					if rr.Summary == nil { rr.Summary = map[string]any{} }
-					rr.Summary["postVerify"] = map[string]any{"match": pvMatch, "timeout": pvTimeout.String(), "srcBytes": lastSrcBytes, "dstBytes": lastDstBytes}
-				})
-			}
-		} else {
-			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
-		}
+		// 收尾校验（Post-Verify）已按要求移除：直接标记结束
+		_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
 		r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 	}()
 	return nil
