@@ -168,6 +168,28 @@ frontend/
 web/                                   # 生产静态资源（由 Vite 构建）
 ```
 
+## WebDAV 最佳实践（默认与兜底）
+- 自动识别 WebDAV（含 crypt:webdav/alias 包装），在启动任务时动态应用：
+  - 默认注入（仅当任务未显式设置时）：
+    - --timeout 24h
+    - --contimeout 60s
+    - --expect-continue-timeout 30s
+    - --retries 5
+    - --low-level-retries 20
+    - --disable-http2
+    - --transfers 1
+    - --multi-thread-streams 1
+  - 下限兜底（即使任务带低值也会提升到建议下限，仅 WebDAV）：
+    - timeout ≥ 24h、expect-continue-timeout ≥ 30s
+    - retries ≥ 5、low-level-retries ≥ 20
+    - transfers ≤ 1、multi-thread-streams ≤ 1
+    - 强制 --disable-http2
+- 完成后一致性确认（Finish-Wait）：仅 WebDAV
+  - 逻辑：对“本次 run 成功文件清单”按间隔 lsjson 轮询确认（默认每 60s，最长 5h）
+  - 命中即完成；超时标注 warning（不重传）
+  - 可调环境变量：FINISH_WAIT_INTERVAL=60s、FINISH_WAIT_TIMEOUT=5h
+  - 前端卡片会显示“收尾确认中：每 N s 检查一次 · 预计最晚 <时间>”
+
 ## 常见问题（FAQ）
 - 容器 Unhealthy？
   - 请不要在 compose 里使用 curl /healthz；改为 wget + 首页 /，或直接删掉 compose 的 healthcheck 使用镜像内置检查。
