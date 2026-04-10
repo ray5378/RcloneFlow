@@ -11,6 +11,29 @@ interface AuthResponse {
 
 let isRefreshing = false
 
+// 提前刷新：Access Token 剩余 < 2h 时尝试刷新
+const EARLY_REFRESH_SECONDS = 2 * 60 * 60
+
+function parseJwtExp(token: string | null): number | null {
+  try {
+    if (!token) return null
+    const parts = token.split('.')
+    if (parts.length !== 3) return null
+    const payload = JSON.parse(atob(parts[1]))
+    if (typeof payload.exp === 'number') return payload.exp
+    return null
+  } catch { return null }
+}
+
+function shouldEarlyRefresh(): boolean {
+  const token = getToken()
+  const exp = parseJwtExp(token)
+  if (!exp) return false
+  const now = Math.floor(Date.now() / 1000)
+  return exp - now <= EARLY_REFRESH_SECONDS
+}
+
+
 async function request(url: string, data?: object): Promise<any> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
@@ -19,6 +42,11 @@ async function request(url: string, data?: object): Promise<any> {
   const token = getToken()
   if (token) {
     headers['Authorization'] = `Bearer ${token}`
+  }
+
+  // 主动提前刷新（不对 /auth/* 触发，避免循环）
+  if (!url.includes('/auth/') && shouldEarlyRefresh() && !isRefreshing) {
+    try { isRefreshing = true; await refreshToken() } catch { /* 忽略，回退被动刷新 */ } finally { isRefreshing = false }
   }
 
   const res = await fetch(`${API_BASE}${url}`, {
