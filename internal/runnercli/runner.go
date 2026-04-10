@@ -52,14 +52,23 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
 		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	}
-	// attach advanced options if present
+	// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)
 	var effOpt map[string]any
 	if run.Summary != nil {
+		var merged = map[string]any{}
+		if v, ok := run.Summary["transferDefaults"]; ok {
+			if m, ok := v.(map[string]any); ok {
+				for k, val := range m { merged[k] = val }
+			}
+		}
 		if v, ok := run.Summary["effectiveOptions"]; ok {
 			if m, ok := v.(map[string]any); ok {
-				effOpt = m
-				args = append(args, buildFlagsFromOptions(m)...)
+				for k, val := range m { merged[k] = val }
 			}
+		}
+		if len(merged) > 0 {
+			effOpt = merged
+			args = append(args, buildFlagsFromOptions(merged)...)
 		}
 	}
 	// 二次兜底：如 --buffer-size 后是纯数字，自动补 M
