@@ -45,6 +45,9 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	// 健康检查（公开）
 	mux.HandleFunc("/healthz", r.remoteCtrl.Healthz)
 
+	// Webhook 触发（公开）
+	mux.HandleFunc("/webhook/", NewWebhookController(r.taskCtrl.Service()).HandleTrigger)
+
 	// 认证相关（公开）
 	mux.HandleFunc("/api/auth/login", r.authCtrl.Login)
 	mux.HandleFunc("/api/auth/refresh", r.authCtrl.Refresh)

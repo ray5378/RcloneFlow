@@ -41,6 +41,22 @@ const taskProgressData = ref<any>({})
 const activeRuns = ref<any[]>([])
 const showTransferModal = ref(false)
 const transferTaskId = ref<number | undefined>(undefined)
+const webhookModal = ref<{show:boolean, id:number|null, value:string, secret:string}>({show:false, id:null, value:'', secret:''})
+
+function setWebhook(task: Task){
+  webhookModal.value = { show: true, id: task.id, value: (task.options as any)?.webhookId || '', secret: (task.options as any)?.webhookSecret || '' }
+}
+
+async function saveWebhook(){
+  const id = webhookModal.value.id
+  if(!id) return
+  const opts:any = {}
+  if (webhookModal.value.value) opts.webhookId = webhookModal.value.value
+  if (webhookModal.value.secret) opts.webhookSecret = webhookModal.value.secret
+  await api.updateTask(id, { options: opts } as any)
+  webhookModal.value.show = false
+  await loadData()
+}
 
 // （重复定义已移除）
 
@@ -930,6 +946,7 @@ import TransferOptions from '../components/TransferOptions.vue'
               <template v-else>▶ 手动运行</template>
             </button>
             <button class="ghost small" @click.stop="() => { transferTaskId = task.id; showTransferModal = true }">⚙️ 传输选项</button>
+            <button class="ghost small" @click.stop="() => setWebhook(task)">🔗 Webhook</button>
             <button class="ghost small" @click.stop="editTask(task)">✏️</button>
             <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
           </div>
@@ -1482,6 +1499,34 @@ import TransferOptions from '../components/TransferOptions.vue'
 
   <!-- 任务传输选项弹窗（任务级） -->
   <TransferOptions v-model="showTransferModal" :taskId="transferTaskId" />
+
+  <!-- Webhook 设置弹窗 -->
+  <div v-if="webhookModal.show" class="modal-overlay" @click.self="webhookModal.show = false">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Webhook 触发设置</h3>
+        <button class="close-btn" @click="webhookModal.show = false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-item">
+          <label>触发 ID（自定义）</label>
+          <input v-model="webhookModal.value" placeholder="例如：gate-front-01" />
+        </div>
+        <div class="detail-item">
+          <label>可选密钥（token）</label>
+          <input v-model="webhookModal.secret" placeholder="留空则无需 token" />
+        </div>
+        <div class="detail-item">
+          <label>触发 URL 示例</label>
+          <div class="hint">/webhook/{{ webhookModal.value || 'YOUR_ID' }}<span v-if="webhookModal.secret">?token={{ webhookModal.secret }}</span></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" @click="webhookModal.show = false">取消</button>
+        <button class="primary" @click="saveWebhook">保存</button>
+      </div>
+    </div>
+  </div>
 
   <!-- 任务实时进度弹窗 -->
   <div v-if="showTaskProgressModal" class="modal-overlay" @click.self="showTaskProgressModal = false">

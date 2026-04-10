@@ -17,6 +17,8 @@ type TaskController struct {
 	rc      *rclone.Client
 }
 
+func (c *TaskController) Service() *service.TaskService { return c.taskSvc }
+
 // NewTaskController 创建任务控制器
 func NewTaskController(taskSvc *service.TaskService, rc *rclone.Client) *TaskController {
 	return &TaskController{

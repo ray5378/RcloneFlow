@@ -38,10 +38,18 @@ func (s *TaskService) UpdateTask(id int64, task store.Task) error {
 
 // UpdateTaskOptions 仅更新任务的 Options 字段（用于“传输选项”任务级覆盖）
 func (s *TaskService) UpdateTaskOptions(id int64, opts map[string]any) error {
-	// 读出任务再回写 Options
+	// 读出任务，合并 Options 再回写（保留已有键，覆盖提交的键）
 	t, ok := s.db.GetTask(id)
 	if !ok { return ErrTaskNotFound }
-	b, err := json.Marshal(opts)
+	merged := map[string]any{}
+	if len(t.Options) > 0 {
+		var cur map[string]any
+		if json.Unmarshal(t.Options, &cur) == nil && cur != nil {
+			for k, v := range cur { merged[k] = v }
+		}
+	}
+	for k, v := range opts { merged[k] = v }
+	b, err := json.Marshal(merged)
 	if err != nil { return err }
 	t.Options = b
 	return s.db.UpdateTask(id, t)
