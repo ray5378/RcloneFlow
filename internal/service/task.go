@@ -83,14 +83,13 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	if bs, err := json.Marshal(opts); err == nil {
 		_ = json.Unmarshal(bs, &effectiveOptions)
 	}
-	// 合并原始任务 Options（保留未被 TaskOptions 映射的键，如 include/exclude/filter 等）
+	// 合并原始任务 Options（显式配置覆盖默认/推导值，比如 transfers=2 应覆盖默认1）
 	if len(t.Options) > 0 {
 		var raw map[string]any
 		if err := json.Unmarshal(t.Options, &raw); err == nil && raw != nil {
 			for k, v := range raw {
-				if _, exists := effectiveOptions[k]; !exists {
-					effectiveOptions[k] = v
-				}
+				// 总是用任务显式值覆盖（包括 transfers/checkers/bufferSize 等）
+				effectiveOptions[k] = v
 			}
 		}
 	}
