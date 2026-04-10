@@ -2,6 +2,9 @@ package auth
 
 import (
 	"errors"
+	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -22,14 +25,31 @@ type Claims struct {
 	jwt.RegisteredClaims
 }
 
+func parseTTL(envKey string, def time.Duration) time.Duration {
+	v := strings.TrimSpace(os.Getenv(envKey))
+	if v == "" { return def }
+	// 支持标准 time.ParseDuration，如 "24h"；也支持 "90d"（天）
+	if strings.HasSuffix(v, "d") {
+		num := strings.TrimSuffix(v, "d")
+		if n, err := strconv.Atoi(num); err == nil && n > 0 {
+			return time.Duration(n) * 24 * time.Hour
+		}
+	}
+	if d, err := time.ParseDuration(v); err == nil { return d }
+	return def
+}
+
+func accessTTL() time.Duration  { return parseTTL("ACCESS_TOKEN_TTL", 24*time.Hour) }
+func refreshTTL() time.Duration { return parseTTL("REFRESH_TOKEN_TTL", 90*24*time.Hour) }
+
 // GenerateTokenPair 生成访问令牌和刷新令牌
 func GenerateTokenPair(userID int64, username string) (*TokenPair, error) {
-	// 生成访问令牌 (15分钟有效期)
+	// 访问令牌（默认 24h）
 	accessClaims := Claims{
 		UserID:   userID,
 		Username: username,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(accessTTL())),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
@@ -39,12 +59,12 @@ func GenerateTokenPair(userID int64, username string) (*TokenPair, error) {
 		return nil, err
 	}
 
-	// 生成刷新令牌 (7天有效期)
+	// 刷新令牌（默认 90d）
 	refreshClaims := Claims{
 		UserID:   userID,
 		Username: username,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(7 * 24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(refreshTTL())),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
