@@ -39,8 +39,6 @@ const globalStats = ref<any>({})
 const showTaskProgressModal = ref(false)
 const taskProgressData = ref<any>({})
 const activeRuns = ref<any[]>([])
-const showTransferModal = ref(false)
-const transferTaskId = ref<number | undefined>(undefined)
 const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
 
 function setWebhook(task: Task){
@@ -951,7 +949,6 @@ import TransferOptions from '../components/TransferOptions.vue'
               <template v-if="runningTaskId === task.id">运行成功</template>
               <template v-else>▶ 手动运行</template>
             </button>
-            <button class="ghost small" @click.stop="() => { transferTaskId = task.id; showTransferModal = true }">⚙️ 传输选项</button>
             <button class="ghost small" @click.stop="() => setWebhook(task)">🔗 Webhook</button>
             <button class="ghost small" @click.stop="editTask(task)">✏️</button>
             <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
@@ -1503,8 +1500,6 @@ import TransferOptions from '../components/TransferOptions.vue'
     </div>
   </div>
 
-  <!-- 任务传输选项弹窗（任务级） -->
-  <TransferOptions v-model="showTransferModal" :taskId="transferTaskId" />
 
   <!-- Webhook 设置弹窗 -->
   <div v-if="webhookModal.show" class="modal-overlay" @click.self="webhookModal.show = false">
