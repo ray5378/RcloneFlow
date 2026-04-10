@@ -69,13 +69,6 @@ services:
       - ./data:/app/data
     ports:
       - 17870:17870
-    # 建议使用镜像内置 healthcheck；如需覆盖：
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:17870/ >/dev/null 2>&1 || exit 1"]
-      interval: 30s
-      timeout: 5s
-      start_period: 45s
-      retries: 3
     restart: unless-stopped
 ```
 
