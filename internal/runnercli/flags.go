@@ -38,6 +38,8 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	// 常用数值
 	if v, ok := asInt(opt["transfers"]); ok { push("--transfers", v) }
 	if v, ok := asInt(opt["checkers"]); ok { push("--checkers", v) }
+	if v, ok := asInt(opt["retries"]); ok { push("--retries", v) }
+	if v, ok := asInt(opt["lowLevelRetries"]); ok { push("--low-level-retries", v) }
 	// bufferSize：数字→自动补 M；字符串→纯数字则补 M，带单位则原样
 	if raw, ok := opt["bufferSize"]; ok {
 		switch vv := raw.(type) {
@@ -58,12 +60,13 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	if s, ok := asStr(opt["bwlimit"]); ok { push("--bwlimit", s) }
 
 	// 布尔开关
-	for _, key := range []string{"ignoreExisting","checksum","sizeOnly","ignoreSize","ignoreTimes","update","noTraverse","noCheckDest","inplace","immutable","checkFirst","deleteBefore","deleteDuring","deleteAfter","trackRenames","ignoreErrors","useServerModtime","refreshTimes","deleteExcluded","dryRun","serverSideAcrossConfigs"} {
+	for _, key := range []string{"ignoreExisting","checksum","sizeOnly","ignoreSize","ignoreTimes","update","noTraverse","noCheckDest","inplace","immutable","checkFirst","deleteBefore","deleteDuring","deleteAfter","trackRenames","ignoreErrors","useServerModtime","refreshTimes","deleteExcluded","dryRun","serverSideAcrossConfigs","interactive"} {
 		if b, ok := asBool(opt[key]); ok && b { push("--"+toKebab(key)) }
 	}
 	// 路径类
 	if s, ok := asStr(opt["compareDest"]); ok { push("--compare-dest", s) }
 	if s, ok := asStr(opt["copyDest"]); ok { push("--copy-dest", s) }
+	if s, ok := asStr(opt["backupDir"]); ok { push("--backup-dir", s) }
 
 	// include/exclude：收集→归一→去重→拼接
 	norm := func(s string) string {
@@ -88,8 +91,14 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	}
 
 	// 超时：仅在显式配置时映射
+	if s, ok := asInt(opt["timeout"]); ok { push("--timeout", s+"s") }
 	if s, ok := asInt(opt["connTimeout"]); ok { push("--contimeout", s+"s") }
 	if s, ok := asInt(opt["expectContinueTimeout"]); ok { push("--expect-continue-timeout", s+"s") }
+	// 其他
+	if s, ok := asStr(opt["bwLimit"]); ok { push("--bwlimit", s) }
+	if s, ok := asInt(opt["maxTransfer"]); ok { push("--max-transfer", s) }
+	if s, ok := asInt(opt["maxDuration"]); ok { push("--max-duration", s+"s") }
+	if s, ok := asStr(opt["logFile"]); ok { push("--log-file", s) }
 	return flags
 }
 
