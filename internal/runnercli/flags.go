@@ -63,6 +63,8 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	for _, key := range []string{"ignoreExisting","checksum","sizeOnly","ignoreSize","ignoreTimes","update","noTraverse","noCheckDest","inplace","immutable","checkFirst","deleteBefore","deleteDuring","deleteAfter","trackRenames","ignoreErrors","useServerModtime","refreshTimes","deleteExcluded","dryRun","serverSideAcrossConfigs","interactive"} {
 		if b, ok := asBool(opt[key]); ok && b { push("--"+toKebab(key)) }
 	}
+	// 特殊布尔：disableHttp2 → --disable-http2
+	if b, ok := asBool(opt["disableHttp2"]); ok && b { push("--disable-http2") }
 	// 路径类
 	if s, ok := asStr(opt["compareDest"]); ok { push("--compare-dest", s) }
 	if s, ok := asStr(opt["copyDest"]); ok { push("--copy-dest", s) }
