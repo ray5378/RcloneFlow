@@ -75,6 +75,17 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	if bs, err := json.Marshal(opts); err == nil {
 		_ = json.Unmarshal(bs, &effectiveOptions)
 	}
+	// 合并原始任务 Options（保留未被 TaskOptions 映射的键，如 include/exclude/filter 等）
+	if len(t.Options) > 0 {
+		var raw map[string]any
+		if err := json.Unmarshal(t.Options, &raw); err == nil && raw != nil {
+			for k, v := range raw {
+				if _, exists := effectiveOptions[k]; !exists {
+					effectiveOptions[k] = v
+				}
+			}
+		}
+	}
 
 	streamingEnabled := true
 	if v, ok := effectiveOptions["enableStreaming"].(bool); ok {
