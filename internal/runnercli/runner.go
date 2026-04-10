@@ -47,7 +47,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	dataDir := os.Getenv("APP_DATA_DIR"); if dataDir == "" { dataDir = "./data" }
 	cfg := os.Getenv("RCLONE_CONFIG"); if cfg == "" { cfg = filepath.Join(dataDir, "rclone.conf") }
 	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
-	args := []string{cmdName, src, dst, "-vv", "--stats", "5s", "--stats-one-line", "--config", cfg}
+	// 降低默认日志级别：从 -vv 改为 -v，显著减少日志行数和解析/写库开销
+	args := []string{cmdName, src, dst, "-v", "--stats", "5s", "--stats-one-line", "--config", cfg}
 	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
 	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
 		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
@@ -116,7 +117,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 
 	// 两路都写入同一日志文件，并启用 one-line 解析 + 按文件统计
 	fileStats := &fileProgress{m: map[string]*fileProg{}}
-	go r.consume(run.ID, outR, stderrFile, true, fileStats)
+	// 仅解析 stderr（rclone 进度通常在 stderr），stdout 只写文件，减少重复解析/写库
+	go r.consume(run.ID, outR, stderrFile, false, fileStats)
 	go r.consume(run.ID, errR, stderrFile, true, fileStats)
 	go func(){
 		err := cmd.Wait()
