@@ -515,8 +515,8 @@ function editTask(task: Task) {
   const schedule = getScheduleByTaskId(task.id)
   
   if (schedule) {
-    // 解析 spec: year,month,week,day,hour,minute
-    const parts = schedule.spec.split(',')
+    // 解析 spec: minute|hour|day|month|week
+    const parts = schedule.spec.split('|')
     createForm.value = {
       name: task.name,
       mode: task.mode,

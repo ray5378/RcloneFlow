@@ -7,7 +7,13 @@ RUN npm run build
 
 # Stage 2: go build (Alpine)
 FROM golang:1.25-alpine AS gobuilder
-RUN apk add --no-cache build-base git sqlite-dev ca-certificates tzdata wget
+# resilient apk with multi mirrors + retries to avoid TLS/permission glitches
+RUN set -eux; \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/main" > /etc/apk/repositories; \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/community" >> /etc/apk/repositories; \
+    echo "https://mirrors.aliyun.com/alpine/v3.19/main" >> /etc/apk/repositories; \
+    echo "https://mirrors.aliyun.com/alpine/v3.19/community" >> /etc/apk/repositories; \
+    for i in 1 2 3; do apk update && apk add --no-cache build-base git sqlite-dev ca-certificates tzdata wget && break || (echo "apk failed, retry $i" && sleep 5); done
 WORKDIR /app
 COPY go.mod ./
 RUN go mod download || true
@@ -16,7 +22,7 @@ ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto
 # rclone v1.73.4
 ARG RCLONE_VERSION=v1.73.4
 # fallback to downloads.rclone.org to avoid Go proxy/TLS issues
-RUN set -eux; apk add --no-cache curl unzip; \
+RUN set -eux; (apk add --no-cache curl unzip || (apk update && apk add --no-cache curl unzip)); \
     arch="amd64"; \
     url="https://downloads.rclone.org/v1.73.4/rclone-v1.73.4-linux-${arch}.zip"; \
     curl -fSL --retry 5 --retry-connrefused -o /tmp/rclone.zip "$url"; \

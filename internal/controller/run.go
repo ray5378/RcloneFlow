@@ -203,17 +203,25 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
 	// 扁平化关键字段：bytes/totalBytes/speed/eta，从 run.Summary.progress 提取
 	items := make([]map[string]any, 0, len(runs))
+	// 稳态进度阈值（环境变量可扩展，这里用常量）
+	const holdMs = 60000
+	const tinyPct = 0.1
+	const jumpFactor = 5.0
+	const tbBytes = 1 << 40 // 1TB
 	for _, run := range runs {
 		// 兼容前端旧形状：每项包含 runRecord + realtimeStatus + derivedProgress
+		var summary map[string]any
 		var progress map[string]any
 		// 兼容两种形态：store 层可能已将 summary 反序列化成 map，也可能是原始 JSON 字符串
 		switch v := any(run.Summary).(type) {
 		case map[string]any:
+			summary = v
 			if p, ok := v["progress"].(map[string]any); ok { progress = p }
 		case string:
 			if v != "" {
 				var m map[string]any
 				if json.Unmarshal([]byte(v), &m) == nil {
+					summary = m
 					if p, ok := m["progress"].(map[string]any); ok { progress = p }
 				}
 			}
@@ -226,8 +234,61 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		if v, ok := progress["speed"].(float64); ok { speed = int64(v) }
 		var eta any
 		if v, ok := progress["eta"]; ok { eta = v }
-		percentage := 0.0
-		if total > 0 { percentage = float64(bytes) / float64(total) * 100 }
+		pct := 0.0
+		if total > 0 && bytes >= 0 && bytes <= total { pct = float64(bytes) / float64(total) * 100 }
+		_ = eta
+
+		// 稳态进度：从 summary.stableProgress 读取上一帧
+		var stablePrev map[string]any
+		if summary != nil {
+			if sp, ok := summary["stableProgress"].(map[string]any); ok { stablePrev = sp }
+		}
+		// 计算稳态候选
+		stable := map[string]any{"bytes": bytes, "totalBytes": total, "speed": speed, "percentage": pct, "phase": "transferring", "lastUpdatedAt": time.Now().Format(time.RFC3339)}
+		// 阶段：preparing
+		if total == 0 {
+			stable["phase"] = "preparing"
+		}
+		// 收尾：若有 finishWait 且未 done
+		if summary != nil {
+			if fw, ok := summary["finishWait"].(map[string]any); ok {
+				if en, ok2 := fw["enabled"].(bool); ok2 && en {
+					if done, ok3 := fw["done"].(bool); !ok3 || !done {
+						stable["phase"] = "finalizing"
+					}
+				}
+			}
+		}
+		// 应用稳态规则（仅当非 finalizing）
+		if stable["phase"] != "finalizing" {
+			// 取上一帧
+			var lastBytes, lastTotal int64
+			var lastPct float64
+			var lastAt int64
+			if stablePrev != nil {
+				if v, ok := stablePrev["bytes"].(float64); ok { lastBytes = int64(v) }
+				if v, ok := stablePrev["totalBytes"].(float64); ok { lastTotal = int64(v) }
+				if v, ok := stablePrev["percentage"].(float64); ok { lastPct = v }
+				if v, ok := stablePrev["lastUpdatedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, v); e == nil { lastAt = t.UnixMilli() } }
+			}
+			// 规则判断
+			nowMs := time.Now().UnixMilli()
+			percentTiny := pct < tinyPct
+			totalJump := (lastTotal > 0 && float64(total) >= float64(lastTotal)*jumpFactor) || (lastTotal == 0 && total >= tbBytes)
+			speedZero := speed == 0
+			noMovement := bytes <= lastBytes && pct <= lastPct
+			holdWindow := (lastAt > 0 && (nowMs-lastAt) <= holdMs)
+			// clamp
+			if total > 0 && bytes > total { bytes = total; stable["bytes"] = bytes; pct = float64(bytes) / float64(total) * 100; stable["percentage"] = pct }
+			// 空窗/毛刺：优先保持上一帧
+			if stablePrev != nil && ( (speedZero && holdWindow) || (speedZero && (percentTiny || totalJump || noMovement)) || (pct < lastPct) ) {
+				stable = stablePrev
+				stable["phase"] = "between_files"
+			}
+		}
+
+		// 将 stableProgress 写回 summary，供下一次作为上一帧基线
+		c.runSvc.UpdateRunStatus(run.ID, map[string]any{"stableProgress": stable})
 
 		item := map[string]any{
 			"runRecord": map[string]any{
@@ -238,23 +299,7 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				"bytesTransferred": run.BytesTransferred,
 				"error": run.Error,
 			},
-			// 兼容旧前端：在 realtimeStatus 中也提供扁平字段
-			"realtimeStatus": map[string]any{
-				"progress": progress,
-				"error": run.Error,
-				"bytes": bytes,
-				"totalBytes": total,
-				"speed": speed,
-				"eta": eta,
-				"percentage": percentage,
-			},
-			"derivedProgress": map[string]any{
-				"bytes": bytes,
-				"totalBytes": total,
-				"speed": speed,
-				"eta": eta,
-				"percentage": percentage,
-			},
+			"stableProgress": stable,
 		}
 		items = append(items, item)
 	}
