@@ -13,7 +13,7 @@ export type { ResponseInterceptor } from './client'
 export { default as apiRequest } from './client'
 
 // ============ Task API ============
-export { getTasks, createTask, updateTask, runTask, deleteTask, stopTaskTransfer, getTaskProgress } from './task'
+export { getTasks, createTask, updateTask, runTask, deleteTask, stopTaskTransfer, getTaskProgress, killTask } from './task'
 export { getTasks as listTasks } from './task'
 
 // ============ Schedule API ============
