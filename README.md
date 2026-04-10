@@ -117,6 +117,19 @@ docker build --no-cache \
   -t ray5378/rcloneflow:master-$SHA .
 ```
 
+## Webhook 触发（外部调用）
+- 端点（公开，无需认证）
+  - 按任务ID：GET/POST /webhook/{taskId}
+  - 按自定义ID：GET/POST /webhook/{customId}（在任务卡片“Webhook”按钮设置 webhookId）
+- 返回示例：`{"started": true, "taskId": 12}`
+- 示例
+```bash
+curl -X POST http://localhost:17870/webhook/12
+curl http://localhost:17870/webhook/gate-front-01
+```
+- 注意
+  - 该端点无需认证；若暴露到公网，建议通过反向代理限制来源或路径前缀。
+
 ## 迁移提示（老版本 → 本版）
 - 健康检查：改用 wget 请求首页 /；若 compose 里写了 curl /healthz，请改/删除。
 - 日志：仅保留 stderr.log；下载接口统一到 /api/runs/{id}/log。
