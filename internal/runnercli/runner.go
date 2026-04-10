@@ -129,7 +129,41 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 			return
 		}
-		// 收尾校验（Post-Verify）已按要求移除：直接标记结束
+		// WebDAV 专用 Finish-Wait：对本次成功文件清单做 size 确认（默认 interval=60s, timeout=5h）
+		finishWait := strings.EqualFold(strings.ToLower(dstRemote), "webdav") || strings.Contains(strings.ToLower(dstRemote), "webdav")
+		if finishWait {
+			interval := 60 * time.Second
+			timeout := 5 * time.Hour
+			if s := strings.TrimSpace(os.Getenv("FINISH_WAIT_INTERVAL")); s != "" { if d, e := time.ParseDuration(s); e == nil { interval = d } }
+			if s := strings.TrimSpace(os.Getenv("FINISH_WAIT_TIMEOUT")); s != "" { if d, e := time.ParseDuration(s); e == nil { timeout = d } }
+			copied := fileStats.copiedList()
+			if len(copied) > 0 {
+				vr := &adapter.CmdRunner{}
+				deadline := time.Now().Add(timeout)
+				for time.Now().Before(deadline) {
+					allOk := true
+					for _, name := range copied {
+						// 通过 lsjson 获取目标文件 size
+						args := []string{"lsjson", dst, "--config", cfg, "--files-only"}
+						out, _, e := vr.Run(context.Background(), args...)
+						if e != nil { allOk = false; break }
+						var arr []map[string]any
+						if json.Unmarshal([]byte(out), &arr) == nil {
+							found := false
+							for _, it := range arr {
+								if it["Name"] == name || it["name"] == name {
+									found = true
+									break
+								}
+							}
+							if !found { allOk = false; break }
+						} else { allOk = false; break }
+					}
+					if allOk { break }
+					time.Sleep(interval)
+				}
+			}
+		}
 		_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
 		r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 	}()
@@ -199,6 +233,7 @@ type fileProgress struct {
 	m   map[string]*fileProg
 	mu  sync.Mutex
 	ver uint64
+	copied []string
 }
 
 func (fp *fileProgress) update(name string, bytes, total, speed, pct float64){
@@ -213,11 +248,24 @@ func (fp *fileProgress) update(name string, bytes, total, speed, pct float64){
 	atomic.AddUint64(&fp.ver, 1)
 }
 
+func (fp *fileProgress) markCopied(name string){
+	fp.mu.Lock()
+	fp.copied = append(fp.copied, name)
+	fp.mu.Unlock()
+}
+
 func (fp *fileProgress) snapshot(limit int) []fileProg {
 	fp.mu.Lock(); defer fp.mu.Unlock()
 	out := make([]fileProg, 0, len(fp.m))
 	for _, v := range fp.m { out = append(out, *v) }
 	if limit > 0 && len(out) > limit { out = out[len(out)-limit:] }
+	return out
+}
+
+func (fp *fileProgress) copiedList() []string {
+	fp.mu.Lock(); defer fp.mu.Unlock()
+	out := make([]string, len(fp.copied))
+	copy(out, fp.copied)
 	return out
 }
 
@@ -278,6 +326,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				if m := fileCopiedRe.FindStringSubmatch(line); len(m) > 0 {
 					name := strings.TrimSpace(m[1])
 					fp.update(name, -1, -1, -1, 100)
+					fp.markCopied(name)
 				}
 			}
 		}
