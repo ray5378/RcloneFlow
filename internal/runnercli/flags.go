@@ -9,7 +9,20 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	flags := []string{}
 	push := func(k string, vs ...string){ flags = append(flags, k); flags = append(flags, vs...) }
 	asBool := func(v any) (bool, bool){ b, ok := v.(bool); return b, ok }
-	asInt := func(v any) (string, bool){ switch x:=v.(type){ case float64: return fmt.Sprintf("%d", int64(x)), true; case int64: return fmt.Sprintf("%d", x), true; case string: if strings.TrimSpace(x)!="" { return strings.TrimSpace(x), true }; default: } ; return "", false }
+	asInt := func(v any) (string, bool){
+		switch x := v.(type) {
+		case float64:
+			return fmt.Sprintf("%d", int64(x)), true
+		case int64:
+			return fmt.Sprintf("%d", x), true
+		case int:
+			return fmt.Sprintf("%d", x), true
+		case string:
+			s := strings.TrimSpace(x)
+			if s != "" { return s, true }
+		}
+		return "", false
+	}
 	asStr := func(v any) (string, bool){ s, ok := v.(string); if !ok { return "", false }; s = strings.TrimSpace(s); if s=="" { return "", false }; return s, true }
 	asArr := func(v any) ([]string, bool){
 		arr := []string{}
