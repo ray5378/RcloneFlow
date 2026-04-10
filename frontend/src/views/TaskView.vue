@@ -456,13 +456,9 @@ function viewTaskHistory(taskId: number) {
 async function stopTaskAny(taskId: number) {
   showConfirm('停止传输', '确定停止该任务的当前传输？', async () => {
     try {
-      // 优先 kill 最近的 run（即使不在 active 列表）
-      const runsList = await api.getRuns()
-      const latest = (runsList || []).filter(r => r.taskId === taskId).sort((a,b)=> new Date(b.startedAt||0).getTime() - new Date(a.startedAt||0).getTime())[0]
-      if (latest) {
-        try { await api.killRun(latest.id) } catch {}
-      }
-      // 再尝试 RC 停止活跃 Job（兼容 RC 模式）
+      // 直接按任务 ID kill（后端会定位最近 run 并发信号）
+      await api.killTask(taskId)
+      // 兼容 RC：如仍有 rcJobId，则再尝试停止
       const active = await api.getActiveRuns().catch(()=>[])
       const cur:any = Array.isArray(active) ? active.find(x => x?.runRecord?.taskId === taskId && x?.runRecord?.rcJobId) : null
       if (cur?.runRecord?.rcJobId) {

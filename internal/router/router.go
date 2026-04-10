@@ -83,7 +83,10 @@ func (r *Router) Setup(mux *http.ServeMux) {
 
 	// 任务管理
 	apiMux.HandleFunc("/api/tasks", r.taskCtrl.HandleTasks)
-	apiMux.HandleFunc("/api/tasks/", r.taskCtrl.HandleTaskActions)
+	apiMux.HandleFunc("/api/tasks/", func(w http.ResponseWriter, req *http.Request){
+		if strings.HasSuffix(req.URL.Path, "/kill") { r.runCtrl.HandleTaskKill(w, req); return }
+		r.taskCtrl.HandleTaskActions(w, req)
+	})
 
 	// 定时任务
 	apiMux.HandleFunc("/api/schedules", r.scheduleCtrl.HandleSchedules)

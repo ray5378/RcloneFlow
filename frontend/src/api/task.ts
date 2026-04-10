@@ -6,6 +6,11 @@ import { get, post, put, del } from './client'
 import { getActiveRuns, getRuns, getJobStatus, stopJob } from './run'
 import type { Task } from '../types'
 
+/** 强制终止任务的当前传输（按最近 run 定位 PID） */
+export async function killTask(taskId: number): Promise<void> {
+  await post(`/api/tasks/${taskId}/kill`, {})
+}
+
 /** 获取所有任务 */
 export async function getTasks(): Promise<Task[]> {
   return get<Task[]>('/api/tasks')
