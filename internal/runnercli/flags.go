@@ -9,19 +9,18 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	flags := []string{}
 	push := func(k string, vs ...string){ flags = append(flags, k); flags = append(flags, vs...) }
 	asBool := func(v any) (bool, bool){ b, ok := v.(bool); return b, ok }
-	asInt := func(v any) (string, bool){ switch x:=v.(type){ case float64: return fmt.Sprintf("%d", int64(x)), true; case int64: return fmt.Sprintf("%d", x), true; case string: if x!="" { return x, true }; default: } ; return "", false }
-	asStr := func(v any) (string, bool){ s, ok := v.(string); if !ok || s=="" { return "", false }; return s, true }
+	asInt := func(v any) (string, bool){ switch x:=v.(type){ case float64: return fmt.Sprintf("%d", int64(x)), true; case int64: return fmt.Sprintf("%d", x), true; case string: if strings.TrimSpace(x)!="" { return strings.TrimSpace(x), true }; default: } ; return "", false }
+	asStr := func(v any) (string, bool){ s, ok := v.(string); if !ok { return "", false }; s = strings.TrimSpace(s); if s=="" { return "", false }; return s, true }
 	asArr := func(v any) ([]string, bool){
 		arr := []string{}
 		switch vv := v.(type){
 		case []any:
-			for _, e := range vv { if s, ok := e.(string); ok && s!="" { arr = append(arr, s) } }
+			for _, e := range vv { if s, ok := e.(string); ok { s = strings.TrimSpace(s); if s!="" { arr = append(arr, s) } } }
 		case []string:
-			arr = vv
+			for _, s := range vv { s = strings.TrimSpace(s); if s!="" { arr = append(arr, s) } }
 		case string:
 			s := strings.TrimSpace(vv)
 			if s != "" {
-				// 支持换行或逗号分隔的多条规则
 				s = strings.ReplaceAll(s, "\r", "")
 				for _, line := range strings.Split(s, "\n") {
 					line = strings.TrimSpace(line)
@@ -35,6 +34,8 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 		}
 		return arr, len(arr)>0
 	}
+
+	// 常用数值
 	if v, ok := asInt(opt["transfers"]); ok { push("--transfers", v) }
 	if v, ok := asInt(opt["checkers"]); ok { push("--checkers", v) }
 	// bufferSize：数字→自动补 M；字符串→纯数字则补 M，带单位则原样
@@ -55,24 +56,38 @@ func buildFlagsFromOptions(opt map[string]any) []string {
 	}
 	if s, ok := asStr(opt["bwLimit"]); ok { push("--bwlimit", s) }
 	if s, ok := asStr(opt["bwlimit"]); ok { push("--bwlimit", s) }
+
+	// 布尔开关
 	for _, key := range []string{"ignoreExisting","checksum","sizeOnly","ignoreSize","ignoreTimes","update","noTraverse","noCheckDest","inplace","immutable","checkFirst","deleteBefore","deleteDuring","deleteAfter","trackRenames","ignoreErrors","useServerModtime","refreshTimes","deleteExcluded","dryRun","serverSideAcrossConfigs"} {
 		if b, ok := asBool(opt[key]); ok && b { push("--"+toKebab(key)) }
 	}
+	// 路径类
 	if s, ok := asStr(opt["compareDest"]); ok { push("--compare-dest", s) }
 	if s, ok := asStr(opt["copyDest"]); ok { push("--copy-dest", s) }
-	// include/exclude：既支持数组，也支持单字符串；对以".ext"开头的字符串自动转为 "*.ext"
+
+	// include/exclude：收集→归一→去重→拼接
 	norm := func(s string) string {
 		s = strings.TrimSpace(s)
 		if s == "" { return s }
 		if strings.HasPrefix(s, ".") && !strings.ContainsAny(s, "*?[") { return "*"+s }
 		return s
 	}
-	if arr, ok := asArr(opt["include"]); ok { for _, p := range arr { push("--include", norm(p)) } }
-	if s, ok := asStr(opt["include"]); ok { push("--include", norm(s)) }
-	if arr, ok := asArr(opt["exclude"]); ok { for _, p := range arr { push("--exclude", norm(p)) } }
-	if s, ok := asStr(opt["exclude"]); ok { push("--exclude", norm(s)) }
-	// 按你的要求：不再强制追加 --timeout；仅在需要时可后续单独支持显式字段
-	// if s, ok := asInt(opt["timeout"]); ok { push("--timeout", s+"s") }
+	// include
+	{
+		incSet := map[string]struct{}{}
+		if arr, ok := asArr(opt["include"]); ok { for _, p := range arr { p = norm(p); if p!="" { incSet[p] = struct{}{} } } }
+		if s, ok := asStr(opt["include"]); ok { s = norm(s); if s!="" { incSet[s] = struct{}{} } }
+		for p := range incSet { push("--include", p) }
+	}
+	// exclude
+	{
+		excSet := map[string]struct{}{}
+		if arr, ok := asArr(opt["exclude"]); ok { for _, p := range arr { p = norm(p); if p!="" { excSet[p] = struct{}{} } } }
+		if s, ok := asStr(opt["exclude"]); ok { s = norm(s); if s!="" { excSet[s] = struct{}{} } }
+		for p := range excSet { push("--exclude", p) }
+	}
+
+	// 超时：仅在显式配置时映射
 	if s, ok := asInt(opt["connTimeout"]); ok { push("--contimeout", s+"s") }
 	if s, ok := asInt(opt["expectContinueTimeout"]); ok { push("--expect-continue-timeout", s+"s") }
 	return flags
