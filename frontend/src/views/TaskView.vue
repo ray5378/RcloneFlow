@@ -41,10 +41,10 @@ const taskProgressData = ref<any>({})
 const activeRuns = ref<any[]>([])
 const showTransferModal = ref(false)
 const transferTaskId = ref<number | undefined>(undefined)
-const webhookModal = ref<{show:boolean, id:number|null, value:string, secret:string}>({show:false, id:null, value:'', secret:''})
+const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
 
 function setWebhook(task: Task){
-  webhookModal.value = { show: true, id: task.id, value: (task.options as any)?.webhookId || '', secret: (task.options as any)?.webhookSecret || '' }
+  webhookModal.value = { show: true, id: task.id, value: (task.options as any)?.webhookId || '' }
 }
 
 async function saveWebhook(){
@@ -52,7 +52,6 @@ async function saveWebhook(){
   if(!id) return
   const opts:any = {}
   if (webhookModal.value.value) opts.webhookId = webhookModal.value.value
-  if (webhookModal.value.secret) opts.webhookSecret = webhookModal.value.secret
   await api.updateTask(id, { options: opts } as any)
   webhookModal.value.show = false
   await loadData()
@@ -1509,16 +1508,12 @@ import TransferOptions from '../components/TransferOptions.vue'
       </div>
       <div class="modal-body">
         <div class="detail-item">
-          <label>触发 ID（自定义）</label>
-          <input v-model="webhookModal.value" placeholder="例如：gate-front-01" />
-        </div>
-        <div class="detail-item">
-          <label>可选密钥（token）</label>
-          <input v-model="webhookModal.secret" placeholder="留空则无需 token" />
+          <label>触发 ID（可选，留空则使用任务 ID）</label>
+          <input v-model="webhookModal.value" placeholder="例如：gate-front-01（可留空）" />
         </div>
         <div class="detail-item">
           <label>触发 URL 示例</label>
-          <div class="hint">/webhook/{{ webhookModal.value || 'YOUR_ID' }}<span v-if="webhookModal.secret">?token={{ webhookModal.secret }}</span></div>
+          <div class="hint">/webhook/&lt;任务ID&gt; 或 /webhook/{{ webhookModal.value || 'YOUR_ID' }}</div>
         </div>
       </div>
       <div class="modal-footer">
