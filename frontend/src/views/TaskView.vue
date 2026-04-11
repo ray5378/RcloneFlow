@@ -1079,9 +1079,25 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span>{{ formatDuration(runDetail.startedAt, runDetail.finishedAt) }}</span>
           </div>
           <div class="detail-item">
+            <label>阶段：</label>
+            <span>
+              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress">
+                {{ getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.phase === 'preparing' ? '准备中' :
+                   getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.phase === 'between_files' ? '切换中文件' :
+                   getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.phase === 'finalizing' ? '收尾确认中' : '传输中' }}
+              </template>
+              <template v-else>
+                {{ runDetail.status==='finished' ? '已完成' : getStatusText(runDetail.status) }}
+              </template>
+            </span>
+          </div>
+          <div class="detail-item">
             <label>进度：</label>
             <span>
-              <template v-if="historyProgressFromSummary(runDetail.summary)">
+              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress">
+                {{ ((getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.percentage) || 0).toFixed(2) }}%
+              </template>
+              <template v-else-if="historyProgressFromSummary(runDetail.summary)">
                 {{ (historyProgressFromSummary(runDetail.summary)?.percentage || 0).toFixed(2) }}%
               </template>
               <template v-else>-</template>
@@ -1090,7 +1106,10 @@ import TransferOptions from '../components/TransferOptions.vue'
           <div class="detail-item">
             <label>当前速度：</label>
             <span>
-              <template v-if="historyProgressFromSummary(runDetail.summary)">
+              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress">
+                {{ formatBytesPerSec(getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.speed || 0) }}
+              </template>
+              <template v-else-if="historyProgressFromSummary(runDetail.summary)">
                 {{ formatBytesPerSec(historyProgressFromSummary(runDetail.summary)?.speed || 0) }}
               </template>
               <template v-else>{{ runDetail.speed || '-' }}</template>
@@ -1099,7 +1118,11 @@ import TransferOptions from '../components/TransferOptions.vue'
           <div class="detail-item">
             <label>已传输/总大小：</label>
             <span>
-              <template v-if="historyProgressFromSummary(runDetail.summary)">
+              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress">
+                {{ formatBytes(getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.bytes || 0) }} /
+                {{ formatBytes(getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.totalBytes || 0) }}
+              </template>
+              <template v-else-if="historyProgressFromSummary(runDetail.summary)">
                 {{ formatBytes(historyProgressFromSummary(runDetail.summary)?.bytes || 0) }} /
                 {{ formatBytes(historyProgressFromSummary(runDetail.summary)?.totalBytes || 0) }}
               </template>
