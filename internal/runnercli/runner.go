@@ -178,7 +178,16 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		outW.Close(); errW.Close()
 		stderrFile.Close()
 		if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) {
-			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "failed" })
+			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
+				rr.Status = "failed"
+				if rr.Summary == nil { rr.Summary = map[string]any{} }
+				rr.Summary["finished"] = true
+				rr.Summary["success"] = false
+				// 若无 progress 但有 stableProgress，则回填，便于历史详情展示
+				if _, ok := rr.Summary["progress"]; !ok {
+					if sp, ok2 := rr.Summary["stableProgress"].(map[string]any); ok2 { rr.Summary["progress"] = sp }
+				}
+			})
 			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 			return
 		}
@@ -217,7 +226,16 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				}
 			}
 		}
-		_ = r.db.UpdateRun(run.ID, func(rr *store.Run){ rr.Status = "finished" })
+		_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
+			rr.Status = "finished"
+			if rr.Summary == nil { rr.Summary = map[string]any{} }
+			rr.Summary["finished"] = true
+			rr.Summary["success"] = true
+			// 若无 progress 但有 stableProgress，则将最后稳态快照固化为 progress（供历史页展示）
+			if _, ok := rr.Summary["progress"]; !ok {
+				if sp, ok2 := rr.Summary["stableProgress"].(map[string]any); ok2 { rr.Summary["progress"] = sp }
+			}
+		})
 		r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 	}()
 	return nil
