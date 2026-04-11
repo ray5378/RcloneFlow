@@ -1909,7 +1909,7 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 .error-text { color: #ff6b6b; white-space: pre-wrap; }
 .danger-hint { color: #ff6b6b; font-size: 13px; line-height: 1.5; }
 .modal-content.log-modal{width:92vw !important; max-width:1200px !important; max-height:80vh; display:flex; flex-direction:column;}
-.log-modal .modal-body{padding:12px 16px; width:100%; flex:1; overflow:hidden;}
+.log-modal .modal-body{padding:12px 16px; width:100%; flex:1; overflow:hidden; display:flex;}
 .log-modal .modal-body > *{width:100%;}
-.log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;height:100%;overflow:auto;white-space:pre-wrap;width:100%;box-sizing:border-box;margin:0;border:1px solid #334155}
+.log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;height:100%;overflow:auto;white-space:pre-wrap;width:100%;box-sizing:border-box;margin:0;border:1px solid #334155; flex:1 1 auto}
 </style>
