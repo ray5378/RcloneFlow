@@ -15,6 +15,7 @@ const isAuth = ref(false)
 const authChecked = ref(false)
 const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
+const showDefaultsModal = ref(false)
 
 
 const user = getUser()
@@ -170,6 +171,11 @@ onMounted(async () => {
               <span class="settings-text">{{ isLight ? '深色模式' : '浅色模式' }}</span>
               <span class="settings-arrow">›</span>
             </div>
+            <div class="settings-item" @click="showDefaultsModal = true">
+              <span class="settings-icon">🛠️</span>
+              <span class="settings-text">修改默认设置</span>
+              <span class="settings-arrow">›</span>
+            </div>
             <div class="settings-item" @click="openGitHub">
               <span class="settings-icon">⭐</span>
               <span class="settings-text">给项目点个Star</span>
@@ -218,7 +224,18 @@ onMounted(async () => {
 
     </template>
   </div>
+      
+      <!-- 修改默认设置弹窗 -->
+      <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal=false" />
+
+    </template>
+  </div>
 </template>
+
+<script lang="ts">
+import DefaultsModal from './components/DefaultsModal.vue'
+export default { components: { DefaultsModal } }
+</script>
 
 <style scoped>
 .header-actions {
