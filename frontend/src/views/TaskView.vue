@@ -1048,7 +1048,7 @@ import TransferOptions from '../components/TransferOptions.vue'
 
   <!-- 传输日志弹窗 -->
   <div v-if="showLogModal" class="modal-overlay" @click.self="showLogModal=false">
-    <div class="modal-content" style="max-width: 960px;">
+    <div class="modal-content log-modal">
       <div class="modal-header">
         <h3>{{ logModalTitle }}</h3>
         <button class="close-btn" @click="showLogModal=false">×</button>
@@ -1908,5 +1908,6 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 
 .error-text { color: #ff6b6b; white-space: pre-wrap; }
 .danger-hint { color: #ff6b6b; font-size: 13px; line-height: 1.5; }
-.log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;max-height:60vh;overflow:auto;white-space:pre-wrap}
+.log-modal{max-width: min(90vw, 1200px); width: 90vw;}
+.log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;max-height:70vh;min-height:50vh;overflow:auto;white-space:pre-wrap}
 </style>
