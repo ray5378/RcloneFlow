@@ -180,6 +180,18 @@ onMounted(load)
           </div>
         </div>
 
+        <div class="section">
+          <div class="section-title">WebDAV 收尾（完成确认）</div>
+          <div class="grid">
+            <label title="WebDAV 收尾轮询间隔">收尾轮询间隔 <small class="subkey">FINISH_WAIT_INTERVAL</small></label>
+            <input v-model="form.FINISH_WAIT_INTERVAL" placeholder="如 5s" />
+            <div class="error" v-if="errors.FINISH_WAIT_INTERVAL">{{ errors.FINISH_WAIT_INTERVAL }}</div>
+            <label title="WebDAV 收尾最长等待">收尾超时时间 <small class="subkey">FINISH_WAIT_TIMEOUT</small></label>
+            <input v-model="form.FINISH_WAIT_TIMEOUT" placeholder="如 5h" />
+            <div class="error" v-if="errors.FINISH_WAIT_TIMEOUT">{{ errors.FINISH_WAIT_TIMEOUT }}</div>
+          </div>
+        </div>
+
       </div>
       <div class="modal-footer">
         <button class="ghost" @click="onReset" :disabled="saving">重置为默认</button>
