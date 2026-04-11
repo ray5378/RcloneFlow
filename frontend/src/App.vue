@@ -224,10 +224,10 @@ onMounted(async () => {
       </div>
 
     </template>
-  </div>
       
       <!-- 修改默认设置弹窗 -->
       <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal=false" />
+  </div>
 </template>
 
 <style scoped>
