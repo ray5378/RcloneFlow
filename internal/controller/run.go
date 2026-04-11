@@ -9,6 +9,8 @@ import (
 	"time"
 	"os"
 	"regexp"
+	"path/filepath"
+	stdiostrconv "strconv"
 
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/service"
@@ -197,6 +199,37 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 				if p, ok := m["stderrFile"].(string); ok && p != "" { logPath = p }
 			}
 		}
+		if logPath == "" {
+			// 尝试新目录结构：logs/<任务名-MMDD>/<HHMM>.log
+			base := "/app/data/logs"
+			// 以 run.StartedAt 推导可能的子目录（如果有）
+			if run.StartedAt != "" {
+				if t, e := time.Parse(time.RFC3339, run.StartedAt); e == nil {
+					sub := t.Local().Format("0102")
+					// 任务名可能未知，这里扫描匹配 *-MMDD 目录下最近的 HHMM.log
+					entries, _ := os.ReadDir(base)
+					for _, ent := range entries {
+						name := ent.Name()
+						if ent.IsDir() && strings.HasSuffix(name, "-"+sub) {
+							// 取该目录内最接近 startedAt 的文件
+							files, _ := os.ReadDir(filepath.Join(base, name))
+							var best string; var bestDiff int64 = 1<<62
+							for _, f := range files {
+								if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") { continue }
+								fn := strings.TrimSuffix(f.Name(), ".log") // HHMM
+											if len(fn)==4 {
+									th, _ := stdiostrconv.Atoi(fn[:2]); tm, _ := stdiostrconv.Atoi(fn[2:])
+									cand := time.Date(t.Year(), t.Month(), t.Day(), th, tm, 0, 0, t.Location())
+									diff := abs64(t.Unix()-cand.Unix())
+									if diff < bestDiff { bestDiff = diff; best = filepath.Join(base, name, f.Name()) }
+								}
+							}
+							if best != "" { logPath = best; break }
+						}
+					}
+				}
+			}
+		}
 		if logPath == "" { logPath = "/app/data/logs/run-"+idStr+"-stderr.log" }
 		break
 	}
@@ -255,8 +288,10 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	end := offset+limit; if end>total { end = total }
 	if offset>total { offset = total }
 	page := rows[offset:end]
-	WriteJSON(w, 200, map[string]any{"total": total, "items": page})
+	WriteJSON(w, 200, map[string]any{"total": total, "items": page, "logPath": logPath})
 }
+
+func abs64(x int64) int64 { if x<0 { return -x }; return x }
 
 // HandleRunLog 统一提供 stderr 单文件下载
 func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
