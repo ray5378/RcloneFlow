@@ -123,8 +123,21 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 
 	logsBase := os.Getenv("APP_DATA_DIR"); if logsBase == "" { logsBase = "./data" }
 	logsDir := filepath.Join(logsBase, "logs"); _ = os.MkdirAll(logsDir, 0o755)
-	// 仅保留单一日志文件（stderr）；stdout 也合并写入该文件
-	stderrPath := filepath.Join(logsDir, fmt.Sprintf("run-%d-stderr.log", run.ID))
+	// 日志文件名：任务名称-运行时间.log（stdout 也合并写入该文件）
+	sanitizeFilename := func(s string) string {
+		s = strings.TrimSpace(s)
+		if s == "" { s = fmt.Sprintf("task-%d", run.TaskID) }
+		invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+		s = invalid.ReplaceAllString(s, "_")
+		// 截断到 60 字符以内，避免过长
+		r := []rune(s)
+		if len(r) > 60 { s = string(r[:60]) }
+		if s == "" { s = fmt.Sprintf("task-%d", run.TaskID) }
+		return s
+	}
+	safeTask := sanitizeFilename(run.TaskName)
+	ts := time.Now().Local().Format("20060102-150405")
+	stderrPath := filepath.Join(logsDir, fmt.Sprintf("%s-%s.log", safeTask, ts))
 	stderrFile, _ := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 
 	cmd := runner.CmdContext(ctx, args...)
