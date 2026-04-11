@@ -101,11 +101,17 @@ function closeRunDetail(){
   if (runDetailTimer) { clearInterval(runDetailTimer); runDetailTimer = null }
 }
 
+onUnmounted(()=>{
+  if (activeRunsTimer) { clearInterval(activeRunsTimer as any); activeRunsTimer = null }
+  if (runsTimer) { clearInterval(runsTimer as any); runsTimer = null }
+})
+
 const pagedRunFiles = computed(()=> runFiles.value)
 const totalRunFilesPages = computed(()=> Math.max(1, Math.ceil((runFilesTotal.value||0)/runFilesPageSize.value)))
 function goPrevFilesPage(){ if (runFilesPage.value>1) { runFilesPage.value--; reloadRunFiles() } }
 function goNextFilesPage(){ if (runFilesPage.value<totalRunFilesPages.value) { runFilesPage.value++; reloadRunFiles() } }
 let activeRunsTimer: number | null = null
+let runsTimer: number | null = null
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
   title: '',
@@ -180,9 +186,9 @@ function normalizeTaskOptions(raw: Record<string, any> | undefined | null) {
 onMounted(async () => {
   await loadData()
   await loadActiveRuns()
-  activeRunsTimer = window.setInterval(() => {
-    loadActiveRuns().catch(console.error)
-  }, 3000)
+  activeRunsTimer = window.setInterval(() => { loadActiveRuns().catch(console.error) }, 2000)
+  // 历史列表也轮询，保证新 run 及时出现（避免必须手动刷新）
+  runsTimer = window.setInterval(() => { api.listRuns().then(v=> runs.value = v||[]).catch(()=>{}) }, 3000)
 })
 
 async function loadData() {
