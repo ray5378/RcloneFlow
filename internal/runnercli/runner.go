@@ -98,11 +98,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			if n, ok := getInt(merged["expectContinueTimeout"]); !ok || n < 30 { merged["expectContinueTimeout"] = 30 }
 			if n, ok := getInt(merged["retries"]); !ok || n < 5 { merged["retries"] = 5 }
 			if n, ok := getInt(merged["lowLevelRetries"]); !ok || n < 20 { merged["lowLevelRetries"] = 20 }
-			// 布尔强制：禁用 HTTP/2
+			// 布尔强制：禁用 HTTP/2；并发/多线程尊重用户显式设置
 			merged["disableHttp2"] = true
-			// 传输并发：最大 1（过高容易导致 WebDAV 代理/后端拥塞）
-			if n, ok := getInt(merged["transfers"]); !ok || n > 1 { merged["transfers"] = 1 }
-			if n, ok := getInt(merged["multiThreadStreams"]); ok && n > 1 { merged["multiThreadStreams"] = 1 }
 		}
 		if len(merged) > 0 {
 			effOpt = merged
