@@ -74,6 +74,13 @@ func Run(cfg *config.Config) error {
 	// 初始化路由
 	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl)
 
+	// 注入 settings → cleanup 重排钩子
+	controller.ReplanCleanupHook = func(intervalHours int, retentionDays int) {
+		if cleanupSvc != nil {
+			cleanupSvc.Replan(intervalHours, retentionDays)
+		}
+	}
+
 	// 启动任务状态同步服务
 	jobSync := service.NewJobSyncService(db, rc, cfg.GetPoolInterval())
 	ctx, cancel := context.WithCancel(context.Background())
@@ -81,8 +88,9 @@ func Run(cfg *config.Config) error {
 	go jobSync.Start(ctx)
 
 	// 启动历史记录清理服务
+	var cleanupSvc *service.CleanupService
 	if cfg.GetCleanupInterval() > 0 && cfg.GetCleanupRetention() > 0 {
-		cleanupSvc := service.NewCleanupService(
+		cleanupSvc = service.NewCleanupService(
 			runSvc,
 			time.Duration(cfg.GetCleanupInterval())*time.Hour,
 			cfg.GetCleanupRetention(),

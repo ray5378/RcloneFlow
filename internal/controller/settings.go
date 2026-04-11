@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"strconv"
 
 	"rcloneflow/internal/logger"
 )
@@ -140,12 +141,21 @@ func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 	if err := writeOverrides(cur); err != nil {
 		WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()}); return
 	}
-	// 热生效：日志与清理（清理重排留在 app/scheduler 层接入）
+	// 热生效：日志与清理
 	if _, ok := cur["LOG_LEVEL"]; ok || cur["LOG_OUTPUT"]!="" {
 		lev := cur["LOG_LEVEL"]; if lev=="" { lev = defaultsMap()["LOG_LEVEL"] }
 		out := cur["LOG_OUTPUT"]; if out=="" { out = defaultsMap()["LOG_OUTPUT"] }
-		// 依赖 logger 包
 		_ = logger.HotSet(lev, out)
+	}
+	// 清理计划重排：通过一个可选的回调（由 app 层注入）
+	if ReplanCleanupHook != nil {
+		intervalHours := atoiDefault(cur["CLEANUP_INTERVAL_HOURS"], atoiDefault(defaultsMap()["CLEANUP_INTERVAL_HOURS"], 24))
+		retentionDays := atoiDefault(cur["FINAL_SUMMARY_RETENTION_DAYS"], atoiDefault(defaultsMap()["FINAL_SUMMARY_RETENTION_DAYS"], 7))
+		ReplanCleanupHook(intervalHours, retentionDays)
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
+
+var ReplanCleanupHook func(intervalHours int, retentionDays int)
+
+func atoiDefault(s string, d int) int { if s=="" { return d }; if v,err := strconv.Atoi(s); err==nil { return v }; return d }
