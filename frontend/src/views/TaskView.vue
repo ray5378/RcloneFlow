@@ -1105,7 +1105,7 @@ import TransferOptions from '../components/TransferOptions.vue'
             {{ formatBytesPerSec(historyProgressFromSummary(run.summary)?.speed || 0) }}
           </span>
         </div>
-        <button class="ghost small" @click="showRunDetail(run)">详情</button>
+        <button class="ghost small" @click="showRunDetail(run)">运行详情</button>
         <button class="ghost small" @click="openRunLog(run)">传输日志</button>
         <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
       </div>

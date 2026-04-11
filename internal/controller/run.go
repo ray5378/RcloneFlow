@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"crypto/sha1"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,6 +17,59 @@ import (
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/service"
 )
+
+// resolveLogPath returns absolute log file path for a run, sharing logic for files+download
+func (c *RunController) resolveLogPath(run service.RunRecord) (string, bool) {
+	// 1) summary.stderrFile
+	if s, ok := any(run.Summary).(string); ok && s != "" {
+		var m map[string]any
+		if json.Unmarshal([]byte(s), &m) == nil {
+			if p, ok := m["stderrFile"].(string); ok && p != "" { return p, true }
+		}
+	}
+	if m, ok := any(run.Summary).(map[string]any); ok {
+		if p, ok := m["stderrFile"].(string); ok && p != "" { return p, true }
+	}
+	// 2) search logs/<task-MMDD>/<HHMM>.log around StartedAt/CreatedAt
+	base := "/app/data/logs"
+	parseStart := func(s string) (time.Time, bool) {
+		layouts := []string{time.RFC3339, "2006-01-02 15:04:05"}
+		for _, l := range layouts { if t, e := time.ParseInLocation(l, s, time.Local); e == nil { return t, true } }
+		return time.Time{}, false
+	}
+	var t time.Time; var ok bool
+	if run.StartedAt != "" { if tt, o := parseStart(run.StartedAt); o { t, ok = tt, true } }
+	if !ok && run.FinishedAt != "" { if tt, o := parseStart(run.FinishedAt); o { t, ok = tt, true } }
+	if ok {
+		sub := t.Local().Format("0102")
+		sanitize := func(s string) string {
+			s = strings.TrimSpace(s); if s == "" { return s }
+			inv := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+			s = inv.ReplaceAllString(s, "_"); r := []rune(s); if len(r)>60 { s = string(r[:60]) }
+			return s
+		}
+		candDirs := []string{}
+		if run.TaskName != "" { candDirs = append(candDirs, filepath.Join(base, sanitize(run.TaskName)+"-"+sub)) }
+		entries, _ := os.ReadDir(base)
+		for _, ent := range entries { if ent.IsDir() && strings.HasSuffix(ent.Name(), "-"+sub) { candDirs = append(candDirs, filepath.Join(base, ent.Name())) } }
+		var best string; var bestDiff int64 = 1<<62
+		for _, dir := range candDirs {
+			files, _ := os.ReadDir(dir)
+			for _, f := range files {
+				if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") { continue }
+				fn := strings.TrimSuffix(f.Name(), ".log")
+				if len(fn)==4 {
+					th, _ := stdiostrconv.Atoi(fn[:2]); tm, _ := stdiostrconv.Atoi(fn[2:])
+					cand := time.Date(t.Year(), t.Month(), t.Day(), th, tm, 0, 0, t.Location())
+					diff := t.Unix()-cand.Unix(); if diff<0 { diff = -diff }
+					if diff < bestDiff { bestDiff = diff; best = filepath.Join(dir, f.Name()) }
+				}
+			}
+		}
+		if best != "" { return best, true }
+	}
+	return "", false
+}
 
 // RunController 运行记录控制器
 type RunController struct {
@@ -234,6 +289,15 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 	if logPath == "" { WriteJSON(w, 404, map[string]any{"error":"log not found"}); return }
+	// raw 模式：直接返回日志文本（便于前端/人工对照）
+	if strings.EqualFold(r.URL.Query().Get("mode"), "raw") {
+		f, e := os.Open(logPath)
+		if e != nil { WriteJSON(w, 500, map[string]any{"error": e.Error()}); return }
+		defer f.Close()
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		http.ServeFile(w, r, logPath)
+		return
+	}
 	// 读取并解析日志
 	data, readErr := os.ReadFile(logPath)
 	if readErr != nil { WriteJSON(w, 500, map[string]any{"error": readErr.Error()}); return }
@@ -288,7 +352,10 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	end := offset+limit; if end>total { end = total }
 	if offset>total { offset = total }
 	page := rows[offset:end]
-	WriteJSON(w, 200, map[string]any{"total": total, "items": page, "logPath": logPath})
+	// 附带校验信息，便于核对与“传输日志”一致性
+	h := sha1.Sum(data)
+	info := map[string]any{"logPath": logPath, "logSize": len(data), "logSha1": fmt.Sprintf("%x", h[:])}
+	WriteJSON(w, 200, map[string]any{"total": total, "items": page, "info": info})
 }
 
 func abs64(x int64) int64 { if x<0 { return -x }; return x }
