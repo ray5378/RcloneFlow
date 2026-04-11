@@ -5,6 +5,7 @@ import { getSettings, saveSettings, resetSettings } from '../api/settings'
 const loading = ref(true)
 const saving = ref(false)
 const saved = ref(false)
+const showResetConfirm = ref(false)
 const data = ref<any>(null)
 const form = ref<Record<string,string>>({})
 
@@ -34,9 +35,21 @@ async function onSave(){
   }
 }
 async function onReset(){
-  if (!confirm('确认重置为默认？')) return
+  showResetConfirm.value = true
+}
+async function doConfirmReset(){
   saving.value = true
-  try{ await resetSettings(); alert('已重置为默认'); await load() } catch(e:any){ alert(e?.message||e) } finally { saving.value=false }
+  try{
+    await resetSettings()
+    await load()
+    saved.value = true
+    setTimeout(()=>{ saved.value=false }, 10000)
+  }catch(e:any){
+    alert(e?.message||e)
+  }finally{
+    saving.value = false
+    showResetConfirm.value = false
+  }
 }
 
 onMounted(load)
@@ -121,6 +134,23 @@ onMounted(load)
       <div class="modal-footer">
         <button class="ghost" @click="onReset" :disabled="saving">重置为默认</button>
         <button :class="['primary', { saved: saved }]" @click="onSave" :disabled="saving">{{ saved ? '已保存生效' : '保存' }}</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 确认重置弹窗（与现有确认风格对齐） -->
+  <div v-if="showResetConfirm" class="modal-overlay" @click.self="showResetConfirm=false">
+    <div class="modal-content confirm-modal">
+      <div class="modal-header">
+        <h3>重置为默认</h3>
+        <button class="close-btn" @click="showResetConfirm=false">×</button>
+      </div>
+      <div class="modal-body">
+        <p>确定将所有设置重置为默认值？此操作不可撤销。</p>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" @click="showResetConfirm=false">取消</button>
+        <button class="primary danger" @click="doConfirmReset">确认</button>
       </div>
     </div>
   </div>
