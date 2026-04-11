@@ -55,10 +55,10 @@ onMounted(load)
           <div class="grid">
             <label>日志级别 <small class="subkey">LOG_LEVEL</small></label>
             <select v-model="form.LOG_LEVEL">
-              <option value="debug">debug</option>
-              <option value="info">info</option>
-              <option value="warn">warn</option>
-              <option value="error">error</option>
+              <option value="debug">调试</option>
+              <option value="info">信息</option>
+              <option value="warn">警告</option>
+              <option value="error">错误</option>
             </select>
             <label>日志输出 <small class="subkey">LOG_OUTPUT</small></label>
             <input v-model="form.LOG_OUTPUT" placeholder="stdout" />
@@ -80,8 +80,8 @@ onMounted(load)
           <div class="grid">
             <label>预检模式 <small class="subkey">PRECHECK_MODE</small></label>
             <select v-model="form.PRECHECK_MODE">
-              <option value="none">none</option>
-              <option value="size">size</option>
+              <option value="none">关闭</option>
+              <option value="size">按大小预检</option>
             </select>
           </div>
         </div>
