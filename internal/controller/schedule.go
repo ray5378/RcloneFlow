@@ -92,12 +92,12 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
-		// 运行时热重载：删除旧 entry，再按最新 spec/状态重建或移除
+		// 运行时热重载（强制单一生效）：先移除旧 entry，再按最新状态重建
 		if s, ok := c.sched.DB().GetSchedule(id); ok {
+			// 无条件先移除旧 entry，避免旧规则残留
+			c.sched.RemoveSchedule(id)
 			if s.Enabled {
 				_ = c.sched.AddSchedule(s)
-			} else {
-				c.sched.RemoveSchedule(id)
 			}
 		}
 		WriteJSON(w, 200, map[string]any{"enabled": req.Enabled, "spec": req.Spec})
