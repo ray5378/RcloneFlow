@@ -43,42 +43,42 @@ onMounted(load)
         <div class="section">
           <div class="section-title">认证</div>
           <div class="grid">
-            <label>ACCESS_TOKEN_TTL</label>
+            <label>访问令牌有效期 <small class="subkey">ACCESS_TOKEN_TTL</small></label>
             <input v-model="form.ACCESS_TOKEN_TTL" placeholder="如 24h" />
-            <label>REFRESH_TOKEN_TTL</label>
+            <label>刷新令牌有效期 <small class="subkey">REFRESH_TOKEN_TTL</small></label>
             <input v-model="form.REFRESH_TOKEN_TTL" placeholder="如 90d" />
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">日志与等级</div>
+          <div class="section-title">日志与等级（实时生效）</div>
           <div class="grid">
-            <label>LOG_LEVEL</label>
+            <label>日志级别 <small class="subkey">LOG_LEVEL</small></label>
             <select v-model="form.LOG_LEVEL">
               <option value="debug">debug</option>
               <option value="info">info</option>
               <option value="warn">warn</option>
               <option value="error">error</option>
             </select>
-            <label>LOG_OUTPUT</label>
+            <label>日志输出 <small class="subkey">LOG_OUTPUT</small></label>
             <input v-model="form.LOG_OUTPUT" placeholder="stdout" />
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">历史与保留</div>
+          <div class="section-title">历史与保留（定期清理）</div>
           <div class="grid">
-            <label>FINAL_SUMMARY_RETENTION_DAYS</label>
+            <label>运行总结保留天数 <small class="subkey">FINAL_SUMMARY_RETENTION_DAYS</small></label>
             <input v-model="form.FINAL_SUMMARY_RETENTION_DAYS" type="number" min="0" />
-            <label>CLEANUP_INTERVAL_HOURS</label>
+            <label>清理扫描间隔（小时） <small class="subkey">CLEANUP_INTERVAL_HOURS</small></label>
             <input v-model="form.CLEANUP_INTERVAL_HOURS" type="number" min="0" />
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">预检/统计概览</div>
+          <div class="section-title">预检/统计概览（任务启动前）</div>
           <div class="grid">
-            <label>PRECHECK_MODE</label>
+            <label>预检模式 <small class="subkey">PRECHECK_MODE</small></label>
             <select v-model="form.PRECHECK_MODE">
               <option value="none">none</option>
               <option value="size">size</option>
@@ -87,23 +87,23 @@ onMounted(load)
         </div>
 
         <div class="section">
-          <div class="section-title">运行中进度限流写库</div>
+          <div class="section-title">运行中进度限流写库（热生效）</div>
           <div class="grid">
-            <label>PROGRESS_FLUSH_INTERVAL</label>
+            <label>写库最小间隔 <small class="subkey">PROGRESS_FLUSH_INTERVAL</small></label>
             <input v-model="form.PROGRESS_FLUSH_INTERVAL" placeholder="如 5s" />
-            <label>PROGRESS_FLUSH_MIN_DELTA_PCT</label>
+            <label>写库最小增量（百分比） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_PCT</small></label>
             <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_PCT" type="number" min="0" step="0.1" />
-            <label>PROGRESS_FLUSH_MIN_DELTA_BYTES</label>
+            <label>写库最小增量（字节） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_BYTES</small></label>
             <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_BYTES" type="number" min="0" />
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">WebDAV 收尾</div>
+          <div class="section-title">WebDAV 收尾（完成确认）</div>
           <div class="grid">
-            <label>FINISH_WAIT_INTERVAL</label>
+            <label>收尾轮询间隔 <small class="subkey">FINISH_WAIT_INTERVAL</small></label>
             <input v-model="form.FINISH_WAIT_INTERVAL" placeholder="如 5s" />
-            <label>FINISH_WAIT_TIMEOUT</label>
+            <label>收尾超时时间 <small class="subkey">FINISH_WAIT_TIMEOUT</small></label>
             <input v-model="form.FINISH_WAIT_TIMEOUT" placeholder="如 5h" />
           </div>
         </div>
@@ -124,4 +124,5 @@ body.light .section-title{ color: #111827 }
 .grid{ display:grid; grid-template-columns: 220px 1fr; gap: 8px 12px }
 input, select{ padding: 8px 10px; border-radius: 8px; border: 1px solid #333; background:#252525; color:#e0e0e0 }
 body.light input, body.light select{ background:#fff; color:#111; border-color:#ddd }
+.subkey{opacity:.6;margin-left:6px;font-weight:400}
 </style>
