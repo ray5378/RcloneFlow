@@ -31,6 +31,7 @@ let runDetailTimer: any = null
 
 // 运行详情 - 文件列表分页
 const runFiles = ref<any[]>([])
+const runFilesTotal = ref(0)
 const runFilesPage = ref(1)
 const runFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 380) / 32)))
 const showCreateModal = ref(false)
@@ -59,10 +60,18 @@ async function saveWebhook(){
 
 // （重复定义已移除）
 
+async function reloadRunFiles(){
+  try{
+    if (!runDetail.value?.id) return
+    const pageOffset = (runFilesPage.value-1) * runFilesPageSize.value
+    const res = await api.getRunFiles(runDetail.value.id, pageOffset, runFilesPageSize.value)
+    runFiles.value = res.items || []
+    runFilesTotal.value = res.total || 0
+  }catch(e){ console.error(e) }
+}
+
 function pickFilesFromRun(run:any){
-  // 优先从实时数据
-  if (run?.realtimeStatus?.files && Array.isArray(run.realtimeStatus.files)) return run.realtimeStatus.files
-  // 其次从 summary.files
+  // 兼容旧数据：summary.files
   try{
     const sum = typeof run.summary === 'string' ? JSON.parse(run.summary) : run.summary
     if (sum?.files && Array.isArray(sum.files)) return sum.files
@@ -74,21 +83,16 @@ function showRunDetail(run:any){
   runDetail.value = run
   showDetailModal.value = true
   runFilesPage.value = 1
-  runFiles.value = pickFilesFromRun(run)
+  runFiles.value = []
+  runFilesTotal.value = 0
+  reloadRunFiles()
   if (run.status === 'running'){
     if (runDetailTimer) clearInterval(runDetailTimer)
     runDetailTimer = setInterval(async ()=>{
       try{
-        const actives:any[] = await api.getActiveRuns()
-        const cur = actives.find(a => a?.runRecord?.taskId === run.taskId)
-        if (cur){
-          runFiles.value = pickFilesFromRun({
-            realtimeStatus: cur.realtimeStatus,
-            summary: cur.runRecord?.summary || run.summary
-          })
-        }
+        await reloadRunFiles()
       }catch{}
-    }, 2000)
+    }, 5000)
   }
 }
 
@@ -97,13 +101,10 @@ function closeRunDetail(){
   if (runDetailTimer) { clearInterval(runDetailTimer); runDetailTimer = null }
 }
 
-const pagedRunFiles = computed(()=>{
-  const start = (runFilesPage.value-1) * runFilesPageSize.value
-  return runFiles.value.slice(start, start + runFilesPageSize.value)
-})
-const totalRunFilesPages = computed(()=> Math.max(1, Math.ceil((runFiles.value.length||0)/runFilesPageSize.value)))
-function goPrevFilesPage(){ if (runFilesPage.value>1) runFilesPage.value-- }
-function goNextFilesPage(){ if (runFilesPage.value<totalRunFilesPages.value) runFilesPage.value++ }
+const pagedRunFiles = computed(()=> runFiles.value)
+const totalRunFilesPages = computed(()=> Math.max(1, Math.ceil((runFilesTotal.value||0)/runFilesPageSize.value)))
+function goPrevFilesPage(){ if (runFilesPage.value>1) { runFilesPage.value--; reloadRunFiles() } }
+function goNextFilesPage(){ if (runFilesPage.value<totalRunFilesPages.value) { runFilesPage.value++; reloadRunFiles() } }
 let activeRunsTimer: number | null = null
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
@@ -1147,6 +1148,37 @@ import TransferOptions from '../components/TransferOptions.vue'
           <div class="detail-item full-width">
             <label>传输统计：</label>
             <pre class="summary-pre">{{ formatSummary(runDetail.summary) }}</pre>
+          </div>
+          <div class="detail-item full-width">
+            <label>传输明细：</label>
+            <div>
+              <div class="files-toolbar">
+                <span>共 {{ runFilesTotal }} 条</span>
+                <button class="ghost small" @click="reloadRunFiles()">刷新</button>
+              </div>
+              <div class="files-table">
+                <div class="files-header">
+                  <span class="name">文件</span>
+                  <span class="status">结果</span>
+                  <span class="time">时间</span>
+                  <span class="size">大小</span>
+                </div>
+                <div class="files-body">
+                  <div v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" class="files-row">
+                    <span class="name" :title="it.name">{{ it.name }}</span>
+                    <span class="status" :class="it.status">{{ it.status }}</span>
+                    <span class="time">{{ it.at || '-' }}</span>
+                    <span class="size">{{ it.sizeBytes ? formatBytes(it.sizeBytes) : '-' }}</span>
+                  </div>
+                  <div v-if="!pagedRunFiles.length" class="path-empty">无明细（可能日志为空或历史记录较旧）</div>
+                </div>
+              </div>
+              <div class="files-pager">
+                <button class="ghost small" :disabled="runFilesPage<=1" @click="goPrevFilesPage()">上一页</button>
+                <span>{{ runFilesPage }}/{{ totalRunFilesPages }}</span>
+                <button class="ghost small" :disabled="runFilesPage>=totalRunFilesPages" @click="goNextFilesPage()">下一页</button>
+              </div>
+            </div>
           </div>
           <div v-if="runDetail.error" class="detail-item full-width">
             <label>错误信息：</label>

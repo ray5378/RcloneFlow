@@ -5,6 +5,19 @@
 import { get, del, post } from './client'
 import type { Run } from '../types'
 
+export interface RunFileRow {
+  name: string
+  status: 'success' | 'failed' | 'skipped' | 'deleted'
+  action: string
+  at: string
+  sizeBytes?: number
+  message?: string
+}
+
+export async function getRunFiles(runId: number, offset=0, limit=50): Promise<{ total: number; items: RunFileRow[] }> {
+  return get<{ total:number; items: RunFileRow[] }>(`/api/runs/${runId}/files?offset=${offset}&limit=${limit}`)
+}
+
 /** 获取所有运行记录 */
 export async function getRuns(): Promise<Run[]> {
   return get<Run[]>('/api/runs')

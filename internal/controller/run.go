@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	"os"
 
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/service"
@@ -168,6 +169,77 @@ func killRunBySummary(run service.RunRecord) bool {
 		return true
 	}
 	return false
+}
+
+// HandleRunFiles 返回指定 run 的文件级明细（从 stderr 日志解析）
+func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
+	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/files")
+	id, _ := strconv.ParseInt(idStr, 10, 64)
+	offset := 0; limit := 50
+	if v := r.URL.Query().Get("offset"); v != "" { if n, e := strconv.Atoi(v); e==nil && n>=0 { offset = n } }
+	if v := r.URL.Query().Get("limit"); v != "" { if n, e := strconv.Atoi(v); e==nil && n>0 && n<=1000 { limit = n } }
+
+	runs, err := c.runSvc.ListRuns()
+	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	var logPath string
+	for _, run := range runs {
+		if run.ID != id { continue }
+		// Summary 里优先取 stderrFile
+		if s, ok := any(run.Summary).(string); ok && s != "" {
+			var m map[string]any
+			if json.Unmarshal([]byte(s), &m) == nil {
+				if p, ok := m["stderrFile"].(string); ok && p != "" { logPath = p }
+			}
+		}
+		if logPath == "" {
+			if m, ok := any(run.Summary).(map[string]any); ok {
+				if p, ok := m["stderrFile"].(string); ok && p != "" { logPath = p }
+			}
+		}
+		if logPath == "" { logPath = "/app/data/logs/run-"+idStr+"-stderr.log" }
+		break
+	}
+	if logPath == "" { WriteJSON(w, 404, map[string]any{"error":"log not found"}); return }
+	// 读取并解析日志
+	data, readErr := os.ReadFile(logPath)
+	if readErr != nil { WriteJSON(w, 500, map[string]any{"error": readErr.Error()}); return }
+	lines := strings.Split(string(data), "\n")
+	// 解析
+	type Row struct{ Name string `json:"name"`; Status string `json:"status"`; Action string `json:"action"`; At string `json:"at"`; Size int64 `json:"sizeBytes"`; Message string `json:"message,omitempty"` }
+	rows := make([]Row, 0, 200)
+	for _, ln := range lines {
+		l := strings.TrimSpace(ln); if l=="" { continue }
+		// 尝试匹配形如 "YYYY/MM/DD HH:MM:SS LEVEL : <path>: <msg>"
+		// 简化：从最后一次 ": " 分割取 path 与 msg
+		pos := strings.Index(l, ": ")
+		if pos < 0 { continue }
+		remain := l[pos+2:]
+		pos2 := strings.Index(remain, ": ")
+		if pos2 < 0 { continue }
+		path := strings.TrimSpace(remain[:pos2])
+		msg := strings.TrimSpace(remain[pos2+2:])
+		row := Row{Name: path, At: "", Size: 0, Message: msg}
+		low := strings.ToLower(msg)
+		switch {
+		case strings.Contains(low, "copied"):
+			row.Status = "success"; row.Action = "Copied"
+		case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
+			row.Status = "success"; row.Action = "Deleted"
+		case strings.Contains(low, "skipped"):
+			row.Status = "skipped"; row.Action = "Skipped"
+		case strings.Contains(low, "error") || strings.Contains(low, "failed"):
+			row.Status = "failed"; row.Action = "Error"
+		default:
+			continue
+		}
+		rows = append(rows, row)
+	}
+	// 分页
+	total := len(rows)
+	end := offset+limit; if end>total { end = total }
+	if offset>total { offset = total }
+	page := rows[offset:end]
+	WriteJSON(w, 200, map[string]any{"total": total, "items": page})
 }
 
 // HandleRunLog 统一提供 stderr 单文件下载
