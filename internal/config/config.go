@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -169,6 +170,17 @@ func loadFromEnv(cfg *Config) {
 	}
 	if v := os.Getenv("LOG_OUTPUT"); v != "" {
 		cfg.Log.Output = v
+	}
+
+	// 清理策略（运行记录/最终总结）
+	// 优先级：FINAL_SUMMARY_RETENTION_DAYS > CLEANUP_RETENTION_DAYS > cfg.Sync.CleanupRetention
+	if v := os.Getenv("FINAL_SUMMARY_RETENTION_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 { cfg.Sync.CleanupRetention = n }
+	} else if v := os.Getenv("CLEANUP_RETENTION_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 { cfg.Sync.CleanupRetention = n }
+	}
+	if v := os.Getenv("CLEANUP_INTERVAL_HOURS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 { cfg.Sync.CleanupInterval = n }
 	}
 }
 

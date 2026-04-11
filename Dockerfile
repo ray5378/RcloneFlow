@@ -2,7 +2,7 @@
 FROM node:18-alpine AS webbuilder
 WORKDIR /fe
 COPY frontend/ ./
-RUN npm ci --silent || npm install
+RUN npm ci --silent || npm install --no-audit --no-fund
 RUN npm run build
 
 # Stage 2: go build (Alpine)
@@ -15,8 +15,11 @@ RUN set -eux; \
     echo "https://mirrors.aliyun.com/alpine/v3.19/community" >> /etc/apk/repositories; \
     for i in 1 2 3; do apk update && apk add --no-cache build-base git sqlite-dev ca-certificates tzdata wget && break || (echo "apk failed, retry $i" && sleep 5); done
 WORKDIR /app
-COPY go.mod ./
-RUN go mod download || true
+# Prefer IPv4-friendly Go proxy, with fallback
+ENV GOPROXY=https://goproxy.cn,direct \
+    GOSUMDB=sum.golang.org
+COPY go.mod go.sum ./
+RUN go mod download || (go env -w GOPROXY=https://goproxy.io,direct && go mod download) || true
 COPY . .
 ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto
 # rclone v1.73.4

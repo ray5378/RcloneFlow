@@ -26,7 +26,10 @@ const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const historyFilterTaskId = ref<number | null>(null)
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
-const runDetailProgress = ref<any>(null)
+// 运行中提示小窗（不切换主窗口，不弹出完整详情）
+const showRunningHint = ref(false)
+const runningHintRun = ref<any>(null)
+
 let runDetailTimer: any = null
 
 // 运行详情 - 文件列表分页
@@ -37,10 +40,9 @@ const runFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 380) 
 const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
 const showGlobalStatsModal = ref(false)
-const globalStats = ref<any>({})
+const globalStats = ref<any>({}) // 全局实时数据保留为独立弹窗，与历史态无关
 // 已移除“实时进度”弹窗逻辑，卡片直接显示稳态进度
-// const showTaskProgressModal = ref(false)
-// const taskProgressData = ref<any>({})
+
 const activeRuns = ref<any[]>([])
 // 任务卡片：完成后保留最近稳态进度的观察期（默认 15s）
 const LINGER_MS = 15000
@@ -56,14 +58,24 @@ async function openRunLog(run:any){
   logContent.value = '加载中…'
   showLogModal.value = true
   try {
-    const resp = await fetch(`/api/runs/${run.id}/log?auth=${getToken()||''}`)
+    const token = getToken() || ''
+    const resp = await fetch(`/api/runs/${run.id}/log`, {
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+    })
     if (!resp.ok){
-      const txt = await resp.text()
-      logContent.value = `加载失败：${resp.status} ${txt}`
+      // 兜底再试一次 ?auth= 兼容
+      const fallback = await fetch(`/api/runs/${run.id}/log?auth=${token}`)
+      if (!fallback.ok){
+        const txt = await fallback.text()
+        logContent.value = `加载失败：${fallback.status} ${txt}`
+        return
+      }
+      const buf2 = await fallback.arrayBuffer()
+      const dec2 = new TextDecoder('utf-8')
+      logContent.value = dec2.decode(buf2)
       return
     }
     const buf = await resp.arrayBuffer()
-    // 日志是文本文件，尝试以 UTF-8 解码
     const dec = new TextDecoder('utf-8')
     logContent.value = dec.decode(buf)
   } catch(e:any){
@@ -98,29 +110,26 @@ async function reloadRunFiles(){
 }
 
 function pickFilesFromRun(run:any){
-  // 兼容旧数据：summary.files
   try{
     const sum = typeof run.summary === 'string' ? JSON.parse(run.summary) : run.summary
-    if (sum?.files && Array.isArray(sum.files)) return sum.files
+    if (sum?.finalSummary?.files && Array.isArray(sum.finalSummary.files)) return sum.finalSummary.files
   }catch{}
   return []
 }
 
 function showRunDetail(run:any){
+  if (run.status === 'running'){
+    // 不切主窗口：给出轻量提示小窗，引导去“任务日志”查看实时内容
+    runningHintRun.value = run
+    showRunningHint.value = true
+    return
+  }
   runDetail.value = run
   showDetailModal.value = true
   runFilesPage.value = 1
   runFiles.value = []
   runFilesTotal.value = 0
   reloadRunFiles()
-  if (run.status === 'running'){
-    if (runDetailTimer) clearInterval(runDetailTimer)
-    runDetailTimer = setInterval(async ()=>{
-      try{
-        await reloadRunFiles()
-      }catch{}
-    }, 5000)
-  }
 }
 
 function closeRunDetail(){
@@ -137,8 +146,37 @@ const pagedRunFiles = computed(()=> runFiles.value)
 const totalRunFilesPages = computed(()=> Math.max(1, Math.ceil((runFilesTotal.value||0)/runFilesPageSize.value)))
 function goPrevFilesPage(){ if (runFilesPage.value>1) { runFilesPage.value--; reloadRunFiles() } }
 function goNextFilesPage(){ if (runFilesPage.value<totalRunFilesPages.value) { runFilesPage.value++; reloadRunFiles() } }
+// finalSummary.files 分页（内存分页）
+const finalFiles = computed(()=> (getFinalSummary(runDetail.value)?.files || []) as any[])
+// 统计计数
+const finalCountAll = computed(()=> finalFiles.value.length)
+const finalCountSuccess = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='success').length)
+const finalCountFailed = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='failed').length)
+const finalCountOther = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='skipped').length)
+// 可筛选标签：all|success|failed|other
+const currentFinalFilter = ref<'all'|'success'|'failed'|'other'>('all')
+function setFinalFilter(k:'all'|'success'|'failed'|'other') { currentFinalFilter.value = k; finalFilesPage.value = 1 }
+const finalFilteredFiles = computed(()=> {
+  if (currentFinalFilter.value==='success') return finalFiles.value.filter(it=> (it.status||'')==='success')
+  if (currentFinalFilter.value==='failed') return finalFiles.value.filter(it=> (it.status||'')==='failed')
+  if (currentFinalFilter.value==='other') return finalFiles.value.filter(it=> (it.status||'')==='skipped')
+  return finalFiles.value
+})
+// 分页（按筛选后的集）
+const finalFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 420) / 34)))
+const finalFilesPage = ref(1)
+const finalFilesTotal = computed(()=> finalFilteredFiles.value.length)
+const totalFinalFilesPages = computed(()=> Math.max(1, Math.ceil((finalFilesTotal.value||0)/finalFilesPageSize.value)))
+const pagedFinalFiles = computed(()=> {
+  const start = (finalFilesPage.value-1) * finalFilesPageSize.value
+  return finalFilteredFiles.value.slice(start, start + finalFilesPageSize.value)
+})
+const finalFilesJump = ref<number | null>(null)
+function goPrevFinalFilesPage(){ if (finalFilesPage.value>1) finalFilesPage.value-- }
+function goNextFinalFilesPage(){ if (finalFilesPage.value<totalFinalFilesPages.value) finalFilesPage.value++ }
+function jumpFinalFilesPage(){ if (!finalFilesJump.value) return; const p = Math.min(Math.max(1, finalFilesJump.value), totalFinalFilesPages.value); finalFilesPage.value = p }
 let activeRunsTimer: number | null = null
-let runsTimer: number | null = null
+let runsTimer: number | null = null // 历史态仅为列表刷新，保留，其他实时逻辑已移除
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
   title: '',
@@ -268,34 +306,6 @@ function getActiveRunByTaskId(taskId: number) {
   return undefined as any
 }
 
-function getTaskRealtimeProgress(taskId: number) {
-  const active = getActiveRunByTaskId(taskId)
-  if (!active) return null
-  const rt = active.realtimeStatus || {}
-  const derived = (active.derivedProgress && typeof active.derivedProgress === 'object') ? active.derivedProgress : {}
-  const groupStats = (active.groupStats && typeof active.groupStats === 'object') ? active.groupStats : {}
-  const globalStats = (active.globalStats && typeof active.globalStats === 'object') ? active.globalStats : {}
-  const progress = (rt.progress && typeof rt.progress === 'object') ? rt.progress : {}
-  const group = (progress.group && typeof progress.group === 'object') ? progress.group : {}
-
-  const bytes = Number(
-    derived.bytes ?? groupStats.bytes ?? progress.bytes ?? group.bytes ?? globalStats.bytes ?? active.runRecord?.bytesTransferred ?? 0,
-  )
-  const totalBytes = Number(
-    derived.totalBytes ?? derived.total_bytes ?? groupStats.totalBytes ?? groupStats.total_bytes ?? progress.totalBytes ?? progress.total_bytes ?? group.totalBytes ?? group.total_bytes ?? globalStats.totalBytes ?? globalStats.total_bytes ?? 0,
-  )
-  const speed = Number(
-    derived.speed ?? groupStats.speed ?? progress.speed ?? group.speed ?? globalStats.speed ?? 0,
-  )
-  const eta = derived.eta ?? groupStats.eta ?? progress.eta ?? group.eta ?? globalStats.eta ?? null
-  let percentage = Number(
-    derived.percentage ?? groupStats.percentage ?? progress.percentage ?? group.percentage ?? globalStats.percentage ?? 0,
-  )
-  if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) {
-    percentage = (bytes / totalBytes) * 100
-  }
-  return { bytes, totalBytes, speed, eta, percentage, raw: rt, derived, groupStats, globalStats, run: active.runRecord }
-}
 
 // 加载全局实时统计
 async function loadGlobalStats() {
@@ -330,18 +340,30 @@ function formatDuration(startTime: string | undefined, endTime: string | undefin
   const start = new Date(startTime).getTime()
   const end = endTime ? new Date(endTime).getTime() : Date.now()
   const diff = Math.max(0, end - start)
-  
   const seconds = Math.floor(diff / 1000) % 60
   const minutes = Math.floor(diff / 60000) % 60
   const hours = Math.floor(diff / 3600000)
-  
-  if (hours > 0) {
-    return `${hours}h ${minutes}m ${seconds}s`
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds}s`
-  } else {
-    return `${seconds}s`
-  }
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
+  if (minutes > 0) return `${minutes}m ${seconds}s`
+  return `${seconds}s`
+}
+
+function getFinalSummary(run: any){
+  try{
+    const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
+    if (sum && typeof sum === 'object' && sum.finalSummary) return sum.finalSummary
+  }catch{}
+  return null
+}
+function getRunDurationText(run:any){
+  const fs = getFinalSummary(run)
+  if (fs && fs.durationText) return fs.durationText
+  // fallback to local compute for running
+  return formatDuration(run.startedAt, run.finishedAt)
+}
+function formatBps(bps:number){
+  if (!bps || bps<=0) return '-'
+  return formatBytes(bps) + '/s'
 }
 
 function getStatusClass(status: string) {
@@ -529,16 +551,6 @@ async function stopTaskAny(taskId: number) {
   })
 }
 
-// 已废弃：卡片实时展示进度，无需弹窗
-// async function viewTaskProgress(taskId: number) {
-//   try {
-//     const data = await api.getTaskProgress(taskId)
-//     taskProgressData.value = data || {}
-//     showTaskProgressModal.value = true
-//   } catch (e) {
-//     alert((e as Error).message)
-//   }
-// }
 
 async function runTask(taskId: number) {
   if (runningTaskId.value !== null) return
@@ -707,23 +719,7 @@ async function deleteSchedule(id: number) {
 
 // duplicate old implementation removed (showRunDetail)
 
-function historyProgressFromSummary(summary: any){
-  try{
-    if (!summary) return null
-    if (typeof summary === 'string') summary = JSON.parse(summary)
-    if (summary && typeof summary === 'object'){
-      const p = summary.progress || {}
-      const bytes = Number(p.bytes || 0)
-      const totalBytes = Number(p.totalBytes || 0)
-      const speed = Number(p.speed || 0)
-      const eta = typeof p.eta === 'number' ? p.eta : null
-      let percentage = Number(p.percentage || 0)
-      if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) percentage = (bytes/totalBytes)*100
-      return { bytes, totalBytes, speed, eta, percentage }
-    }
-  }catch{}
-  return null
-}
+// 已弃用的历史态实时解析已移除，历史仅展示 finalSummary（冻结信息）
 
 function formatSummary(summary: any): string {
   if (!summary) return '-'
@@ -1096,13 +1092,12 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="path-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
         </div>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
-        <span class="time">{{ formatDuration(run.startedAt, run.finishedAt) }}</span>
-        <div class="info" v-if="historyProgressFromSummary(run.summary)">
+        <span class="time">{{ getRunDurationText(run) }}</span>
+        <div class="info" v-if="getFinalSummary(run)">
           <span>
-            {{ (historyProgressFromSummary(run.summary)?.percentage || 0).toFixed(0) }}% ·
-            {{ formatBytes(historyProgressFromSummary(run.summary)?.bytes || 0) }} /
-            {{ formatBytes(historyProgressFromSummary(run.summary)?.totalBytes || 0) }} ·
-            {{ formatBytesPerSec(historyProgressFromSummary(run.summary)?.speed || 0) }}
+            {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }} /
+            {{ formatBytes(getFinalSummary(run).totalBytes || 0) }} ·
+            {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}
           </span>
         </div>
         <button class="ghost small" @click="showRunDetail(run)">运行详情</button>
@@ -1154,7 +1149,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           </div>
           <div class="detail-item">
             <label>耗时：</label>
-            <span>{{ formatDuration(runDetail.startedAt, runDetail.finishedAt) }}</span>
+            <span>{{ getRunDurationText(runDetail) }}</span>
           </div>
           <div class="detail-item">
             <label>阶段：</label>
@@ -1175,22 +1170,16 @@ import TransferOptions from '../components/TransferOptions.vue'
               <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress">
                 {{ ((getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.percentage) || 0).toFixed(2) }}%
               </template>
-              <template v-else-if="historyProgressFromSummary(runDetail.summary)">
-                {{ (historyProgressFromSummary(runDetail.summary)?.percentage || 0).toFixed(2) }}%
-              </template>
               <template v-else>-</template>
             </span>
           </div>
           <div class="detail-item">
             <label>当前速度：</label>
             <span>
-              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress">
+              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress()">
                 {{ formatBytesPerSec(getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.speed || 0) }}
               </template>
-              <template v-else-if="historyProgressFromSummary(runDetail.summary)">
-                {{ formatBytesPerSec(historyProgressFromSummary(runDetail.summary)?.speed || 0) }}
-              </template>
-              <template v-else>{{ runDetail.speed || '-' }}</template>
+              <template v-else>-</template>
             </span>
           </div>
           <div class="detail-item">
@@ -1200,34 +1189,57 @@ import TransferOptions from '../components/TransferOptions.vue'
                 {{ formatBytes(getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.bytes || 0) }} /
                 {{ formatBytes(getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.totalBytes || 0) }}
               </template>
-              <template v-else-if="historyProgressFromSummary(runDetail.summary)">
-                {{ formatBytes(historyProgressFromSummary(runDetail.summary)?.bytes || 0) }} /
-                {{ formatBytes(historyProgressFromSummary(runDetail.summary)?.totalBytes || 0) }}
+              <template v-else-if="getFinalSummary(runDetail)">
+                {{ formatBytes(getFinalSummary(runDetail).transferredBytes || 0) }} /
+                {{ formatBytes(getFinalSummary(runDetail).totalBytes || 0) }}
               </template>
               <template v-else>-</template>
             </span>
           </div>
-          <div class="detail-item">
-            <label>预计剩余时间：</label>
-            <span>
-              <template v-if="historyProgressFromSummary(runDetail.summary)">
-                {{ formatEta(historyProgressFromSummary(runDetail.summary)?.eta || 0) }}
-              </template>
-              <template v-else>-</template>
-            </span>
-          </div>
+          <!-- 运行总结（友好统计） -->
           <div class="detail-item full-width">
-            <label>传输统计：</label>
-            <pre class="summary-pre">{{ formatSummary(runDetail.summary) }}</pre>
+            <label>运行总结：</label>
+            <div class="summary-box" v-if="getFinalSummary(runDetail)">
+              <div class="summary-title">统计概览（可筛选）</div>
+              <div class="summary-grid">
+                <div class="summary-cell clickable" @click="setFinalFilter('all')">
+                  <div class="summary-key">总计</div>
+                  <div class="summary-val">{{ finalCountAll }}</div>
+                </div>
+                <div class="summary-cell clickable" @click="setFinalFilter('success')">
+                  <div class="summary-key">成功</div>
+                  <div class="summary-val">{{ finalCountSuccess }}</div>
+                </div>
+                <div class="summary-cell clickable" @click="setFinalFilter('failed')">
+                  <div class="summary-key">失败</div>
+                  <div class="summary-val error-text">{{ finalCountFailed }}</div>
+                </div>
+                <div class="summary-cell clickable" @click="setFinalFilter('other')">
+                  <div class="summary-key">其他</div>
+                  <div class="summary-val">{{ finalCountOther }}</div>
+                </div>
+              </div>
+            </div>
+            <pre v-else class="summary-pre">{{ JSON.stringify({ note: '无总结，可查看传输日志' }, null, 2) }}</pre>
           </div>
+
+          <!-- 传输明细（可分页、可跳页） -->
           <div class="detail-item full-width">
             <label>传输明细：</label>
             <div>
               <div class="files-toolbar">
-                <span>共 {{ runFilesTotal }} 条</span>
+                <span>共 {{ finalFilesTotal }} 条</span>
+                <div class="pager-inline">
+                  <button class="ghost small" :disabled="finalFilesPage<=1" @click="goPrevFinalFilesPage()">上一页</button>
+                  <span>{{ finalFilesPage }}/{{ totalFinalFilesPages }}</span>
+                  <button class="ghost small" :disabled="finalFilesPage>=totalFinalFilesPages" @click="goNextFinalFilesPage()">下一页</button>
+                  <span>跳转</span>
+                  <input class="page-input" v-model.number="finalFilesJump" type="number" min="1" :max="totalFinalFilesPages" />
+                  <button class="ghost small" @click="jumpFinalFilesPage()">GO</button>
+                </div>
                 <button class="ghost small" @click="reloadRunFiles()">刷新</button>
               </div>
-              <div class="files-table">
+              <div class="files-table large">
                 <div class="files-header">
                   <span class="name">文件</span>
                   <span class="status">结果</span>
@@ -1235,16 +1247,26 @@ import TransferOptions from '../components/TransferOptions.vue'
                   <span class="size">大小</span>
                 </div>
                 <div class="files-body">
-                  <div v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" class="files-row">
-                    <span class="name" :title="it.name">{{ it.name }}</span>
-                    <span class="status" :class="it.status">{{ it.status }}</span>
-                    <span class="time">{{ it.at || '-' }}</span>
-                    <span class="size">{{ it.sizeBytes ? formatBytes(it.sizeBytes) : '-' }}</span>
-                  </div>
-                  <div v-if="!pagedRunFiles.length" class="path-empty">无明细（可能日志为空或历史记录较旧）</div>
+                  <template v-if="finalFiles && finalFiles.length">
+                    <div v-for="it in pagedFinalFiles" :key="(it.path||it.name) + (it.at||'') + (it.status||'')" class="files-row">
+                      <span class="name" :title="it.path||it.name">{{ it.path || it.name }}</span>
+                      <span class="status" :class="it.status">{{ it.status }}</span>
+                      <span class="time">{{ it.at || '-' }}</span>
+                      <span class="size">{{ it.sizeBytes ? formatBytes(it.sizeBytes) : '-' }}</span>
+                    </div>
+                  </template>
+                  <template v-else>
+                    <div v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" class="files-row">
+                      <span class="name" :title="it.name">{{ it.name }}</span>
+                      <span class="status" :class="it.status">{{ it.status }}</span>
+                      <span class="time">{{ it.at || '-' }}</span>
+                      <span class="size">{{ it.sizeBytes ? formatBytes(it.sizeBytes) : '-' }}</span>
+                    </div>
+                    <div v-if="!pagedRunFiles.length" class="path-empty">无明细（可能日志为空或历史记录较旧）</div>
+                  </template>
                 </div>
               </div>
-              <div class="files-pager">
+              <div class="files-pager" v-if="!finalFiles || !finalFiles.length">
                 <button class="ghost small" :disabled="runFilesPage<=1" @click="goPrevFilesPage()">上一页</button>
                 <span>{{ runFilesPage }}/{{ totalRunFilesPages }}</span>
                 <button class="ghost small" :disabled="runFilesPage>=totalRunFilesPages" @click="goNextFilesPage()">下一页</button>
@@ -1256,6 +1278,29 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="error-text">{{ runDetail.error }}</span>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 运行中轻量提示小窗（不切主窗口） -->
+  <div v-if="showRunningHint" class="modal-overlay" @click.self="showRunningHint = false">
+    <div class="modal-content" style="max-width:520px">
+      <div class="modal-header">
+        <h3>任务运行中</h3>
+        <button class="close-btn" @click="showRunningHint = false">×</button>
+      </div>
+      <div class="modal-body">
+        <p>该任务仍在传输中，运行详情（历史）仅展示最终信息。</p>
+        <p>实时日志与进度请点击“传输日志”或查看任务卡片上的实时进度。</p>
+        <div class="hint-box">
+          <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
+          <div class="detail-item"><label>阶段：</label><span>{{ getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.phase || '-' }}</span></div>
+          <div class="detail-item"><label>进度：</label><span>{{ ((getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.percentage)||0).toFixed(2) }}%</span></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="primary" @click="() => { openRunLog(runningHintRun); showRunningHint=false }">打开传输日志</button>
+        <button class="ghost" @click="showRunningHint=false">我知道了</button>
       </div>
     </div>
   </div>
@@ -1661,50 +1706,6 @@ import TransferOptions from '../components/TransferOptions.vue'
     </div>
   </div>
 
-  <!-- 任务实时进度弹窗 -->
-  <div v-if="showTaskProgressModal" class="modal-overlay" @click.self="showTaskProgressModal = false">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>任务实时进度 - {{ taskProgressData.name }}</h3>
-        <button class="close-btn" @click="showTaskProgressModal = false">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="detail-item">
-          <label>任务状态：</label>
-          <span :class="taskProgressData.status === 'running' ? 'status-running' : taskProgressData.status === 'finished' ? 'status-success' : 'status-error'">
-            {{ taskProgressData.status === 'running' ? '运行中' : taskProgressData.status === 'finished' ? '已完成' : taskProgressData.status === 'no_runs' ? '无运行记录' : taskProgressData.status === 'error' ? '获取失败' : taskProgressData.status }}
-          </span>
-        </div>
-        <div class="detail-item">
-          <label>进度：</label>
-          <span>{{ taskProgressData.percentage !== undefined ? taskProgressData.percentage.toFixed(2) + '%' : '-' }}</span>
-        </div>
-        <div class="detail-item">
-          <label>当前速度：</label>
-          <span>{{ taskProgressData.speed || '-' }}</span>
-        </div>
-        <div class="detail-item">
-          <label>已传输/总大小：</label>
-          <span>{{ taskProgressData.bytes ? formatBytes(taskProgressData.bytes) : '-' }} / {{ taskProgressData.totalBytes ? formatBytes(taskProgressData.totalBytes) : '-' }}</span>
-        </div>
-        <div class="detail-item">
-          <label>预计剩余时间：</label>
-          <span>{{ taskProgressData.eta || '-' }}</span>
-        </div>
-        <div class="detail-item" v-if="taskProgressData.error">
-          <label>错误信息：</label>
-          <span class="error-text">{{ taskProgressData.error }}</span>
-        </div>
-        <div class="detail-item" v-if="taskProgressData.anomalyMessage">
-          <label>异常提示：</label>
-          <span class="error-text">{{ taskProgressData.anomalyMessage }}</span>
-        </div>
-        <div class="progress-bar-container">
-          <div class="progress-bar" :style="{ width: (taskProgressData.percentage || 0) + '%' }"></div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- 确认删除弹窗 -->
   <div v-if="confirmModal.show" class="modal-overlay" @click.self="confirmModal.show = false">
@@ -1914,4 +1915,22 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 .log-modal .modal-body{padding:12px 16px; width:100%; flex:1; overflow:hidden; display:flex;}
 .log-box{width:100%; display:flex; justify-content:center;}
 .log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;height:100%;overflow:auto;white-space:pre-wrap;width:calc(100% - 64px);max-width:1100px;box-sizing:border-box;margin:0;border:1px solid #334155}
+
+/* 运行总结样式 */
+.summary-box{background:#111827;border:1px solid #333;border-radius:10px;padding:12px 14px;margin-top:6px;max-width:1200px}
+.summary-title{font-weight:600;color:#e0e0e0;margin-bottom:8px}
+.summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.summary-cell{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px}
+.summary-key{font-size:12px;color:#94a3b8;margin-bottom:6px}
+.summary-val{font-size:16px;color:#e2e8f0;font-weight:700}
+
+/* 传输明细表更宽、更疏朗 */
+.files-table{margin-top:14px;border:1px solid #333;border-radius:10px;}
+.files-table.large{max-width:1200px}
+.files-header,.files-row{display:grid;grid-template-columns:1fr 140px 200px 140px;gap:18px;align-items:center}
+.files-header{padding:12px 16px;background:#252525;color:#aaa;font-size:13px}
+.files-body{max-height:540px;overflow:auto}
+.files-row{padding:12px 16px;border-top:1px solid #333}
+.pager-inline{display:flex;align-items:center;gap:8px}
+.page-input{width:64px;padding:6px 8px;border:1px solid #333;border-radius:8px;background:#252525;color:#e0e0e0}
 </style>

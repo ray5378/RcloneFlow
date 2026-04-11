@@ -69,23 +69,48 @@ func (s *RunService) GetActiveRunByTaskID(taskID int64) (RunRecord, error) {
 // UpdateRunStatus 更新运行状态
 func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
 	s.db.UpdateRun(id, func(r *RunRecord) {
-		// 将 summary 持久为 JSON 字符串，避免后续读取时丢失结构
-		if bs, err := json.Marshal(summary); err == nil { r.Summary = string(bs) }
-		finished, _ := summary["finished"].(bool)
-		success, _ := summary["success"].(bool)
+		// 读取旧 summary
+		var old map[string]any
+		if r.Summary != "" {
+			_ = json.Unmarshal([]byte(r.Summary), &old)
+		}
+		if old == nil { old = map[string]any{} }
+		// 合并：src 覆盖 dst 的同名键；map 递归
+		merged := deepMerge(old, summary)
+		if bs, err := json.Marshal(merged); err == nil { r.Summary = string(bs) }
+		finished, _ := merged["finished"].(bool)
+		success, _ := merged["success"].(bool)
 		if finished {
 			if success {
 				r.Status = "finished"
 				r.Error = ""
 			} else {
 				r.Status = "failed"
-				if errMsg, ok := summary["error"].(string); ok {
+				if errMsg, ok := merged["error"].(string); ok {
 					r.Error = errMsg
 				}
 			}
 		}
 	})
 }
+
+// deepMerge merges b into a (map[string]any); for nested maps it recurses.
+func deepMerge(a, b map[string]any) map[string]any {
+	if a == nil { a = map[string]any{} }
+	for k, v := range b {
+		if vm, ok := v.(map[string]any); ok {
+			if am, ok2 := a[k].(map[string]any); ok2 {
+				a[k] = deepMerge(am, vm)
+			} else {
+				a[k] = deepMerge(map[string]any{}, vm)
+			}
+		} else {
+			a[k] = v
+		}
+	}
+	return a
+}
+
 
 func (s *RunService) DeleteRun(id int64) error {
 	return s.db.DeleteRun(id)

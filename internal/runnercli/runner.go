@@ -184,11 +184,93 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				if rr.Summary == nil { rr.Summary = map[string]any{} }
 				rr.Summary["finished"] = true
 				rr.Summary["success"] = false
+				fin := time.Now().Local()
 				// 若无 progress 但有 stableProgress，则回填，便于历史详情展示
 				if _, ok := rr.Summary["progress"]; !ok {
 					if sp, ok2 := rr.Summary["stableProgress"].(map[string]any); ok2 { rr.Summary["progress"] = sp }
 				}
-				rr.Summary["finishedAt"] = time.Now().Local().Format(time.RFC3339)
+				rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
+				// 冻结最终总结（失败态）
+				finalSummary := map[string]any{}
+				var start time.Time
+				if s, ok := rr.Summary["startedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, s); e == nil { start = t } }
+				if !start.IsZero() { finalSummary["startAt"] = start.Format(time.RFC3339) }
+				finalSummary["finishedAt"] = fin.Format(time.RFC3339)
+				durSec := int64(0); if !start.IsZero() { durSec = int64(fin.Sub(start).Seconds()) }; if durSec < 0 { durSec = 0 }
+				finalSummary["durationSec"] = durSec
+				finalSummary["durationText"] = humanDuration(durSec)
+				finalSummary["result"] = "failed"
+				// 体量/均速
+				var prog map[string]any
+				if p, ok := rr.Summary["progress"].(map[string]any); ok { prog = p } else if sp, ok := rr.Summary["stableProgress"].(map[string]any); ok { prog = sp }
+				var bytes, total int64
+				if prog != nil { if v, ok := prog["bytes"].(float64); ok { bytes = int64(v) }; if v, ok := prog["totalBytes"].(float64); ok { total = int64(v) } }
+				finalSummary["transferredBytes"] = bytes
+				finalSummary["totalBytes"] = total
+				avg := int64(0); if durSec > 0 { avg = bytes / durSec }
+				finalSummary["avgSpeedBps"] = avg
+				// 文件明细（从 stderrFile 解析）
+				files := []map[string]any{}
+				counts := map[string]int{"copied":0,"deleted":0,"skipped":0,"failed":0,"total":0}
+				if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
+					if b, e := os.ReadFile(p); e == nil {
+						lines := strings.Split(string(b), "\n")
+						// pre-scan file total sizes to populate sizeBytes in finalSummary.files
+						sizes := map[string]int64{}
+						for _, ln := range lines {
+							if m := fileLineRe.FindStringSubmatch(ln); len(m) > 0 {
+								name := strings.TrimSpace(m[1])
+								var tb float64
+								fmt.Sscanf(m[4], "%f", &tb)
+								total := int64(tb * unitToMul(m[5]))
+								if total > 0 { sizes[name] = total }
+							}
+						}
+
+						re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
+						tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
+						for _, ln := range lines {
+							l := strings.TrimSpace(ln); if l=="" { continue }
+							segments := []string{}
+							idx := tsRe.FindAllStringIndex(l, -1)
+							if len(idx) > 1 {
+								for i := 0; i < len(idx); i++ {
+									startI := idx[i][0]
+									endI := len(l)
+									if i+1 < len(idx) { endI = idx[i+1][0] }
+									segments = append(segments, strings.TrimSpace(l[startI:endI]))
+								}
+							} else {
+								segments = []string{l}
+							}
+							for _, seg := range segments {
+								m := re.FindStringSubmatch(seg)
+								if len(m) == 0 { continue }
+								at := strings.TrimSpace(m[1])
+								level := strings.ToUpper(strings.TrimSpace(m[2]))
+								path := strings.TrimSpace(m[3])
+								msg := strings.TrimSpace(m[4])
+								row := map[string]any{"path": path, "at": at, "status": "", "action": "", "sizeBytes": 0}
+								low := strings.ToLower(msg)
+								if level == "ERROR" { row["status"] = "failed"; row["action"] = "Error"; counts["failed"]++ } else {
+									switch {
+									case strings.Contains(low, "copied"):
+										row["status"] = "success"; row["action"] = "Copied"; counts["copied"]++
+									case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
+										row["status"] = "success"; row["action"] = "Deleted"; counts["deleted"]++
+									case strings.Contains(low, "skipped"):
+										row["status"] = "skipped"; row["action"] = "Skipped"; counts["skipped"]++
+									default:
+										continue
+									}
+								}
+								files = append(files, row)
+								counts["total"]++
+							}
+						}
+					}
+				}
+				rr.Summary["finalSummary"] = map[string]any{"counts":counts, "files":files, "startAt":finalSummary["startAt"], "finishedAt":finalSummary["finishedAt"], "durationSec":durSec, "durationText":humanDuration(durSec), "result":"failed", "transferredBytes":bytes, "totalBytes":total, "avgSpeedBps":avg}
 			})
 			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 			return
@@ -233,15 +315,111 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			if rr.Summary == nil { rr.Summary = map[string]any{} }
 			rr.Summary["finished"] = true
 			rr.Summary["success"] = true
-			rr.Summary["finishedAt"] = time.Now().Local().Format(time.RFC3339)
+			fin := time.Now().Local()
+			rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
 			// 若无 progress 但有 stableProgress，则将最后稳态快照固化为 progress（供历史页展示）
 			if _, ok := rr.Summary["progress"]; !ok {
 				if sp, ok2 := rr.Summary["stableProgress"].(map[string]any); ok2 { rr.Summary["progress"] = sp }
 			}
+			// 生成并冻结最终总结 finalSummary（仅在结束时一次性写入）
+			finalSummary := map[string]any{}
+			// 时间
+			var start time.Time
+			if s, ok := rr.Summary["startedAt"].(string); ok {
+				if t, e := time.Parse(time.RFC3339, s); e == nil { start = t }
+			}
+			if !start.IsZero() { finalSummary["startAt"] = start.Format(time.RFC3339) }
+			finalSummary["finishedAt"] = fin.Format(time.RFC3339)
+			durSec := int64(0)
+			if !start.IsZero() { durSec = int64(fin.Sub(start).Seconds()) }
+			if durSec < 0 { durSec = 0 }
+			finalSummary["durationSec"] = durSec
+			finalSummary["durationText"] = humanDuration(durSec)
+			// 结果
+			finalSummary["result"] = "success"
+			// 体量/均速（从 progress 或 stableProgress 回填）
+			var prog map[string]any
+			if p, ok := rr.Summary["progress"].(map[string]any); ok { prog = p } else if sp, ok := rr.Summary["stableProgress"].(map[string]any); ok { prog = sp }
+			var bytes, total int64
+			if prog != nil {
+				if v, ok := prog["bytes"].(float64); ok { bytes = int64(v) }
+				if v, ok := prog["totalBytes"].(float64); ok { total = int64(v) }
+			}
+			finalSummary["transferredBytes"] = bytes
+			finalSummary["totalBytes"] = total
+			avg := int64(0)
+			if durSec > 0 { avg = bytes / durSec }
+			finalSummary["avgSpeedBps"] = avg
+			// 从 stderrFile 解析文件级明细
+			files := []map[string]any{}
+			counts := map[string]int{"copied":0,"deleted":0,"skipped":0,"failed":0,"total":0}
+			if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
+				if b, e := os.ReadFile(p); e == nil {
+					lines := strings.Split(string(b), "\n")
+					re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
+					tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
+					for _, ln := range lines {
+						l := strings.TrimSpace(ln); if l=="" { continue }
+						segments := []string{}
+						idx := tsRe.FindAllStringIndex(l, -1)
+						if len(idx) > 1 {
+							for i := 0; i < len(idx); i++ {
+								startI := idx[i][0]
+								endI := len(l)
+								if i+1 < len(idx) { endI = idx[i+1][0] }
+								segments = append(segments, strings.TrimSpace(l[startI:endI]))
+							}
+						} else {
+							segments = []string{l}
+						}
+						for _, seg := range segments {
+							m := re.FindStringSubmatch(seg)
+							if len(m) == 0 { continue }
+							at := strings.TrimSpace(m[1])
+							level := strings.ToUpper(strings.TrimSpace(m[2]))
+							path := strings.TrimSpace(m[3])
+							msg := strings.TrimSpace(m[4])
+							row := map[string]any{"path": path, "at": at, "status": "", "action": "", "sizeBytes": 0}
+							// remove undefined sizes map in success path
+
+							low := strings.ToLower(msg)
+							if level == "ERROR" { row["status"] = "failed"; row["action"] = "Error"; counts["failed"]++ } else {
+								switch {
+								case strings.Contains(low, "copied"):
+									row["status"] = "success"; row["action"] = "Copied"; counts["copied"]++
+								case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
+									row["status"] = "success"; row["action"] = "Deleted"; counts["deleted"]++
+								case strings.Contains(low, "skipped"):
+									row["status"] = "skipped"; row["action"] = "Skipped"; counts["skipped"]++
+								default:
+									continue
+								}
+							}
+							files = append(files, row)
+							counts["total"]++
+						}
+					}
+				}
+			}
+			finalSummary["counts"] = counts
+			finalSummary["files"] = files
+			rr.Summary["finalSummary"] = finalSummary
 		})
 		r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 	}()
 	return nil
+}
+
+// humanDuration renders seconds to X小时Y分Z秒（省略 0 单位）
+func humanDuration(sec int64) string {
+	h := sec / 3600
+	m := (sec % 3600) / 60
+	s := sec % 60
+	parts := []string{}
+	if h > 0 { parts = append(parts, fmt.Sprintf("%d小时", h)) }
+	if m > 0 || (h > 0 && s > 0) { parts = append(parts, fmt.Sprintf("%d分", m)) }
+	if s > 0 || (h == 0 && m == 0) { parts = append(parts, fmt.Sprintf("%d秒", s)) }
+	return strings.Join(parts, "")
 }
 
 func isWebDAVUnderlying(cfgPath, remote string) bool {

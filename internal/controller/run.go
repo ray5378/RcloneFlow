@@ -102,7 +102,39 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
 	}
-	WriteJSON(w, 200, runs)
+	// attach durationSeconds/durationText (freeze when finished) and passthrough finalSummary
+	out := make([]map[string]any, 0, len(runs))
+	for _, r := range runs {
+		b, _ := json.Marshal(r)
+		var obj map[string]any
+		_ = json.Unmarshal(b, &obj)
+		// parse summary JSON for times/finalSummary
+		var sum map[string]any
+		switch v := any(r.Summary).(type) {
+		case string:
+			if v != "" { _ = json.Unmarshal([]byte(v), &sum) }
+		case map[string]any:
+			sum = v
+		}
+		// prefer finalSummary.duration* if exists
+		if fs, ok := sum["finalSummary"].(map[string]any); ok {
+			if ds, ok2 := fs["durationSec"].(float64); ok2 { obj["durationSeconds"] = int64(ds) }
+			if dt, ok2 := fs["durationText"].(string); ok2 { obj["durationText"] = dt }
+		} else {
+			// compute from started/finished
+			var start, fin time.Time
+			if r.StartedAt != "" { if t, e := time.Parse(time.RFC3339, r.StartedAt); e == nil { start = t } }
+			if r.FinishedAt != "" { if t, e := time.Parse(time.RFC3339, r.FinishedAt); e == nil { fin = t } }
+			if start.IsZero() { if sum != nil { if s, ok := sum["startedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, s); e == nil { start = t } } } }
+			if fin.IsZero() { if sum != nil { if s, ok := sum["finishedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, s); e == nil { fin = t } } } }
+			dur := int64(0)
+			if !start.IsZero() { if !fin.IsZero() { dur = int64(fin.Sub(start).Seconds()) } else { dur = int64(time.Since(start).Seconds()) }; if dur < 0 { dur = 0 } }
+			obj["durationSeconds"] = dur
+			obj["durationText"] = humanDuration(dur)
+		}
+		out = append(out, obj)
+	}
+	WriteJSON(w, 200, out)
 }
 
 // HandleRunsByTask 处理按任务ID删除历史记录
@@ -160,7 +192,32 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 				return
 			}
 		}
-		WriteJSON(w, 200, run)
+		// attach duration* & passthrough finalSummary
+		b, _ := json.Marshal(run)
+		var obj map[string]any
+		_ = json.Unmarshal(b, &obj)
+		var sum map[string]any
+		switch v := any(run.Summary).(type) {
+		case string:
+			if v != "" { _ = json.Unmarshal([]byte(v), &sum) }
+		case map[string]any:
+			sum = v
+		}
+		if fs, ok := sum["finalSummary"].(map[string]any); ok {
+			if ds, ok2 := fs["durationSec"].(float64); ok2 { obj["durationSeconds"] = int64(ds) }
+			if dt, ok2 := fs["durationText"].(string); ok2 { obj["durationText"] = dt }
+		} else {
+			var start, fin time.Time
+			if run.StartedAt != "" { if t, e := time.Parse(time.RFC3339, run.StartedAt); e == nil { start = t } }
+			if run.FinishedAt != "" { if t, e := time.Parse(time.RFC3339, run.FinishedAt); e == nil { fin = t } }
+			if start.IsZero() { if sum != nil { if s, ok := sum["startedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, s); e == nil { start = t } } } }
+			if fin.IsZero() { if sum != nil { if s, ok := sum["finishedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, s); e == nil { fin = t } } } }
+			dur := int64(0)
+			if !start.IsZero() { if !fin.IsZero() { dur = int64(fin.Sub(start).Seconds()) } else { dur = int64(time.Since(start).Seconds()) }; if dur < 0 { dur = 0 } }
+			obj["durationSeconds"] = dur
+			obj["durationText"] = humanDuration(dur)
+		}
+		WriteJSON(w, 200, obj)
 		return
 	}
 	WriteJSON(w, 404, map[string]any{"error": "run not found"})
@@ -360,6 +417,19 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 
 func abs64(x int64) int64 { if x<0 { return -x }; return x }
 
+// humanDuration renders seconds to X小时Y分Z秒（省略 0 单位）
+func humanDuration(sec int64) string {
+	h := sec / 3600
+	m := (sec % 3600) / 60
+	s := sec % 60
+	parts := []string{}
+	if h > 0 { parts = append(parts, fmt.Sprintf("%d小时", h)) }
+	if m > 0 || (h > 0 && s > 0) { parts = append(parts, fmt.Sprintf("%d分", m)) }
+	if s > 0 || (h == 0 && m == 0) { parts = append(parts, fmt.Sprintf("%d秒", s)) }
+	return strings.Join(parts, "")
+}
+
+
 // HandleRunLog 统一提供 stderr 单文件下载
 func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/log")
@@ -513,6 +583,7 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		// 将 stableProgress 写回 summary，供下一次作为上一帧基线
 		c.runSvc.UpdateRunStatus(run.ID, map[string]any{"stableProgress": stable})
 
+		// include basic times for duration calc
 		item := map[string]any{
 			"runRecord": map[string]any{
 				"id": run.ID,
@@ -521,12 +592,29 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				"rcJobId": 0,
 				"bytesTransferred": run.BytesTransferred,
 				"error": run.Error,
+				"startedAt": run.StartedAt,
+				"finishedAt": run.FinishedAt,
 			},
 			"stableProgress": stable,
 		}
 		items = append(items, item)
 	}
 	// 前端期望返回数组
+	// attach frozen durations to active runs too (computed, not stored)
+	for i := range items {
+		it := items[i]
+		if rr, ok := it["runRecord"].(map[string]any); ok {
+			var start time.Time
+			if s, ok2 := rr["startedAt"].(string); ok2 { if t, e := time.Parse(time.RFC3339, s); e == nil { start = t } }
+			if !start.IsZero() {
+				dur := int64(time.Since(start).Seconds()); if dur < 0 { dur = 0 }
+				rr["durationSeconds"] = dur
+				rr["durationText"] = humanDuration(dur)
+			}
+			it["runRecord"] = rr
+		}
+		items[i] = it
+	}
 	WriteJSON(w, 200, items)
 }
 
