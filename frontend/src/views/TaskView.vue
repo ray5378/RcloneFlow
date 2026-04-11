@@ -153,6 +153,7 @@ const finalCountAll = computed(()=> finalFiles.value.length)
 const finalCountSuccess = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='success').length)
 const finalCountFailed = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='failed').length)
 const finalCountOther = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='skipped').length)
+// move 模式时，成功数量代表 Moved 条数；已在后端合并 Copied+Deleted 为 Moved
 // 预估总数（preflight），用于“需完成多少”
 function getPreflight(run:any){
   try{
@@ -1158,9 +1159,9 @@ import TransferOptions from '../components/TransferOptions.vue'
         <!-- 历史卡片内的一目了然统计概览（完成态） -->
         <div class="summary-mini" v-if="run.status==='finished' && getFinalSummary(run)">
           <span class="chip">总计 {{ (getFinalSummary(run).files?.length || 0) }}</span>
-          <span class="chip success">成功 {{ (getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0) }}</span>
+          <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
           <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
-          <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
+          <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0) }}</span>
           <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
           <span class="chip meta">总量 {{ formatBytes(getFinalSummary(run).totalBytes || 0) }}</span>
         </div>
