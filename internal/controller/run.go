@@ -208,32 +208,47 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	// 解析更稳：YYYY/MM/DD HH:MM:SS LEVEL : <path>: <msg>
 	type Row struct{ Name string `json:"name"`; Status string `json:"status"`; Action string `json:"action"`; At string `json:"at"`; Size int64 `json:"sizeBytes"`; Message string `json:"message,omitempty"` }
 	rows := make([]Row, 0, 200)
-	re := regexp.MustCompile(`^(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
+	re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
+	tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
 	for _, ln := range lines {
 		l := strings.TrimSpace(ln); if l=="" { continue }
-		m := re.FindStringSubmatch(l)
-		if len(m) == 0 { continue }
-		at := strings.TrimSpace(m[1])
-		level := strings.ToUpper(strings.TrimSpace(m[2]))
-		path := strings.TrimSpace(m[3])
-		msg := strings.TrimSpace(m[4])
-		row := Row{Name: path, At: at, Size: 0, Message: msg}
-		low := strings.ToLower(msg)
-		if level == "ERROR" { row.Status = "failed"; row.Action = "Error" } else {
-			switch {
-			case strings.Contains(low, "copied"):
-				row.Status = "success"; row.Action = "Copied"
-			case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
-				row.Status = "success"; row.Action = "Deleted"
-			case strings.Contains(low, "skipped"):
-				row.Status = "skipped"; row.Action = "Skipped"
-			case strings.Contains(low, "renamed"):
-				row.Status = "success"; row.Action = "Renamed"
-			default:
-				continue
+		segments := []string{}
+		idx := tsRe.FindAllStringIndex(l, -1)
+		if len(idx) > 1 {
+			for i := 0; i < len(idx); i++ {
+				start := idx[i][0]
+				end := len(l)
+				if i+1 < len(idx) { end = idx[i+1][0] }
+				segments = append(segments, strings.TrimSpace(l[start:end]))
 			}
+		} else {
+			segments = []string{l}
 		}
-		rows = append(rows, row)
+		for _, seg := range segments {
+			m := re.FindStringSubmatch(seg)
+			if len(m) == 0 { continue }
+			at := strings.TrimSpace(m[1])
+			level := strings.ToUpper(strings.TrimSpace(m[2]))
+			path := strings.TrimSpace(m[3])
+			msg := strings.TrimSpace(m[4])
+			row := Row{Name: path, At: at, Size: 0, Message: msg}
+			low := strings.ToLower(msg)
+			if level == "ERROR" { row.Status = "failed"; row.Action = "Error" } else {
+				switch {
+				case strings.Contains(low, "copied"):
+					row.Status = "success"; row.Action = "Copied"
+				case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
+					row.Status = "success"; row.Action = "Deleted"
+				case strings.Contains(low, "skipped"):
+					row.Status = "skipped"; row.Action = "Skipped"
+				case strings.Contains(low, "renamed"):
+					row.Status = "success"; row.Action = "Renamed"
+				default:
+					continue
+				}
+			}
+			rows = append(rows, row)
+		}
 	}
 	// 分页
 	total := len(rows)
