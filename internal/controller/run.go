@@ -345,8 +345,8 @@ func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 				}
 				if best != "" { http.ServeFile(w, r, best); return }
 			}
-			// 回退路径（兼容旧命名，不一定存在）
-			http.ServeFile(w, r, base+"/run-"+idStr+"-stderr.log")
+			// 未找到任何日志文件
+			WriteJSON(w, 404, map[string]any{"error": "log not found"})
 			return
 		}
 	}
