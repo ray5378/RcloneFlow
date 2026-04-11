@@ -67,39 +67,19 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			if m, ok := v.(map[string]any); ok { effm = m; for k, val := range m { merged[k] = val } }
 		}
 		// WebDAV 稳态参数（当目标底层是 WebDAV）
-		// 1) 未显式设置时注入建议默认
-		// 2) 下限兜底：对显式或弱默认过低的数值提升到建议值
+		// 显式设置（effectiveOptions）优先：仅在用户未显式设置时注入建议默认；不再做“下限兜底”强制覆盖
 		if isWebDAVUnderlying(cfg, dstRemote) {
-			// 注入（未显式设置）
-			if _, ok := effm["timeout"]; !ok { merged["timeout"] = 24*3600 }
-			if _, ok := effm["connTimeout"]; !ok { merged["connTimeout"] = 60 }
-			if _, ok := effm["expectContinueTimeout"]; !ok { merged["expectContinueTimeout"] = 30 }
-			if _, ok := effm["retries"]; !ok { merged["retries"] = 5 }
-			if _, ok := effm["lowLevelRetries"]; !ok { merged["lowLevelRetries"] = 20 }
-			if _, ok := effm["disableHttp2"]; !ok { merged["disableHttp2"] = true }
-			if _, ok := effm["transfers"]; !ok { merged["transfers"] = 1 }
-			if _, ok := effm["multiThreadStreams"]; !ok { merged["multiThreadStreams"] = 1 }
-
-			// 下限兜底（无论来自弱默认还是显式低值，都提升到建议下限）
-			getInt := func(v any) (int, bool) {
-				switch t := v.(type) {
-				case float64: return int(t), true
-				case int: return t, true
-				case int64: return int(t), true
-				case string:
-					s := strings.TrimSpace(t)
-					if s == "" { return 0, false }
-					if n, err := strconv.Atoi(s); err == nil { return n, true }
-				}
-				return 0, false
-			}
-			if n, ok := getInt(merged["timeout"]); !ok || n < 24*3600 { merged["timeout"] = 24*3600 }
-			if n, ok := getInt(merged["connTimeout"]); !ok || n < 60 { merged["connTimeout"] = 60 }
-			if n, ok := getInt(merged["expectContinueTimeout"]); !ok || n < 30 { merged["expectContinueTimeout"] = 30 }
-			if n, ok := getInt(merged["retries"]); !ok || n < 5 { merged["retries"] = 5 }
-			if n, ok := getInt(merged["lowLevelRetries"]); !ok || n < 20 { merged["lowLevelRetries"] = 20 }
-			// 布尔强制：禁用 HTTP/2；并发/多线程尊重用户显式设置
-			merged["disableHttp2"] = true
+			injectIfMissing := func(k string, v any){ if effm == nil { if _, ok := merged[k]; !ok { merged[k] = v }; return }; if _, ok := effm[k]; !ok { if _, ok2 := merged[k]; !ok2 { merged[k] = v } } }
+			// 建议默认（保守）：
+			injectIfMissing("timeout", 24*3600)
+			injectIfMissing("connTimeout", 60)
+			injectIfMissing("expectContinueTimeout", 30)
+			injectIfMissing("retries", 5)
+			injectIfMissing("lowLevelRetries", 20)
+			injectIfMissing("disableHttp2", true)
+			// 并发/多线程：仅当用户未显式设置时给出建议默认，用户设置优先生效
+			injectIfMissing("transfers", 1)
+			injectIfMissing("multiThreadStreams", 1)
 		}
 		if len(merged) > 0 {
 			effOpt = merged
