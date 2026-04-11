@@ -165,6 +165,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
 		if rr.Summary == nil { rr.Summary = map[string]any{} }
 		rr.Summary["stderrFile"] = stderrPath
+		if rr.StartedAt == "" { rr.StartedAt = time.Now().Local().Format(time.RFC3339) }
 		if cmd.Process != nil { rr.Summary["pid"] = cmd.Process.Pid }
 	})
 
@@ -231,6 +232,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			if rr.Summary == nil { rr.Summary = map[string]any{} }
 			rr.Summary["finished"] = true
 			rr.Summary["success"] = true
+			if rr.FinishedAt == "" { rr.FinishedAt = time.Now().Local().Format(time.RFC3339) }
+			rr.Summary["finishedAt"] = rr.FinishedAt
 			// 若无 progress 但有 stableProgress，则将最后稳态快照固化为 progress（供历史页展示）
 			if _, ok := rr.Summary["progress"]; !ok {
 				if sp, ok2 := rr.Summary["stableProgress"].(map[string]any); ok2 { rr.Summary["progress"] = sp }
