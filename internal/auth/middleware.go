@@ -15,6 +15,12 @@ const usernameKey contextKey = "username"
 // JWTMiddleware JWT认证中间件
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// 允许公开下载日志：GET /api/runs/{id}/log 无需鉴权
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/runs/") && strings.HasSuffix(r.URL.Path, "/log") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		// 获取Authorization header
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
