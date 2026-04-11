@@ -29,12 +29,21 @@ type Scheduler struct {
 	r    Runner
 }
 
-// New 创建调度器
+// New 创建调度器（默认使用 RC 运行器，保持向后兼容）
 func New(db *store.DB, rc *rclone.Client) *Scheduler {
 	return &Scheduler{
 		cron: cron.New(cron.WithSeconds()),
 		db:   db,
 		r:    &taskRunner{db: db, rc: rc},
+	}
+}
+
+// NewWithRunner 创建调度器（显式指定 Runner，例如 TaskService 以使用 CLI Runner 与 stderr 日志）
+func NewWithRunner(db *store.DB, runner Runner) *Scheduler {
+	return &Scheduler{
+		cron: cron.New(cron.WithSeconds()),
+		db:   db,
+		r:    runner,
 	}
 }
 

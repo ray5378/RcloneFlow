@@ -48,7 +48,7 @@ func Run(cfg *config.Config) error {
 	// 初始化rclone客户端
 	rc := rclone.NewFromEnv()
 
-	// 初始化服务层
+	// 初始化服务层（定时任务采用 TaskService 以使用 CLI Runner，确保产生日志 stderrFile）
 	taskSvc := service.NewTaskService(db, rc)
 	scheduleSvc := service.NewScheduleService(db)
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
@@ -59,7 +59,8 @@ func Run(cfg *config.Config) error {
 	browserCtrl := controller.NewBrowserController(rc)
 	
 	// 初始化调度器(需要在controller之前,以便传递)
-	sched := scheduler.New(db, rc)
+	// 使用 TaskService 作为 Runner，以统一走 CLI Runner（生成 stderr 日志文件）
+	sched := scheduler.NewWithRunner(db, taskSvc)
 	if err := sched.Start(); err != nil {
 		logger.Error("调度器初始化失败", zap.Error(err))
 		return err
