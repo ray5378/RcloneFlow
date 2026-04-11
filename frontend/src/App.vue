@@ -18,7 +18,6 @@ const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
 const showDefaultsModal = ref(false)
 
-
 const user = getUser()
 
 const passwordForm = reactive({
@@ -28,7 +27,7 @@ const passwordForm = reactive({
   confirmPassword: ''
 })
 
-const pages = {
+const pages: Record<string, string> = {
   browser: '文件管理',
   tasks: '任务管理',
 }
@@ -78,7 +77,6 @@ async function handleChangePassword() {
     alert('新密码长度至少6位')
     return
   }
-  
   try {
     await changePassword(passwordForm.oldPassword, passwordForm.newPassword, passwordForm.username)
     alert('修改成功，请重新登录')
@@ -125,7 +123,7 @@ onMounted(async () => {
   <div class="app">
     <!-- 登录页面 -->
     <LoginView v-if="authChecked && !isAuth" @success="handleLoginSuccess" />
-    
+
     <!-- 已登录的主应用 -->
     <template v-else-if="authChecked && isAuth">
       <!-- Header -->
@@ -222,11 +220,10 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-
     </template>
-      
-      <!-- 修改默认设置弹窗 -->
-      <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal=false" />
+
+    <!-- 修改默认设置弹窗（根级） -->
+    <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal=false" />
   </div>
 </template>
 
