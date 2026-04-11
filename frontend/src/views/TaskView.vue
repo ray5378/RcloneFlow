@@ -1054,7 +1054,9 @@ import TransferOptions from '../components/TransferOptions.vue'
         <button class="close-btn" @click="showLogModal=false">×</button>
       </div>
       <div class="modal-body">
-        <pre class="log-pre">{{ logContent }}</pre>
+        <div class="log-box">
+          <pre class="log-pre">{{ logContent }}</pre>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="ghost" @click="showLogModal=false">关闭</button>
@@ -1910,6 +1912,6 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 .danger-hint { color: #ff6b6b; font-size: 13px; line-height: 1.5; }
 .modal-content.log-modal{width:92vw !important; max-width:1200px !important; max-height:80vh; display:flex; flex-direction:column;}
 .log-modal .modal-body{padding:12px 16px; width:100%; flex:1; overflow:hidden; display:flex;}
-.log-modal .modal-body > *{width:100%;}
-.log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;height:100%;overflow:auto;white-space:pre-wrap;width:100%;box-sizing:border-box;margin:0;border:1px solid #334155; flex:1 1 auto}
+.log-box{width:100%; display:flex; justify-content:center;}
+.log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;height:100%;overflow:auto;white-space:pre-wrap;width:calc(100% - 64px);max-width:1100px;box-sizing:border-box;margin:0;border:1px solid #334155}
 </style>
