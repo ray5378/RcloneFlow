@@ -153,6 +153,13 @@ const finalCountAll = computed(()=> finalFiles.value.length)
 const finalCountSuccess = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='success').length)
 const finalCountFailed = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='failed').length)
 const finalCountOther = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='skipped').length)
+// 预估总数（preflight），用于“需完成多少”
+function getPreflight(run:any){
+  try{
+    const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
+    return sum?.preflight || null
+  }catch{ return null }
+}
 // 可筛选标签：all|success|failed|other
 const currentFinalFilter = ref<'all'|'success'|'failed'|'other'>('all')
 function setFinalFilter(k:'all'|'success'|'failed'|'other') { currentFinalFilter.value = k; finalFilesPage.value = 1 }
@@ -364,6 +371,23 @@ function getRunDurationText(run:any){
 function formatBps(bps:number){
   if (!bps || bps<=0) return '-'
   return formatBytes(bps) + '/s'
+}
+// 从 DB 的 summary.progress 读取运行中实时（不落库也可兼容）
+function getLiveSummaryFromDB(run:any){
+  try{
+    const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
+    const p = sum?.progress
+    if (p && typeof p === 'object'){
+      const bytes = Number(p.bytes || 0)
+      const totalBytes = Number(p.totalBytes || 0)
+      const speed = Number(p.speed || 0)
+      const eta = typeof p.eta === 'number' ? p.eta : null
+      let percentage = Number(p.percentage || 0)
+      if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
+      return { bytes, totalBytes, speed, eta, percentage }
+    }
+  }catch{}
+  return null
 }
 
 function getStatusClass(status: string) {
@@ -1100,6 +1124,33 @@ import TransferOptions from '../components/TransferOptions.vue'
             {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}
           </span>
         </div>
+        <!-- 运行中卡片的实时概览（优先读 DB 中 summary.progress，缺失再用 active） -->
+        <div class="summary-mini" v-else-if="run.status==='running'">
+          <template v-if="getLiveSummaryFromDB(run)">
+            <span class="chip">进度 {{ (getLiveSummaryFromDB(run)?.percentage||0).toFixed(2) }}%</span>
+            <span class="chip meta">速度 {{ formatBytesPerSec(getLiveSummaryFromDB(run)?.speed || 0) }}</span>
+            <span class="chip meta">已传 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span>
+            <span class="chip meta">总量 {{ formatBytes(getLiveSummaryFromDB(run)?.totalBytes || 0) }}</span>
+            <span class="chip meta" v-if="getLiveSummaryFromDB(run)?.eta">ETA {{ formatEta(getLiveSummaryFromDB(run)?.eta||0) }}</span>
+            <span class="chip meta" v-if="getPreflight(run)">需完成约 {{ getPreflight(run).totalCount }}</span>
+          </template>
+          <template v-else-if="getActiveRunByTaskId(run.taskId)?.stableProgress">
+            <span class="chip">进度 {{ ((getActiveRunByTaskId(run.taskId)?.stableProgress?.percentage)||0).toFixed(2) }}%</span>
+            <span class="chip meta">速度 {{ formatBytesPerSec(getActiveRunByTaskId(run.taskId)?.stableProgress?.speed || 0) }}</span>
+            <span class="chip meta">已传 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes || 0) }}</span>
+            <span class="chip meta">总量 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.totalBytes || 0) }}</span>
+            <span class="chip meta" v-if="getActiveRunByTaskId(run.taskId)?.stableProgress?.eta">ETA {{ formatEta(getActiveRunByTaskId(run.taskId)?.stableProgress?.eta) }}</span>
+          </template>
+        </div>
+        <!-- 历史卡片内的一目了然统计概览（完成态） -->
+        <div class="summary-mini" v-if="run.status==='finished' && getFinalSummary(run)">
+          <span class="chip">总计 {{ (getFinalSummary(run).files?.length || 0) }}</span>
+          <span class="chip success">成功 {{ (getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0) }}</span>
+          <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
+          <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
+          <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
+          <span class="chip meta">耗时 {{ getFinalSummary(run).durationText || '-' }}</span>
+        </div>
         <button class="ghost small" @click="showRunDetail(run)">运行详情</button>
         <button class="ghost small" @click="openRunLog(run)">传输日志</button>
         <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
@@ -1217,6 +1268,14 @@ import TransferOptions from '../components/TransferOptions.vue'
                 <div class="summary-cell clickable" @click="setFinalFilter('other')">
                   <div class="summary-key">其他</div>
                   <div class="summary-val">{{ finalCountOther }}</div>
+                </div>
+                <div class="summary-cell">
+                  <div class="summary-key">平均速度</div>
+                  <div class="summary-val">{{ formatBps(getFinalSummary(runDetail)?.avgSpeedBps || 0) }}</div>
+                </div>
+                <div class="summary-cell">
+                  <div class="summary-key">耗时</div>
+                  <div class="summary-val">{{ getFinalSummary(runDetail)?.durationText || '-' }}</div>
                 </div>
               </div>
             </div>
@@ -1779,6 +1838,12 @@ body.light .item { border-color: #f0f0f0; }
 .status.clickable:hover { opacity: 0.8; }
 .time { width: 150px; text-align: right; color: #888; font-size: 13px; }
 .info { width: 120px; color: #888; font-size: 13px; }
+.summary-mini { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0; }
+.summary-mini .chip { padding:2px 8px; border-radius:999px; background:#1f2937; color:#e5e7eb; font-size:12px; border:1px solid #334155 }
+.summary-mini .chip.success{ background:#0a2f22; border-color:#14532d; color:#34d399 }
+.summary-mini .chip.failed{ background:#2b0a0a; border-color:#7f1d1d; color:#f87171 }
+.summary-mini .chip.other{ background:#2b1a04; border-color:#92400e; color:#fbbf24 }
+.summary-mini .chip.meta{ background:#111827; border-color:#374151; color:#cbd5e1 }
 .item-actions { display: flex; gap: 8px; }
 .danger-text { color: #ef5350 !important; }
 .form-content { padding: 20px; }
@@ -1928,9 +1993,19 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 .files-table{margin-top:14px;border:1px solid #333;border-radius:10px;}
 .files-table.large{max-width:1200px}
 .files-header,.files-row{display:grid;grid-template-columns:1fr 140px 200px 140px;gap:18px;align-items:center}
-.files-header{padding:12px 16px;background:#252525;color:#aaa;font-size:13px}
+.files-header{padding:12px 16px;background:#252525;color:#cbd5e1;font-size:13px}
 .files-body{max-height:540px;overflow:auto}
 .files-row{padding:12px 16px;border-top:1px solid #333}
+/* 修正黑底黑字：表格内文字统一亮色，浅色主题时再覆盖 */
+.files-row .name,.files-row .status,.files-row .time,.files-row .size { color:#e5e7eb }
+body.light .files-header{ background:#f5f5f5; color:#4b5563 }
+body.light .files-row .name,body.light .files-row .status,body.light .files-row .time,body.light .files-row .size { color:#1f2937 }
+/* 表格内的 status 仅作为结果文本，不用徽章底色 */
+.files-table .status { width:auto; padding:0; background:transparent; border-radius:0; font-weight:600 }
+.files-table .status.success{ color:#34d399 }
+.files-table .status.failed{ color:#f87171 }
+.files-table .status.skipped{ color:#fbbf24 }
 .pager-inline{display:flex;align-items:center;gap:8px}
 .page-input{width:64px;padding:6px 8px;border:1px solid #333;border-radius:8px;background:#252525;color:#e0e0e0}
+body.light .page-input{ background:#fff; color:#111827; border-color:#ddd }
 </style>
