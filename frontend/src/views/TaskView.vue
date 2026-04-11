@@ -359,9 +359,6 @@ async function createTask() {
       await api.updateTask(editingTask.value.id, taskData)
       // 更新定时规则：先删除旧的在创建新的
       const oldSchedule = getScheduleByTaskId(editingTask.value.id)
-      if (oldSchedule) {
-        await api.deleteSchedule(oldSchedule.id)
-      }
       if (createForm.value.enableSchedule) {
         const spec = [
           createForm.value.scheduleMinute || '00',
@@ -370,7 +367,14 @@ async function createTask() {
           createForm.value.scheduleMonth || '*',
           createForm.value.scheduleWeek || '*',
         ].join('|')
-        await api.createSchedule({ taskId: editingTask.value.id, spec, enabled: true })
+        if (oldSchedule) {
+          await api.updateSchedule(oldSchedule.id, true, spec)
+        } else {
+          await api.createSchedule({ taskId: editingTask.value.id, spec, enabled: true })
+        }
+      } else if (oldSchedule) {
+        // 关闭并保留记录
+        await api.updateSchedule(oldSchedule.id, false)
       }
       editingTask.value = null
     } else {

@@ -73,17 +73,26 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 			return
 		}
 		var req struct {
-			Enabled bool `json:"enabled"`
+			Enabled bool   `json:"enabled"`
+			Spec    string `json:"spec"`
 		}
 		if err := DecodeRequest(r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}
+		// 可选：更新 spec
+		if strings.TrimSpace(req.Spec) != "" {
+			if err := c.scheduleSvc.UpdateSpec(id, req.Spec); err != nil {
+				WriteJSON(w, 500, map[string]any{"error": err.Error()})
+				return
+			}
+		}
+		// 更新启用状态
 		if err := c.scheduleSvc.SetScheduleEnabled(id, req.Enabled); err != nil {
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
-		// 运行时更新：重新加载该 schedule 的规则（删除旧 entry、按新状态/规格重建）
+		// 运行时热重载：删除旧 entry，再按最新 spec/状态重建或移除
 		if s, ok := c.sched.DB().GetSchedule(id); ok {
 			if s.Enabled {
 				_ = c.sched.AddSchedule(s)
@@ -91,7 +100,7 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 				c.sched.RemoveSchedule(id)
 			}
 		}
-		WriteJSON(w, 200, map[string]any{"enabled": req.Enabled})
+		WriteJSON(w, 200, map[string]any{"enabled": req.Enabled, "spec": req.Spec})
 
 	default:
 		w.WriteHeader(405)

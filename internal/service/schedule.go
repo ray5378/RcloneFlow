@@ -28,6 +28,11 @@ func (s *ScheduleService) CreateSchedule(taskID int64, spec string, enabled bool
 	})
 }
 
+// UpdateSpec 更新定时规则
+func (s *ScheduleService) UpdateSpec(id int64, spec string) error {
+	return s.db.UpdateScheduleSpec(id, spec)
+}
+
 // DeleteSchedule 删除定时任务
 func (s *ScheduleService) DeleteSchedule(id int64) error {
 	return s.db.DeleteSchedule(id)

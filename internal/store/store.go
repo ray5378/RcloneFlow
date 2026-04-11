@@ -433,6 +433,13 @@ func (db *DB) UpdateScheduleNextRunTime(id int64, nextRunTime time.Time) error {
 	return err
 }
 
+// UpdateScheduleSpec 更新定时表达式（不重建记录）
+func (db *DB) UpdateScheduleSpec(id int64, spec string) error {
+	db.mu.Lock(); defer db.mu.Unlock()
+	_, err := db.db.Exec("UPDATE schedules SET spec = ? WHERE id = ?", spec, id)
+	return err
+}
+
 // ===== Runs =====
 
 func (db *DB) ListRuns() ([]Run, error) {

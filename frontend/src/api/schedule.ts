@@ -15,9 +15,11 @@ export async function createSchedule(schedule: Omit<Schedule, 'id' | 'createdAt'
   return post<Schedule>('/api/schedules', schedule)
 }
 
-/** 更新定时任务(启用/禁用) */
-export async function updateSchedule(scheduleId: number, enabled: boolean): Promise<void> {
-  return put<void>(`/api/schedules/${scheduleId}`, { enabled })
+/** 更新定时任务(启用/禁用/规则) */
+export async function updateSchedule(scheduleId: number, enabled: boolean, spec?: string): Promise<void> {
+  const body: any = { enabled }
+  if (spec && spec.trim()) body.spec = spec
+  return put<void>(`/api/schedules/${scheduleId}`, body)
 }
 
 /** 删除定时任务 */
