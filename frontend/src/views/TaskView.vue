@@ -47,6 +47,30 @@ const LINGER_MS = 15000
 const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
 const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
 
+// 传输日志弹窗
+const showLogModal = ref(false)
+const logModalTitle = ref('传输日志')
+const logContent = ref('')
+async function openRunLog(run:any){
+  logModalTitle.value = `传输日志 #${run.id}`
+  logContent.value = '加载中…'
+  showLogModal.value = true
+  try {
+    const resp = await fetch(`/api/runs/${run.id}/log?auth=${getToken()||''}`)
+    if (!resp.ok){
+      const txt = await resp.text()
+      logContent.value = `加载失败：${resp.status} ${txt}`
+      return
+    }
+    const buf = await resp.arrayBuffer()
+    // 日志是文本文件，尝试以 UTF-8 解码
+    const dec = new TextDecoder('utf-8')
+    logContent.value = dec.decode(buf)
+  } catch(e:any){
+    logContent.value = `加载异常：${e?.message||e}`
+  }
+}
+
 function setWebhook(task: Task){
   webhookModal.value = { show: true, id: task.id, value: (task.options as any)?.webhookId || '' }
 }
@@ -1022,6 +1046,22 @@ import TransferOptions from '../components/TransferOptions.vue'
     </div>
   </div>
 
+  <!-- 传输日志弹窗 -->
+  <div v-if="showLogModal" class="modal-overlay" @click.self="showLogModal=false">
+    <div class="modal-content" style="max-width: 960px;">
+      <div class="modal-header">
+        <h3>{{ logModalTitle }}</h3>
+        <button class="close-btn" @click="showLogModal=false">×</button>
+      </div>
+      <div class="modal-body">
+        <pre class="log-pre">{{ logContent }}</pre>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" @click="showLogModal=false">关闭</button>
+      </div>
+    </div>
+  </div>
+
   <div v-if="currentModule === 'history'" class="card">
     <div class="card-header">
       <div class="title">历史记录</div>
@@ -1064,7 +1104,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           </span>
         </div>
         <button class="ghost small" @click="showRunDetail(run)">详情</button>
-        <a class="ghost small" :href="'/api/runs/' + run.id + '/log?auth=' + (getToken()||'')" target="_blank">传输日志</a>
+        <button class="ghost small" @click="openRunLog(run)">传输日志</button>
         <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
       </div>
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>
@@ -1868,4 +1908,5 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 
 .error-text { color: #ff6b6b; white-space: pre-wrap; }
 .danger-hint { color: #ff6b6b; font-size: 13px; line-height: 1.5; }
+.log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;max-height:60vh;overflow:auto;white-space:pre-wrap}
 </style>
