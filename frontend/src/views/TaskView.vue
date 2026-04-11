@@ -36,8 +36,9 @@ const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
 const showGlobalStatsModal = ref(false)
 const globalStats = ref<any>({})
-const showTaskProgressModal = ref(false)
-const taskProgressData = ref<any>({})
+// 已移除“实时进度”弹窗逻辑，卡片直接显示稳态进度
+// const showTaskProgressModal = ref(false)
+// const taskProgressData = ref<any>({})
 const activeRuns = ref<any[]>([])
 const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
 
@@ -469,15 +470,16 @@ async function stopTaskAny(taskId: number) {
   })
 }
 
-async function viewTaskProgress(taskId: number) {
-  try {
-    const data = await api.getTaskProgress(taskId)
-    taskProgressData.value = data || {}
-    showTaskProgressModal.value = true
-  } catch (e) {
-    alert((e as Error).message)
-  }
-}
+// 已废弃：卡片实时展示进度，无需弹窗
+// async function viewTaskProgress(taskId: number) {
+//   try {
+//     const data = await api.getTaskProgress(taskId)
+//     taskProgressData.value = data || {}
+//     showTaskProgressModal.value = true
+//   } catch (e) {
+//     alert((e as Error).message)
+//   }
+// }
 
 async function runTask(taskId: number) {
   if (runningTaskId.value !== null) return
@@ -936,7 +938,6 @@ import TransferOptions from '../components/TransferOptions.vue'
           <div class="item-actions">
             <button class="ghost small" @click.stop="viewTaskHistory(task.id)">📋 历史</button>
             <button class="ghost small" @click.stop="stopTaskAny(task.id)">⏹ 停止传输</button>
-            <button class="ghost small" @click.stop="viewTaskProgress(task.id)">📊 实时进度</button>
             <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
               {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}
             </button>
