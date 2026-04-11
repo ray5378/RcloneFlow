@@ -311,10 +311,41 @@ func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 			if m, ok := any(run.Summary).(map[string]any); ok {
 				if p, ok := m["stderrFile"].(string); ok && p != "" { http.ServeFile(w, r, p); return }
 			}
-			// 回退路径（标准位置）
-			base := "/app/data/logs"
 			// 兼容前端带 auth 查询参数（忽略，仅用于传递 Bearer token 给中间件）
 			r.URL.RawQuery = ""
+			// 搜索新目录结构：/app/data/logs/<任务名-MMDD>/<HHMM>.log
+			base := "/app/data/logs"
+			sanitize := func(s string) string {
+				s = strings.TrimSpace(s)
+				if s == "" { return s }
+				inv := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+				s = inv.ReplaceAllString(s, "_")
+				r := []rune(s); if len(r)>60 { s = string(r[:60]) }
+				return s
+			}
+			if run.TaskName != "" {
+				san := sanitize(run.TaskName)
+				entries, _ := os.ReadDir(base)
+				var best string
+				var bestMod int64
+				for _, ent := range entries {
+					if !ent.IsDir() { continue }
+					name := ent.Name()
+					if !strings.HasPrefix(name, san+"-") { continue }
+					sub := filepath.Join(base, name)
+					files, _ := os.ReadDir(sub)
+					for _, f := range files {
+						if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") { continue }
+						fi, _ := f.Info()
+						if fi != nil {
+							mod := fi.ModTime().Unix()
+							if mod > bestMod { bestMod = mod; best = filepath.Join(sub, f.Name()) }
+						}
+					}
+				}
+				if best != "" { http.ServeFile(w, r, best); return }
+			}
+			// 回退路径（兼容旧命名，不一定存在）
 			http.ServeFile(w, r, base+"/run-"+idStr+"-stderr.log")
 			return
 		}
