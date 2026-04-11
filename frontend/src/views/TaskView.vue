@@ -572,22 +572,26 @@ function viewTaskHistory(taskId: number) {
   currentModule.value = 'history'
 }
 
+const stoppedTaskId = ref<number|null>(null)
 async function stopTaskAny(taskId: number) {
-  showConfirm('停止传输', '确定停止该任务的当前传输？', async () => {
-    try {
-      // 直接按任务 ID kill（后端会定位最近 run 并发信号）
-      await api.killTask(taskId)
-      // 兼容 RC：如仍有 rcJobId，则再尝试停止
-      const active = await api.getActiveRuns().catch(()=>[])
-      const cur:any = Array.isArray(active) ? active.find(x => x?.runRecord?.taskId === taskId && x?.runRecord?.rcJobId) : null
-      if (cur?.runRecord?.rcJobId) {
-        await api.stopJob(cur.runRecord.rcJobId)
-      }
-      await refreshTaskViewData()
-    } catch (e) {
-      alert((e as Error).message)
+  try {
+    // 直接按任务 ID kill（后端会定位最近 run 并发信号）
+    await api.killTask(taskId)
+    // 兼容 RC：如仍有 rcJobId，则再尝试停止
+    const active = await api.getActiveRuns().catch(()=>[])
+    const cur:any = Array.isArray(active) ? active.find(x => x?.runRecord?.taskId === taskId && x?.runRecord?.rcJobId) : null
+    if (cur?.runRecord?.rcJobId) {
+      await api.stopJob(cur.runRecord.rcJobId)
     }
-  })
+    // 按钮状态反馈：红色“已经停止”，10秒后恢复
+    stoppedTaskId.value = taskId
+    setTimeout(()=>{ if (stoppedTaskId.value===taskId) stoppedTaskId.value=null }, 10000)
+    // 轻量刷新列表
+    await loadData()
+  } catch (e) {
+    stoppedTaskId.value = null
+    alert((e as Error).message)
+  }
 }
 
 
@@ -1030,10 +1034,13 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span v-else class="no-schedule">未设置</span>
           </div>
           <div class="item-actions">
-            <button class="ghost small" @click.stop="viewTaskHistory(task.id)">📋 历史</button>
-            <button class="ghost small" @click.stop="stopTaskAny(task.id)">⏹ 停止传输</button>
+            <button class="ghost small" @click.stop="viewTaskHistory(task.id)">📋 任务历史记录</button>
+            <button class="ghost small" :class="{ 'danger-text': stoppedTaskId===task.id }" @click.stop="stopTaskAny(task.id)">
+              <template v-if="stoppedTaskId===task.id">⏹ 已经停止</template>
+              <template v-else>⏹ 停止传输</template>
+            </button>
             <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
-              {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭' : '▶ 开启' }}
+              {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭定时' : '▶ 开启定时' }}
             </button>
             <button 
               class="ghost small" 
@@ -1101,7 +1108,7 @@ import TransferOptions from '../components/TransferOptions.vue'
 
   <div v-if="currentModule === 'history'" class="card">
     <div class="card-header">
-      <div class="title">历史记录</div>
+      <div class="title">任务历史记录</div>
       <div class="header-actions">
         <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click="clearAllRuns">删除所有</button>
         <button v-if="historyFilterTaskId !== null" class="ghost small" @click="currentModule = 'tasks'">
