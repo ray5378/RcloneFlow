@@ -289,26 +289,23 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
 			return
 		}
-		// WebDAV 完成确认（仅针对 copy/sync；move 不等待）
-		if strings.ToLower(cmdName) != "move" {
-			if isWebDAVUnderlying(cfg, dstRemote) {
-				interval := config.GetFinishWaitInterval()
-				timeout := config.GetFinishWaitTimeout()
-				copied := fileStats.copiedList()
-				if len(copied) > 0 && timeout > 0 {
-					vr := &adapter.CmdRunner{}
-					deadline := time.Now().Add(timeout)
-					for time.Now().Before(deadline) {
-						allOk := true
-						// 简化：检查目标目录出现（可读可见）；不做逐文件 size 校验
-						args := []string{"lsjson", dst, "--config", cfg, "--files-only"}
-						out, _, e := vr.Run(context.Background(), args...)
-						if e != nil { allOk = false }
-						var arr []map[string]any
-						if json.Unmarshal([]byte(out), &arr) != nil { allOk = false }
-						if allOk { break }
-						time.Sleep(interval)
-					}
+		// WebDAV 完成确认（copy/sync/move 通用）：仅做可见性检查，不改变 rclone 语义
+		if isWebDAVUnderlying(cfg, dstRemote) {
+			interval := config.GetFinishWaitInterval()
+			timeout := config.GetFinishWaitTimeout()
+			if timeout > 0 {
+				vr := &adapter.CmdRunner{}
+				deadline := time.Now().Add(timeout)
+				for time.Now().Before(deadline) {
+					allOk := true
+					// 简化：检查目标目录可读可见；不做逐文件 size 校验
+					args := []string{"lsjson", dst, "--config", cfg, "--files-only"}
+					out, _, e := vr.Run(context.Background(), args...)
+					if e != nil { allOk = false }
+					var arr []map[string]any
+					if json.Unmarshal([]byte(out), &arr) != nil { allOk = false }
+					if allOk { break }
+					time.Sleep(interval)
 				}
 			}
 		}
