@@ -1,6 +1,6 @@
 package service
 
-import "fmt"
+import "encoding/json"
 
 // RunRecord 运行记录结构
 type RunRecord struct {
@@ -69,7 +69,8 @@ func (s *RunService) GetActiveRunByTaskID(taskID int64) (RunRecord, error) {
 // UpdateRunStatus 更新运行状态
 func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
 	s.db.UpdateRun(id, func(r *RunRecord) {
-		r.Summary = fmt.Sprintf("%v", summary)
+		// 将 summary 持久为 JSON 字符串，避免后续读取时丢失结构
+		if bs, err := json.Marshal(summary); err == nil { r.Summary = string(bs) }
 		finished, _ := summary["finished"].(bool)
 		success, _ := summary["success"].(bool)
 		if finished {

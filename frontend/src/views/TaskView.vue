@@ -963,19 +963,23 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="path-label">目标:</span>
             <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
           </div>
-          <template v-if="getTaskRealtimeProgress(task.id)">
-            <div class="path-row">
-              <span class="path-label">实时:</span>
-              <span class="path-value">运行中 · Job #{{ getTaskRealtimeProgress(task.id)?.run?.rcJobId }}</span>
-            </div>
-            <div class="path-row">
-              <span class="path-label">进度:</span>
-              <span class="path-value">{{ (getTaskRealtimeProgress(task.id)?.percentage || 0).toFixed(2) }}% · {{ formatBytes(getTaskRealtimeProgress(task.id)?.bytes || 0) }} / {{ formatBytes(getTaskRealtimeProgress(task.id)?.totalBytes || 0) }} · {{ formatBytesPerSec(getTaskRealtimeProgress(task.id)?.speed || 0) }} · ETA {{ formatEta(getTaskRealtimeProgress(task.id)?.eta || null) }}</span>
-            </div>
-            <div class="progress-bar-container" style="margin-top:8px">
-              <div class="progress-bar" :style="{ width: ((getTaskRealtimeProgress(task.id)?.percentage || 0)) + '%' }"></div>
-            </div>
-          </template>
+          <div class="path-row">
+            <span class="path-label">进度:</span>
+            <span class="path-value">
+              <template v-if="getActiveRunByTaskId(task.id)?.stableProgress?.phase === 'preparing'">
+                准备中 · 已传 {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.bytes || 0) }} · 速度 {{ formatBytesPerSec(getActiveRunByTaskId(task.id)?.stableProgress?.speed || 0) }}
+              </template>
+              <template v-else>
+                {{ ((getActiveRunByTaskId(task.id)?.stableProgress?.percentage) || 0).toFixed(2) }}% ·
+                {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.bytes || 0) }} /
+                {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.totalBytes || 0) }} ·
+                {{ formatBytesPerSec(getActiveRunByTaskId(task.id)?.stableProgress?.speed || 0) }}
+              </template>
+            </span>
+          </div>
+          <div class="progress-bar-container" style="margin-top:8px" v-if="getActiveRunByTaskId(task.id)?.stableProgress && getActiveRunByTaskId(task.id)?.stableProgress?.phase !== 'preparing'">
+            <div class="progress-bar" :style="{ width: ((getActiveRunByTaskId(task.id)?.stableProgress?.percentage || 0)) + '%' }"></div>
+          </div>
         </div>
       </div>
       <div v-if="!filteredTasks.length" class="empty">暂无任务</div>
