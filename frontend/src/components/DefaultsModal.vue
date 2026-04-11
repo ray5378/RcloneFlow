@@ -4,6 +4,7 @@ import { getSettings, saveSettings, resetSettings } from '../api/settings'
 
 const loading = ref(true)
 const saving = ref(false)
+const saved = ref(false)
 const data = ref<any>(null)
 const form = ref<Record<string,string>>({})
 
@@ -21,7 +22,16 @@ async function load(){
 
 async function onSave(){
   saving.value = true
-  try{ await saveSettings(form.value); alert('已保存并生效'); await load() } catch(e:any){ alert(e?.message||e) } finally { saving.value=false }
+  try{
+    await saveSettings(form.value)
+    await load()
+    saved.value = true
+    setTimeout(()=>{ saved.value=false }, 10000)
+  } catch(e:any){
+    alert(e?.message||e)
+  } finally {
+    saving.value=false
+  }
 }
 async function onReset(){
   if (!confirm('确认重置为默认？')) return
@@ -110,7 +120,7 @@ onMounted(load)
       </div>
       <div class="modal-footer">
         <button class="ghost" @click="onReset" :disabled="saving">重置为默认</button>
-        <button class="primary" @click="onSave" :disabled="saving">保存</button>
+        <button :class="['primary', { saved: saved }]" @click="onSave" :disabled="saving">{{ saved ? '已保存生效' : '保存' }}</button>
       </div>
     </div>
   </div>
@@ -125,4 +135,5 @@ body.light .section-title{ color: #111827 }
 input, select{ padding: 8px 10px; border-radius: 8px; border: 1px solid #333; background:#252525; color:#e0e0e0 }
 body.light input, body.light select{ background:#fff; color:#111; border-color:#ddd }
 .subkey{opacity:.6;margin-left:6px;font-weight:400}
+.modal-footer .primary.saved{ background:#16a34a; color:#fff; border:none }
 </style>
