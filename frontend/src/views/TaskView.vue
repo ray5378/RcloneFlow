@@ -233,10 +233,13 @@ function getActiveRunByTaskId(taskId: number) {
   // 优先返回活跃项
   const cur = activeRuns.value.find(item => item.runRecord?.taskId === taskId)
   if (cur) return cur
-  // 否则在观察期内返回最后稳态快照（phase=completed）
+  // 否则在观察期内返回最后稳态快照（仅当确实完成：>=99.9%）
   const st = lastStableByTask.value[taskId]
   if (st && Date.now()-st.at <= LINGER_MS){
-    return { runRecord: { taskId }, stableProgress: { ...(st.sp||{}), phase: 'completed' } }
+    const pct = Number((st.sp||{}).percentage || 0)
+    if (!isNaN(pct) && pct >= 99.9) {
+      return { runRecord: { taskId }, stableProgress: { ...(st.sp||{}), phase: 'completed', percentage: pct } }
+    }
   }
   return undefined as any
 }
