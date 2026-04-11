@@ -136,7 +136,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		return s
 	}
 	safeTask := sanitizeFilename(run.TaskName)
-	ts := time.Now().Local().Format("20060102-150405")
+	ts := time.Now().Local().Format("0102-1504")
 	stderrPath := filepath.Join(logsDir, fmt.Sprintf("%s-%s.log", safeTask, ts))
 	stderrFile, _ := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 
