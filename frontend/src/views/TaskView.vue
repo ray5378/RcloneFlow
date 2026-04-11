@@ -1216,7 +1216,7 @@ import TransferOptions from '../components/TransferOptions.vue'
                   <div class="summary-val">{{ finalCountAll }}</div>
                 </div>
                 <div class="summary-cell clickable" @click="setFinalFilter('success')">
-                  <div class="summary-key">成功</div>
+                  <div class="summary-key">{{ runDetail.taskMode==='move' ? '移动' : '成功' }}</div>
                   <div class="summary-val">{{ finalCountSuccess }}</div>
                 </div>
                 <div class="summary-cell clickable" @click="setFinalFilter('failed')">
