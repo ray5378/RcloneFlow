@@ -89,7 +89,7 @@ func Run(cfg *config.Config) error {
 	go jobSync.Start(ctx)
 
 	// 启动历史记录清理服务
-	var cleanupSvc *service.CleanupService
+	// 清理服务（单实例），供设置保存后重排
 	if cfg.GetCleanupInterval() > 0 && cfg.GetCleanupRetention() > 0 {
 		cleanupSvc = service.NewCleanupService(
 			runSvc,
