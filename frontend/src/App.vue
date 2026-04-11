@@ -7,7 +7,7 @@ import LoginView from './views/LoginView.vue'
 import * as api from './api'
 import { isLoggedIn as checkAuth, getUser, logout, changePassword } from './api/auth'
 
-const currentPage = ref('browser')
+const currentPage = ref(localStorage.getItem('currentPage') || (location.hash.replace('#','')||'browser'))
 const taskViewKey = ref(0)
 const version = ref('加载中...')
 const isLight = ref(localStorage.getItem('theme') === 'light')
@@ -33,6 +33,8 @@ const pages = {
 
 function switchPage(page: string) {
   currentPage.value = page
+  localStorage.setItem('currentPage', page)
+  location.hash = page
   if (page === 'tasks') {
     taskViewKey.value++
   }
@@ -94,14 +96,20 @@ onMounted(async () => {
   if (isLight.value) {
     document.body.classList.add('light')
   }
-  
+
+  // 恢复页面状态
+  const hash = (location.hash || '').replace('#','')
+  if (hash && ['browser','tasks'].includes(hash)) {
+    currentPage.value = hash
+  }
+
   isAuth.value = checkAuth()
   authChecked.value = true
-  
+
   if (!isAuth.value) {
     return
   }
-  
+
   try {
     const data = await api.listRemotes()
     version.value = data.version || '未知版本'
