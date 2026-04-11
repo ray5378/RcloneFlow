@@ -3,6 +3,7 @@ import { ref, onMounted, reactive } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
 import LoginView from './views/LoginView.vue'
+import DefaultsModal from './components/DefaultsModal.vue'
 
 import * as api from './api'
 import { isLoggedIn as checkAuth, getUser, logout, changePassword } from './api/auth'
@@ -227,13 +228,7 @@ onMounted(async () => {
       
       <!-- 修改默认设置弹窗 -->
       <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal=false" />
-    </div>
-  </div>
 </template>
-
-<script lang="ts" setup>
-import DefaultsModal from './components/DefaultsModal.vue'
-</script>
 
 <style scoped>
 .header-actions {
