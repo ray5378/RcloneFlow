@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"rcloneflow/internal/logger"
 )
 
 type SettingsController struct{}
@@ -137,6 +139,13 @@ func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := writeOverrides(cur); err != nil {
 		WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()}); return
+	}
+	// 热生效：日志与清理（清理重排留在 app/scheduler 层接入）
+	if _, ok := cur["LOG_LEVEL"]; ok || cur["LOG_OUTPUT"]!="" {
+		lev := cur["LOG_LEVEL"]; if lev=="" { lev = defaultsMap()["LOG_LEVEL"] }
+		out := cur["LOG_OUTPUT"]; if out=="" { out = defaultsMap()["LOG_OUTPUT"] }
+		// 依赖 logger 包
+		_ = logger.HotSet(lev, out)
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }

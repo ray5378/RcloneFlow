@@ -131,11 +131,14 @@ var globalLogger Logger
 // Init 初始化全局日志
 func Init(level, output string) error {
 	logger, err := New(level, output)
-	if err != nil {
-		return err
-	}
+	if err != nil { return err }
 	globalLogger = logger
 	return nil
+}
+
+// HotSet 运行时切换日志级别/输出
+func HotSet(level, output string) error {
+	return Init(level, output)
 }
 
 // Get 获取全局日志实例
