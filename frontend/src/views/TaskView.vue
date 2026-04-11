@@ -1099,7 +1099,6 @@ import TransferOptions from '../components/TransferOptions.vue'
       <span class="col-status">状态</span>
       <span class="col-path-full">路径</span>
       <span class="col-time">开始</span>
-      <span class="col-time">耗时</span>
       <span class="col-action">操作</span>
     </div>
     <div class="list">
@@ -1116,14 +1115,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="path-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
         </div>
         <span class="time">{{ formatTime(run.startedAt) }}</span>
-        <span class="time">{{ getRunDurationText(run) }}</span>
-        <div class="info" v-if="getFinalSummary(run)">
-          <span>
-            {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }} /
-            {{ formatBytes(getFinalSummary(run).totalBytes || 0) }} ·
-            {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}
-          </span>
-        </div>
+        <div class="info" v-if="getFinalSummary(run)"></div>
         <!-- 运行中卡片的实时概览（优先读 DB 中 summary.progress，缺失再用 active） -->
         <div class="summary-mini" v-else-if="run.status==='running'">
           <template v-if="getLiveSummaryFromDB(run)">
@@ -1149,7 +1141,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
           <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
           <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
-          <span class="chip meta">耗时 {{ getFinalSummary(run).durationText || '-' }}</span>
+          <span class="chip meta">总量 {{ formatBytes(getFinalSummary(run).totalBytes || 0) }}</span>
         </div>
         <button class="ghost small" @click="showRunDetail(run)">运行详情</button>
         <button class="ghost small" @click="openRunLog(run)">传输日志</button>
@@ -1190,63 +1182,7 @@ import TransferOptions from '../components/TransferOptions.vue'
             <label>目标路径：</label>
             <span>{{ runDetail.targetRemote }}:{{ runDetail.targetPath || '/' }}</span>
           </div>
-          <div class="detail-item">
-            <label>开始时间：</label>
-            <span>{{ formatTime(runDetail.startedAt) }}</span>
-          </div>
-          <div class="detail-item">
-            <label>结束时间：</label>
-            <span>{{ formatTime(runDetail.finishedAt) }}</span>
-          </div>
-          <div class="detail-item">
-            <label>耗时：</label>
-            <span>{{ getRunDurationText(runDetail) }}</span>
-          </div>
-          <div class="detail-item">
-            <label>阶段：</label>
-            <span>
-              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress">
-                {{ getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.phase === 'preparing' ? '准备中' :
-                   getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.phase === 'between_files' ? '切换中文件' :
-                   getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.phase === 'finalizing' ? '收尾确认中' : '传输中' }}
-              </template>
-              <template v-else>
-                {{ runDetail.status==='finished' ? '已完成' : getStatusText(runDetail.status) }}
-              </template>
-            </span>
-          </div>
-          <div class="detail-item">
-            <label>进度：</label>
-            <span>
-              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress">
-                {{ ((getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.percentage) || 0).toFixed(2) }}%
-              </template>
-              <template v-else>-</template>
-            </span>
-          </div>
-          <div class="detail-item">
-            <label>当前速度：</label>
-            <span>
-              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress()">
-                {{ formatBytesPerSec(getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.speed || 0) }}
-              </template>
-              <template v-else>-</template>
-            </span>
-          </div>
-          <div class="detail-item">
-            <label>已传输/总大小：</label>
-            <span>
-              <template v-if="runDetail.status==='running' && getActiveRunByTaskId(runDetail.taskId)?.stableProgress">
-                {{ formatBytes(getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.bytes || 0) }} /
-                {{ formatBytes(getActiveRunByTaskId(runDetail.taskId)?.stableProgress?.totalBytes || 0) }}
-              </template>
-              <template v-else-if="getFinalSummary(runDetail)">
-                {{ formatBytes(getFinalSummary(runDetail).transferredBytes || 0) }} /
-                {{ formatBytes(getFinalSummary(runDetail).totalBytes || 0) }}
-              </template>
-              <template v-else>-</template>
-            </span>
-          </div>
+          <!-- 从统计概览中展示开始/结束/耗时/进度/速度（数据库无则省略） -->
           <!-- 运行总结（友好统计） -->
           <div class="detail-item full-width">
             <label>运行总结：</label>
@@ -1270,12 +1206,36 @@ import TransferOptions from '../components/TransferOptions.vue'
                   <div class="summary-val">{{ finalCountOther }}</div>
                 </div>
                 <div class="summary-cell">
-                  <div class="summary-key">平均速度</div>
-                  <div class="summary-val">{{ formatBps(getFinalSummary(runDetail)?.avgSpeedBps || 0) }}</div>
+                  <div class="summary-key">开始时间</div>
+                  <div class="summary-val">{{ formatTime(runDetail.startedAt) }}</div>
+                </div>
+                <div class="summary-cell">
+                  <div class="summary-key">结束时间</div>
+                  <div class="summary-val">{{ formatTime(runDetail.finishedAt) }}</div>
                 </div>
                 <div class="summary-cell">
                   <div class="summary-key">耗时</div>
                   <div class="summary-val">{{ getFinalSummary(runDetail)?.durationText || '-' }}</div>
+                </div>
+                <div class="summary-cell">
+                  <div class="summary-key">平均速度</div>
+                  <div class="summary-val">{{ formatBps(getFinalSummary(runDetail)?.avgSpeedBps || 0) }}</div>
+                </div>
+                <div class="summary-cell" v-if="getFinalSummary(runDetail)">
+                  <div class="summary-key">已传输</div>
+                  <div class="summary-val">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
+                </div>
+                <div class="summary-cell" v-if="getFinalSummary(runDetail)">
+                  <div class="summary-key">总大小</div>
+                  <div class="summary-val">{{ formatBytes(getFinalSummary(runDetail)?.totalBytes || 0) }}</div>
+                </div>
+                <div class="summary-cell" v-if="getLiveSummaryFromDB(runDetail)">
+                  <div class="summary-key">（运行中）进度</div>
+                  <div class="summary-val">{{ (getLiveSummaryFromDB(runDetail)?.percentage||0).toFixed(2) }}%</div>
+                </div>
+                <div class="summary-cell" v-if="getLiveSummaryFromDB(runDetail)">
+                  <div class="summary-key">（运行中）速度</div>
+                  <div class="summary-val">{{ formatBytesPerSec(getLiveSummaryFromDB(runDetail)?.speed || 0) }}</div>
                 </div>
               </div>
             </div>
@@ -1821,6 +1781,8 @@ body.light .list-header { background: #f5f5f5; color: #666; border-bottom: 1px s
 .col-time { width: 150px; text-align: right; }
 .col-action { width: 80px; text-align: right; }
 .col-info { width: 120px; }
+/* 让卡片更宽松，展示 chips */
+.list .run-item { align-items:flex-start }
 .item {
   display: flex;
   align-items: center;
