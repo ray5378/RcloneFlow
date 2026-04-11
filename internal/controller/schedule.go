@@ -83,6 +83,14 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
+		// 运行时更新：重新加载该 schedule 的规则（删除旧 entry、按新状态/规格重建）
+		if s, ok := c.sched.DB().GetSchedule(id); ok {
+			if s.Enabled {
+				_ = c.sched.AddSchedule(s)
+			} else {
+				c.sched.RemoveSchedule(id)
+			}
+		}
 		WriteJSON(w, 200, map[string]any{"enabled": req.Enabled})
 
 	default:

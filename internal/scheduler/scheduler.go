@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"rcloneflow/internal/adapter"
@@ -27,23 +28,40 @@ type Scheduler struct {
 	cron *cron.Cron
 	db   *store.DB
 	r    Runner
+	mu   sync.Mutex
+	// 映射 scheduleID -> cron EntryID，便于删除/重建
+	entries map[int64]cron.EntryID
+}
+
+// DB 返回底层存储（仅用于控制器在更新启用状态后读取最新 schedule）
+func (s *Scheduler) DB() *store.DB { return s.db }
+
+// RemoveSchedule 移除一个运行时调度项（若存在）
+func (s *Scheduler) RemoveSchedule(id int64) {
+	s.mu.Lock(); defer s.mu.Unlock()
+	if eid, ok := s.entries[id]; ok {
+		s.cron.Remove(eid)
+		delete(s.entries, id)
+	}
 }
 
 // New 创建调度器（默认使用 RC 运行器，保持向后兼容）
 func New(db *store.DB, rc *rclone.Client) *Scheduler {
 	return &Scheduler{
-		cron: cron.New(cron.WithSeconds()),
-		db:   db,
-		r:    &taskRunner{db: db, rc: rc},
+		cron:    cron.New(cron.WithSeconds()),
+		db:      db,
+		r:       &taskRunner{db: db, rc: rc},
+		entries: map[int64]cron.EntryID{},
 	}
 }
 
 // NewWithRunner 创建调度器（显式指定 Runner，例如 TaskService 以使用 CLI Runner 与 stderr 日志）
 func NewWithRunner(db *store.DB, runner Runner) *Scheduler {
 	return &Scheduler{
-		cron: cron.New(cron.WithSeconds()),
-		db:   db,
-		r:    runner,
+		cron:    cron.New(cron.WithSeconds()),
+		db:      db,
+		r:       runner,
+		entries: map[int64]cron.EntryID{},
 	}
 }
 
@@ -195,13 +213,21 @@ func (s *Scheduler) AddSchedule(schedule store.Schedule) error {
 	taskID := schedule.TaskID
 	scheduleID := schedule.ID
 
+	// 如已有旧 entry，先删除
+	s.mu.Lock()
+	if eid, ok := s.entries[scheduleID]; ok {
+		s.cron.Remove(eid)
+		delete(s.entries, scheduleID)
+	}
+	s.mu.Unlock()
+
 	// 计算下次触发时间
 	nextTime, err := CalcNextRun(cronSpec)
 	if err == nil {
 		s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
 	}
 
-	_, err = s.cron.AddFunc(cronSpec, func() {
+	eid, err := s.cron.AddFunc(cronSpec, func() {
 		if err := s.r.RunTask(context.Background(), taskID, "schedule"); err != nil {
 			logger.Error("定时任务执行失败",
 				zap.Int64("task_id", taskID),
@@ -217,6 +243,7 @@ func (s *Scheduler) AddSchedule(schedule store.Schedule) error {
 	if err != nil {
 		return err
 	}
+	s.mu.Lock(); s.entries[scheduleID] = eid; s.mu.Unlock()
 	logger.Info("定时任务已添加(运行时)",
 		zap.Int64("schedule_id", scheduleID),
 		zap.Int64("task_id", taskID),
