@@ -1161,7 +1161,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="chip">总计 {{ (getFinalSummary(run).files?.length || 0) }}</span>
           <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
           <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
-          <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0) }}</span>
+          <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
           <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
           <span class="chip meta">总量 {{ formatBytes(getFinalSummary(run).totalBytes || 0) }}</span>
         </div>
