@@ -374,7 +374,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 						}
 					}
 					// 如果是 move 模式：将成对的 Copied+Deleted 合并为 Moved，并调整计数
-					if strings.ToLower("",""+cmdName) == "move" || strings.ToLower(cmdName) == "move" {
+					if strings.ToLower(cmdName) == "move" {
 						copiedMap := map[string]map[string]any{}
 						deletedMap := map[string]map[string]any{}
 						for _, f := range files {
