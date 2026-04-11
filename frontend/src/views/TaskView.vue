@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
+import { getToken } from '../api/auth'
 import type { Task, Schedule, Run } from '../types'
 
 const tasks = ref<Task[]>([])
@@ -1033,7 +1034,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           </span>
         </div>
         <button class="ghost small" @click="showRunDetail(run)">详情</button>
-        <a class="ghost small" :href="'/api/runs/' + run.id + '/log'" target="_blank">下载日志</a>
+        <a class="ghost small" :href="'/api/runs/' + run.id + '/log?auth=' + (getToken()||'')" target="_blank">下载日志</a>
         <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
       </div>
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>

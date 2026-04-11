@@ -190,6 +190,8 @@ func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 			}
 			// 回退路径（标准位置）
 			base := "/app/data/logs"
+			// 兼容前端带 auth 查询参数（忽略，仅用于传递 Bearer token 给中间件）
+			r.URL.RawQuery = ""
 			http.ServeFile(w, r, base+"/run-"+idStr+"-stderr.log")
 			return
 		}
