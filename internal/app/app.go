@@ -74,7 +74,8 @@ func Run(cfg *config.Config) error {
 	// 初始化路由
 	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl)
 
-	// 注入 settings → cleanup 重排钩子
+	// 注入 settings → cleanup 重排钩子（在声明 cleanupSvc 之后再赋值）
+	var cleanupSvc *service.CleanupService
 	controller.ReplanCleanupHook = func(intervalHours int, retentionDays int) {
 		if cleanupSvc != nil {
 			cleanupSvc.Replan(intervalHours, retentionDays)
