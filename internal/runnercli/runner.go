@@ -379,8 +379,6 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 							path := strings.TrimSpace(m[3])
 							msg := strings.TrimSpace(m[4])
 							row := map[string]any{"path": path, "at": at, "status": "", "action": "", "sizeBytes": 0}
-							// remove undefined sizes map in success path
-
 							low := strings.ToLower(msg)
 							if level == "ERROR" { row["status"] = "failed"; row["action"] = "Error"; counts["failed"]++ } else {
 								switch {
@@ -397,6 +395,33 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 							files = append(files, row)
 							counts["total"]++
 						}
+					}
+					// 如果是 move 模式：将成对的 Copied+Deleted 合并为 Moved，并调整计数
+					if strings.ToLower("",""+cmdName) == "move" || strings.ToLower(cmdName) == "move" {
+						copiedMap := map[string]map[string]any{}
+						deletedMap := map[string]map[string]any{}
+						for _, f := range files {
+							a := strings.ToLower(fmt.Sprint(f["action"]))
+							p := fmt.Sprint(f["path"])
+							if a == "copied" { copiedMap[p] = f }
+							if a == "deleted" { deletedMap[p] = f }
+						}
+						moved := []map[string]any{}
+						others := []map[string]any{}
+						for p, c := range copiedMap {
+							if _, ok := deletedMap[p]; ok {
+								moved = append(moved, map[string]any{"path": p, "at": c["at"], "status": "success", "action": "Moved", "sizeBytes": 0})
+								delete(deletedMap, p)
+							} else {
+								others = append(others, c)
+							}
+						}
+						for p, d := range deletedMap { _ = p; others = append(others, d) }
+						files = append(moved, others...)
+						// 计数：将 copied 置为 moved 数，deleted 置 0（成功= copied）
+						counts["copied"] = len(moved)
+						counts["deleted"] = 0
+						counts["total"] = counts["copied"] + counts["failed"] + counts["skipped"]
 					}
 				}
 			}
