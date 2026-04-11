@@ -118,8 +118,7 @@ onMounted(load)
               <option value="warn">警告</option>
               <option value="error">错误</option>
             </select>
-            <label title="日志输出目标：stdout/stderr 或文件路径">日志输出 <small class="subkey">LOG_OUTPUT</small></label>
-            <input v-model="form.LOG_OUTPUT" placeholder="stdout" />
+
           </div>
         </div>
 
