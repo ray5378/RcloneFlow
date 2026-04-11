@@ -42,6 +42,9 @@ const globalStats = ref<any>({})
 // const showTaskProgressModal = ref(false)
 // const taskProgressData = ref<any>({})
 const activeRuns = ref<any[]>([])
+// 任务卡片：完成后保留最近稳态进度的观察期（默认 15s）
+const LINGER_MS = 15000
+const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
 const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
 
 function setWebhook(task: Task){
@@ -211,6 +214,15 @@ async function loadData() {
 async function loadActiveRuns() {
   try {
     const data = await api.getActiveRuns()
+    const now = Date.now()
+    // 更新最后稳态快照
+    for (const it of data || []){
+      const tid = it.runRecord?.taskId
+      const sp = it.stableProgress
+      if (tid && sp && typeof sp === 'object'){
+        lastStableByTask.value[tid] = { sp, at: now }
+      }
+    }
     activeRuns.value = data || []
   } catch (e) {
     console.error(e)
@@ -218,7 +230,15 @@ async function loadActiveRuns() {
 }
 
 function getActiveRunByTaskId(taskId: number) {
-  return activeRuns.value.find(item => item.runRecord?.taskId === taskId)
+  // 优先返回活跃项
+  const cur = activeRuns.value.find(item => item.runRecord?.taskId === taskId)
+  if (cur) return cur
+  // 否则在观察期内返回最后稳态快照（phase=completed）
+  const st = lastStableByTask.value[taskId]
+  if (st && Date.now()-st.at <= LINGER_MS){
+    return { runRecord: { taskId }, stableProgress: { ...(st.sp||{}), phase: 'completed' } }
+  }
+  return undefined as any
 }
 
 function getTaskRealtimeProgress(taskId: number) {
