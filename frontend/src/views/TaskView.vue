@@ -1908,6 +1908,7 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 
 .error-text { color: #ff6b6b; white-space: pre-wrap; }
 .danger-hint { color: #ff6b6b; font-size: 13px; line-height: 1.5; }
-.log-modal{max-width: min(90vw, 1200px); width: 90vw;}
-.log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;max-height:70vh;min-height:50vh;overflow:auto;white-space:pre-wrap}
+.log-modal{max-width: min(95vw, 1400px); width: 95vw;}
+.log-modal .modal-body{padding:0}
+.log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;max-height:75vh;min-height:60vh;overflow:auto;white-space:pre-wrap;width:100%;box-sizing:border-box;margin:0}
 </style>
