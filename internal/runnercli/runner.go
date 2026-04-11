@@ -145,7 +145,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	stderrFile, _ := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 
 	// Preflight (approx) total count/size if enabled
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("PRECHECK_MODE")), "size") {
+	if strings.EqualFold(strings.TrimSpace(config.GetPrecheckMode()), "size") {
 		if b, c, e := sizeOf(&adapter.CmdRunner{}, cfg, src); e == nil {
 			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
 				if rr.Summary == nil { rr.Summary = map[string]any{} }
@@ -153,6 +153,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			})
 		}
 	}
+
+	// dynamic progress flush thresholds (read on each run start; consumer also re-reads periodically)
+	_ = config.GetProgressFlushInterval(); _ = config.GetProgressFlushDeltaPct(); _ = config.GetProgressFlushDeltaBytes()
 
 	cmd := runner.CmdContext(ctx, args...)
 	// fan-out: write to parser via io.Pipe（由 consumer 单点写入同一文件）
