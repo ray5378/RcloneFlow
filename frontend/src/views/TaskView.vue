@@ -1964,13 +1964,23 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 .log-box{width:100%; display:flex; justify-content:center;}
 .log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;height:100%;overflow:auto;white-space:pre-wrap;width:calc(100% - 64px);max-width:1100px;box-sizing:border-box;margin:0;border:1px solid #334155}
 
-/* 运行总结样式 */
+/* 运行总结样式（深浅主题适配） */
 .summary-box{background:#111827;border:1px solid #333;border-radius:10px;padding:12px 14px;margin-top:6px;max-width:1200px}
 .summary-title{font-weight:600;color:#e0e0e0;margin-bottom:8px}
 .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .summary-cell{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px}
 .summary-key{font-size:12px;color:#94a3b8;margin-bottom:6px}
 .summary-val{font-size:16px;color:#e2e8f0;font-weight:700}
+/* 浅色主题覆盖 */
+body.light .summary-box{background:#ffffff;border-color:#e5e7eb}
+body.light .summary-title{color:#111827}
+body.light .summary-cell{background:#f8fafc;border-color:#e5e7eb}
+body.light .summary-key{color:#64748b}
+body.light .summary-val{color:#111827}
+/* 可点击统计卡片的交互反馈 */
+.summary-cell.clickable{cursor:pointer;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
+.summary-cell.clickable:hover{background:#1f2937;border-color:#475569;box-shadow:0 0 0 1px #334155 inset}
+body.light .summary-cell.clickable:hover{background:#f0f4f8;border-color:#cbd5e1;box-shadow:0 0 0 1px #cbd5e1 inset}
 
 /* 传输明细表更宽、更疏朗 */
 .files-table{margin-top:14px;border:1px solid #333;border-radius:10px;}

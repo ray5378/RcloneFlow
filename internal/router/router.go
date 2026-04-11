@@ -97,8 +97,8 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/runs/active", r.runCtrl.HandleActiveRuns)
 	apiMux.HandleFunc("/api/stats/global", r.runCtrl.HandleGlobalStats)
 
-	// 设置（全局传输选项）
-	apiMux.HandleFunc("/api/settings/transfer", controller.NewSettingsController().HandleTransfer)
+	// 设置中心
+	apiMux.HandleFunc("/api/settings", controller.NewSettingsController().HandleSettings)
 	// CLI 扩展接口：停止/强杀/日志下载/文件明细
 	apiMux.HandleFunc("/api/runs/", func(w http.ResponseWriter, req *http.Request){
 		if strings.HasSuffix(req.URL.Path, "/stop") { r.runCtrl.HandleRunStopCLI(w, req); return }

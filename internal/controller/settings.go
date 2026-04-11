@@ -2,26 +2,141 @@ package controller
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
-
-	"rcloneflow/internal/settings"
+	"os"
+	"path/filepath"
+	"strings"
 )
 
-type SettingsController struct {}
+type SettingsController struct{}
 
 func NewSettingsController() *SettingsController { return &SettingsController{} }
 
-func (c *SettingsController) HandleTransfer(w http.ResponseWriter, r *http.Request) {
+// model
+type settingsPayload struct {
+	Values map[string]string `json:"values"`
+	Reset  bool              `json:"reset"`
+}
+
+type settingsResponse struct {
+	Auth      map[string]map[string]string `json:"auth"`
+	Log       map[string]map[string]string `json:"log"`
+	History   map[string]map[string]string `json:"history"`
+	Precheck  map[string]map[string]string `json:"precheck"`
+	Progress  map[string]map[string]string `json:"progress"`
+	Webdav    map[string]map[string]string `json:"webdav"`
+}
+
+func defaultsMap() map[string]string {
+	return map[string]string{
+		"ACCESS_TOKEN_TTL":                 "24h",
+		"REFRESH_TOKEN_TTL":                "90d",
+		"LOG_LEVEL":                        "info",
+		"LOG_OUTPUT":                       "stdout",
+		"FINAL_SUMMARY_RETENTION_DAYS":     "7",
+		"CLEANUP_INTERVAL_HOURS":           "24",
+		"PRECHECK_MODE":                    "none",
+		"PROGRESS_FLUSH_INTERVAL":          "5s",
+		"PROGRESS_FLUSH_MIN_DELTA_PCT":     "1",
+		"PROGRESS_FLUSH_MIN_DELTA_BYTES":   "52428800",
+		"FINISH_WAIT_INTERVAL":             "5s",
+		"FINISH_WAIT_TIMEOUT":              "5h",
+	}
+}
+
+func settingsPath() string {
+	dataDir := os.Getenv("APP_DATA_DIR")
+	if dataDir == "" { dataDir = "." }
+	_ = os.MkdirAll(dataDir, 0755)
+	return filepath.Join(dataDir, "settings.json")
+}
+
+func readOverrides() map[string]string {
+	fp := settingsPath()
+	b, err := os.ReadFile(fp)
+	if err != nil || len(b)==0 { return map[string]string{} }
+	var m map[string]string
+	if json.Unmarshal(b, &m) != nil || m==nil { return map[string]string{} }
+	return m
+}
+
+func writeOverrides(m map[string]string) error {
+	fp := settingsPath()
+	b, _ := json.MarshalIndent(m, "", "  ")
+	return os.WriteFile(fp, b, 0644)
+}
+
+func effectiveValue(key string, overrides map[string]string, defs map[string]string) string {
+	if v := os.Getenv(key); v != "" { return v }
+	if v := overrides[key]; v != "" { return v }
+	return defs[key]
+}
+
+// HandleSettings handles GET/PUT /api/settings
+func (s *SettingsController) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		ts, err := settings.Load()
-		if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
-		WriteJSON(w, 200, ts); return
+		s.handleGet(w, r); return
 	}
 	if r.Method == http.MethodPut {
-		var ts settings.TransferSettings
-		if err := json.NewDecoder(r.Body).Decode(&ts); err != nil { WriteJSON(w, 400, map[string]any{"error":"invalid body"}); return }
-		if err := settings.Save(ts); err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
-		WriteJSON(w, 200, map[string]any{"ok": true}); return
+		s.handlePut(w, r); return
 	}
-	w.WriteHeader(405)
+	w.WriteHeader(http.StatusMethodNotAllowed)
+}
+
+func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
+	defs := defaultsMap()
+	over := readOverrides()
+	eff := func(k string) string { return effectiveValue(k, over, defs) }
+
+	resp := settingsResponse{
+		Auth: map[string]map[string]string{
+			"ACCESS_TOKEN_TTL":      {"effective": eff("ACCESS_TOKEN_TTL"), "default": defs["ACCESS_TOKEN_TTL"]},
+			"REFRESH_TOKEN_TTL":     {"effective": eff("REFRESH_TOKEN_TTL"), "default": defs["REFRESH_TOKEN_TTL"]},
+		},
+		Log: map[string]map[string]string{
+			"LOG_LEVEL":  {"effective": eff("LOG_LEVEL"),  "default": defs["LOG_LEVEL"]},
+			"LOG_OUTPUT": {"effective": eff("LOG_OUTPUT"), "default": defs["LOG_OUTPUT"]},
+		},
+		History: map[string]map[string]string{
+			"FINAL_SUMMARY_RETENTION_DAYS": {"effective": eff("FINAL_SUMMARY_RETENTION_DAYS"), "default": defs["FINAL_SUMMARY_RETENTION_DAYS"]},
+			"CLEANUP_INTERVAL_HOURS":       {"effective": eff("CLEANUP_INTERVAL_HOURS"),       "default": defs["CLEANUP_INTERVAL_HOURS"]},
+		},
+		Precheck: map[string]map[string]string{
+			"PRECHECK_MODE": {"effective": eff("PRECHECK_MODE"), "default": defs["PRECHECK_MODE"]},
+		},
+		Progress: map[string]map[string]string{
+			"PROGRESS_FLUSH_INTERVAL":        {"effective": eff("PROGRESS_FLUSH_INTERVAL"),        "default": defs["PROGRESS_FLUSH_INTERVAL"]},
+			"PROGRESS_FLUSH_MIN_DELTA_PCT":   {"effective": eff("PROGRESS_FLUSH_MIN_DELTA_PCT"),   "default": defs["PROGRESS_FLUSH_MIN_DELTA_PCT"]},
+			"PROGRESS_FLUSH_MIN_DELTA_BYTES": {"effective": eff("PROGRESS_FLUSH_MIN_DELTA_BYTES"), "default": defs["PROGRESS_FLUSH_MIN_DELTA_BYTES"]},
+		},
+		Webdav: map[string]map[string]string{
+			"FINISH_WAIT_INTERVAL": {"effective": eff("FINISH_WAIT_INTERVAL"), "default": defs["FINISH_WAIT_INTERVAL"]},
+			"FINISH_WAIT_TIMEOUT":  {"effective": eff("FINISH_WAIT_TIMEOUT"),  "default": defs["FINISH_WAIT_TIMEOUT"]},
+		},
+	}
+	WriteJSON(w, http.StatusOK, resp)
+}
+
+func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
+	body, _ := io.ReadAll(r.Body)
+	var p settingsPayload
+	_ = json.Unmarshal(body, &p)
+	if p.Reset {
+		_ = writeOverrides(map[string]string{})
+		WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "reset": true})
+		return
+	}
+	// sanitize: only accept known keys
+	defs := defaultsMap()
+	cur := readOverrides()
+	for k, v := range p.Values {
+		k = strings.TrimSpace(k)
+		if _, ok := defs[k]; !ok { continue }
+		cur[k] = strings.TrimSpace(v)
+	}
+	if err := writeOverrides(cur); err != nil {
+		WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()}); return
+	}
+	WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
