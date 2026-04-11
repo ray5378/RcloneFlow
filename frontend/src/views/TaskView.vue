@@ -1008,7 +1008,6 @@ import TransferOptions from '../components/TransferOptions.vue'
       <div class="title">任务列表</div>
       <div class="header-actions">
         <input v-model="taskSearch" type="text" placeholder="搜索任务..." class="search-input" />
-        <button class="secondary small" @click="openGlobalStats">全局实时数据</button>
         <button class="primary small" @click="goToAddTask">+ 添加任务</button>
       </div>
     </div>
