@@ -15,12 +15,17 @@ const durationRe = /^\s*\d+\s*(ms|s|m|h|d)\s*$/i
 function validate(){
   errors.value = {}
   // 数字字段 >=0
-  const intFields = ['FINAL_SUMMARY_RETENTION_DAYS','CLEANUP_INTERVAL_HOURS','PROGRESS_FLUSH_MIN_DELTA_BYTES']
+  const intFields = ['FINAL_SUMMARY_RETENTION_DAYS','CLEANUP_INTERVAL_HOURS']
   for (const k of intFields){
     const v = (form.value as any)[k]
     if (v!=='' && (isNaN(Number(v)) || !Number.isFinite(Number(v)) || Number(v) < 0)){
       errors.value[k] = '请输入大于或等于 0 的数字'
     }
+  }
+  // MB 字段单独校验，可小数
+  const mb = (form.value as any)['PROGRESS_FLUSH_MIN_DELTA_BYTES']
+  if (mb!=='' && (isNaN(Number(mb)) || Number(mb) < 0)){
+    errors.value['PROGRESS_FLUSH_MIN_DELTA_BYTES'] = '请输入大于或等于 0 的数字（单位：MB，可小数）'
   }
   // 百分比 0-100
   const pct = (form.value as any)['PROGRESS_FLUSH_MIN_DELTA_PCT']
@@ -47,15 +52,30 @@ function flat(resp:any){
 
 async function load(){
   loading.value = true
-  try{ const resp = await getSettings(); data.value = resp; form.value = flat(resp) } finally { loading.value=false }
+  try{
+    const resp = await getSettings();
+    data.value = resp;
+    form.value = flat(resp);
+    // 将字节转为 MB（保留两位小数显示）
+    const b = Number((form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES || 0)
+    if (!isNaN(b) && isFinite(b) && b>0){
+      (form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES = String(Math.round((b/1048576)*100)/100)
+    }
+  } finally { loading.value=false }
 }
 
 async function onSave(){
   if (!validate()) return
+  // 将 MB 转回字节提交
+  const payload = { ...form.value }
+  const mb = Number((payload as any).PROGRESS_FLUSH_MIN_DELTA_BYTES)
+  if (!isNaN(mb) && isFinite(mb) && mb>=0){
+    ;(payload as any).PROGRESS_FLUSH_MIN_DELTA_BYTES = String(Math.round(mb * 1048576))
+  }
   saving.value = true
   saveFailed.value = false
   try{
-    await saveSettings(form.value)
+    await saveSettings(payload)
     await load()
     saved.value = true
     setTimeout(()=>{ saved.value=false }, 10000)
@@ -154,8 +174,8 @@ onMounted(load)
             <label title="两次写库的最小增量（百分比）">写库最小增量（百分比） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_PCT</small></label>
             <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_PCT" type="number" min="0" step="0.1" />
             <div class="error" v-if="errors.PROGRESS_FLUSH_MIN_DELTA_PCT">{{ errors.PROGRESS_FLUSH_MIN_DELTA_PCT }}</div>
-            <label title="两次写库的最小增量（字节）">写库最小增量（字节） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_BYTES</small></label>
-            <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_BYTES" type="number" min="0" />
+            <label title="两次写库的最小增量（MB）">写库最小增量（MB） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_BYTES</small></label>
+            <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_BYTES" type="number" min="0" step="0.01" />
             <div class="error" v-if="errors.PROGRESS_FLUSH_MIN_DELTA_BYTES">{{ errors.PROGRESS_FLUSH_MIN_DELTA_BYTES }}</div>
           </div>
         </div>
