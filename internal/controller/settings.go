@@ -28,7 +28,6 @@ type settingsResponse struct {
 	History   map[string]map[string]string `json:"history"`
 	Precheck  map[string]map[string]string `json:"precheck"`
 	Progress  map[string]map[string]string `json:"progress"`
-	Webdav    map[string]map[string]string `json:"webdav"`
 }
 
 func defaultsMap() map[string]string {
@@ -43,8 +42,6 @@ func defaultsMap() map[string]string {
 		"PROGRESS_FLUSH_INTERVAL":          "5s",
 		"PROGRESS_FLUSH_MIN_DELTA_PCT":     "1",
 		"PROGRESS_FLUSH_MIN_DELTA_BYTES":   "52428800",
-		"FINISH_WAIT_INTERVAL":             "5s",
-		"FINISH_WAIT_TIMEOUT":              "5h",
 	}
 }
 
@@ -112,10 +109,6 @@ func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
 			"PROGRESS_FLUSH_INTERVAL":        {"effective": eff("PROGRESS_FLUSH_INTERVAL"),        "default": defs["PROGRESS_FLUSH_INTERVAL"]},
 			"PROGRESS_FLUSH_MIN_DELTA_PCT":   {"effective": eff("PROGRESS_FLUSH_MIN_DELTA_PCT"),   "default": defs["PROGRESS_FLUSH_MIN_DELTA_PCT"]},
 			"PROGRESS_FLUSH_MIN_DELTA_BYTES": {"effective": eff("PROGRESS_FLUSH_MIN_DELTA_BYTES"), "default": defs["PROGRESS_FLUSH_MIN_DELTA_BYTES"]},
-		},
-		Webdav: map[string]map[string]string{
-			"FINISH_WAIT_INTERVAL": {"effective": eff("FINISH_WAIT_INTERVAL"), "default": defs["FINISH_WAIT_INTERVAL"]},
-			"FINISH_WAIT_TIMEOUT":  {"effective": eff("FINISH_WAIT_TIMEOUT"),  "default": defs["FINISH_WAIT_TIMEOUT"]},
 		},
 	}
 	WriteJSON(w, http.StatusOK, resp)
