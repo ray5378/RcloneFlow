@@ -227,8 +227,7 @@ onMounted(async () => {
       
       <!-- 修改默认设置弹窗 -->
       <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal=false" />
-
-    </template>
+    </div>
   </div>
 </template>
 
