@@ -232,9 +232,8 @@ onMounted(async () => {
   </div>
 </template>
 
-<script lang="ts">
+<script lang="ts" setup>
 import DefaultsModal from './components/DefaultsModal.vue'
-export default { components: { DefaultsModal } }
 </script>
 
 <style scoped>
