@@ -8,6 +8,35 @@ const saved = ref(false)
 const showResetConfirm = ref(false)
 const data = ref<any>(null)
 const form = ref<Record<string,string>>({})
+const errors = ref<Record<string,string>>({})
+const saveFailed = ref(false)
+const durationRe = /^\s*\d+\s*(ms|s|m|h|d)\s*$/i
+
+function validate(){
+  errors.value = {}
+  // 数字字段 >=0
+  const intFields = ['FINAL_SUMMARY_RETENTION_DAYS','CLEANUP_INTERVAL_HOURS','PROGRESS_FLUSH_MIN_DELTA_BYTES']
+  for (const k of intFields){
+    const v = (form.value as any)[k]
+    if (v!=='' && (isNaN(Number(v)) || !Number.isFinite(Number(v)) || Number(v) < 0)){
+      errors.value[k] = '请输入大于或等于 0 的数字'
+    }
+  }
+  // 百分比 0-100
+  const pct = (form.value as any)['PROGRESS_FLUSH_MIN_DELTA_PCT']
+  if (pct!=='' && (isNaN(Number(pct)) || Number(pct) < 0 || Number(pct) > 100)){
+    errors.value['PROGRESS_FLUSH_MIN_DELTA_PCT'] = '请输入 0-100 之间的数字（可带小数）'
+  }
+  // 时长字段
+  const durFields = ['ACCESS_TOKEN_TTL','REFRESH_TOKEN_TTL','PROGRESS_FLUSH_INTERVAL','FINISH_WAIT_INTERVAL','FINISH_WAIT_TIMEOUT']
+  for (const k of durFields){
+    const v = (form.value as any)[k]
+    if (v && !durationRe.test(String(v))){
+      errors.value[k] = '格式应为 数字+单位（ms/s/m/h/d），例如：5s、24h、90d'
+    }
+  }
+  return Object.keys(errors.value).length === 0
+}
 
 function flat(resp:any){
   const out:Record<string,string> = {}
@@ -22,14 +51,18 @@ async function load(){
 }
 
 async function onSave(){
+  if (!validate()) return
   saving.value = true
+  saveFailed.value = false
   try{
     await saveSettings(form.value)
     await load()
     saved.value = true
     setTimeout(()=>{ saved.value=false }, 10000)
   } catch(e:any){
-    alert(e?.message||e)
+    console.error(e)
+    saveFailed.value = true
+    setTimeout(()=>{ saveFailed.value=false }, 3000)
   } finally {
     saving.value=false
   }
@@ -66,24 +99,26 @@ onMounted(load)
         <div class="section">
           <div class="section-title">认证</div>
           <div class="grid">
-            <label>访问令牌有效期 <small class="subkey">ACCESS_TOKEN_TTL</small></label>
+            <label title="JWT 访问令牌有效期，示例：24h">访问令牌有效期 <small class="subkey">ACCESS_TOKEN_TTL</small></label>
             <input v-model="form.ACCESS_TOKEN_TTL" placeholder="如 24h" />
-            <label>刷新令牌有效期 <small class="subkey">REFRESH_TOKEN_TTL</small></label>
+            <div class="error" v-if="errors.ACCESS_TOKEN_TTL">{{ errors.ACCESS_TOKEN_TTL }}</div>
+            <label title="Refresh 令牌有效期，示例：90d">刷新令牌有效期 <small class="subkey">REFRESH_TOKEN_TTL</small></label>
             <input v-model="form.REFRESH_TOKEN_TTL" placeholder="如 90d" />
+            <div class="error" v-if="errors.REFRESH_TOKEN_TTL">{{ errors.REFRESH_TOKEN_TTL }}</div>
           </div>
         </div>
 
         <div class="section">
           <div class="section-title">日志与等级（实时生效）</div>
           <div class="grid">
-            <label>日志级别 <small class="subkey">LOG_LEVEL</small></label>
+            <label title="日志级别（保存后即时生效）">日志级别 <small class="subkey">LOG_LEVEL</small></label>
             <select v-model="form.LOG_LEVEL">
               <option value="debug">调试</option>
               <option value="info">信息</option>
               <option value="warn">警告</option>
               <option value="error">错误</option>
             </select>
-            <label>日志输出 <small class="subkey">LOG_OUTPUT</small></label>
+            <label title="日志输出目标：stdout/stderr 或文件路径">日志输出 <small class="subkey">LOG_OUTPUT</small></label>
             <input v-model="form.LOG_OUTPUT" placeholder="stdout" />
           </div>
         </div>
@@ -91,17 +126,19 @@ onMounted(load)
         <div class="section">
           <div class="section-title">历史与保留（定期清理）</div>
           <div class="grid">
-            <label>运行总结保留天数 <small class="subkey">FINAL_SUMMARY_RETENTION_DAYS</small></label>
+            <label title="运行总结（finalSummary）保留天数">运行总结保留天数 <small class="subkey">FINAL_SUMMARY_RETENTION_DAYS</small></label>
             <input v-model="form.FINAL_SUMMARY_RETENTION_DAYS" type="number" min="0" />
-            <label>清理扫描间隔（小时） <small class="subkey">CLEANUP_INTERVAL_HOURS</small></label>
+            <div class="error" v-if="errors.FINAL_SUMMARY_RETENTION_DAYS">{{ errors.FINAL_SUMMARY_RETENTION_DAYS }}</div>
+            <label title="清理任务执行间隔（小时）">清理扫描间隔（小时） <small class="subkey">CLEANUP_INTERVAL_HOURS</small></label>
             <input v-model="form.CLEANUP_INTERVAL_HOURS" type="number" min="0" />
+            <div class="error" v-if="errors.CLEANUP_INTERVAL_HOURS">{{ errors.CLEANUP_INTERVAL_HOURS }}</div>
           </div>
         </div>
 
         <div class="section">
           <div class="section-title">预检/统计概览（任务启动前）</div>
           <div class="grid">
-            <label>预检模式 <small class="subkey">PRECHECK_MODE</small></label>
+            <label title="任务启动前是否做体量预估（size）">预检模式 <small class="subkey">PRECHECK_MODE</small></label>
             <select v-model="form.PRECHECK_MODE">
               <option value="none">关闭</option>
               <option value="size">按大小预检</option>
@@ -112,28 +149,33 @@ onMounted(load)
         <div class="section">
           <div class="section-title">运行中进度限流写库（热生效）</div>
           <div class="grid">
-            <label>写库最小间隔 <small class="subkey">PROGRESS_FLUSH_INTERVAL</small></label>
+            <label title="进度写库最小时间间隔">写库最小间隔 <small class="subkey">PROGRESS_FLUSH_INTERVAL</small></label>
             <input v-model="form.PROGRESS_FLUSH_INTERVAL" placeholder="如 5s" />
-            <label>写库最小增量（百分比） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_PCT</small></label>
+            <div class="error" v-if="errors.PROGRESS_FLUSH_INTERVAL">{{ errors.PROGRESS_FLUSH_INTERVAL }}</div>
+            <label title="两次写库的最小增量（百分比）">写库最小增量（百分比） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_PCT</small></label>
             <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_PCT" type="number" min="0" step="0.1" />
-            <label>写库最小增量（字节） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_BYTES</small></label>
+            <div class="error" v-if="errors.PROGRESS_FLUSH_MIN_DELTA_PCT">{{ errors.PROGRESS_FLUSH_MIN_DELTA_PCT }}</div>
+            <label title="两次写库的最小增量（字节）">写库最小增量（字节） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_BYTES</small></label>
             <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_BYTES" type="number" min="0" />
+            <div class="error" v-if="errors.PROGRESS_FLUSH_MIN_DELTA_BYTES">{{ errors.PROGRESS_FLUSH_MIN_DELTA_BYTES }}</div>
           </div>
         </div>
 
         <div class="section">
           <div class="section-title">WebDAV 收尾（完成确认）</div>
           <div class="grid">
-            <label>收尾轮询间隔 <small class="subkey">FINISH_WAIT_INTERVAL</small></label>
+            <label title="WebDAV 收尾轮询间隔">收尾轮询间隔 <small class="subkey">FINISH_WAIT_INTERVAL</small></label>
             <input v-model="form.FINISH_WAIT_INTERVAL" placeholder="如 5s" />
-            <label>收尾超时时间 <small class="subkey">FINISH_WAIT_TIMEOUT</small></label>
+            <div class="error" v-if="errors.FINISH_WAIT_INTERVAL">{{ errors.FINISH_WAIT_INTERVAL }}</div>
+            <label title="WebDAV 收尾最长等待">收尾超时时间 <small class="subkey">FINISH_WAIT_TIMEOUT</small></label>
             <input v-model="form.FINISH_WAIT_TIMEOUT" placeholder="如 5h" />
+            <div class="error" v-if="errors.FINISH_WAIT_TIMEOUT">{{ errors.FINISH_WAIT_TIMEOUT }}</div>
           </div>
         </div>
       </div>
       <div class="modal-footer">
         <button class="ghost" @click="onReset" :disabled="saving">重置为默认</button>
-        <button :class="['primary', { saved: saved }]" @click="onSave" :disabled="saving">{{ saved ? '已保存生效' : '保存' }}</button>
+        <button :class="['primary', { saved: saved, failed: saveFailed }]" @click="onSave" :disabled="saving">{{ saved ? '已保存生效' : (saveFailed ? '保存失败' : '保存') }}</button>
       </div>
     </div>
   </div>
@@ -166,4 +208,6 @@ input, select{ padding: 8px 10px; border-radius: 8px; border: 1px solid #333; ba
 body.light input, body.light select{ background:#fff; color:#111; border-color:#ddd }
 .subkey{opacity:.6;margin-left:6px;font-weight:400}
 .modal-footer .primary.saved{ background:#16a34a; color:#fff; border:none }
+.modal-footer .primary.failed{ background:#dc2626; color:#fff; border:none }
+.error{ color:#ef4444; font-size:12px; margin-top:4px }
 </style>
