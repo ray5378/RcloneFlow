@@ -381,13 +381,28 @@ function getLiveSummaryFromDB(run:any){
       const bytes = Number(p.bytes || 0)
       const totalBytes = Number(p.totalBytes || 0)
       const speed = Number(p.speed || 0)
-      const eta = typeof p.eta === 'number' ? p.eta : null
       let percentage = Number(p.percentage || 0)
       if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
-      return { bytes, totalBytes, speed, eta, percentage }
+      return { bytes, totalBytes, speed, percentage }
     }
   }catch{}
   return null
+}
+// 以“开始时间 + 平均速度”计算更稳健的 ETA（剩余时间，秒）
+function calcEtaFromAvg(run:any, live:any){
+  try{
+    if (!run?.startedAt || !live) return null
+    const start = new Date(run.startedAt).getTime()
+    const now = Date.now()
+    const elapsedSec = Math.max(1, Math.floor((now - start)/1000))
+    const bytes = Number(live.bytes||0)
+    const total = Number(live.totalBytes||0)
+    if (!total || bytes<=0) return null
+    const avgBps = bytes / elapsedSec
+    if (avgBps <= 0) return null
+    const remaining = Math.max(0, total - bytes)
+    return Math.floor(remaining / avgBps)
+  }catch{ return null }
 }
 
 function getStatusClass(status: string) {
@@ -1123,7 +1138,7 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip meta">速度 {{ formatBytesPerSec(getLiveSummaryFromDB(run)?.speed || 0) }}</span>
             <span class="chip meta">已传 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span>
             <span class="chip meta">总量 {{ formatBytes(getLiveSummaryFromDB(run)?.totalBytes || 0) }}</span>
-            <span class="chip meta" v-if="getLiveSummaryFromDB(run)?.eta">ETA {{ formatEta(getLiveSummaryFromDB(run)?.eta||0) }}</span>
+            <span class="chip meta" v-if="calcEtaFromAvg(run, getLiveSummaryFromDB(run))">ETA {{ formatEta(calcEtaFromAvg(run, getLiveSummaryFromDB(run))||0) }}</span>
             <span class="chip meta" v-if="getPreflight(run)">需完成约 {{ getPreflight(run).totalCount }}</span>
           </template>
           <template v-else-if="getActiveRunByTaskId(run.taskId)?.stableProgress">

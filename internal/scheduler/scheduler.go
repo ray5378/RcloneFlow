@@ -258,50 +258,17 @@ func (s *Scheduler) Start() error {
 		return err
 	}
 	for _, item := range schedules {
-		if !item.Enabled {
-			continue
-		}
-		cronSpec, ok := ParseSpecToCron(item.Spec)
-		if !ok {
-			logger.Warn("跳过不支持的定时规格",
-				zap.Int64("schedule_id", item.ID),
-				zap.String("spec", item.Spec),
-				zap.String("reason", "cron表达式解析失败"))
-			continue
-		}
-		taskID := item.TaskID
-		scheduleID := item.ID
-
-		// 计算并存储下次触发时间
-		nextTime, err := CalcNextRun(cronSpec)
-		if err == nil {
-			s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
-		}
-
-		_, err = s.cron.AddFunc(cronSpec, func() {
-			if err := s.r.RunTask(context.Background(), taskID, "schedule"); err != nil {
-				logger.Error("定时任务执行失败",
-					zap.Int64("task_id", taskID),
-					zap.String("spec", cronSpec),
-					zap.Error(err))
-			}
-			// 执行后更新下次触发时间
-			nextTime, err := CalcNextRun(cronSpec)
-			if err == nil {
-				s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
-			}
-		})
-		if err != nil {
+		if !item.Enabled { continue }
+		if err := s.AddSchedule(item); err != nil {
 			logger.Warn("添加定时任务失败",
 				zap.Int64("schedule_id", item.ID),
-				zap.String("cron_spec", cronSpec),
+				zap.String("spec", item.Spec),
 				zap.Error(err))
 			continue
 		}
 		logger.Info("定时任务已启动",
 			zap.Int64("schedule_id", item.ID),
-			zap.Int64("task_id", taskID),
-			zap.String("cron_spec", cronSpec))
+			zap.Int64("task_id", item.TaskID))
 	}
 	s.cron.Start()
 	return nil
