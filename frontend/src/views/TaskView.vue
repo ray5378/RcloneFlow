@@ -441,7 +441,8 @@ function getLiveSummaryFromDB(run:any){
   return null
 }
 // 以“开始时间 + 平均速度”计算更稳健的 ETA（剩余时间，秒）
-// 预估完成（剩余时间）：剩余字节 / 最近一次非 0 速度
+// 预估完成（剩余时间）：剩余字节 / 最近一次“前端实际展示”的非 0 速度
+// 判定规则：仅当 formatBytesPerSec(speed) 不是 '-' 时才采信该速度
 const lastNonZeroSpeedByTask: Record<number, number> = {}
 function calcEtaFromAvg(run:any, live:any){
   try{
@@ -450,15 +451,20 @@ function calcEtaFromAvg(run:any, live:any){
     const total = Number(live.totalBytes||0)
     if (!total || bytes<=0) return null
     const remaining = Math.max(0, total - bytes)
-    // 记录并使用最近一次非 0 的速度
     const tid = (run.taskId || run.taskID || run.task_id || run.runRecord?.taskId) as number
     const curSpeed = Number(live.speed||0)
+    // 只有当前端会显示有效速度（formatBytesPerSec 不是 '-'）时，才更新缓存
+    const curSpeedShown = formatBytesPerSec(curSpeed) !== '-' ? curSpeed : 0
     if (tid){
-      if (curSpeed>0) lastNonZeroSpeedByTask[tid] = curSpeed
+      if (curSpeedShown>0) lastNonZeroSpeedByTask[tid] = curSpeedShown
     }
-    const sp = tid ? (lastNonZeroSpeedByTask[tid] || 0) : curSpeed
+    const sp = tid ? (lastNonZeroSpeedByTask[tid] || 0) : curSpeedShown
+    // 如果没有可用速度，或速度过小导致预估时间极大，则不展示预估完成
     if (!sp || sp<=0) return null
-    return Math.floor(remaining / sp)
+    const etaSec = Math.floor(remaining / sp)
+    // 超过 99 小时视为不合理，直接不显示
+    if (etaSec > 99*3600) return null
+    return etaSec
   }catch{ return null }
 }
 
