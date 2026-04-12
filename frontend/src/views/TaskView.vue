@@ -1223,10 +1223,10 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip">进度 {{ ((getDeNoisedStableByRun(run) as any)?.percentage||0).toFixed(2) }}%</span>
             <span class="chip meta">速度 {{ formatBytesPerSec((getDeNoisedStableByRun(run) as any)?.speed || 0) }}</span>
             <!-- 移除“总量/已传”冗余，统一用“总体积/已传输” -->
-            <span class="chip meta" v-if="calcEtaFromAvg(run, (getDbProgressStable(run) as any))">预估完成 {{ formatEta(calcEtaFromAvg(run, (getDbProgressStable(run) as any))||0) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDbProgressStable(run) as any)?.bytes || 0) }}</span></span>
+            <span class="chip meta" v-if="calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))">预估完成 {{ formatEta(calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))||0) }}</span>
+            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDeNoisedStableByRun(run) as any)?.bytes || 0) }}</span></span>
             <!-- 仅保留“总数量/已传输数量”，去掉“总量/已传”重复口径 -->
-            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount || 0 }}</span> ／ <span class="act">已传输 {{ (getDbProgressStable(run) as any)?.completedFiles || 0 }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount || 0 }}</span> ／ <span class="act">已传输 {{ (getDeNoisedStableByRun(run) as any)?.completedFiles || 0 }}</span></span>
           </template>
         </div>
         <!-- 历史卡片内的一目了然统计概览（完成态） -->
