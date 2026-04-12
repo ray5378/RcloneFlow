@@ -819,8 +819,15 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				if cf == 0 { if vv, ok2 := sp["completedFiles"].(float64); ok2 { cf = vv } }
 			}
 		}
-		// 计算稳态候选（包含 completedFiles，供前端 DB-only 流直接使用）
-		stable := map[string]any{"bytes": bytes, "totalBytes": total, "speed": speed, "percentage": pct, "phase": "transferring", "lastUpdatedAt": time.Now().Format(time.RFC3339), "completedFiles": cf}
+		// 预估总数量：来自 summary.preflight.totalCount（若有）
+		totalCount := float64(0)
+		if summary != nil {
+			if pf, ok := summary["preflight"].(map[string]any); ok {
+				if v, ok2 := pf["totalCount"].(float64); ok2 { totalCount = v }
+			}
+		}
+		// 计算稳态候选（包含 completedFiles/totalCount，供前端 DB-only 流直接使用）
+		stable := map[string]any{"bytes": bytes, "totalBytes": total, "speed": speed, "percentage": pct, "phase": "transferring", "lastUpdatedAt": time.Now().Format(time.RFC3339), "completedFiles": cf, "totalCount": totalCount}
 		// 阶段：preparing
 		if total == 0 {
 			stable["phase"] = "preparing"
