@@ -1000,6 +1000,10 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					fmt.Sscanf(m[6], "%f", &pct)
 					fmt.Sscanf(m[7], "%f", &sp)
 					fp.update(name, cb*unitToMul(m[3]), tb*unitToMul(m[5]), sp*unitToMul(m[8]), pct)
+					// 若该文件进度已达到或超过 100%，也视为已完成（补齐非英文环境缺少 "Copied (new)" 的情况）
+					if (tb > 0 && cb >= tb) || pct >= 100 {
+						fp.markCopied(name)
+					}
 					continue
 				}
 				if m := fileCopiedRe.FindStringSubmatch(line); len(m) > 0 {
