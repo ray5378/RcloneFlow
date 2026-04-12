@@ -1180,7 +1180,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           </template>
         </div>
         <!-- 历史卡片内的一目了然统计概览（完成态） -->
-        <div class="summary-mini" v-if="run.status==='finished' && getFinalSummary(run)">
+        <div class="summary-mini" v-if="run.status!=='running' && getFinalSummary(run)">
           <span class="chip">总计 {{ (getFinalSummary(run).files?.length || 0) }}</span>
           <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
           <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
