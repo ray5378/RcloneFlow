@@ -264,6 +264,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 								path := strings.TrimSpace(m[3])
 								msg := strings.TrimSpace(m[4])
 								row := map[string]any{"path": path, "at": at, "status": "", "action": "", "sizeBytes": 0}
+								if sz, ok := sizes[path]; ok { row["sizeBytes"] = sz }
 								low := strings.ToLower(msg)
 								if level == "ERROR" { row["status"] = "failed"; row["action"] = "Error"; counts["failed"]++ } else {
 									switch {
