@@ -387,6 +387,15 @@ function calcEtaForTaskCard(taskId:number){
   }catch{ return null }
 }
 
+// 抗噪稳态读取（任务卡片用）：优先 lastStableByTask，再回退当前 active 的 stableProgress
+function getDeNoisedStableByTask(taskId:number){
+  try{
+    const st = lastStableByTask.value?.[taskId]?.sp
+    if (st) return st
+  }catch{}
+  return getActiveRunByTaskId(taskId)?.stableProgress
+}
+
 
 // 加载全局实时统计
 async function loadGlobalStats() {
@@ -1173,9 +1182,9 @@ import TransferOptions from '../components/TransferOptions.vue'
               </template>
               <template v-else>
                 {{ ((getActiveRunByTaskId(task.id)?.stableProgress?.percentage) || 0).toFixed(2) }}% ·
-                {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.bytes || 0) }} /
-                {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.totalBytes || 0) }} ·
-                {{ formatBytesPerSec(getActiveRunByTaskId(task.id)?.stableProgress?.speed || 0) }} ·
+                {{ formatBytes(getDeNoisedStableByTask(task.id)?.bytes || 0) }} /
+                {{ formatBytes(getDeNoisedStableByTask(task.id)?.totalBytes || 0) }} ·
+                {{ formatBytesPerSec(getDeNoisedStableByTask(task.id)?.speed || 0) }} ·
                 总数量 {{ getActiveRunByTaskId(task.id)?.stableProgress?.totalCount || 0 }} ／ 已传输 {{ getActiveRunByTaskId(task.id)?.stableProgress?.completedFiles || 0 }} ·
                 <span v-if="calcEtaForTaskCard(task.id)">预估完成 {{ formatEta(calcEtaForTaskCard(task.id) || 0) }}</span>
               </template>
