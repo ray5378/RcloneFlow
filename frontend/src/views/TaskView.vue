@@ -1147,10 +1147,9 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip meta">已传 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span>
             <span class="chip meta">总量 {{ formatBytes(getLiveSummaryFromDB(run)?.totalBytes || 0) }}</span>
             <span class="chip meta" v-if="calcEtaFromAvg(run, getLiveSummaryFromDB(run))">ETA {{ formatEta(calcEtaFromAvg(run, getLiveSummaryFromDB(run))||0) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">预估 {{ getPreflight(run).totalCount }}</span>
-            <span class="chip meta" v-if="getLiveSummaryFromDB(run)?.completedFiles !== undefined">实际 {{ getLiveSummaryFromDB(run)?.completedFiles }}</span>
-            <!-- 体量 预估/实际（运行中） -->
-            <span class="chip meta" v-if="getPreflight(run)">体量 <span class="est">约 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">实 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ getLiveSummaryFromDB(run)?.completedFiles ?? 0 }}</span></span>
+            <!-- 体量（运行中）：总体积/已传输 -->
+            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span></span>
           </template>
           <template v-else-if="getActiveRunByTaskId(run.taskId)?.stableProgress">
             <!-- DB 暂无时才回退 active -->
@@ -1159,8 +1158,8 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip meta">已传 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes || 0) }}</span>
             <span class="chip meta">总量 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.totalBytes || 0) }}</span>
             <span class="chip meta" v-if="getActiveRunByTaskId(run.taskId)?.stableProgress?.eta">ETA {{ formatEta(getActiveRunByTaskId(run.taskId)?.stableProgress?.eta) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">预估 {{ getPreflight(run).totalCount }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">体量 <span class="est">约 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">实 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes || 0) }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes || 0) }}</span></span>
           </template>
         </div>
         <!-- 历史卡片内的一目了然统计概览（完成态） -->
@@ -1169,10 +1168,9 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
           <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
           <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
-          <!-- 预估 vs 实际（数量） -->
-          <span class="chip meta" v-if="getPreflight(run)">数量 <span class="est">约 {{ getPreflight(run).totalCount }}</span> ／ <span class="act">实 {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span></span>
-          <!-- 预估 vs 实际（体量） -->
-          <span class="chip meta" v-if="getPreflight(run)">体量 <span class="est">约 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">实 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span></span>
+          <!-- 预估 vs 实际（数量/体量） → 文案：总数量/已传输、总体积/已传输 -->
+          <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span></span>
+          <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span></span>
           <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
           <span class="chip meta">总量 {{ formatBytes(getFinalSummary(run).totalBytes || 0) }}</span>
         </div>
