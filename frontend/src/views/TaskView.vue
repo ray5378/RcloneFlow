@@ -1144,12 +1144,12 @@ import TransferOptions from '../components/TransferOptions.vue'
           <template v-if="getLiveSummaryFromDB(run)">
             <span class="chip">进度 {{ (getLiveSummaryFromDB(run)?.percentage||0).toFixed(2) }}%</span>
             <span class="chip meta">速度 {{ formatBytesPerSec(getLiveSummaryFromDB(run)?.speed || 0) }}</span>
-            <span class="chip meta">已传 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span>
-            <span class="chip meta">总量 {{ formatBytes(getLiveSummaryFromDB(run)?.totalBytes || 0) }}</span>
+            <span class="chip meta">已传 {{ formatBytes((getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes) || (getLiveSummaryFromDB(run)?.bytes || 0)) }}</span>
+            <span class="chip meta">总量 {{ formatBytes((getActiveRunByTaskId(run.taskId)?.stableProgress?.totalBytes) || (getLiveSummaryFromDB(run)?.totalBytes || 0)) }}</span>
             <span class="chip meta" v-if="calcEtaFromAvg(run, getLiveSummaryFromDB(run))">ETA {{ formatEta(calcEtaFromAvg(run, getLiveSummaryFromDB(run))||0) }}</span>
             <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ getLiveSummaryFromDB(run)?.completedFiles ?? 0 }}</span></span>
             <!-- 体量（运行中）：总体积/已传输 -->
-            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes) || (getLiveSummaryFromDB(run)?.bytes || 0)) }}</span></span>
           </template>
           <template v-else-if="getActiveRunByTaskId(run.taskId)?.stableProgress">
             <!-- DB 暂无时才回退 active -->
@@ -1237,19 +1237,19 @@ import TransferOptions from '../components/TransferOptions.vue'
                   <div class="summary-val">{{ finalCountOther }}</div>
                 </div>
                 <div class="summary-cell" v-if="getPreflight(runDetail)">
-                  <div class="summary-key">预估数量</div>
-                  <div class="summary-val est">约 {{ getPreflight(runDetail).totalCount }}</div>
+                  <div class="summary-key">总数量</div>
+                  <div class="summary-val est">{{ getPreflight(runDetail).totalCount }}</div>
                 </div>
                 <div class="summary-cell">
-                  <div class="summary-key">实际数量</div>
+                  <div class="summary-key">已传输数量</div>
                   <div class="summary-val act">{{ runDetail.taskMode==='move' ? (getFinalSummary(runDetail).counts?.copied || 0) : ((getFinalSummary(runDetail).counts?.copied || 0) + (getFinalSummary(runDetail).counts?.deleted || 0)) }}</div>
                 </div>
                 <div class="summary-cell" v-if="getPreflight(runDetail)">
-                  <div class="summary-key">预估体量</div>
-                  <div class="summary-val est">约 {{ formatBytes(getPreflight(runDetail).totalBytes || 0) }}</div>
+                  <div class="summary-key">总体积</div>
+                  <div class="summary-val est">{{ formatBytes(getPreflight(runDetail).totalBytes || 0) }}</div>
                 </div>
                 <div class="summary-cell">
-                  <div class="summary-key">实际体量</div>
+                  <div class="summary-key">已传输体积</div>
                   <div class="summary-val act">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
                 </div>
                 <div class="summary-cell">
