@@ -1100,7 +1100,8 @@ import TransferOptions from '../components/TransferOptions.vue'
                 {{ ((getActiveRunByTaskId(task.id)?.stableProgress?.percentage) || 0).toFixed(2) }}% ·
                 {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.bytes || 0) }} /
                 {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.totalBytes || 0) }} ·
-                {{ formatBytesPerSec(getActiveRunByTaskId(task.id)?.stableProgress?.speed || 0) }}
+                {{ formatBytesPerSec(getActiveRunByTaskId(task.id)?.stableProgress?.speed || 0) }} ·
+                总数量 {{ getActiveRunByTaskId(task.id)?.stableProgress?.totalCount || 0 }} ／ 已传输 {{ getActiveRunByTaskId(task.id)?.stableProgress?.completedFiles || 0 }}
               </template>
             </span>
           </div>
