@@ -411,6 +411,32 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 						}
 					}
 				}
+				// 如果是 move 模式：将成对的 Copied+Deleted 合并为 Moved，并调整计数（失败态也应用）
+				if strings.ToLower(cmdName) == "move" {
+					copiedMap := map[string]map[string]any{}
+					deletedMap := map[string]map[string]any{}
+					for _, f := range files {
+						a := strings.ToLower(fmt.Sprint(f["action"]))
+						p := fmt.Sprint(f["path"])
+						if a == "copied" { copiedMap[p] = f }
+						if a == "deleted" { deletedMap[p] = f }
+					}
+					moved := []map[string]any{}
+					others := []map[string]any{}
+					for p, c := range copiedMap {
+						if _, ok := deletedMap[p]; ok {
+							moved = append(moved, map[string]any{"path": p, "at": c["at"], "status": "success", "action": "Moved", "sizeBytes": c["sizeBytes"]})
+							delete(deletedMap, p)
+						} else {
+							others = append(others, c)
+						}
+					}
+					for _, d := range deletedMap { others = append(others, d) }
+					files = append(moved, others...)
+					counts["copied"] = len(moved)
+					counts["deleted"] = 0
+					counts["total"] = counts["copied"] + counts["failed"] + counts["skipped"]
+				}
 				// Fallback enrichment: lsjson target to fill missing sizeBytes
 				if len(files) > 0 {
 					cr := &adapter.CmdRunner{}
