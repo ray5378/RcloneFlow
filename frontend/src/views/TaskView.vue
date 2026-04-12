@@ -1237,14 +1237,6 @@ import TransferOptions from '../components/TransferOptions.vue'
                   <div class="summary-val">{{ finalCountOther }}</div>
                 </div>
                 <div class="summary-cell" v-if="getPreflight(runDetail)">
-                  <div class="summary-key">总数量</div>
-                  <div class="summary-val est">{{ getPreflight(runDetail).totalCount }}</div>
-                </div>
-                <div class="summary-cell">
-                  <div class="summary-key">已传输数量</div>
-                  <div class="summary-val act">{{ runDetail.taskMode==='move' ? (getFinalSummary(runDetail).counts?.copied || 0) : ((getFinalSummary(runDetail).counts?.copied || 0) + (getFinalSummary(runDetail).counts?.deleted || 0)) }}</div>
-                </div>
-                <div class="summary-cell" v-if="getPreflight(runDetail)">
                   <div class="summary-key">总体积</div>
                   <div class="summary-val est">{{ formatBytes(getPreflight(runDetail).totalBytes || 0) }}</div>
                 </div>
@@ -1268,6 +1260,7 @@ import TransferOptions from '../components/TransferOptions.vue'
                   <div class="summary-key">平均速度</div>
                   <div class="summary-val">{{ formatBps(getFinalSummary(runDetail)?.avgSpeedBps || 0) }}</div>
                 </div>
+                <!-- 运行中进度/运行中速度两项已移除：此处只展示完成态汇总，不含实时项 -->
                 <div class="summary-cell" v-if="getFinalSummary(runDetail)">
                   <div class="summary-key">已传输</div>
                   <div class="summary-val">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
