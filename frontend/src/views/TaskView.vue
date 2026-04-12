@@ -318,9 +318,13 @@ function getActiveRunByTaskId(taskId: number) {
 
 function getDbProgressDejitter(run:any){
   try{
-    const p = getLiveSummaryFromDB(run)
-    if (!p) return null
     const id = run?.id
+    const p = getLiveSummaryFromDB(run)
+    if (!p){
+      // 没有新帧时，保留上一帧
+      if (id && lastDbProgressByRunId.value[id]) return lastDbProgressByRunId.value[id]
+      return null
+    }
     if (!id) return p
     const last = lastDbProgressByRunId.value[id]
     if (last){
@@ -332,7 +336,7 @@ function getDbProgressDejitter(run:any){
     }
     lastDbProgressByRunId.value[id] = { bytes: p.bytes||0, totalBytes: p.totalBytes||0, percentage: p.percentage||0, speed: p.speed||0 }
     return p
-  }catch{ return getLiveSummaryFromDB(run) }
+  }catch{ return null }
 }
 
 
@@ -1165,12 +1169,12 @@ import TransferOptions from '../components/TransferOptions.vue'
           <template v-if="getDbProgressDejitter(run)">
             <span class="chip">进度 {{ (getDbProgressDejitter(run)?.percentage||0).toFixed(2) }}%</span>
             <span class="chip meta">速度 {{ formatBytesPerSec(getDbProgressDejitter(run)?.speed || 0) }}</span>
-            <span class="chip meta">已传 {{ formatBytes((getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes) || (getDbProgressDejitter(run)?.bytes || 0)) }}</span>
-            <span class="chip meta">总量 {{ formatBytes((getActiveRunByTaskId(run.taskId)?.stableProgress?.totalBytes) || (getDbProgressDejitter(run)?.totalBytes || 0)) }}</span>
+            <span class="chip meta">已传 {{ formatBytes((getDbProgressDejitter(run)?.bytes || 0)) }}</span>
+            <span class="chip meta">总量 {{ formatBytes((getDbProgressDejitter(run)?.totalBytes || 0)) }}</span>
             <span class="chip meta" v-if="calcEtaFromAvg(run, getDbProgressDejitter(run))">ETA {{ formatEta(calcEtaFromAvg(run, getDbProgressDejitter(run))||0) }}</span>
             <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ getDbProgressDejitter(run)?.completedFiles ?? 0 }}</span></span>
             <!-- 体量（运行中）：总体积/已传输 -->
-            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes) || (getDbProgressDejitter(run)?.bytes || 0)) }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDbProgressDejitter(run)?.bytes || 0)) }}</span></span>
           </template>
           <template v-else-if="getActiveRunByTaskId(run.taskId)?.stableProgress">
             <!-- DB 暂无时才回退 active -->
