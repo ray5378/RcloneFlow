@@ -1170,7 +1170,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
           <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
           <!-- 总数量/已传输、总体积/已传输（仅保留总体积，不再重复“总量”） -->
-          <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span></span>
+
           <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span></span>
           <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
         </div>
@@ -1269,14 +1269,7 @@ import TransferOptions from '../components/TransferOptions.vue'
                   <div class="summary-key">总大小</div>
                   <div class="summary-val">{{ formatBytes(getFinalSummary(runDetail)?.totalBytes || 0) }}</div>
                 </div>
-                <div class="summary-cell" v-if="getLiveSummaryFromDB(runDetail)">
-                  <div class="summary-key">（运行中）进度</div>
-                  <div class="summary-val">{{ (getLiveSummaryFromDB(runDetail)?.percentage||0).toFixed(2) }}%</div>
-                </div>
-                <div class="summary-cell" v-if="getLiveSummaryFromDB(runDetail)">
-                  <div class="summary-key">（运行中）速度</div>
-                  <div class="summary-val">{{ formatBytesPerSec(getLiveSummaryFromDB(runDetail)?.speed || 0) }}</div>
-                </div>
+
               </div>
             </div>
             <pre v-else class="summary-pre">{{ JSON.stringify({ note: '无总结，可查看传输日志' }, null, 2) }}</pre>
@@ -1308,7 +1301,7 @@ import TransferOptions from '../components/TransferOptions.vue'
                 <div class="files-body">
                   <template v-if="finalFiles && finalFiles.length">
                     <div v-for="it in pagedFinalFiles" :key="(it.path||it.name) + (it.at||'') + (it.status||'')" class="files-row">
-                      <span class="name" :title="it.path||it.name">{{ it.path || it.name }}</span>
+                      <span class="name" :title="it.path||it.name">{{ ((it.path || it.name || '').replace(/\\/g,'/').split('/').pop()) }}</span>
                       <span class="status" :class="it.status">{{ it.status }}</span>
                       <span class="time">{{ it.at || '-' }}</span>
                       <span class="size">{{ it.sizeBytes ? formatBytes(it.sizeBytes) : '-' }}</span>
