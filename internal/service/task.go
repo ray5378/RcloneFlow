@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"rcloneflow/internal/adapter"
 	runnercli "rcloneflow/internal/runnercli"
@@ -31,9 +32,35 @@ func (s *TaskService) CreateTask(task store.Task) (store.Task, error) {
 	return s.db.AddTask(task)
 }
 
-// UpdateTask 更新任务
+// UpdateTask 更新任务（容忍部分字段未提供；未提供的字段保持不变，避免误清空）
 func (s *TaskService) UpdateTask(id int64, task store.Task) error {
-	return s.db.UpdateTask(id, task)
+	cur, ok := s.db.GetTask(id)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	merged := cur
+	if strings.TrimSpace(task.Name) != "" {
+		merged.Name = task.Name
+	}
+	if strings.TrimSpace(task.Mode) != "" {
+		merged.Mode = task.Mode
+	}
+	if strings.TrimSpace(task.SourceRemote) != "" {
+		merged.SourceRemote = task.SourceRemote
+	}
+	if strings.TrimSpace(task.SourcePath) != "" {
+		merged.SourcePath = task.SourcePath
+	}
+	if strings.TrimSpace(task.TargetRemote) != "" {
+		merged.TargetRemote = task.TargetRemote
+	}
+	if strings.TrimSpace(task.TargetPath) != "" {
+		merged.TargetPath = task.TargetPath
+	}
+	if len(task.Options) > 0 {
+		merged.Options = task.Options
+	}
+	return s.db.UpdateTask(id, merged)
 }
 
 // UpdateTaskOptions 仅更新任务的 Options 字段（用于“传输选项”任务级覆盖）
