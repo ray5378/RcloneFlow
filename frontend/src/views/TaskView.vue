@@ -1159,7 +1159,7 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip meta">已传 {{ formatBytes((getDbProgressStable(run) as any)?.bytes || 0) }}</span>
             <span class="chip meta">总量 {{ formatBytes((getDbProgressStable(run) as any)?.totalBytes || 0) }}</span>
             <span class="chip meta" v-if="calcEtaFromAvg(run, (getDbProgressStable(run) as any))">ETA {{ formatEta(calcEtaFromAvg(run, (getDbProgressStable(run) as any))||0) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ (getDbProgressStable(run) as any)?.completedFiles ?? 0 }}</span></span>
+            
             <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDbProgressStable(run) as any)?.bytes || 0) }}</span></span>
           </template>
         </div>
