@@ -352,6 +352,17 @@ function getDbProgressStable(run:any){
   return db || null
 }
 
+// 历史“运行中”卡片也使用任务卡片的抗噪稳态：优先 lastStableByTask，再回退 DB
+function getDeNoisedStableByRun(run:any){
+  try{
+    const tid = run?.taskId as number
+    if (tid && lastStableByTask.value && lastStableByTask.value[tid] && lastStableByTask.value[tid].sp){
+      return lastStableByTask.value[tid].sp
+    }
+  }catch{}
+  return getDbProgressStable(run)
+}
+
 
 // 加载全局实时统计
 async function loadGlobalStats() {
@@ -1209,8 +1220,8 @@ import TransferOptions from '../components/TransferOptions.vue'
         <div class="summary-mini" v-else-if="run.status==='running'">
           <!-- 全部用 DB：百分比/体量/速度/ETA 均取 DB 的 summary.progress；实时完成文件计数也取 DB（progress.completedFiles） -->
           <template v-if="(getDbProgressStable(run) as any) && true">
-            <span class="chip">进度 {{ ((getDbProgressStable(run) as any)?.percentage||0).toFixed(2) }}%</span>
-            <span class="chip meta">速度 {{ formatBytesPerSec((getDbProgressStable(run) as any)?.speed || 0) }}</span>
+            <span class="chip">进度 {{ ((getDeNoisedStableByRun(run) as any)?.percentage||0).toFixed(2) }}%</span>
+            <span class="chip meta">速度 {{ formatBytesPerSec((getDeNoisedStableByRun(run) as any)?.speed || 0) }}</span>
             <!-- 移除“总量/已传”冗余，统一用“总体积/已传输” -->
             <span class="chip meta" v-if="calcEtaFromAvg(run, (getDbProgressStable(run) as any))">预估完成 {{ formatEta(calcEtaFromAvg(run, (getDbProgressStable(run) as any))||0) }}</span>
             <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDbProgressStable(run) as any)?.bytes || 0) }}</span></span>
