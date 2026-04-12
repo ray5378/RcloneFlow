@@ -1153,14 +1153,14 @@ import TransferOptions from '../components/TransferOptions.vue'
         <!-- 运行中卡片的实时概览（优先读 active 的 stableProgress，缺失再用 DB 的 summary.progress） -->
         <div class="summary-mini" v-else-if="run.status==='running'">
           <!-- 全部用 DB：百分比/体量/速度/ETA 均取 DB 的 summary.progress；实时完成文件计数也取 DB（progress.completedFiles） -->
-          <template v-if="getDbProgressStable(run) as dp">
-            <span class="chip">进度 {{ (dp.percentage||0).toFixed(2) }}%</span>
-            <span class="chip meta">速度 {{ formatBytesPerSec(dp.speed || 0) }}</span>
-            <span class="chip meta">已传 {{ formatBytes(dp.bytes || 0) }}</span>
-            <span class="chip meta">总量 {{ formatBytes(dp.totalBytes || 0) }}</span>
-            <span class="chip meta" v-if="calcEtaFromAvg(run, dp)">ETA {{ formatEta(calcEtaFromAvg(run, dp)||0) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ dp.completedFiles ?? 0 }}</span></span>
-            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(dp.bytes || 0) }}</span></span>
+          <template v-if="(getDbProgressStable(run) as any) && true">
+            <span class="chip">进度 {{ ((getDbProgressStable(run) as any)?.percentage||0).toFixed(2) }}%</span>
+            <span class="chip meta">速度 {{ formatBytesPerSec((getDbProgressStable(run) as any)?.speed || 0) }}</span>
+            <span class="chip meta">已传 {{ formatBytes((getDbProgressStable(run) as any)?.bytes || 0) }}</span>
+            <span class="chip meta">总量 {{ formatBytes((getDbProgressStable(run) as any)?.totalBytes || 0) }}</span>
+            <span class="chip meta" v-if="calcEtaFromAvg(run, (getDbProgressStable(run) as any))">ETA {{ formatEta(calcEtaFromAvg(run, (getDbProgressStable(run) as any))||0) }}</span>
+            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ (getDbProgressStable(run) as any)?.completedFiles ?? 0 }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDbProgressStable(run) as any)?.bytes || 0) }}</span></span>
           </template>
         </div>
         <!-- 历史卡片内的一目了然统计概览（完成态） -->
