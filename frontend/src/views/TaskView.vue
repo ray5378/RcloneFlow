@@ -1183,7 +1183,7 @@ import TransferOptions from '../components/TransferOptions.vue'
 
     <!-- 运行详情弹窗 -->
     <div v-if="showDetailModal" class="modal-overlay" @click.self="showDetailModal = false">
-      <div class="modal-content">
+      <div class="modal-content detail-modal">
         <div class="modal-header">
           <h3>运行详情</h3>
           <button class="close-btn" @click="showDetailModal = false">×</button>
@@ -1967,6 +1967,8 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 .log-modal .modal-body{padding:12px 16px; width:100%; flex:1; overflow:hidden; display:flex;}
 .log-box{width:100%; display:flex; justify-content:center;}
 .log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;height:100%;overflow:auto;white-space:pre-wrap;width:calc(100% - 64px);max-width:1100px;box-sizing:border-box;margin:0;border:1px solid #334155}
+/* 运行详情弹窗加宽 50% */
+.detail-modal{ width: 135% !important; max-width: 1200px !important; }
 
 /* 运行总结样式（深浅主题适配） */
 .summary-box{background:#111827;border:1px solid #333;border-radius:10px;padding:12px 14px;margin-top:6px;max-width:1200px}
