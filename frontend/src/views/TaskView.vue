@@ -47,8 +47,8 @@ const activeRuns = ref<any[]>([])
 // 任务卡片：完成后保留最近稳态进度的观察期（默认 15s）
 const LINGER_MS = 15000
 const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
-// DB 稳态进度去抖缓存：保证百分比/已传不回退
-const lastDbProgressByRunId = ref<Record<number, { bytes:number; totalBytes:number; percentage:number; speed:number }>>({})
+// DB 稳态进度去抖缓存（非响应式）：保证百分比/已传不回退，避免在渲染期写响应式导致重渲
+const lastDbProgressByRunId: Record<number, { bytes:number; totalBytes:number; percentage:number; speed:number }> = {}
 const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
 
 // 传输日志弹窗
@@ -321,12 +321,12 @@ function getDbProgressDejitter(run:any){
     const id = run?.id
     const p = getLiveSummaryFromDB(run)
     if (!p){
-      // 没有新帧时，保留上一帧
-      if (id && lastDbProgressByRunId.value[id]) return lastDbProgressByRunId.value[id]
+      // 没有新帧时，保留上一帧（非响应式读取）
+      if (id && lastDbProgressByRunId[id]) return lastDbProgressByRunId[id]
       return null
     }
     if (!id) return p
-    const last = lastDbProgressByRunId.value[id]
+    const last = lastDbProgressByRunId[id]
     if (last){
       // 非递减守护
       p.bytes = Math.max(last.bytes, p.bytes||0)
@@ -334,7 +334,7 @@ function getDbProgressDejitter(run:any){
       p.percentage = Math.max(last.percentage, p.percentage||0)
       // 速度保留原值（不做非递减）
     }
-    lastDbProgressByRunId.value[id] = { bytes: p.bytes||0, totalBytes: p.totalBytes||0, percentage: p.percentage||0, speed: p.speed||0 }
+    lastDbProgressByRunId[id] = { bytes: p.bytes||0, totalBytes: p.totalBytes||0, percentage: p.percentage||0, speed: p.speed||0 }
     return p
   }catch{ return null }
 }
@@ -1166,15 +1166,15 @@ import TransferOptions from '../components/TransferOptions.vue'
         <!-- 运行中卡片的实时概览（优先读 active 的 stableProgress，缺失再用 DB 的 summary.progress） -->
         <div class="summary-mini" v-else-if="run.status==='running'">
           <!-- 全部用 DB：百分比/体量/速度/ETA 均取 DB 的 summary.progress；实时完成文件计数也取 DB（progress.completedFiles） -->
-          <template v-if="getDbProgressDejitter(run)">
-            <span class="chip">进度 {{ (getDbProgressDejitter(run)?.percentage||0).toFixed(2) }}%</span>
-            <span class="chip meta">速度 {{ formatBytesPerSec(getDbProgressDejitter(run)?.speed || 0) }}</span>
-            <span class="chip meta">已传 {{ formatBytes((getDbProgressDejitter(run)?.bytes || 0)) }}</span>
-            <span class="chip meta">总量 {{ formatBytes((getDbProgressDejitter(run)?.totalBytes || 0)) }}</span>
-            <span class="chip meta" v-if="calcEtaFromAvg(run, getDbProgressDejitter(run))">ETA {{ formatEta(calcEtaFromAvg(run, getDbProgressDejitter(run))||0) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ getDbProgressDejitter(run)?.completedFiles ?? 0 }}</span></span>
+          <template v-if="getDbProgressDejitter(run) as dp">
+            <span class="chip">进度 {{ (dp.percentage||0).toFixed(2) }}%</span>
+            <span class="chip meta">速度 {{ formatBytesPerSec(dp.speed || 0) }}</span>
+            <span class="chip meta">已传 {{ formatBytes(dp.bytes || 0) }}</span>
+            <span class="chip meta">总量 {{ formatBytes(dp.totalBytes || 0) }}</span>
+            <span class="chip meta" v-if="calcEtaFromAvg(run, dp)">ETA {{ formatEta(calcEtaFromAvg(run, dp)||0) }}</span>
+            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ dp.completedFiles ?? 0 }}</span></span>
             <!-- 体量（运行中）：总体积/已传输 -->
-            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDbProgressDejitter(run)?.bytes || 0)) }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(dp.bytes || 0) }}</span></span>
           </template>
           <template v-else-if="getActiveRunByTaskId(run.taskId)?.stableProgress">
             <!-- DB 暂无时才回退 active -->
