@@ -69,10 +69,16 @@ async function load(){
 async function onSave(){
   if (!validate()) return
   // 将 MB 转回字节提交
-  const payload = { ...form.value }
-  const mb = Number((payload as any).PROGRESS_FLUSH_MIN_DELTA_BYTES)
+  // 统一把所有字段转成字符串，避免后端 map[string]string 丢键
+  const payload: Record<string,string> = {}
+  Object.keys(form.value).forEach(k => {
+    const v = (form.value as any)[k]
+    payload[k] = v === undefined || v === null ? '' : String(v)
+  })
+  // 将 MB 转回字节提交
+  const mb = Number(payload.PROGRESS_FLUSH_MIN_DELTA_BYTES)
   if (!isNaN(mb) && isFinite(mb) && mb>=0){
-    ;(payload as any).PROGRESS_FLUSH_MIN_DELTA_BYTES = String(Math.round(mb * 1048576))
+    payload.PROGRESS_FLUSH_MIN_DELTA_BYTES = String(Math.round(mb * 1048576))
   }
   saving.value = true
   saveFailed.value = false
