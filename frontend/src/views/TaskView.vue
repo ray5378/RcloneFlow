@@ -396,7 +396,20 @@ function getLiveSummaryFromDB(run:any){
       const speed = Number(p.speed || 0)
       let percentage = Number(p.percentage || 0)
       if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
-      return { bytes, totalBytes, speed, percentage }
+      // 补充实时“已传输数量”：优先 progress.completedFiles，其次 stableProgress.completedFiles
+      const completedFiles = Number(p.completedFiles ?? sum?.stableProgress?.completedFiles ?? 0)
+      return { bytes, totalBytes, speed, percentage, completedFiles }
+    }
+    // 退路：直接从 stableProgress 取（DB-only 流）
+    const sp = sum?.stableProgress
+    if (sp && typeof sp === 'object'){
+      const bytes = Number(sp.bytes || 0)
+      const totalBytes = Number(sp.totalBytes || 0)
+      const speed = Number(sp.speed || 0)
+      let percentage = Number(sp.percentage || 0)
+      if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
+      const completedFiles = Number(sp.completedFiles || 0)
+      return { bytes, totalBytes, speed, percentage, completedFiles }
     }
   }catch{}
   return null
