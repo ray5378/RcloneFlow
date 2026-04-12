@@ -284,6 +284,30 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 						}
 					}
 				}
+				// Fallback enrichment: lsjson target to fill missing sizeBytes
+				if len(files) > 0 {
+					cr := &adapter.CmdRunner{}
+					if out, _, e2 := cr.Run(context.Background(), []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}...); e2 == nil {
+						var arr []map[string]any
+						if json.Unmarshal([]byte(out), &arr) == nil {
+							m := map[string]int64{}
+							for _, it := range arr {
+								p, _ := it["Path"].(string); if p == "" { p, _ = it["path"].(string) }
+								var sz int64
+								switch vv := it["Size"].(type) { case float64: sz = int64(vv) }
+								if p != "" { p = strings.ReplaceAll(p, "\\", "/"); m[p] = sz }
+							}
+							if len(m) > 0 {
+								for i := range files {
+									if szAny, ok := files[i]["sizeBytes"]; !ok || fmt.Sprint(szAny) == "0" {
+										p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
+										if sz, ok2 := m[p]; ok2 && sz > 0 { files[i]["sizeBytes"] = sz }
+									}
+								}
+							}
+						}
+					}
+				}
 				rr.Summary["finalSummary"] = map[string]any{"counts":counts, "files":files, "startAt":finalSummary["startAt"], "finishedAt":finalSummary["finishedAt"], "durationSec":durSec, "durationText":humanDuration(durSec), "result":"failed", "transferredBytes":bytes, "totalBytes":total, "avgSpeedBps":avg}
 			})
 			r.mu.Lock(); delete(r.procs, run.ID); r.mu.Unlock()
@@ -422,6 +446,30 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 						counts["copied"] = len(moved)
 						counts["deleted"] = 0
 						counts["total"] = counts["copied"] + counts["failed"] + counts["skipped"]
+					}
+				}
+			}
+			// Fallback enrichment: lsjson target to fill missing sizeBytes
+			if len(files) > 0 {
+				cr := &adapter.CmdRunner{}
+				if out, _, e2 := cr.Run(context.Background(), []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}...); e2 == nil {
+					var arr []map[string]any
+					if json.Unmarshal([]byte(out), &arr) == nil {
+						m := map[string]int64{}
+						for _, it := range arr {
+							p, _ := it["Path"].(string); if p == "" { p, _ = it["path"].(string) }
+							var sz int64
+							switch vv := it["Size"].(type) { case float64: sz = int64(vv) }
+							if p != "" { p = strings.ReplaceAll(p, "\\", "/"); m[p] = sz }
+						}
+						if len(m) > 0 {
+							for i := range files {
+								if szAny, ok := files[i]["sizeBytes"]; !ok || fmt.Sprint(szAny) == "0" {
+									p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
+									if sz, ok2 := m[p]; ok2 && sz > 0 { files[i]["sizeBytes"] = sz }
+								}
+							}
+						}
 					}
 				}
 			}
