@@ -1164,6 +1164,10 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
           <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
           <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
+          <!-- 预估 vs 实际（数量） -->
+          <span class="chip meta" v-if="getPreflight(run)">数量 约 {{ getPreflight(run).totalCount }} ／ 实 {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
+          <!-- 预估 vs 实际（体量） -->
+          <span class="chip meta" v-if="getPreflight(run)">体量 约 {{ formatBytes(getPreflight(run).totalBytes || 0) }} ／ 实 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span>
           <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
           <span class="chip meta">总量 {{ formatBytes(getFinalSummary(run).totalBytes || 0) }}</span>
         </div>
@@ -1228,6 +1232,22 @@ import TransferOptions from '../components/TransferOptions.vue'
                 <div class="summary-cell clickable" @click="setFinalFilter('other')">
                   <div class="summary-key">其他</div>
                   <div class="summary-val">{{ finalCountOther }}</div>
+                </div>
+                <div class="summary-cell" v-if="getPreflight(runDetail)">
+                  <div class="summary-key">预估数量</div>
+                  <div class="summary-val">约 {{ getPreflight(runDetail).totalCount }}</div>
+                </div>
+                <div class="summary-cell">
+                  <div class="summary-key">实际数量</div>
+                  <div class="summary-val">{{ runDetail.taskMode==='move' ? (getFinalSummary(runDetail).counts?.copied || 0) : ((getFinalSummary(runDetail).counts?.copied || 0) + (getFinalSummary(runDetail).counts?.deleted || 0)) }}</div>
+                </div>
+                <div class="summary-cell" v-if="getPreflight(runDetail)">
+                  <div class="summary-key">预估体量</div>
+                  <div class="summary-val">约 {{ formatBytes(getPreflight(runDetail).totalBytes || 0) }}</div>
+                </div>
+                <div class="summary-cell">
+                  <div class="summary-key">实际体量</div>
+                  <div class="summary-val">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
                 </div>
                 <div class="summary-cell">
                   <div class="summary-key">开始时间</div>
