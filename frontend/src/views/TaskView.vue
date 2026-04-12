@@ -1149,6 +1149,8 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip meta" v-if="calcEtaFromAvg(run, getLiveSummaryFromDB(run))">ETA {{ formatEta(calcEtaFromAvg(run, getLiveSummaryFromDB(run))||0) }}</span>
             <span class="chip meta" v-if="getPreflight(run)">预估 {{ getPreflight(run).totalCount }}</span>
             <span class="chip meta" v-if="getLiveSummaryFromDB(run)?.completedFiles !== undefined">实际 {{ getLiveSummaryFromDB(run)?.completedFiles }}</span>
+            <!-- 体量 预估/实际（运行中） -->
+            <span class="chip meta" v-if="getPreflight(run)">体量 <span class="est">约 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">实 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span></span>
           </template>
           <template v-else-if="getActiveRunByTaskId(run.taskId)?.stableProgress">
             <!-- DB 暂无时才回退 active -->
@@ -1158,6 +1160,7 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip meta">总量 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.totalBytes || 0) }}</span>
             <span class="chip meta" v-if="getActiveRunByTaskId(run.taskId)?.stableProgress?.eta">ETA {{ formatEta(getActiveRunByTaskId(run.taskId)?.stableProgress?.eta) }}</span>
             <span class="chip meta" v-if="getPreflight(run)">预估 {{ getPreflight(run).totalCount }}</span>
+            <span class="chip meta" v-if="getPreflight(run)">体量 <span class="est">约 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">实 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes || 0) }}</span></span>
           </template>
         </div>
         <!-- 历史卡片内的一目了然统计概览（完成态） -->
