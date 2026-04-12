@@ -1261,14 +1261,6 @@ import TransferOptions from '../components/TransferOptions.vue'
                   <div class="summary-val">{{ formatBps(getFinalSummary(runDetail)?.avgSpeedBps || 0) }}</div>
                 </div>
                 <!-- 运行中进度/运行中速度两项已移除：此处只展示完成态汇总，不含实时项 -->
-                <div class="summary-cell" v-if="getFinalSummary(runDetail)">
-                  <div class="summary-key">已传输</div>
-                  <div class="summary-val">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
-                </div>
-                <div class="summary-cell" v-if="getFinalSummary(runDetail)">
-                  <div class="summary-key">总大小</div>
-                  <div class="summary-val">{{ formatBytes(getFinalSummary(runDetail)?.totalBytes || 0) }}</div>
-                </div>
 
               </div>
             </div>
