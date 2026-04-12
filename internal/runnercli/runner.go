@@ -195,16 +195,14 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	stderrPath := filepath.Join(subDir, fmt.Sprintf("%s.log", timePart))
 	stderrFile, _ := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 
-	// Preflight (approx) total count/size if enabled
-	if strings.EqualFold(strings.TrimSpace(config.GetPrecheckMode()), "size") {
-		if b, c, e := sizeOf(&adapter.CmdRunner{}, cfg, src, effOpt); e == nil {
-			_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
-				if rr.Summary == nil {
-					rr.Summary = map[string]any{}
-				}
-				rr.Summary["preflight"] = map[string]any{"totalCount": c, "totalBytes": b}
-			})
-		}
+	// Mandatory preflight: always compute total count/size via size + filters for all tasks
+	if b, c, e := sizeOf(&adapter.CmdRunner{}, cfg, src, effOpt); e == nil {
+		_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+			if rr.Summary == nil {
+				rr.Summary = map[string]any{}
+			}
+			rr.Summary["preflight"] = map[string]any{"totalCount": c, "totalBytes": b}
+		})
 	}
 
 	// dynamic progress flush thresholds (read on each run start; consumer also re-reads periodically)
