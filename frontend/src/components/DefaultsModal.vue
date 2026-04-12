@@ -2,6 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { getSettings, saveSettings, resetSettings } from '../api/settings'
 
+const emit = defineEmits<{ (e: 'close'): void }>()
+
 const loading = ref(true)
 const saving = ref(false)
 const saved = ref(false)
@@ -86,6 +88,10 @@ async function onSave(){
   } finally {
     saving.value=false
   }
+}
+
+function onSavedClick(){
+  if (saved.value) emit('close')
 }
 async function onReset(){
   showResetConfirm.value = true
@@ -195,7 +201,7 @@ onMounted(load)
       </div>
       <div class="modal-footer">
         <button class="ghost" @click="onReset" :disabled="saving">重置为默认</button>
-        <button :class="['primary', { saved: saved, failed: saveFailed }]" @click="onSave" :disabled="saving">{{ saved ? '已保存生效' : (saveFailed ? '保存失败' : '保存') }}</button>
+        <button :class="['primary', { saved: saved, failed: saveFailed }]" @click="saved ? onSavedClick() : onSave()" :disabled="saving">{{ saved ? '已保存生效' : (saveFailed ? '保存失败' : '保存') }}</button>
       </div>
     </div>
   </div>
