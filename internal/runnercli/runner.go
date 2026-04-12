@@ -85,12 +85,29 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			args = append(args, buildFlagsFromOptions(merged)...)
 		}
 	}
-	// 二次兜底：如 --buffer-size 后是纯数字，自动补 M
+	// 二次兜底：如 --buffer-size/--bwlimit 后是纯数字，自动补单位（M）
 	for i := 0; i < len(args)-1; i++ {
-		if args[i] == "--buffer-size" {
+		if args[i] == "--buffer-size" || args[i] == "--bwlimit" {
 			n := strings.TrimSpace(args[i+1])
 			pureNum := n != ""; for _, ch := range n { if ch < '0' || ch > '9' { pureNum = false; break } }
 			if pureNum { args[i+1] = n + "M" }
+		}
+	}
+	// 去重：--bwlimit 若出现多次，仅保留最后一次（后者覆盖前者）
+	{
+		last := -1
+		for i := 0; i < len(args); i++ { if args[i] == "--bwlimit" { last = i } }
+		if last >= 0 {
+			newArgs := make([]string, 0, len(args))
+			for i := 0; i < len(args); {
+				if args[i] == "--bwlimit" && i != last {
+					// 跳过成对参数
+					i += 2; continue
+				}
+				newArgs = append(newArgs, args[i])
+				i++
+			}
+			args = newArgs
 		}
 	}
 	// header will be written after files are opened below
