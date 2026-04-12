@@ -17,17 +17,17 @@ func NewStoreRunAdapter(db *store.DB) RunServiceInterface {
 	return &storeRunAdapter{db: db}
 }
 
-// formatTime 格式化时间
+// formatTime 格式化时间（保留原时区偏移，RFC3339）
 func formatTime(t time.Time) string {
-	return t.Format("2006-01-02T15:04:05Z")
+	return t.Format(time.RFC3339)
 }
 
-// formatOptTime 格式化可选时间
+// formatOptTime 格式化可选时间（保留原时区偏移，RFC3339）
 func formatOptTime(t *time.Time) string {
 	if t == nil {
 		return ""
 	}
-	return t.Format("2006-01-02T15:04:05Z")
+	return t.Format(time.RFC3339)
 }
 
 // ListRuns 获取所有运行记录
