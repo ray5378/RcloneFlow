@@ -140,7 +140,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 
 	// Preflight (approx) total count/size if enabled
 	if strings.EqualFold(strings.TrimSpace(config.GetPrecheckMode()), "size") {
-		if b, c, e := sizeOf(&adapter.CmdRunner{}, cfg, src); e == nil {
+		if b, c, e := sizeOf(&adapter.CmdRunner{}, cfg, src, effOpt); e == nil {
 			_ = r.db.UpdateRun(run.ID, func(rr *store.Run){
 				if rr.Summary == nil { rr.Summary = map[string]any{} }
 				rr.Summary["preflight"] = map[string]any{"totalCount": c, "totalBytes": b}
@@ -466,9 +466,33 @@ func isWebDAVUnderlying(cfgPath, remote string) bool {
 	return false
 }
 
-func sizeOf(r *adapter.CmdRunner, cfg, target string) (bytes int64, count int64, err error) {
+func sizeOf(r *adapter.CmdRunner, cfg, target string, opts map[string]any) (bytes int64, count int64, err error) {
 	// Prefer JSON when available. Fallback to parsing text if needed.
 	args := []string{"size", target, "--config", cfg, "--json"}
+	// 透传过滤/列表相关参数以贴近任务过滤集合
+	if opts != nil {
+		pass := []string{"include","exclude","filter","filterFrom","includeFrom","excludeFrom","filesFrom","minSize","maxSize","minAge","maxAge","fastList"}
+		for _, k := range pass {
+			if v, ok := opts[k]; ok {
+				flag := ""
+				switch k {
+				case "include": flag = "--include"
+				case "exclude": flag = "--exclude"
+				case "filter": flag = "--filter"
+				case "filterFrom": flag = "--filter-from"
+				case "includeFrom": flag = "--include-from"
+				case "excludeFrom": flag = "--exclude-from"
+				case "filesFrom": flag = "--files-from"
+				case "minSize": flag = "--min-size"
+				case "maxSize": flag = "--max-size"
+				case "minAge": flag = "--min-age"
+				case "maxAge": flag = "--max-age"
+				case "fastList": if s := strings.ToLower(fmt.Sprint(v)); s=="true"||s=="1" { args = append(args, "--fast-list") }; continue
+				}
+				args = append(args, flag, fmt.Sprint(v))
+			}
+		}
+	}
 	out, _, e := r.Run(context.Background(), args...)
 	if e == nil {
 		var m map[string]any
