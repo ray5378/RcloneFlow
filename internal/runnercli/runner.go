@@ -964,6 +964,23 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
 					}
+					// preserve non-decreasing completedFiles; fallback to copied list if needed
+					if prev, ok := rr.Summary["progress"].(map[string]any); ok {
+						if pc, ok2 := prev["completedFiles"].(float64); ok2 {
+							if nc, ok3 := prog["completedFiles"].(float64); ok3 {
+								if nc < pc { prog["completedFiles"] = pc }
+							} else {
+								prog["completedFiles"] = pc
+							}
+						}
+					}
+					if fp != nil {
+						if lst := fp.copiedList(); len(lst) > 0 {
+							if nc, ok3 := prog["completedFiles"].(float64); !ok3 || float64(len(lst)) > nc {
+								prog["completedFiles"] = float64(len(lst))
+							}
+						}
+					}
 					rr.Summary["progress"] = prog
 					rr.BytesTransferred = int64(prog["bytes"].(float64))
 					rr.Speed = fmt.Sprintf("%d B/s", int64(prog["speed"].(float64)))

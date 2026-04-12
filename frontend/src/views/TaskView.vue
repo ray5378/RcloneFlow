@@ -1161,6 +1161,8 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip meta" v-if="calcEtaFromAvg(run, (getDbProgressStable(run) as any))">ETA {{ formatEta(calcEtaFromAvg(run, (getDbProgressStable(run) as any))||0) }}</span>
             
             <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDbProgressStable(run) as any)?.bytes || 0) }}</span></span>
+            <!-- 恢复：总数量 / 实时已传输文件数量（总数来自预检 size，已传来自 DB 的 progress.completedFiles） -->
+            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount || 0 }}</span> ／ <span class="act">已传输 {{ (getDbProgressStable(run) as any)?.completedFiles || 0 }}</span></span>
           </template>
         </div>
         <!-- 历史卡片内的一目了然统计概览（完成态） -->
