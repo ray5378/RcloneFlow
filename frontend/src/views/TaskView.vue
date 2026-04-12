@@ -363,6 +363,30 @@ function getDeNoisedStableByRun(run:any){
   return getDbProgressStable(run)
 }
 
+// 任务卡片的预估完成时间：使用卡片的抗噪稳态（sp.totalBytes/sp.bytes/sp.speed）
+function calcEtaForTaskCard(taskId:number){
+  try{
+    const st = lastStableByTask.value?.[taskId]?.sp || getActiveRunByTaskId(taskId)?.stableProgress
+    if (!st) return null
+    const total = Number(st.totalBytes||0)
+    const bytes = Number(st.bytes||0)
+    if (!total || bytes<=0) return null
+    let speed = Number(st.speed||0)
+    // 仅当可渲染时采信，否则使用最近一次有效速度
+    if (formatBytesPerSec(speed) === '-'){
+      const last = lastNonZeroSpeedByTask[taskId] || 0
+      if (!last || last<=0) return null
+      speed = last
+    } else {
+      lastNonZeroSpeedByTask[taskId] = speed
+    }
+    const remaining = Math.max(0, total - bytes)
+    const eta = Math.floor(remaining / speed)
+    if (eta > 99*3600) return null
+    return eta
+  }catch{ return null }
+}
+
 
 // 加载全局实时统计
 async function loadGlobalStats() {
@@ -1152,7 +1176,8 @@ import TransferOptions from '../components/TransferOptions.vue'
                 {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.bytes || 0) }} /
                 {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.totalBytes || 0) }} ·
                 {{ formatBytesPerSec(getActiveRunByTaskId(task.id)?.stableProgress?.speed || 0) }} ·
-                总数量 {{ getActiveRunByTaskId(task.id)?.stableProgress?.totalCount || 0 }} ／ 已传输 {{ getActiveRunByTaskId(task.id)?.stableProgress?.completedFiles || 0 }}
+                总数量 {{ getActiveRunByTaskId(task.id)?.stableProgress?.totalCount || 0 }} ／ 已传输 {{ getActiveRunByTaskId(task.id)?.stableProgress?.completedFiles || 0 }} ·
+                <span v-if="calcEtaForTaskCard(task.id)">预估完成 {{ formatEta(calcEtaForTaskCard(task.id) || 0) }}</span>
               </template>
             </span>
           </div>
