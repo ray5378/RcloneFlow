@@ -16,10 +16,10 @@ import (
 // JobSyncService 任务状态同步服务
 // 定期从 rclone job API 同步任务状态到数据库
 type JobSyncService struct {
-	db          JobStatusProvider
-	rc          *rclone.Client
-	poolGap     time.Duration
-	stop        chan struct{}
+	db      JobStatusProvider
+	rc      *rclone.Client
+	poolGap time.Duration
+	stop    chan struct{}
 }
 
 // JobStatusProvider 任务状态提供者接口
@@ -43,10 +43,10 @@ func NewJobSyncService(db JobStatusProvider, rc *rclone.Client, poolIntervalSec 
 // 后台goroutine定期从rclone job API获取任务状态并更新数据库
 func (s *JobSyncService) Start(ctx context.Context) {
 	logger.Info("启动任务状态同步服务", zap.Duration("interval", s.poolGap))
-	
+
 	ticker := time.NewTicker(s.poolGap)
 	defer ticker.Stop()
-	
+
 	for {
 		select {
 		case <-ctx.Done():

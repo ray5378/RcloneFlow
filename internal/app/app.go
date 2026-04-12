@@ -26,7 +26,7 @@ func Run(cfg *config.Config) error {
 		return err
 	}
 	defer logger.Sync()
-	
+
 	logger.Info("启动RcloneFlow服务",
 		zap.String("addr", cfg.GetServerAddr()),
 		zap.String("data_dir", cfg.GetDataDir()),
@@ -57,7 +57,7 @@ func Run(cfg *config.Config) error {
 	remoteCtrl := controller.NewRemoteController(rc)
 	taskCtrl := controller.NewTaskController(taskSvc, rc)
 	browserCtrl := controller.NewBrowserController(rc)
-	
+
 	// 初始化调度器(需要在controller之前,以便传递)
 	// 使用 TaskService 作为 Runner，以统一走 CLI Runner（生成 stderr 日志文件）
 	sched := scheduler.NewWithRunner(db, taskSvc)
@@ -65,7 +65,7 @@ func Run(cfg *config.Config) error {
 		logger.Error("调度器初始化失败", zap.Error(err))
 		return err
 	}
-	
+
 	scheduleCtrl := controller.NewScheduleController(scheduleSvc, sched)
 	runCtrl := controller.NewRunController(runSvc, rc)
 	fsCtrl := controller.NewFsController(rc)

@@ -94,7 +94,9 @@ func (c *RemoteController) HandleRemoteConfig(w http.ResponseWriter, r *http.Req
 
 // HandleRemoteTest 测试远程存储
 func (c *RemoteController) HandleRemoteTest(w http.ResponseWriter, r *http.Request) {
-	var req struct{ Name string `json:"name"` }
+	var req struct {
+		Name string `json:"name"`
+	}
 	if err := DecodeRequest(r, &req); err != nil {
 		WriteJSON(w, 400, map[string]any{"error": err.Error()})
 		return

@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"rcloneflow/internal/logger"
 	"go.uber.org/zap"
+	"rcloneflow/internal/logger"
 )
 
 // CleanupService 自动清理服务
@@ -68,9 +68,16 @@ func (s *CleanupService) Stop() { close(s.stopCh) }
 
 // Replan 重新设置 interval/retention，并触发重排
 func (s *CleanupService) Replan(intervalHours int, retentionDays int) {
-	if intervalHours > 0 { s.interval = time.Duration(intervalHours) * time.Hour }
-	if retentionDays >= 0 { s.retention = retentionDays }
-	select { case s.resetCh <- struct{}{}: default: }
+	if intervalHours > 0 {
+		s.interval = time.Duration(intervalHours) * time.Hour
+	}
+	if retentionDays >= 0 {
+		s.retention = retentionDays
+	}
+	select {
+	case s.resetCh <- struct{}{}:
+	default:
+	}
 }
 
 // cleanup 执行清理

@@ -35,12 +35,12 @@ func (c *Client) ListPath(ctx context.Context, fs, remote string) ([]map[string]
 	result := make([]map[string]any, len(items))
 	for i, item := range items {
 		result[i] = map[string]any{
-			"Name":    item.Name,
-			"Path":    item.Path,
-			"IsDir":   item.IsDir,
+			"Name":     item.Name,
+			"Path":     item.Path,
+			"IsDir":    item.IsDir,
 			"MimeType": item.MimeType,
-			"ModTime": item.ModTime,
-			"Size":    item.Size,
+			"ModTime":  item.ModTime,
+			"Size":     item.Size,
 		}
 	}
 	return result, nil
@@ -187,8 +187,8 @@ func (c *Client) JobStatus(ctx context.Context, jobID int64) (map[string]any, er
 	}
 	return map[string]any{
 		"finished": status.Finished,
-		"success": status.Success,
-		"error":   status.Error,
+		"success":  status.Success,
+		"error":    status.Error,
 	}, nil
 }
 

@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 
 	"rcloneflow/internal/adapter"
-	"rcloneflow/internal/store"
 	runnercli "rcloneflow/internal/runnercli"
 	"rcloneflow/internal/settings"
+	"rcloneflow/internal/store"
 )
 
 // TaskService 任务服务层
 type TaskService struct {
-	db  *store.DB
+	db     *store.DB
 	runner adapter.TaskRunner
 }
 
@@ -40,17 +40,25 @@ func (s *TaskService) UpdateTask(id int64, task store.Task) error {
 func (s *TaskService) UpdateTaskOptions(id int64, opts map[string]any) error {
 	// 读出任务，合并 Options 再回写（保留已有键，覆盖提交的键）
 	t, ok := s.db.GetTask(id)
-	if !ok { return ErrTaskNotFound }
+	if !ok {
+		return ErrTaskNotFound
+	}
 	merged := map[string]any{}
 	if len(t.Options) > 0 {
 		var cur map[string]any
 		if json.Unmarshal(t.Options, &cur) == nil && cur != nil {
-			for k, v := range cur { merged[k] = v }
+			for k, v := range cur {
+				merged[k] = v
+			}
 		}
 	}
-	for k, v := range opts { merged[k] = v }
+	for k, v := range opts {
+		merged[k] = v
+	}
 	b, err := json.Marshal(merged)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	t.Options = b
 	return s.db.UpdateTask(id, t)
 }
@@ -101,9 +109,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 
 	// 切换为 CLI：先记录运行，再异步启动（可中断/进度）
 	run, err := s.db.AddRun(store.Run{
-		TaskID:       taskID,
-		Status:       "running",
-		Trigger:      trigger,
+		TaskID:  taskID,
+		Status:  "running",
+		Trigger: trigger,
 		Summary: map[string]any{
 			"streamingEnabled": streamingEnabled,
 			"effectiveOptions": effectiveOptions,
@@ -117,13 +125,19 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	})
 	// 合并全局传输设置（用于 Runner 默认值回退）
 	if ts, err := settings.Load(); err == nil {
-		_ = s.db.UpdateRun(run.ID, func(rr *store.Run){
-			if rr.Summary == nil { rr.Summary = map[string]any{} }
+		_ = s.db.UpdateRun(run.ID, func(rr *store.Run) {
+			if rr.Summary == nil {
+				rr.Summary = map[string]any{}
+			}
 			rr.Summary["transferDefaults"] = ts
 		})
 	}
-	if err != nil { return err }
-	go func(){ _ = runnercli.New(s.db).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath) }()
+	if err != nil {
+		return err
+	}
+	go func() {
+		_ = runnercli.New(s.db).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+	}()
 	return nil
 }
 

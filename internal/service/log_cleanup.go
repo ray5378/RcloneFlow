@@ -7,22 +7,26 @@ import (
 	"strconv"
 	"time"
 
-	"rcloneflow/internal/logger"
 	"go.uber.org/zap"
+	"rcloneflow/internal/logger"
 )
 
 // LogCleanupService 清理 /app/data/logs 下的运行日志文件（run-*-stdout.log / run-*-stderr.log）
 // 默认保留 7 天；可用环境变量 LOG_RETENTION_DAYS 覆盖；清理周期默认 24 小时，可用 LOG_CLEANUP_INTERVAL_HOURS 覆盖。
 type LogCleanupService struct {
-	logsDir        string
-	interval       time.Duration
-	retentionDays  int
-	stopCh         chan struct{}
+	logsDir       string
+	interval      time.Duration
+	retentionDays int
+	stopCh        chan struct{}
 }
 
 func NewLogCleanupService(logsDir string, interval time.Duration, retentionDays int) *LogCleanupService {
-	if retentionDays <= 0 { retentionDays = 7 }
-	if interval <= 0 { interval = 24 * time.Hour }
+	if retentionDays <= 0 {
+		retentionDays = 7
+	}
+	if interval <= 0 {
+		interval = 24 * time.Hour
+	}
 	return &LogCleanupService{logsDir: logsDir, interval: interval, retentionDays: retentionDays, stopCh: make(chan struct{})}
 }
 
@@ -59,7 +63,9 @@ func (s *LogCleanupService) cleanup() {
 		matches, _ := filepath.Glob(filepath.Join(s.logsDir, pat))
 		for _, p := range matches {
 			info, err := os.Stat(p)
-			if err != nil { continue }
+			if err != nil {
+				continue
+			}
 			if info.ModTime().Before(cutoff) {
 				_ = os.Remove(p)
 				deleted++
@@ -74,14 +80,18 @@ func (s *LogCleanupService) cleanup() {
 // Helpers to read env overrides
 func EnvLogRetentionDays(defaultDays int) int {
 	if v := os.Getenv("LOG_RETENTION_DAYS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 { return n }
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
 	}
 	return defaultDays
 }
 
 func EnvLogCleanupInterval(defaultHours int) time.Duration {
 	if v := os.Getenv("LOG_CLEANUP_INTERVAL_HOURS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 { return time.Duration(n) * time.Hour }
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return time.Duration(n) * time.Hour
+		}
 	}
 	return time.Duration(defaultHours) * time.Hour
 }

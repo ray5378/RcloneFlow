@@ -24,17 +24,17 @@ func (d *RunDAO) Create(run store.Run) (store.Run, error) {
 	result, err := d.db.Exec(`
 		INSERT INTO runs (task_id, rc_job_id, status, trigger, task_name, task_mode, source_remote, source_path, target_remote, target_path)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		run.TaskID, run.RcJobID, run.Status, run.Trigger, 
+		run.TaskID, run.RcJobID, run.Status, run.Trigger,
 		run.TaskName, run.TaskMode, run.SourceRemote, run.SourcePath, run.TargetRemote, run.TargetPath)
 	if err != nil {
 		return store.Run{}, err
 	}
-	
+
 	id, err := result.LastInsertId()
 	if err != nil {
 		return store.Run{}, err
 	}
-	
+
 	return d.GetByID(id)
 }
 
@@ -72,7 +72,7 @@ func (d *RunDAO) GetAll() ([]store.Run, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var runs []store.Run
 	for rows.Next() {
 		var r store.Run
@@ -104,7 +104,7 @@ func (d *RunDAO) GetByTaskID(taskID int64) ([]store.Run, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var runs []store.Run
 	for rows.Next() {
 		var r store.Run
@@ -162,7 +162,7 @@ func (d *RunDAO) GetRunning() ([]store.JobStatus, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var runs []store.JobStatus
 	for rows.Next() {
 		var r store.JobStatus
@@ -184,9 +184,9 @@ func (d *RunDAO) Update(id int64, updateFn func(*store.Run)) error {
 	if err != nil {
 		return nil
 	}
-	
+
 	updateFn(&r)
-	
+
 	summaryBytes, _ := json.Marshal(r.Summary)
 	_, err = d.db.Exec(`
 		UPDATE runs SET status = ?, summary = ?, error = ?, updated_at = datetime('now'),
@@ -199,12 +199,12 @@ func (d *RunDAO) Update(id int64, updateFn func(*store.Run)) error {
 // UpdateStatus 更新运行状态
 func (d *RunDAO) UpdateStatus(id int64, status, errorMsg string, summary map[string]any) error {
 	summaryBytes, _ := json.Marshal(summary)
-	
+
 	var finishedAt interface{}
 	if status == "finished" || status == "failed" {
 		finishedAt = time.Now()
 	}
-	
+
 	// 解析 summary 中的传输统计
 	var bytesTransferred int64
 	var speed string
@@ -218,7 +218,7 @@ func (d *RunDAO) UpdateStatus(id int64, status, errorMsg string, summary map[str
 			speed = formatSpeed(spd)
 		}
 	}
-	
+
 	_, err := d.db.Exec(`
 		UPDATE runs SET status = ?, summary = ?, error = ?, finished_at = ?, bytes_transferred = ?, speed = ?
 		WHERE id = ?`,

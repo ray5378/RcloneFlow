@@ -12,7 +12,7 @@ import (
 // ScheduleController 定时任务控制器
 type ScheduleController struct {
 	scheduleSvc *service.ScheduleService
-	sched      *scheduler.Scheduler
+	sched       *scheduler.Scheduler
 }
 
 // NewScheduleController 创建定时任务控制器
@@ -33,9 +33,9 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 
 	case http.MethodPost:
 		var req struct {
-			TaskID int64  `json:"taskId"`
-			Spec   string `json:"spec"`
-			Enabled bool  `json:"enabled"`
+			TaskID  int64  `json:"taskId"`
+			Spec    string `json:"spec"`
+			Enabled bool   `json:"enabled"`
 		}
 		if err := DecodeRequest(r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})

@@ -11,10 +11,18 @@ import (
 type CmdRunner struct{ Bin string }
 
 func (r *CmdRunner) bin() string {
-	if r.Bin != "" { return r.Bin }
-	if b := os.Getenv("RCLONE_BIN"); b != "" { return b }
-	if p, err := exec.LookPath("rclone"); err == nil { return p }
-	if st, err := os.Stat("./bin/rclone"); err == nil && !st.IsDir() { return "./bin/rclone" }
+	if r.Bin != "" {
+		return r.Bin
+	}
+	if b := os.Getenv("RCLONE_BIN"); b != "" {
+		return b
+	}
+	if p, err := exec.LookPath("rclone"); err == nil {
+		return p
+	}
+	if st, err := os.Stat("./bin/rclone"); err == nil && !st.IsDir() {
+		return "./bin/rclone"
+	}
 	return "rclone"
 }
 

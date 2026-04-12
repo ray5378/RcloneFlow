@@ -64,7 +64,7 @@ func NewRcloneClient(cfg *RcloneConfig) *RcloneClient {
 func (c *RcloneClient) Call(ctx context.Context, endpoint string, req, resp interface{}) error {
 	var body []byte
 	var err error
-	
+
 	if req != nil {
 		body, err = json.Marshal(req)
 		if err != nil {
@@ -74,30 +74,30 @@ func (c *RcloneClient) Call(ctx context.Context, endpoint string, req, resp inte
 		// 空请求也发送空JSON对象，避免 rclone EOF 错误
 		body = []byte("{}")
 	}
-	
-	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, 
-		strings.TrimRight(c.config.BaseURL, "/")+"/"+strings.TrimLeft(endpoint, "/"), 
+
+	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost,
+		strings.TrimRight(c.config.BaseURL, "/")+"/"+strings.TrimLeft(endpoint, "/"),
 		bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("create request failed: %w", err)
 	}
-	
+
 	httpReq.Header.Set("Content-Type", "application/json")
 	if c.config.User != "" || c.config.Pass != "" {
 		httpReq.SetBasicAuth(c.config.User, c.config.Pass)
 	}
-	
+
 	httpResp, err := c.client.Do(httpReq)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer httpResp.Body.Close()
-	
+
 	respBody, _ := io.ReadAll(httpResp.Body)
 	if httpResp.StatusCode >= 300 {
 		return fmt.Errorf("rclone %s failed: %s", endpoint, strings.TrimSpace(string(respBody)))
 	}
-	
+
 	if resp != nil && len(respBody) > 0 {
 		if err := json.Unmarshal(respBody, resp); err != nil {
 			return fmt.Errorf("unmarshal response failed: %w", err)
@@ -112,16 +112,16 @@ func (c *RcloneClient) Call(ctx context.Context, endpoint string, req, resp inte
 type VersionResponse struct {
 	Version    string `json:"version"`
 	Decomposed []int  `json:"decomposed"`
-	IsGit     bool   `json:"isGit"`
-	IsBeta    bool   `json:"isBeta"`
-	Os        string `json:"os"`
-	OsKernel  string `json:"osKernel"`
-	OsVersion string `json:"osVersion"`
-	OsArch    string `json:"osArch"`
-	Arch      string `json:"arch"`
-	GoVersion string `json:"goVersion"`
-	Linking   string `json:"linking"`
-	GoTags    string `json:"goTags"`
+	IsGit      bool   `json:"isGit"`
+	IsBeta     bool   `json:"isBeta"`
+	Os         string `json:"os"`
+	OsKernel   string `json:"osKernel"`
+	OsVersion  string `json:"osVersion"`
+	OsArch     string `json:"osArch"`
+	Arch       string `json:"arch"`
+	GoVersion  string `json:"goVersion"`
+	Linking    string `json:"linking"`
+	GoTags     string `json:"goTags"`
 }
 
 // Version 获取rclone版本
@@ -151,10 +151,10 @@ func (c *RcloneClient) ListRemotes(ctx context.Context) ([]string, error) {
 
 // CreateRemoteRequest 创建远程存储请求
 type CreateRemoteRequest struct {
-	Name       string            `json:"name"`
-	Type       string            `json:"type"`
-	Parameters map[string]any    `json:"parameters"`
-	Opt        *CreateRemoteOpt  `json:"opt,omitempty"`
+	Name       string           `json:"name"`
+	Type       string           `json:"type"`
+	Parameters map[string]any   `json:"parameters"`
+	Opt        *CreateRemoteOpt `json:"opt,omitempty"`
 }
 
 // CreateRemoteOpt 创建远程存储选项
@@ -170,7 +170,7 @@ func (c *RcloneClient) CreateRemote(ctx context.Context, req *CreateRemoteReques
 	if req.Opt == nil {
 		req.Opt = &CreateRemoteOpt{Obscure: false, NoOutput: true}
 	}
-	
+
 	// 清理参数
 	cleanParams := make(map[string]any)
 	for k, v := range req.Parameters {
@@ -199,7 +199,7 @@ func (c *RcloneClient) CreateRemote(ctx context.Context, req *CreateRemoteReques
 		cleanParams[k] = v
 	}
 	req.Parameters = cleanParams
-	
+
 	return c.Call(ctx, "config/create", req, nil)
 }
 
@@ -241,36 +241,36 @@ func (c *RcloneClient) GetConfig(ctx context.Context, name string) (map[string]a
 
 // ProviderInfo 提供商信息
 type ProviderInfo struct {
-	Name     string         `json:"Name"`
-	Hangul   string         `json:"Hangul,omitempty"`
-	Prefix   string         `json:"Prefix,omitempty"`
-	OpenURL  string         `json:"OpenURL,omitempty"`
+	Name      string        `json:"Name"`
+	Hangul    string        `json:"Hangul,omitempty"`
+	Prefix    string        `json:"Prefix,omitempty"`
+	OpenURL   string        `json:"OpenURL,omitempty"`
 	HashTypes []string      `json:"HashTypes,omitempty"`
-	Attr     []string       `json:"Attr,omitempty"`
-	Policy   []string       `json:"Policy,omitempty"`
-	Options  []OptionBlock  `json:"Options,omitempty"`
+	Attr      []string      `json:"Attr,omitempty"`
+	Policy    []string      `json:"Policy,omitempty"`
+	Options   []OptionBlock `json:"Options,omitempty"`
 }
 
 // OptionBlock 选项块
 type OptionBlock struct {
-	Name       string      `json:"Name"`
-	FieldName  string      `json:"FieldName,omitempty"`
-	Help       string      `json:"Help"`
-	Groups     string      `json:"Groups,omitempty"`
-	Provider   string      `json:"Provider,omitempty"`
-	Default    any         `json:"Default"`
-	Value      any         `json:"Value,omitempty"`
-	DefaultStr string      `json:"DefaultStr,omitempty"`
-	ValueStr   string      `json:"ValueStr,omitempty"`
-	Examples   []Example   `json:"Examples,omitempty"`
-	ShortOpt   string      `json:"ShortOpt,omitempty"`
-	Hide       int         `json:"Hide"`
-	Required   bool        `json:"Required"`
-	IsPassword bool        `json:"IsPassword"`
-	NoPrefix   bool        `json:"NoPrefix"`
-	Advanced   bool        `json:"Advanced"`
-	Exclusive  bool        `json:"Exclusive"`
-	Sensitive  bool        `json:"Sensitive"`
+	Name       string    `json:"Name"`
+	FieldName  string    `json:"FieldName,omitempty"`
+	Help       string    `json:"Help"`
+	Groups     string    `json:"Groups,omitempty"`
+	Provider   string    `json:"Provider,omitempty"`
+	Default    any       `json:"Default"`
+	Value      any       `json:"Value,omitempty"`
+	DefaultStr string    `json:"DefaultStr,omitempty"`
+	ValueStr   string    `json:"ValueStr,omitempty"`
+	Examples   []Example `json:"Examples,omitempty"`
+	ShortOpt   string    `json:"ShortOpt,omitempty"`
+	Hide       int       `json:"Hide"`
+	Required   bool      `json:"Required"`
+	IsPassword bool      `json:"IsPassword"`
+	NoPrefix   bool      `json:"NoPrefix"`
+	Advanced   bool      `json:"Advanced"`
+	Exclusive  bool      `json:"Exclusive"`
+	Sensitive  bool      `json:"Sensitive"`
 }
 
 // Example 示例
@@ -297,33 +297,33 @@ func (c *RcloneClient) GetProviders(ctx context.Context) ([]ProviderInfo, error)
 
 // PathInfo 路径信息
 type PathInfo struct {
-	Name      string         `json:"Name"`
-	Path      string         `json:"Path"`
-	IsDir     bool           `json:"IsDir"`
-	IsBucket  bool           `json:"IsBucket,omitempty"`
-	MimeType  string         `json:"MimeType,omitempty"`
-	ModTime   string         `json:"ModTime,omitempty"`
-	Size      int64          `json:"Size"`
-	Hash      map[string]any `json:"Hash,omitempty"`
+	Name     string         `json:"Name"`
+	Path     string         `json:"Path"`
+	IsDir    bool           `json:"IsDir"`
+	IsBucket bool           `json:"IsBucket,omitempty"`
+	MimeType string         `json:"MimeType,omitempty"`
+	ModTime  string         `json:"ModTime,omitempty"`
+	Size     int64          `json:"Size"`
+	Hash     map[string]any `json:"Hash,omitempty"`
 }
 
 // ListPathRequest 列出路径请求
 type ListPathRequest struct {
-	Fs         string `json:"fs"`
-	Remote     string `json:"remote"`
-	Opt        *ListOpt `json:"opt,omitempty"`
+	Fs     string   `json:"fs"`
+	Remote string   `json:"remote"`
+	Opt    *ListOpt `json:"opt,omitempty"`
 }
 
 // ListOpt 列出选项
 type ListOpt struct {
-	Recurse       bool     `json:"recurse"`
-	NoModTime     bool     `json:"noModTime"`
-	DirsOnly      bool     `json:"dirsOnly"`
-	FilesOnly     bool     `json:"filesOnly"`
-	ShowHash      []string `json:"showHash,omitempty"`
-	IgnoreSize    bool     `json:"ignoreSize"`
-	IncludeEmpty  bool     `json:"includeEmpty"`
-	Flatten       []int    `json:"flatten,omitempty"`
+	Recurse      bool     `json:"recurse"`
+	NoModTime    bool     `json:"noModTime"`
+	DirsOnly     bool     `json:"dirsOnly"`
+	FilesOnly    bool     `json:"filesOnly"`
+	ShowHash     []string `json:"showHash,omitempty"`
+	IgnoreSize   bool     `json:"ignoreSize"`
+	IncludeEmpty bool     `json:"includeEmpty"`
+	Flatten      []int    `json:"flatten,omitempty"`
 }
 
 // ListPathResponse 列出路径响应
@@ -418,7 +418,7 @@ func (c *RcloneClient) CopyFile(ctx context.Context, srcFs, srcRemote, dstFs, ds
 
 // AboutResponse 存储使用量响应
 type AboutResponse struct {
-	Used   int64  `json:"used"`
+	Used    int64 `json:"used"`
 	Trashed int64 `json:"trashed,omitempty"`
 	Other   int64 `json:"other,omitempty"`
 	Free    int64 `json:"free"`
@@ -440,55 +440,55 @@ type FsRequest struct {
 
 // FsInfoResponse 文件系统信息响应
 type FsInfoResponse struct {
-	Name      string           `json:"Name"`
-	Precision int64            `json:"Precision"`
-	Root      string           `json:"Root"`
-	String    string           `json:"String"`
-	Features  *Features        `json:"Features,omitempty"`
-	Hashes    []string         `json:"Hashes,omitempty"`
+	Name         string        `json:"Name"`
+	Precision    int64         `json:"Precision"`
+	Root         string        `json:"Root"`
+	String       string        `json:"String"`
+	Features     *Features     `json:"Features,omitempty"`
+	Hashes       []string      `json:"Hashes,omitempty"`
 	MetadataInfo *MetadataInfo `json:"MetadataInfo,omitempty"`
 }
 
 // Features 功能特性
 type Features struct {
-	About             bool `json:"About"`
-	BucketBased       bool `json:"BucketBased"`
-	BucketBasedRootOK bool `json:"BucketBasedRootOK"`
+	About                   bool `json:"About"`
+	BucketBased             bool `json:"BucketBased"`
+	BucketBasedRootOK       bool `json:"BucketBasedRootOK"`
 	CanHaveEmptyDirectories bool `json:"CanHaveEmptyDirectories"`
-	CaseInsensitive   bool `json:"CaseInsensitive"`
-	ChangeNotify      bool `json:"ChangeNotify"`
-	CleanUp           bool `json:"CleanUp"`
-	Command           bool `json:"Command"`
-	Copy              bool `json:"Copy"`
-	DirCacheFlush     bool `json:"DirCacheFlush"`
-	DirMove           bool `json:"DirMove"`
-	Disconnect        bool `json:"Disconnect"`
-	DuplicateFiles    bool `json:"DuplicateFiles"`
-	GetTier           bool `json:"GetTier"`
-	IsLocal           bool `json:"IsLocal"`
-	ListR             bool `json:"ListR"`
-	MergeDirs         bool `json:"MergeDirs"`
-	MetadataInfo      bool `json:"MetadataInfo"`
-	Move              bool `json:"Move"`
-	OpenWriterAt      bool `json:"OpenWriterAt"`
-	PublicLink        bool `json:"PublicLink"`
-	Purge             bool `json:"Purge"`
-	PutStream         bool `json:"PutStream"`
-	PutUnchecked      bool `json:"PutUnchecked"`
-	ReadMetadata      bool `json:"ReadMetadata"`
-	ReadMimeType      bool `json:"ReadMimeType"`
+	CaseInsensitive         bool `json:"CaseInsensitive"`
+	ChangeNotify            bool `json:"ChangeNotify"`
+	CleanUp                 bool `json:"CleanUp"`
+	Command                 bool `json:"Command"`
+	Copy                    bool `json:"Copy"`
+	DirCacheFlush           bool `json:"DirCacheFlush"`
+	DirMove                 bool `json:"DirMove"`
+	Disconnect              bool `json:"Disconnect"`
+	DuplicateFiles          bool `json:"DuplicateFiles"`
+	GetTier                 bool `json:"GetTier"`
+	IsLocal                 bool `json:"IsLocal"`
+	ListR                   bool `json:"ListR"`
+	MergeDirs               bool `json:"MergeDirs"`
+	MetadataInfo            bool `json:"MetadataInfo"`
+	Move                    bool `json:"Move"`
+	OpenWriterAt            bool `json:"OpenWriterAt"`
+	PublicLink              bool `json:"PublicLink"`
+	Purge                   bool `json:"Purge"`
+	PutStream               bool `json:"PutStream"`
+	PutUnchecked            bool `json:"PutUnchecked"`
+	ReadMetadata            bool `json:"ReadMetadata"`
+	ReadMimeType            bool `json:"ReadMimeType"`
 	ServerSideAcrossConfigs bool `json:"ServerSideAcrossConfigs"`
-	SetTier           bool `json:"SetTier"`
-	SetWrapper        bool `json:"SetWrapper"`
-	Shutdown          bool `json:"Shutdown"`
-	SlowHash          bool `json:"SlowHash"`
-	SlowModTime       bool `json:"SlowModTime"`
-	UnWrap            bool `json:"UnWrap"`
-	UserInfo          bool `json:"UserInfo"`
-	UserMetadata      bool `json:"UserMetadata"`
-	WrapFs            bool `json:"WrapFs"`
-	WriteMetadata     bool `json:"WriteMetadata"`
-	WriteMimeType     bool `json:"WriteMimeType"`
+	SetTier                 bool `json:"SetTier"`
+	SetWrapper              bool `json:"SetWrapper"`
+	Shutdown                bool `json:"Shutdown"`
+	SlowHash                bool `json:"SlowHash"`
+	SlowModTime             bool `json:"SlowModTime"`
+	UnWrap                  bool `json:"UnWrap"`
+	UserInfo                bool `json:"UserInfo"`
+	UserMetadata            bool `json:"UserMetadata"`
+	WrapFs                  bool `json:"WrapFs"`
+	WriteMetadata           bool `json:"WriteMetadata"`
+	WriteMimeType           bool `json:"WriteMimeType"`
 }
 
 // MetadataInfo 元数据信息
@@ -530,18 +530,18 @@ func (c *RcloneClient) PublicLink(ctx context.Context, fs, remote string) (strin
 
 // PublicLinkRequest 分享链接请求
 type PublicLinkRequest struct {
-	Fs           string `json:"fs"`
-	Remote       string `json:"remote"`
-	Expire       string `json:"expire,omitempty"`
-	Unpublished  bool   `json:"unpublished"`
+	Fs          string `json:"fs"`
+	Remote      string `json:"remote"`
+	Expire      string `json:"expire,omitempty"`
+	Unpublished bool   `json:"unpublished"`
 }
 
 // ==================== 同步操作API ====================
 
 // SyncCopyRequest 同步复制请求
 type SyncCopyRequest struct {
-	SrcFs               string `json:"srcFs"`
-	DstFs               string `json:"dstFs"`
+	SrcFs              string `json:"srcFs"`
+	DstFs              string `json:"dstFs"`
 	CreateEmptySrcDirs bool   `json:"createEmptySrcDirs"`
 }
 
@@ -555,8 +555,8 @@ func (c *RcloneClient) CopyDir(ctx context.Context, srcFs, dstFs string) error {
 
 // SyncMoveRequest 同步移动请求
 type SyncMoveRequest struct {
-	SrcFs               string `json:"srcFs"`
-	DstFs               string `json:"dstFs"`
+	SrcFs              string `json:"srcFs"`
+	DstFs              string `json:"dstFs"`
 	CreateEmptySrcDirs bool   `json:"createEmptySrcDirs"`
 	DeleteEmptySrcDirs bool   `json:"deleteEmptySrcDirs"`
 }
@@ -579,9 +579,9 @@ type JobIDResponse struct {
 
 // StartJobRequest 启动任务请求
 type StartJobRequest struct {
-	SrcFs  string `json:"srcFs"`
-	DstFs  string `json:"dstFs"`
-	Async  bool   `json:"_async"`
+	SrcFs string `json:"srcFs"`
+	DstFs string `json:"dstFs"`
+	Async bool   `json:"_async"`
 	*TaskOptions
 }
 
@@ -595,15 +595,15 @@ func (c *RcloneClient) StartJob(ctx context.Context, mode, srcFs, dstFs string, 
 	case "move":
 		ep = "sync/move"
 	}
-	
+
 	var resp JobIDResponse
 	req := &StartJobRequest{
-		SrcFs:        srcFs,
-		DstFs:        dstFs,
-		Async:        true,
-		TaskOptions:  opts,
+		SrcFs:       srcFs,
+		DstFs:       dstFs,
+		Async:       true,
+		TaskOptions: opts,
 	}
-	
+
 	if err := c.Call(ctx, ep, req, &resp); err != nil {
 		return 0, err
 	}
@@ -612,16 +612,16 @@ func (c *RcloneClient) StartJob(ctx context.Context, mode, srcFs, dstFs string, 
 
 // JobStatusResponse 任务状态响应
 type JobStatusResponse struct {
-	ID        int64             `json:"id"`
-	ExecuteID string            `json:"executeId"`
-	StartTime string            `json:"startTime"`
-	EndTime   string            `json:"endTime,omitempty"`
-	Duration  float64          `json:"duration"`
-	Success   bool              `json:"success"`
-	Finished  bool              `json:"finished"`
-	Error     string            `json:"error,omitempty"`
-	Output    map[string]any    `json:"output,omitempty"`
-	Progress  map[string]any    `json:"progress,omitempty"`
+	ID        int64          `json:"id"`
+	ExecuteID string         `json:"executeId"`
+	StartTime string         `json:"startTime"`
+	EndTime   string         `json:"endTime,omitempty"`
+	Duration  float64        `json:"duration"`
+	Success   bool           `json:"success"`
+	Finished  bool           `json:"finished"`
+	Error     string         `json:"error,omitempty"`
+	Output    map[string]any `json:"output,omitempty"`
+	Progress  map[string]any `json:"progress,omitempty"`
 }
 
 // JobStatus 获取任务状态

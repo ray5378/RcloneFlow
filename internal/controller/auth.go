@@ -240,12 +240,12 @@ func (c *AuthController) ChangePassword(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	finalUsername := req.Username
 	if finalUsername == "" {
 		finalUsername = user.Username
 	}
-	
+
 	json.NewEncoder(w).Encode(map[string]any{
 		"message": "修改成功",
 		"user": map[string]any{

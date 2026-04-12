@@ -43,24 +43,24 @@ func (m *ScheduleDAOMock) Delete(id int64) error {
 // TestScheduleService_CreateSchedule 测试创建定时任务
 func TestScheduleService_CreateSchedule(t *testing.T) {
 	scheduleDAO := &ScheduleDAOMock{}
-	
+
 	svc := &testScheduleService{
 		scheduleDAO: scheduleDAO,
 	}
-	
+
 	schedule, err := svc.CreateSchedule(1, "@every 5m")
 	if err != nil {
 		t.Fatalf("CreateSchedule() error = %v", err)
 	}
-	
+
 	if schedule.ID == 0 {
 		t.Error("expected non-zero ID")
 	}
-	
+
 	if schedule.Spec != "@every 5m" {
 		t.Errorf("expected Spec '@every 5m', got '%s'", schedule.Spec)
 	}
-	
+
 	if len(scheduleDAO.schedules) != 1 {
 		t.Errorf("expected 1 schedule, got %d", len(scheduleDAO.schedules))
 	}
@@ -74,16 +74,16 @@ func TestScheduleService_ListSchedules(t *testing.T) {
 			{ID: 2, TaskID: 2, Spec: "@every 10m"},
 		},
 	}
-	
+
 	svc := &testScheduleService{
 		scheduleDAO: scheduleDAO,
 	}
-	
+
 	schedules, err := svc.ListSchedules()
 	if err != nil {
 		t.Fatalf("ListSchedules() error = %v", err)
 	}
-	
+
 	if len(schedules) != 2 {
 		t.Errorf("expected 2 schedules, got %d", len(schedules))
 	}
@@ -97,20 +97,20 @@ func TestScheduleService_DeleteSchedule(t *testing.T) {
 			{ID: 2, TaskID: 2, Spec: "@every 10m"},
 		},
 	}
-	
+
 	svc := &testScheduleService{
 		scheduleDAO: scheduleDAO,
 	}
-	
+
 	err := svc.DeleteSchedule(1)
 	if err != nil {
 		t.Fatalf("DeleteSchedule() error = %v", err)
 	}
-	
+
 	if len(scheduleDAO.schedules) != 1 {
 		t.Errorf("expected 1 schedule after delete, got %d", len(scheduleDAO.schedules))
 	}
-	
+
 	_, ok := scheduleDAO.GetByID(1)
 	if ok {
 		t.Error("expected schedule 1 to be deleted")
@@ -124,16 +124,16 @@ func TestScheduleService_GetSchedule(t *testing.T) {
 			{ID: 1, TaskID: 1, Spec: "@every 5m"},
 		},
 	}
-	
+
 	svc := &testScheduleService{
 		scheduleDAO: scheduleDAO,
 	}
-	
+
 	schedule, ok := svc.GetSchedule(1)
 	if !ok {
 		t.Error("expected to get schedule 1")
 	}
-	
+
 	if schedule.Spec != "@every 5m" {
 		t.Errorf("expected Spec '@every 5m', got '%s'", schedule.Spec)
 	}
@@ -142,11 +142,11 @@ func TestScheduleService_GetSchedule(t *testing.T) {
 // TestScheduleService_GetSchedule_NotFound 测试获取不存在的定时任务
 func TestScheduleService_GetSchedule_NotFound(t *testing.T) {
 	scheduleDAO := &ScheduleDAOMock{}
-	
+
 	svc := &testScheduleService{
 		scheduleDAO: scheduleDAO,
 	}
-	
+
 	_, ok := svc.GetSchedule(999)
 	if ok {
 		t.Error("expected schedule 999 not found")
@@ -161,7 +161,7 @@ type testScheduleService struct {
 func (s *testScheduleService) CreateSchedule(taskID int64, spec string) (store.Schedule, error) {
 	return s.scheduleDAO.Create(store.Schedule{
 		TaskID: taskID,
-		Spec:  spec,
+		Spec:   spec,
 	})
 }
 

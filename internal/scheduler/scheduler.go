@@ -38,7 +38,8 @@ func (s *Scheduler) DB() *store.DB { return s.db }
 
 // RemoveSchedule 移除一个运行时调度项（若存在）
 func (s *Scheduler) RemoveSchedule(id int64) {
-	s.mu.Lock(); defer s.mu.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if eid, ok := s.entries[id]; ok {
 		s.cron.Remove(eid)
 		delete(s.entries, id)
@@ -91,13 +92,13 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 		r.db.AddRun(store.Run{
 			TaskID:       taskID,
 			Status:       "failed",
-			Trigger:     trigger,
-			TaskName:    t.Name,
-			TaskMode:    t.Mode,
+			Trigger:      trigger,
+			TaskName:     t.Name,
+			TaskMode:     t.Mode,
 			SourceRemote: t.SourceRemote,
-			SourcePath:  t.SourcePath,
+			SourcePath:   t.SourcePath,
 			TargetRemote: t.TargetRemote,
-			TargetPath:  t.TargetPath,
+			TargetPath:   t.TargetPath,
 		})
 		return err
 	}
@@ -106,13 +107,13 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 		TaskID:       taskID,
 		RcJobID:      jobID,
 		Status:       "running",
-		Trigger:     trigger,
-		TaskName:    t.Name,
-		TaskMode:    t.Mode,
+		Trigger:      trigger,
+		TaskName:     t.Name,
+		TaskMode:     t.Mode,
 		SourceRemote: t.SourceRemote,
-		SourcePath:  t.SourcePath,
+		SourcePath:   t.SourcePath,
 		TargetRemote: t.TargetRemote,
-		TargetPath:  t.TargetPath,
+		TargetPath:   t.TargetPath,
 	})
 	return err
 }
@@ -243,7 +244,9 @@ func (s *Scheduler) AddSchedule(schedule store.Schedule) error {
 	if err != nil {
 		return err
 	}
-	s.mu.Lock(); s.entries[scheduleID] = eid; s.mu.Unlock()
+	s.mu.Lock()
+	s.entries[scheduleID] = eid
+	s.mu.Unlock()
 	logger.Info("定时任务已添加(运行时)",
 		zap.Int64("schedule_id", scheduleID),
 		zap.Int64("task_id", taskID),
@@ -258,7 +261,9 @@ func (s *Scheduler) Start() error {
 		return err
 	}
 	for _, item := range schedules {
-		if !item.Enabled { continue }
+		if !item.Enabled {
+			continue
+		}
 		if err := s.AddSchedule(item); err != nil {
 			logger.Warn("添加定时任务失败",
 				zap.Int64("schedule_id", item.ID),

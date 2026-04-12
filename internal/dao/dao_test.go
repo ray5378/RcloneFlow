@@ -15,14 +15,14 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 	if err != nil {
 		t.Fatalf("failed to create temp dir: %v", err)
 	}
-	
+
 	dbPath := filepath.Join(tmpDir, "test.db")
 	db, err := sql.Open("sqlite3", dbPath+"?_journal_mode=WAL")
 	if err != nil {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("failed to open db: %v", err)
 	}
-	
+
 	// 创建表
 	_, err = db.Exec(`
 		CREATE TABLE tasks (
@@ -59,12 +59,12 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 		os.RemoveAll(tmpDir)
 		t.Fatalf("failed to create tables: %v", err)
 	}
-	
+
 	cleanup := func() {
 		db.Close()
 		os.RemoveAll(tmpDir)
 	}
-	
+
 	return db, cleanup
 }
 
@@ -72,9 +72,9 @@ func setupTestDB(t *testing.T) (*sql.DB, func()) {
 func TestTaskDAO_Create(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewTaskDAO(db)
-	
+
 	task := Task{
 		Name:         "test-task",
 		Mode:         "copy",
@@ -83,16 +83,16 @@ func TestTaskDAO_Create(t *testing.T) {
 		TargetRemote: "gdrive",
 		TargetPath:   "/dst",
 	}
-	
+
 	created, err := dao.Create(task)
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	
+
 	if created.ID == 0 {
 		t.Error("expected non-zero ID")
 	}
-	
+
 	if created.Name != "test-task" {
 		t.Errorf("expected Name 'test-task', got '%s'", created.Name)
 	}
@@ -102,9 +102,9 @@ func TestTaskDAO_Create(t *testing.T) {
 func TestTaskDAO_GetByID(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewTaskDAO(db)
-	
+
 	// 先创建
 	dao.Create(Task{
 		Name:         "test",
@@ -114,13 +114,13 @@ func TestTaskDAO_GetByID(t *testing.T) {
 		TargetRemote: "gdrive",
 		TargetPath:   "/dst",
 	})
-	
+
 	// 获取
 	task, ok := dao.GetByID(1)
 	if !ok {
 		t.Fatal("expected to get task")
 	}
-	
+
 	if task.Name != "test" {
 		t.Errorf("expected Name 'test', got '%s'", task.Name)
 	}
@@ -130,9 +130,9 @@ func TestTaskDAO_GetByID(t *testing.T) {
 func TestTaskDAO_GetByID_NotFound(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewTaskDAO(db)
-	
+
 	_, ok := dao.GetByID(999)
 	if ok {
 		t.Error("expected not found")
@@ -143,17 +143,17 @@ func TestTaskDAO_GetByID_NotFound(t *testing.T) {
 func TestTaskDAO_GetAll(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewTaskDAO(db)
-	
+
 	dao.Create(Task{Name: "task1", Mode: "copy", SourceRemote: "a", SourcePath: "/a", TargetRemote: "b", TargetPath: "/b"})
 	dao.Create(Task{Name: "task2", Mode: "sync", SourceRemote: "c", SourcePath: "/c", TargetRemote: "d", TargetPath: "/d"})
-	
+
 	tasks, err := dao.GetAll()
 	if err != nil {
 		t.Fatalf("GetAll() error = %v", err)
 	}
-	
+
 	if len(tasks) != 2 {
 		t.Errorf("expected 2 tasks, got %d", len(tasks))
 	}
@@ -163,11 +163,11 @@ func TestTaskDAO_GetAll(t *testing.T) {
 func TestTaskDAO_Update(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewTaskDAO(db)
-	
+
 	dao.Create(Task{Name: "original", Mode: "copy", SourceRemote: "a", SourcePath: "/a", TargetRemote: "b", TargetPath: "/b"})
-	
+
 	err := dao.Update(1, Task{
 		Name:         "updated",
 		Mode:         "sync",
@@ -179,7 +179,7 @@ func TestTaskDAO_Update(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Update() error = %v", err)
 	}
-	
+
 	task, _ := dao.GetByID(1)
 	if task.Name != "updated" {
 		t.Errorf("expected Name 'updated', got '%s'", task.Name)
@@ -193,17 +193,17 @@ func TestTaskDAO_Update(t *testing.T) {
 func TestTaskDAO_Delete(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewTaskDAO(db)
-	
+
 	dao.Create(Task{Name: "task1", Mode: "copy", SourceRemote: "a", SourcePath: "/a", TargetRemote: "b", TargetPath: "/b"})
 	dao.Create(Task{Name: "task2", Mode: "copy", SourceRemote: "c", SourcePath: "/c", TargetRemote: "d", TargetPath: "/d"})
-	
+
 	err := dao.Delete(1)
 	if err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
-	
+
 	tasks, _ := dao.GetAll()
 	if len(tasks) != 1 {
 		t.Errorf("expected 1 task, got %d", len(tasks))
@@ -214,18 +214,18 @@ func TestTaskDAO_Delete(t *testing.T) {
 func TestScheduleDAO_Create(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewScheduleDAO(db)
-	
+
 	schedule, err := dao.Create(Schedule{TaskID: 1, Spec: "@every 5m"})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	
+
 	if schedule.ID == 0 {
 		t.Error("expected non-zero ID")
 	}
-	
+
 	if schedule.Spec != "@every 5m" {
 		t.Errorf("expected Spec '@every 5m', got '%s'", schedule.Spec)
 	}
@@ -235,15 +235,15 @@ func TestScheduleDAO_Create(t *testing.T) {
 func TestScheduleDAO_GetByID(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewScheduleDAO(db)
 	dao.Create(Schedule{TaskID: 1, Spec: "@every 10m"})
-	
+
 	schedule, ok := dao.GetByID(1)
 	if !ok {
 		t.Fatal("expected to get schedule")
 	}
-	
+
 	if schedule.Spec != "@every 10m" {
 		t.Errorf("expected Spec '@every 10m', got '%s'", schedule.Spec)
 	}
@@ -253,17 +253,17 @@ func TestScheduleDAO_GetByID(t *testing.T) {
 func TestScheduleDAO_GetAll(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewScheduleDAO(db)
-	
+
 	dao.Create(Schedule{TaskID: 1, Spec: "@every 5m"})
 	dao.Create(Schedule{TaskID: 2, Spec: "@every 10m"})
-	
+
 	schedules, err := dao.GetAll()
 	if err != nil {
 		t.Fatalf("GetAll() error = %v", err)
 	}
-	
+
 	if len(schedules) != 2 {
 		t.Errorf("expected 2 schedules, got %d", len(schedules))
 	}
@@ -273,17 +273,17 @@ func TestScheduleDAO_GetAll(t *testing.T) {
 func TestScheduleDAO_Delete(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewScheduleDAO(db)
-	
+
 	dao.Create(Schedule{TaskID: 1, Spec: "@every 5m"})
 	dao.Create(Schedule{TaskID: 2, Spec: "@every 10m"})
-	
+
 	err := dao.Delete(1)
 	if err != nil {
 		t.Fatalf("Delete() error = %v", err)
 	}
-	
+
 	schedules, _ := dao.GetAll()
 	if len(schedules) != 1 {
 		t.Errorf("expected 1 schedule, got %d", len(schedules))
@@ -294,23 +294,23 @@ func TestScheduleDAO_Delete(t *testing.T) {
 func TestRunDAO_Create(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewRunDAO(db)
-	
+
 	run, err := dao.Create(Run{
 		TaskID:  1,
 		RcJobID: 123,
-		Status: "running",
+		Status:  "running",
 		Trigger: "manual",
 	})
 	if err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
-	
+
 	if run.ID == 0 {
 		t.Error("expected non-zero ID")
 	}
-	
+
 	if run.RcJobID != 123 {
 		t.Errorf("expected RcJobID 123, got %d", run.RcJobID)
 	}
@@ -320,17 +320,17 @@ func TestRunDAO_Create(t *testing.T) {
 func TestRunDAO_GetAll(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewRunDAO(db)
-	
+
 	dao.Create(Run{TaskID: 1, RcJobID: 1, Status: "running", Trigger: "manual"})
 	dao.Create(Run{TaskID: 2, RcJobID: 2, Status: "finished", Trigger: "schedule"})
-	
+
 	runs, err := dao.GetAll()
 	if err != nil {
 		t.Fatalf("GetAll() error = %v", err)
 	}
-	
+
 	if len(runs) != 2 {
 		t.Errorf("expected 2 runs, got %d", len(runs))
 	}
@@ -340,18 +340,18 @@ func TestRunDAO_GetAll(t *testing.T) {
 func TestRunDAO_GetRunning(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewRunDAO(db)
-	
+
 	dao.Create(Run{TaskID: 1, RcJobID: 1, Status: "running", Trigger: "manual"})
 	dao.Create(Run{TaskID: 2, RcJobID: 2, Status: "finished", Trigger: "schedule"})
 	dao.Create(Run{TaskID: 3, RcJobID: 0, Status: "running", Trigger: "manual"}) // 无rc_job_id
-	
+
 	running, err := dao.GetRunning()
 	if err != nil {
 		t.Fatalf("GetRunning() error = %v", err)
 	}
-	
+
 	if len(running) != 1 {
 		t.Errorf("expected 1 running job, got %d", len(running))
 	}
@@ -361,16 +361,16 @@ func TestRunDAO_GetRunning(t *testing.T) {
 func TestRunDAO_UpdateStatus(t *testing.T) {
 	db, cleanup := setupTestDB(t)
 	defer cleanup()
-	
+
 	dao := NewRunDAO(db)
-	
+
 	dao.Create(Run{TaskID: 1, RcJobID: 1, Status: "running", Trigger: "manual"})
-	
+
 	err := dao.UpdateStatus(1, "finished", "", map[string]any{"files": 10})
 	if err != nil {
 		t.Fatalf("UpdateStatus() error = %v", err)
 	}
-	
+
 	runs, _ := dao.GetAll()
 	if runs[0].Status != "finished" {
 		t.Errorf("expected Status 'finished', got '%s'", runs[0].Status)

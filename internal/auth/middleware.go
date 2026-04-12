@@ -18,13 +18,17 @@ func JWTMiddleware(next http.Handler) http.Handler {
 		// 兼容 GET 请求带 ?auth=token 的方式（用于下载和浏览器直开 GET 接口）
 		tok := ""
 		if r.Method == http.MethodGet {
-			if q := r.URL.Query().Get("auth"); q != "" { tok = q }
+			if q := r.URL.Query().Get("auth"); q != "" {
+				tok = q
+			}
 		}
 		// 优先 Authorization 头
 		authHeader := r.Header.Get("Authorization")
 		if tok == "" && authHeader != "" {
 			parts := strings.SplitN(authHeader, " ", 2)
-			if len(parts) == 2 && parts[0] == "Bearer" { tok = parts[1] }
+			if len(parts) == 2 && parts[0] == "Bearer" {
+				tok = parts[1]
+			}
 		}
 		if tok == "" {
 			http.Error(w, `{"error":"未提供认证token"}`, http.StatusUnauthorized)

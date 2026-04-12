@@ -31,12 +31,12 @@ func New(
 ) *Router {
 	return &Router{
 		remoteCtrl:   rc,
-		taskCtrl:    taskCtrl,
-		browserCtrl: browserCtrl,
+		taskCtrl:     taskCtrl,
+		browserCtrl:  browserCtrl,
 		scheduleCtrl: scheduleCtrl,
-		runCtrl:     runCtrl,
-		fsCtrl:      fsCtrl,
-		authCtrl:    authCtrl,
+		runCtrl:      runCtrl,
+		fsCtrl:       fsCtrl,
+		authCtrl:     authCtrl,
 	}
 }
 
@@ -83,8 +83,11 @@ func (r *Router) Setup(mux *http.ServeMux) {
 
 	// 任务管理
 	apiMux.HandleFunc("/api/tasks", r.taskCtrl.HandleTasks)
-	apiMux.HandleFunc("/api/tasks/", func(w http.ResponseWriter, req *http.Request){
-		if strings.HasSuffix(req.URL.Path, "/kill") { r.runCtrl.HandleTaskKill(w, req); return }
+	apiMux.HandleFunc("/api/tasks/", func(w http.ResponseWriter, req *http.Request) {
+		if strings.HasSuffix(req.URL.Path, "/kill") {
+			r.runCtrl.HandleTaskKill(w, req)
+			return
+		}
 		r.taskCtrl.HandleTaskActions(w, req)
 	})
 
@@ -100,11 +103,23 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	// 设置中心
 	apiMux.HandleFunc("/api/settings", controller.NewSettingsController().HandleSettings)
 	// CLI 扩展接口：停止/强杀/日志下载/文件明细
-	apiMux.HandleFunc("/api/runs/", func(w http.ResponseWriter, req *http.Request){
-		if strings.HasSuffix(req.URL.Path, "/stop") { r.runCtrl.HandleRunStopCLI(w, req); return }
-		if strings.HasSuffix(req.URL.Path, "/kill") { r.runCtrl.HandleRunKillCLI(w, req); return }
-		if strings.HasSuffix(req.URL.Path, "/files") { r.runCtrl.HandleRunFiles(w, req); return }
-		if strings.HasSuffix(req.URL.Path, "/log") { r.runCtrl.HandleRunLog(w, req); return }
+	apiMux.HandleFunc("/api/runs/", func(w http.ResponseWriter, req *http.Request) {
+		if strings.HasSuffix(req.URL.Path, "/stop") {
+			r.runCtrl.HandleRunStopCLI(w, req)
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/kill") {
+			r.runCtrl.HandleRunKillCLI(w, req)
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/files") {
+			r.runCtrl.HandleRunFiles(w, req)
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/log") {
+			r.runCtrl.HandleRunLog(w, req)
+			return
+		}
 		r.runCtrl.HandleRunStatus(w, req)
 	})
 	apiMux.HandleFunc("/api/jobs/{jobId}/status", r.runCtrl.HandleJobStatus)

@@ -74,10 +74,14 @@ func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
 		if r.Summary != "" {
 			_ = json.Unmarshal([]byte(r.Summary), &old)
 		}
-		if old == nil { old = map[string]any{} }
+		if old == nil {
+			old = map[string]any{}
+		}
 		// 合并：src 覆盖 dst 的同名键；map 递归
 		merged := deepMerge(old, summary)
-		if bs, err := json.Marshal(merged); err == nil { r.Summary = string(bs) }
+		if bs, err := json.Marshal(merged); err == nil {
+			r.Summary = string(bs)
+		}
 		finished, _ := merged["finished"].(bool)
 		success, _ := merged["success"].(bool)
 		if finished {
@@ -96,7 +100,9 @@ func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
 
 // deepMerge merges b into a (map[string]any); for nested maps it recurses.
 func deepMerge(a, b map[string]any) map[string]any {
-	if a == nil { a = map[string]any{} }
+	if a == nil {
+		a = map[string]any{}
+	}
 	for k, v := range b {
 		if vm, ok := v.(map[string]any); ok {
 			if am, ok2 := a[k].(map[string]any); ok2 {
@@ -110,7 +116,6 @@ func deepMerge(a, b map[string]any) map[string]any {
 	}
 	return a
 }
-
 
 func (s *RunService) DeleteRun(id int64) error {
 	return s.db.DeleteRun(id)

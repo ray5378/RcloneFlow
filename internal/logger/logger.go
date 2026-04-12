@@ -131,7 +131,9 @@ var globalLogger Logger
 // Init 初始化全局日志
 func Init(level, output string) error {
 	logger, err := New(level, output)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	globalLogger = logger
 	return nil
 }

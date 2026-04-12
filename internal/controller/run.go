@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
+	stdiostrconv "strconv"
 	"strings"
 	"syscall"
 	"time"
-	"os"
-	"regexp"
-	"path/filepath"
-	stdiostrconv "strconv"
 
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/service"
@@ -24,49 +24,91 @@ func (c *RunController) resolveLogPath(run service.RunRecord) (string, bool) {
 	if s, ok := any(run.Summary).(string); ok && s != "" {
 		var m map[string]any
 		if json.Unmarshal([]byte(s), &m) == nil {
-			if p, ok := m["stderrFile"].(string); ok && p != "" { return p, true }
+			if p, ok := m["stderrFile"].(string); ok && p != "" {
+				return p, true
+			}
 		}
 	}
 	if m, ok := any(run.Summary).(map[string]any); ok {
-		if p, ok := m["stderrFile"].(string); ok && p != "" { return p, true }
+		if p, ok := m["stderrFile"].(string); ok && p != "" {
+			return p, true
+		}
 	}
 	// 2) search logs/<task-MMDD>/<HHMM>.log around StartedAt/CreatedAt
 	base := "/app/data/logs"
 	parseStart := func(s string) (time.Time, bool) {
 		layouts := []string{time.RFC3339, "2006-01-02 15:04:05"}
-		for _, l := range layouts { if t, e := time.ParseInLocation(l, s, time.Local); e == nil { return t, true } }
+		for _, l := range layouts {
+			if t, e := time.ParseInLocation(l, s, time.Local); e == nil {
+				return t, true
+			}
+		}
 		return time.Time{}, false
 	}
-	var t time.Time; var ok bool
-	if run.StartedAt != "" { if tt, o := parseStart(run.StartedAt); o { t, ok = tt, true } }
-	if !ok && run.FinishedAt != "" { if tt, o := parseStart(run.FinishedAt); o { t, ok = tt, true } }
+	var t time.Time
+	var ok bool
+	if run.StartedAt != "" {
+		if tt, o := parseStart(run.StartedAt); o {
+			t, ok = tt, true
+		}
+	}
+	if !ok && run.FinishedAt != "" {
+		if tt, o := parseStart(run.FinishedAt); o {
+			t, ok = tt, true
+		}
+	}
 	if ok {
 		sub := t.Local().Format("0102")
 		sanitize := func(s string) string {
-			s = strings.TrimSpace(s); if s == "" { return s }
+			s = strings.TrimSpace(s)
+			if s == "" {
+				return s
+			}
 			inv := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
-			s = inv.ReplaceAllString(s, "_"); r := []rune(s); if len(r)>60 { s = string(r[:60]) }
+			s = inv.ReplaceAllString(s, "_")
+			r := []rune(s)
+			if len(r) > 60 {
+				s = string(r[:60])
+			}
 			return s
 		}
 		candDirs := []string{}
-		if run.TaskName != "" { candDirs = append(candDirs, filepath.Join(base, sanitize(run.TaskName)+"-"+sub)) }
+		if run.TaskName != "" {
+			candDirs = append(candDirs, filepath.Join(base, sanitize(run.TaskName)+"-"+sub))
+		}
 		entries, _ := os.ReadDir(base)
-		for _, ent := range entries { if ent.IsDir() && strings.HasSuffix(ent.Name(), "-"+sub) { candDirs = append(candDirs, filepath.Join(base, ent.Name())) } }
-		var best string; var bestDiff int64 = 1<<62
+		for _, ent := range entries {
+			if ent.IsDir() && strings.HasSuffix(ent.Name(), "-"+sub) {
+				candDirs = append(candDirs, filepath.Join(base, ent.Name()))
+			}
+		}
+		var best string
+		var bestDiff int64 = 1 << 62
 		for _, dir := range candDirs {
 			files, _ := os.ReadDir(dir)
 			for _, f := range files {
-				if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") { continue }
+				if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") {
+					continue
+				}
 				fn := strings.TrimSuffix(f.Name(), ".log")
-				if len(fn)==4 {
-					th, _ := stdiostrconv.Atoi(fn[:2]); tm, _ := stdiostrconv.Atoi(fn[2:])
+				if len(fn) == 4 {
+					th, _ := stdiostrconv.Atoi(fn[:2])
+					tm, _ := stdiostrconv.Atoi(fn[2:])
 					cand := time.Date(t.Year(), t.Month(), t.Day(), th, tm, 0, 0, t.Location())
-					diff := t.Unix()-cand.Unix(); if diff<0 { diff = -diff }
-					if diff < bestDiff { bestDiff = diff; best = filepath.Join(dir, f.Name()) }
+					diff := t.Unix() - cand.Unix()
+					if diff < 0 {
+						diff = -diff
+					}
+					if diff < bestDiff {
+						bestDiff = diff
+						best = filepath.Join(dir, f.Name())
+					}
 				}
 			}
 		}
-		if best != "" { return best, true }
+		if best != "" {
+			return best, true
+		}
 	}
 	return "", false
 }
@@ -112,23 +154,62 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 		var sum map[string]any
 		switch v := any(r.Summary).(type) {
 		case string:
-			if v != "" { _ = json.Unmarshal([]byte(v), &sum) }
+			if v != "" {
+				_ = json.Unmarshal([]byte(v), &sum)
+			}
 		case map[string]any:
 			sum = v
 		}
 		// prefer finalSummary.duration* if exists
 		if fs, ok := sum["finalSummary"].(map[string]any); ok {
-			if ds, ok2 := fs["durationSec"].(float64); ok2 { obj["durationSeconds"] = int64(ds) }
-			if dt, ok2 := fs["durationText"].(string); ok2 { obj["durationText"] = dt }
+			if ds, ok2 := fs["durationSec"].(float64); ok2 {
+				obj["durationSeconds"] = int64(ds)
+			}
+			if dt, ok2 := fs["durationText"].(string); ok2 {
+				obj["durationText"] = dt
+			}
 		} else {
 			// compute from started/finished
 			var start, fin time.Time
-			if r.StartedAt != "" { if t, e := time.Parse(time.RFC3339, r.StartedAt); e == nil { start = t } }
-			if r.FinishedAt != "" { if t, e := time.Parse(time.RFC3339, r.FinishedAt); e == nil { fin = t } }
-			if start.IsZero() { if sum != nil { if s, ok := sum["startedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, s); e == nil { start = t } } } }
-			if fin.IsZero() { if sum != nil { if s, ok := sum["finishedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, s); e == nil { fin = t } } } }
+			if r.StartedAt != "" {
+				if t, e := time.Parse(time.RFC3339, r.StartedAt); e == nil {
+					start = t
+				}
+			}
+			if r.FinishedAt != "" {
+				if t, e := time.Parse(time.RFC3339, r.FinishedAt); e == nil {
+					fin = t
+				}
+			}
+			if start.IsZero() {
+				if sum != nil {
+					if s, ok := sum["startedAt"].(string); ok {
+						if t, e := time.Parse(time.RFC3339, s); e == nil {
+							start = t
+						}
+					}
+				}
+			}
+			if fin.IsZero() {
+				if sum != nil {
+					if s, ok := sum["finishedAt"].(string); ok {
+						if t, e := time.Parse(time.RFC3339, s); e == nil {
+							fin = t
+						}
+					}
+				}
+			}
 			dur := int64(0)
-			if !start.IsZero() { if !fin.IsZero() { dur = int64(fin.Sub(start).Seconds()) } else { dur = int64(time.Since(start).Seconds()) }; if dur < 0 { dur = 0 } }
+			if !start.IsZero() {
+				if !fin.IsZero() {
+					dur = int64(fin.Sub(start).Seconds())
+				} else {
+					dur = int64(time.Since(start).Seconds())
+				}
+				if dur < 0 {
+					dur = 0
+				}
+			}
 			obj["durationSeconds"] = dur
 			obj["durationText"] = humanDuration(dur)
 		}
@@ -162,7 +243,7 @@ func (c *RunController) HandleRunsByTask(w http.ResponseWriter, r *http.Request)
 // HandleRunStatus 处理运行状态查询
 func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(strings.TrimPrefix(r.URL.Path, "/api/runs/"), 10, 64)
-	
+
 	// DELETE 请求
 	if r.Method == http.MethodDelete {
 		if err := c.runSvc.DeleteRun(id); err != nil {
@@ -172,7 +253,7 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		WriteJSON(w, 200, map[string]any{"deleted": true})
 		return
 	}
-	
+
 	// GET 请求
 	runs, err := c.runSvc.ListRuns()
 	if err != nil {
@@ -199,21 +280,60 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		var sum map[string]any
 		switch v := any(run.Summary).(type) {
 		case string:
-			if v != "" { _ = json.Unmarshal([]byte(v), &sum) }
+			if v != "" {
+				_ = json.Unmarshal([]byte(v), &sum)
+			}
 		case map[string]any:
 			sum = v
 		}
 		if fs, ok := sum["finalSummary"].(map[string]any); ok {
-			if ds, ok2 := fs["durationSec"].(float64); ok2 { obj["durationSeconds"] = int64(ds) }
-			if dt, ok2 := fs["durationText"].(string); ok2 { obj["durationText"] = dt }
+			if ds, ok2 := fs["durationSec"].(float64); ok2 {
+				obj["durationSeconds"] = int64(ds)
+			}
+			if dt, ok2 := fs["durationText"].(string); ok2 {
+				obj["durationText"] = dt
+			}
 		} else {
 			var start, fin time.Time
-			if run.StartedAt != "" { if t, e := time.Parse(time.RFC3339, run.StartedAt); e == nil { start = t } }
-			if run.FinishedAt != "" { if t, e := time.Parse(time.RFC3339, run.FinishedAt); e == nil { fin = t } }
-			if start.IsZero() { if sum != nil { if s, ok := sum["startedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, s); e == nil { start = t } } } }
-			if fin.IsZero() { if sum != nil { if s, ok := sum["finishedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, s); e == nil { fin = t } } } }
+			if run.StartedAt != "" {
+				if t, e := time.Parse(time.RFC3339, run.StartedAt); e == nil {
+					start = t
+				}
+			}
+			if run.FinishedAt != "" {
+				if t, e := time.Parse(time.RFC3339, run.FinishedAt); e == nil {
+					fin = t
+				}
+			}
+			if start.IsZero() {
+				if sum != nil {
+					if s, ok := sum["startedAt"].(string); ok {
+						if t, e := time.Parse(time.RFC3339, s); e == nil {
+							start = t
+						}
+					}
+				}
+			}
+			if fin.IsZero() {
+				if sum != nil {
+					if s, ok := sum["finishedAt"].(string); ok {
+						if t, e := time.Parse(time.RFC3339, s); e == nil {
+							fin = t
+						}
+					}
+				}
+			}
 			dur := int64(0)
-			if !start.IsZero() { if !fin.IsZero() { dur = int64(fin.Sub(start).Seconds()) } else { dur = int64(time.Since(start).Seconds()) }; if dur < 0 { dur = 0 } }
+			if !start.IsZero() {
+				if !fin.IsZero() {
+					dur = int64(fin.Sub(start).Seconds())
+				} else {
+					dur = int64(time.Since(start).Seconds())
+				}
+				if dur < 0 {
+					dur = 0
+				}
+			}
 			obj["durationSeconds"] = dur
 			obj["durationText"] = humanDuration(dur)
 		}
@@ -225,16 +345,27 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 
 // HandleRunKillCLI 强制终止指定 run（优先内部 runner；否则按 PID 逐级信号）
 func (c *RunController) HandleRunKillCLI(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost { w.WriteHeader(405); return }
+	if r.Method != http.MethodPost {
+		w.WriteHeader(405)
+		return
+	}
 	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/kill")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 
 	// 读出 run，尝试从 summary 取 pid
 	runs, err := c.runSvc.ListRuns()
-	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
 	for _, run := range runs {
-		if run.ID != id { continue }
-		if killRunBySummary(run) { WriteJSON(w, 200, map[string]any{"killed": true}); return }
+		if run.ID != id {
+			continue
+		}
+		if killRunBySummary(run) {
+			WriteJSON(w, 200, map[string]any{"killed": true})
+			return
+		}
 		break
 	}
 	WriteJSON(w, 404, map[string]any{"error": "run not found or no pid"})
@@ -242,26 +373,46 @@ func (c *RunController) HandleRunKillCLI(w http.ResponseWriter, r *http.Request)
 
 // HandleTaskKill 强制终止某任务的当前 rclone 进程（按最近 run 定位，兼容空窗期）
 func (c *RunController) HandleTaskKill(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost { w.WriteHeader(405); return }
+	if r.Method != http.MethodPost {
+		w.WriteHeader(405)
+		return
+	}
 	idStr := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
 	idStr = strings.TrimSuffix(idStr, "/kill")
 	tid, _ := strconv.ParseInt(strings.Trim(idStr, "/"), 10, 64)
-	if tid == 0 { WriteJSON(w, 400, map[string]any{"error":"invalid task id"}); return }
+	if tid == 0 {
+		WriteJSON(w, 400, map[string]any{"error": "invalid task id"})
+		return
+	}
 	// 找到该任务最近的 run（running/finalizing 优先，找不到就按开始时间最近）
 	runs, err := c.runSvc.ListRunsByTask(tid)
-	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
 	var candidate *service.RunRecord
 	for i := range runs {
 		r := runs[i]
-		if r.Status == "running" || r.Status == "finalizing" { candidate = &r; break }
+		if r.Status == "running" || r.Status == "finalizing" {
+			candidate = &r
+			break
+		}
 	}
 	if candidate == nil {
 		// 回退：取最近一条
-		if len(runs) > 0 { candidate = &runs[0] }
+		if len(runs) > 0 {
+			candidate = &runs[0]
+		}
 	}
-	if candidate == nil { WriteJSON(w, 404, map[string]any{"error":"no runs for task"}); return }
-	if killRunBySummary(*candidate) { WriteJSON(w, 200, map[string]any{"killed": true, "runId": candidate.ID}); return }
-	WriteJSON(w, 404, map[string]any{"error":"pid not found"})
+	if candidate == nil {
+		WriteJSON(w, 404, map[string]any{"error": "no runs for task"})
+		return
+	}
+	if killRunBySummary(*candidate) {
+		WriteJSON(w, 200, map[string]any{"killed": true, "runId": candidate.ID})
+		return
+	}
+	WriteJSON(w, 404, map[string]any{"error": "pid not found"})
 }
 
 func killRunBySummary(run service.RunRecord) bool {
@@ -271,15 +422,23 @@ func killRunBySummary(run service.RunRecord) bool {
 	case map[string]any:
 		sum = v
 	case string:
-		if v != "" { _ = json.Unmarshal([]byte(v), &sum) }
+		if v != "" {
+			_ = json.Unmarshal([]byte(v), &sum)
+		}
 	}
 	if sum != nil {
-		if p, ok := sum["pid"].(float64); ok { pid = int(p) }
-		if p2, ok := sum["pid"].(int); ok { pid = p2 }
+		if p, ok := sum["pid"].(float64); ok {
+			pid = int(p)
+		}
+		if p2, ok := sum["pid"].(int); ok {
+			pid = p2
+		}
 	}
 	if pid > 0 {
-		_ = syscall.Kill(pid, syscall.SIGINT); time.Sleep(2*time.Second)
-		_ = syscall.Kill(pid, syscall.SIGTERM); time.Sleep(2*time.Second)
+		_ = syscall.Kill(pid, syscall.SIGINT)
+		time.Sleep(2 * time.Second)
+		_ = syscall.Kill(pid, syscall.SIGTERM)
+		time.Sleep(2 * time.Second)
 		_ = syscall.Kill(pid, syscall.SIGKILL)
 		return true
 	}
@@ -290,25 +449,43 @@ func killRunBySummary(run service.RunRecord) bool {
 func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/files")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
-	offset := 0; limit := 50
-	if v := r.URL.Query().Get("offset"); v != "" { if n, e := strconv.Atoi(v); e==nil && n>=0 { offset = n } }
-	if v := r.URL.Query().Get("limit"); v != "" { if n, e := strconv.Atoi(v); e==nil && n>0 && n<=1000 { limit = n } }
+	offset := 0
+	limit := 50
+	if v := r.URL.Query().Get("offset"); v != "" {
+		if n, e := strconv.Atoi(v); e == nil && n >= 0 {
+			offset = n
+		}
+	}
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, e := strconv.Atoi(v); e == nil && n > 0 && n <= 1000 {
+			limit = n
+		}
+	}
 
 	runs, err := c.runSvc.ListRuns()
-	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
 	var logPath string
 	for _, run := range runs {
-		if run.ID != id { continue }
+		if run.ID != id {
+			continue
+		}
 		// Summary 里优先取 stderrFile
 		if s, ok := any(run.Summary).(string); ok && s != "" {
 			var m map[string]any
 			if json.Unmarshal([]byte(s), &m) == nil {
-				if p, ok := m["stderrFile"].(string); ok && p != "" { logPath = p }
+				if p, ok := m["stderrFile"].(string); ok && p != "" {
+					logPath = p
+				}
 			}
 		}
 		if logPath == "" {
 			if m, ok := any(run.Summary).(map[string]any); ok {
-				if p, ok := m["stderrFile"].(string); ok && p != "" { logPath = p }
+				if p, ok := m["stderrFile"].(string); ok && p != "" {
+					logPath = p
+				}
 			}
 		}
 		if logPath == "" {
@@ -325,31 +502,49 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 						if ent.IsDir() && strings.HasSuffix(name, "-"+sub) {
 							// 取该目录内最接近 startedAt 的文件
 							files, _ := os.ReadDir(filepath.Join(base, name))
-							var best string; var bestDiff int64 = 1<<62
+							var best string
+							var bestDiff int64 = 1 << 62
 							for _, f := range files {
-								if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") { continue }
+								if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") {
+									continue
+								}
 								fn := strings.TrimSuffix(f.Name(), ".log") // HHMM
-											if len(fn)==4 {
-									th, _ := stdiostrconv.Atoi(fn[:2]); tm, _ := stdiostrconv.Atoi(fn[2:])
+								if len(fn) == 4 {
+									th, _ := stdiostrconv.Atoi(fn[:2])
+									tm, _ := stdiostrconv.Atoi(fn[2:])
 									cand := time.Date(t.Year(), t.Month(), t.Day(), th, tm, 0, 0, t.Location())
-									diff := abs64(t.Unix()-cand.Unix())
-									if diff < bestDiff { bestDiff = diff; best = filepath.Join(base, name, f.Name()) }
+									diff := abs64(t.Unix() - cand.Unix())
+									if diff < bestDiff {
+										bestDiff = diff
+										best = filepath.Join(base, name, f.Name())
+									}
 								}
 							}
-							if best != "" { logPath = best; break }
+							if best != "" {
+								logPath = best
+								break
+							}
 						}
 					}
 				}
 			}
 		}
-		if logPath == "" { logPath = "/app/data/logs/run-"+idStr+"-stderr.log" }
+		if logPath == "" {
+			logPath = "/app/data/logs/run-" + idStr + "-stderr.log"
+		}
 		break
 	}
-	if logPath == "" { WriteJSON(w, 404, map[string]any{"error":"log not found"}); return }
+	if logPath == "" {
+		WriteJSON(w, 404, map[string]any{"error": "log not found"})
+		return
+	}
 	// raw 模式：直接返回日志文本（便于前端/人工对照）
 	if strings.EqualFold(r.URL.Query().Get("mode"), "raw") {
 		f, e := os.Open(logPath)
-		if e != nil { WriteJSON(w, 500, map[string]any{"error": e.Error()}); return }
+		if e != nil {
+			WriteJSON(w, 500, map[string]any{"error": e.Error()})
+			return
+		}
 		defer f.Close()
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		http.ServeFile(w, r, logPath)
@@ -357,22 +552,37 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	// 读取并解析日志
 	data, readErr := os.ReadFile(logPath)
-	if readErr != nil { WriteJSON(w, 500, map[string]any{"error": readErr.Error()}); return }
+	if readErr != nil {
+		WriteJSON(w, 500, map[string]any{"error": readErr.Error()})
+		return
+	}
 	lines := strings.Split(string(data), "\n")
 	// 解析更稳：YYYY/MM/DD HH:MM:SS LEVEL : <path>: <msg>
-	type Row struct{ Name string `json:"name"`; Status string `json:"status"`; Action string `json:"action"`; At string `json:"at"`; Size int64 `json:"sizeBytes"`; Message string `json:"message,omitempty"` }
+	type Row struct {
+		Name    string `json:"name"`
+		Status  string `json:"status"`
+		Action  string `json:"action"`
+		At      string `json:"at"`
+		Size    int64  `json:"sizeBytes"`
+		Message string `json:"message,omitempty"`
+	}
 	rows := make([]Row, 0, 200)
 	re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
 	tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
 	for _, ln := range lines {
-		l := strings.TrimSpace(ln); if l=="" { continue }
+		l := strings.TrimSpace(ln)
+		if l == "" {
+			continue
+		}
 		segments := []string{}
 		idx := tsRe.FindAllStringIndex(l, -1)
 		if len(idx) > 1 {
 			for i := 0; i < len(idx); i++ {
 				start := idx[i][0]
 				end := len(l)
-				if i+1 < len(idx) { end = idx[i+1][0] }
+				if i+1 < len(idx) {
+					end = idx[i+1][0]
+				}
 				segments = append(segments, strings.TrimSpace(l[start:end]))
 			}
 		} else {
@@ -380,23 +590,32 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 		}
 		for _, seg := range segments {
 			m := re.FindStringSubmatch(seg)
-			if len(m) == 0 { continue }
+			if len(m) == 0 {
+				continue
+			}
 			at := strings.TrimSpace(m[1])
 			level := strings.ToUpper(strings.TrimSpace(m[2]))
 			path := strings.TrimSpace(m[3])
 			msg := strings.TrimSpace(m[4])
 			row := Row{Name: path, At: at, Size: 0, Message: msg}
 			low := strings.ToLower(msg)
-			if level == "ERROR" { row.Status = "failed"; row.Action = "Error" } else {
+			if level == "ERROR" {
+				row.Status = "failed"
+				row.Action = "Error"
+			} else {
 				switch {
 				case strings.Contains(low, "copied"):
-					row.Status = "success"; row.Action = "Copied"
+					row.Status = "success"
+					row.Action = "Copied"
 				case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
-					row.Status = "success"; row.Action = "Deleted"
+					row.Status = "success"
+					row.Action = "Deleted"
 				case strings.Contains(low, "skipped"):
-					row.Status = "skipped"; row.Action = "Skipped"
+					row.Status = "skipped"
+					row.Action = "Skipped"
 				case strings.Contains(low, "renamed"):
-					row.Status = "success"; row.Action = "Renamed"
+					row.Status = "success"
+					row.Action = "Renamed"
 				default:
 					continue
 				}
@@ -406,8 +625,13 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	// 分页
 	total := len(rows)
-	end := offset+limit; if end>total { end = total }
-	if offset>total { offset = total }
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+	if offset > total {
+		offset = total
+	}
 	page := rows[offset:end]
 	// 附带校验信息，便于核对与“传输日志”一致性
 	h := sha1.Sum(data)
@@ -415,7 +639,12 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, 200, map[string]any{"total": total, "items": page, "info": info})
 }
 
-func abs64(x int64) int64 { if x<0 { return -x }; return x }
+func abs64(x int64) int64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
 
 // humanDuration renders seconds to X小时Y分Z秒（省略 0 单位）
 func humanDuration(sec int64) string {
@@ -423,30 +652,44 @@ func humanDuration(sec int64) string {
 	m := (sec % 3600) / 60
 	s := sec % 60
 	parts := []string{}
-	if h > 0 { parts = append(parts, fmt.Sprintf("%d小时", h)) }
-	if m > 0 || (h > 0 && s > 0) { parts = append(parts, fmt.Sprintf("%d分", m)) }
-	if s > 0 || (h == 0 && m == 0) { parts = append(parts, fmt.Sprintf("%d秒", s)) }
+	if h > 0 {
+		parts = append(parts, fmt.Sprintf("%d小时", h))
+	}
+	if m > 0 || (h > 0 && s > 0) {
+		parts = append(parts, fmt.Sprintf("%d分", m))
+	}
+	if s > 0 || (h == 0 && m == 0) {
+		parts = append(parts, fmt.Sprintf("%d秒", s))
+	}
 	return strings.Join(parts, "")
 }
-
 
 // HandleRunLog 统一提供 stderr 单文件下载
 func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/log")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 	runs, err := c.runSvc.ListRuns()
-	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
 	for _, run := range runs {
 		if run.ID == id {
 			// Summary 里优先取 stderrFile
 			if s, ok := any(run.Summary).(string); ok && s != "" {
 				var m map[string]any
 				if json.Unmarshal([]byte(s), &m) == nil {
-					if p, ok := m["stderrFile"].(string); ok && p != "" { http.ServeFile(w, r, p); return }
+					if p, ok := m["stderrFile"].(string); ok && p != "" {
+						http.ServeFile(w, r, p)
+						return
+					}
 				}
 			}
 			if m, ok := any(run.Summary).(map[string]any); ok {
-				if p, ok := m["stderrFile"].(string); ok && p != "" { http.ServeFile(w, r, p); return }
+				if p, ok := m["stderrFile"].(string); ok && p != "" {
+					http.ServeFile(w, r, p)
+					return
+				}
 			}
 			// 兼容前端带 auth 查询参数（忽略，仅用于传递 Bearer token 给中间件）
 			r.URL.RawQuery = ""
@@ -454,10 +697,15 @@ func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 			base := "/app/data/logs"
 			sanitize := func(s string) string {
 				s = strings.TrimSpace(s)
-				if s == "" { return s }
+				if s == "" {
+					return s
+				}
 				inv := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
 				s = inv.ReplaceAllString(s, "_")
-				r := []rune(s); if len(r)>60 { s = string(r[:60]) }
+				r := []rune(s)
+				if len(r) > 60 {
+					s = string(r[:60])
+				}
 				return s
 			}
 			if run.TaskName != "" {
@@ -466,21 +714,33 @@ func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 				var best string
 				var bestMod int64
 				for _, ent := range entries {
-					if !ent.IsDir() { continue }
+					if !ent.IsDir() {
+						continue
+					}
 					name := ent.Name()
-					if !strings.HasPrefix(name, san+"-") { continue }
+					if !strings.HasPrefix(name, san+"-") {
+						continue
+					}
 					sub := filepath.Join(base, name)
 					files, _ := os.ReadDir(sub)
 					for _, f := range files {
-						if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") { continue }
+						if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") {
+							continue
+						}
 						fi, _ := f.Info()
 						if fi != nil {
 							mod := fi.ModTime().Unix()
-							if mod > bestMod { bestMod = mod; best = filepath.Join(sub, f.Name()) }
+							if mod > bestMod {
+								bestMod = mod
+								best = filepath.Join(sub, f.Name())
+							}
 						}
 					}
 				}
-				if best != "" { http.ServeFile(w, r, best); return }
+				if best != "" {
+					http.ServeFile(w, r, best)
+					return
+				}
 			}
 			// 未找到任何日志文件
 			WriteJSON(w, 404, map[string]any{"error": "log not found"})
@@ -493,7 +753,10 @@ func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 // HandleActiveRuns 处理获取所有运行中的任务及其实时状态
 func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request) {
 	runs, err := c.runSvc.ListActiveRuns()
-	if err != nil { WriteJSON(w, 500, map[string]any{"error": err.Error()}); return }
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
 	// 扁平化关键字段：bytes/totalBytes/speed/eta，从 run.Summary.progress 提取
 	items := make([]map[string]any, 0, len(runs))
 	// 稳态进度阈值（环境变量可扩展，这里用常量）
@@ -509,32 +772,48 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		switch v := any(run.Summary).(type) {
 		case map[string]any:
 			summary = v
-			if p, ok := v["progress"].(map[string]any); ok { progress = p }
+			if p, ok := v["progress"].(map[string]any); ok {
+				progress = p
+			}
 		case string:
 			if v != "" {
 				var m map[string]any
 				if json.Unmarshal([]byte(v), &m) == nil {
 					summary = m
-					if p, ok := m["progress"].(map[string]any); ok { progress = p }
+					if p, ok := m["progress"].(map[string]any); ok {
+						progress = p
+					}
 				}
 			}
 		}
 		bytes := int64(0)
-		if v, ok := progress["bytes"].(float64); ok { bytes = int64(v) }
+		if v, ok := progress["bytes"].(float64); ok {
+			bytes = int64(v)
+		}
 		total := int64(0)
-		if v, ok := progress["totalBytes"].(float64); ok { total = int64(v) }
+		if v, ok := progress["totalBytes"].(float64); ok {
+			total = int64(v)
+		}
 		speed := int64(0)
-		if v, ok := progress["speed"].(float64); ok { speed = int64(v) }
+		if v, ok := progress["speed"].(float64); ok {
+			speed = int64(v)
+		}
 		var eta any
-		if v, ok := progress["eta"]; ok { eta = v }
+		if v, ok := progress["eta"]; ok {
+			eta = v
+		}
 		pct := 0.0
-		if total > 0 && bytes >= 0 && bytes <= total { pct = float64(bytes) / float64(total) * 100 }
+		if total > 0 && bytes >= 0 && bytes <= total {
+			pct = float64(bytes) / float64(total) * 100
+		}
 		_ = eta
 
 		// 稳态进度：从 summary.stableProgress 读取上一帧
 		var stablePrev map[string]any
 		if summary != nil {
-			if sp, ok := summary["stableProgress"].(map[string]any); ok { stablePrev = sp }
+			if sp, ok := summary["stableProgress"].(map[string]any); ok {
+				stablePrev = sp
+			}
 		}
 		// 计算稳态候选
 		stable := map[string]any{"bytes": bytes, "totalBytes": total, "speed": speed, "percentage": pct, "phase": "transferring", "lastUpdatedAt": time.Now().Format(time.RFC3339)}
@@ -559,10 +838,20 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			var lastPct float64
 			var lastAt int64
 			if stablePrev != nil {
-				if v, ok := stablePrev["bytes"].(float64); ok { lastBytes = int64(v) }
-				if v, ok := stablePrev["totalBytes"].(float64); ok { lastTotal = int64(v) }
-				if v, ok := stablePrev["percentage"].(float64); ok { lastPct = v }
-				if v, ok := stablePrev["lastUpdatedAt"].(string); ok { if t, e := time.Parse(time.RFC3339, v); e == nil { lastAt = t.UnixMilli() } }
+				if v, ok := stablePrev["bytes"].(float64); ok {
+					lastBytes = int64(v)
+				}
+				if v, ok := stablePrev["totalBytes"].(float64); ok {
+					lastTotal = int64(v)
+				}
+				if v, ok := stablePrev["percentage"].(float64); ok {
+					lastPct = v
+				}
+				if v, ok := stablePrev["lastUpdatedAt"].(string); ok {
+					if t, e := time.Parse(time.RFC3339, v); e == nil {
+						lastAt = t.UnixMilli()
+					}
+				}
 			}
 			// 规则判断
 			nowMs := time.Now().UnixMilli()
@@ -572,9 +861,14 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			noMovement := bytes <= lastBytes && pct <= lastPct
 			holdWindow := (lastAt > 0 && (nowMs-lastAt) <= holdMs)
 			// clamp
-			if total > 0 && bytes > total { bytes = total; stable["bytes"] = bytes; pct = float64(bytes) / float64(total) * 100; stable["percentage"] = pct }
+			if total > 0 && bytes > total {
+				bytes = total
+				stable["bytes"] = bytes
+				pct = float64(bytes) / float64(total) * 100
+				stable["percentage"] = pct
+			}
 			// 空窗/毛刺：优先保持上一帧
-			if stablePrev != nil && ( (speedZero && holdWindow) || (speedZero && (percentTiny || totalJump || noMovement)) || (pct < lastPct) ) {
+			if stablePrev != nil && ((speedZero && holdWindow) || (speedZero && (percentTiny || totalJump || noMovement)) || (pct < lastPct)) {
 				stable = stablePrev
 				stable["phase"] = "between_files"
 			}
@@ -586,14 +880,14 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		// include basic times for duration calc
 		item := map[string]any{
 			"runRecord": map[string]any{
-				"id": run.ID,
-				"taskId": run.TaskID,
-				"status": run.Status,
-				"rcJobId": 0,
+				"id":               run.ID,
+				"taskId":           run.TaskID,
+				"status":           run.Status,
+				"rcJobId":          0,
 				"bytesTransferred": run.BytesTransferred,
-				"error": run.Error,
-				"startedAt": run.StartedAt,
-				"finishedAt": run.FinishedAt,
+				"error":            run.Error,
+				"startedAt":        run.StartedAt,
+				"finishedAt":       run.FinishedAt,
 			},
 			"stableProgress": stable,
 		}
@@ -605,9 +899,16 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		it := items[i]
 		if rr, ok := it["runRecord"].(map[string]any); ok {
 			var start time.Time
-			if s, ok2 := rr["startedAt"].(string); ok2 { if t, e := time.Parse(time.RFC3339, s); e == nil { start = t } }
+			if s, ok2 := rr["startedAt"].(string); ok2 {
+				if t, e := time.Parse(time.RFC3339, s); e == nil {
+					start = t
+				}
+			}
 			if !start.IsZero() {
-				dur := int64(time.Since(start).Seconds()); if dur < 0 { dur = 0 }
+				dur := int64(time.Since(start).Seconds())
+				if dur < 0 {
+					dur = 0
+				}
 				rr["durationSeconds"] = dur
 				rr["durationText"] = humanDuration(dur)
 			}
@@ -639,29 +940,41 @@ func (c *RunController) HandleGlobalStats(w http.ResponseWriter, r *http.Request
 		var p map[string]any
 		switch v := any(run.Summary).(type) {
 		case map[string]any:
-			if pp, ok := v["progress"].(map[string]any); ok { p = pp }
+			if pp, ok := v["progress"].(map[string]any); ok {
+				p = pp
+			}
 		case string:
 			if v != "" {
 				var m map[string]any
 				if json.Unmarshal([]byte(v), &m) == nil {
-					if pp, ok := m["progress"].(map[string]any); ok { p = pp }
+					if pp, ok := m["progress"].(map[string]any); ok {
+						p = pp
+					}
 				}
 			}
 		}
 		if p != nil {
-			if v, ok := p["bytes"].(float64); ok { bytesSum += v }
-			if v, ok := p["totalBytes"].(float64); ok { totalSum += v }
-			if v, ok := p["speed"].(float64); ok { speedSum += v }
+			if v, ok := p["bytes"].(float64); ok {
+				bytesSum += v
+			}
+			if v, ok := p["totalBytes"].(float64); ok {
+				totalSum += v
+			}
+			if v, ok := p["speed"].(float64); ok {
+				speedSum += v
+			}
 		}
 	}
 	percentage := 0.0
-	if totalSum > 0 { percentage = (bytesSum / totalSum) * 100 }
+	if totalSum > 0 {
+		percentage = (bytesSum / totalSum) * 100
+	}
 	WriteJSON(w, 200, map[string]any{
-		"bytes": bytesSum,
+		"bytes":      bytesSum,
 		"totalBytes": totalSum,
-		"speed": speedSum,
-		"speedAvg": speedSum, // 简化：无历史窗口，先返回当前合计
-		"eta": nil, // CLI 模式无法可靠聚合 ETA，这里暂置空
+		"speed":      speedSum,
+		"speedAvg":   speedSum, // 简化：无历史窗口，先返回当前合计
+		"eta":        nil,      // CLI 模式无法可靠聚合 ETA，这里暂置空
 		"percentage": percentage,
 	})
 }

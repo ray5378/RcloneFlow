@@ -18,26 +18,26 @@ func TestCall(t *testing.T) {
 		if r.Header.Get("Content-Type") != "application/json" {
 			t.Errorf("expected Content-Type application/json, got %s", r.Header.Get("Content-Type"))
 		}
-		
+
 		// 返回响应
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"result": "ok"})
 	}))
 	defer server.Close()
-	
+
 	// 创建客户端
 	cfg := &RcloneConfig{
 		BaseURL: server.URL,
 	}
 	client := NewRcloneClient(cfg)
-	
+
 	// 测试调用
 	var resp map[string]any
 	err := client.Call(context.Background(), "test/endpoint", map[string]any{"key": "value"}, &resp)
 	if err != nil {
 		t.Fatalf("Call() error = %v", err)
 	}
-	
+
 	if resp["result"] != "ok" {
 		t.Errorf("expected result ok, got %v", resp["result"])
 	}
@@ -49,10 +49,10 @@ func TestCallWithError(t *testing.T) {
 		w.Write([]byte("internal error"))
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	var resp map[string]any
 	err := client.Call(context.Background(), "test", nil, &resp)
 	if err == nil {
@@ -71,19 +71,19 @@ func TestListRemotes(t *testing.T) {
 		})
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	remotes, err := client.ListRemotes(context.Background())
 	if err != nil {
 		t.Fatalf("ListRemotes() error = %v", err)
 	}
-	
+
 	if len(remotes) != 2 {
 		t.Errorf("expected 2 remotes, got %d", len(remotes))
 	}
-	
+
 	if remotes[0] != "local" {
 		t.Errorf("expected first remote local, got %s", remotes[0])
 	}
@@ -94,27 +94,27 @@ func TestCreateRemote(t *testing.T) {
 		if r.URL.Path != "/config/create" {
 			t.Errorf("expected /config/create, got %s", r.URL.Path)
 		}
-		
+
 		var req CreateRemoteRequest
 		json.NewDecoder(r.Body).Decode(&req)
-		
+
 		if req.Name != "testremote" {
 			t.Errorf("expected name testremote, got %s", req.Name)
 		}
 		if req.Type != "local" {
 			t.Errorf("expected type local, got %s", req.Type)
 		}
-		
+
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	err := client.CreateRemote(context.Background(), &CreateRemoteRequest{
-		Name: "testremote",
-		Type: "local",
+		Name:       "testremote",
+		Type:       "local",
 		Parameters: map[string]any{},
 	})
 	if err != nil {
@@ -127,21 +127,21 @@ func TestDeleteRemote(t *testing.T) {
 		if r.URL.Path != "/config/delete" {
 			t.Errorf("expected /config/delete, got %s", r.URL.Path)
 		}
-		
+
 		var req DeleteRemoteRequest
 		json.NewDecoder(r.Body).Decode(&req)
-		
+
 		if req.Name != "testremote" {
 			t.Errorf("expected name testremote, got %s", req.Name)
 		}
-		
+
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	err := client.DeleteRemote(context.Background(), "testremote")
 	if err != nil {
 		t.Fatalf("DeleteRemote() error = %v", err)
@@ -153,7 +153,7 @@ func TestListPath(t *testing.T) {
 		if r.URL.Path != "/operations/list" {
 			t.Errorf("expected /operations/list, got %s", r.URL.Path)
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
 			"fs": "local:",
@@ -164,27 +164,27 @@ func TestListPath(t *testing.T) {
 		})
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	items, err := client.ListPath(context.Background(), "local:", "")
 	if err != nil {
 		t.Fatalf("ListPath() error = %v", err)
 	}
-	
+
 	if len(items) != 2 {
 		t.Errorf("expected 2 items, got %d", len(items))
 	}
-	
+
 	if items[0].Name != "file.txt" {
 		t.Errorf("expected first item file.txt, got %s", items[0].Name)
 	}
-	
+
 	if items[0].IsDir {
 		t.Error("expected first item to be file")
 	}
-	
+
 	if !items[1].IsDir {
 		t.Error("expected second item to be directory")
 	}
@@ -198,10 +198,10 @@ func TestMkdir(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	err := client.Mkdir(context.Background(), "local:", "/testdir")
 	if err != nil {
 		t.Fatalf("Mkdir() error = %v", err)
@@ -216,10 +216,10 @@ func TestDeleteFile(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	err := client.DeleteFile(context.Background(), "local:", "/test.txt")
 	if err != nil {
 		t.Fatalf("DeleteFile() error = %v", err)
@@ -231,33 +231,33 @@ func TestJobStatus(t *testing.T) {
 		if r.URL.Path != "/job/status" {
 			t.Errorf("expected /job/status, got %s", r.URL.Path)
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{
-			"id": 123,
+			"id":       123,
 			"finished": true,
-			"success": true,
+			"success":  true,
 			"duration": 1.5,
 		})
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	status, err := client.JobStatus(context.Background(), 123)
 	if err != nil {
 		t.Fatalf("JobStatus() error = %v", err)
 	}
-	
+
 	if !status.Finished {
 		t.Error("expected finished to be true")
 	}
-	
+
 	if !status.Success {
 		t.Error("expected success to be true")
 	}
-	
+
 	if status.Duration != 1.5 {
 		t.Errorf("expected duration 1.5, got %f", status.Duration)
 	}
@@ -269,20 +269,20 @@ func TestStartJob(t *testing.T) {
 		if r.URL.Path != expectedPath {
 			t.Errorf("expected %s, got %s", expectedPath, r.URL.Path)
 		}
-		
+
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]any{"jobid": 456})
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	jobID, err := client.StartJob(context.Background(), "copy", "local:/src", "local:/dst")
 	if err != nil {
 		t.Fatalf("StartJob() error = %v", err)
 	}
-	
+
 	if jobID != 456 {
 		t.Errorf("expected jobid 456, got %d", jobID)
 	}
@@ -296,10 +296,10 @@ func TestCopyDir(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	err := client.CopyDir(context.Background(), "local:/src", "local:/dst")
 	if err != nil {
 		t.Fatalf("CopyDir() error = %v", err)
@@ -314,10 +314,10 @@ func TestMoveDir(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 	defer server.Close()
-	
+
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
-	
+
 	err := client.MoveDir(context.Background(), "local:/src", "local:/dst")
 	if err != nil {
 		t.Fatalf("MoveDir() error = %v", err)

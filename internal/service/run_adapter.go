@@ -43,14 +43,20 @@ func (a *storeRunAdapter) ListRuns() ([]RunRecord, error) {
 			bs, _ := json.Marshal(r.Summary)
 			summaryStr = string(bs)
 		}
+		finAt := formatOptTime(r.FinishedAt)
+		if finAt == "" && r.Summary != nil {
+			if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+				finAt = v
+			}
+		}
 		result[i] = RunRecord{
 			ID:               r.ID,
 			TaskID:           r.TaskID,
 			RcJobID:          r.RcJobID,
 			Status:           r.Status,
-			Trigger:         r.Trigger,
+			Trigger:          r.Trigger,
 			StartedAt:        formatTime(r.CreatedAt),
-			FinishedAt: func(){fa:=formatOptTime(r.FinishedAt); if fa=="" && r.Summary!=nil { if v,ok:=r.Summary["finishedAt"].(string); ok && v!="" { fa=v } } ; return fa}(),
+			FinishedAt:       finAt,
 			TaskName:         r.TaskName,
 			TaskMode:         r.TaskMode,
 			SourceRemote:     r.SourceRemote,
@@ -78,14 +84,20 @@ func (a *storeRunAdapter) ListRunsByTask(taskId int64) ([]RunRecord, error) {
 			bs, _ := json.Marshal(r.Summary)
 			summaryStr = string(bs)
 		}
+		finAt := formatOptTime(r.FinishedAt)
+		if finAt == "" && r.Summary != nil {
+			if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+				finAt = v
+			}
+		}
 		result[i] = RunRecord{
 			ID:               r.ID,
 			TaskID:           r.TaskID,
 			RcJobID:          r.RcJobID,
 			Status:           r.Status,
-			Trigger:         r.Trigger,
+			Trigger:          r.Trigger,
 			StartedAt:        formatTime(r.CreatedAt),
-			FinishedAt: func(){fa:=formatOptTime(r.FinishedAt); if fa=="" && r.Summary!=nil { if v,ok:=r.Summary["finishedAt"].(string); ok && v!="" { fa=v } } ; return fa}(),
+			FinishedAt:       finAt,
 			TaskName:         r.TaskName,
 			TaskMode:         r.TaskMode,
 			SourceRemote:     r.SourceRemote,
@@ -114,14 +126,20 @@ func (a *storeRunAdapter) ListActiveRuns() ([]RunRecord, error) {
 			bs, _ := json.Marshal(r.Summary)
 			summaryStr = string(bs)
 		}
+		finAt := formatOptTime(r.FinishedAt)
+		if finAt == "" && r.Summary != nil {
+			if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+				finAt = v
+			}
+		}
 		result[i] = RunRecord{
 			ID:               r.ID,
 			TaskID:           r.TaskID,
 			RcJobID:          r.RcJobID,
 			Status:           r.Status,
-			Trigger:         r.Trigger,
+			Trigger:          r.Trigger,
 			StartedAt:        formatTime(r.CreatedAt),
-			FinishedAt: func(){fa:=formatOptTime(r.FinishedAt); if fa=="" && r.Summary!=nil { if v,ok:=r.Summary["finishedAt"].(string); ok && v!="" { fa=v } } ; return fa}(),
+			FinishedAt:       finAt,
 			TaskName:         r.TaskName,
 			TaskMode:         r.TaskMode,
 			SourceRemote:     r.SourceRemote,
@@ -148,14 +166,20 @@ func (a *storeRunAdapter) GetActiveRunByTaskID(taskID int64) (RunRecord, error) 
 		bs, _ := json.Marshal(r.Summary)
 		summaryStr = string(bs)
 	}
+	finAt := formatOptTime(r.FinishedAt)
+	if finAt == "" && r.Summary != nil {
+		if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+			finAt = v
+		}
+	}
 	return RunRecord{
 		ID:               r.ID,
 		TaskID:           r.TaskID,
 		RcJobID:          r.RcJobID,
 		Status:           r.Status,
-		Trigger:         r.Trigger,
+		Trigger:          r.Trigger,
 		StartedAt:        formatTime(r.CreatedAt),
-		FinishedAt: func(){fa:=formatOptTime(r.FinishedAt); if fa=="" && r.Summary!=nil { if v,ok:=r.Summary["finishedAt"].(string); ok && v!="" { fa=v } } ; return fa}(),
+		FinishedAt:       finAt,
 		TaskName:         r.TaskName,
 		TaskMode:         r.TaskMode,
 		SourceRemote:     r.SourceRemote,
@@ -172,14 +196,20 @@ func (a *storeRunAdapter) GetActiveRunByTaskID(taskID int64) (RunRecord, error) 
 // UpdateRun 更新运行记录
 func (a *storeRunAdapter) UpdateRun(id int64, updateFn func(*RunRecord)) {
 	a.db.UpdateRun(id, func(r *store.Run) {
+		finAt := formatOptTime(r.FinishedAt)
+		if finAt == "" && r.Summary != nil {
+			if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+				finAt = v
+			}
+		}
 		record := &RunRecord{
 			ID:               r.ID,
 			TaskID:           r.TaskID,
 			RcJobID:          r.RcJobID,
 			Status:           r.Status,
-			Trigger:         r.Trigger,
+			Trigger:          r.Trigger,
 			StartedAt:        formatTime(r.CreatedAt),
-			FinishedAt: func(){fa:=formatOptTime(r.FinishedAt); if fa=="" && r.Summary!=nil { if v,ok:=r.Summary["finishedAt"].(string); ok && v!="" { fa=v } } ; return fa}(),
+			FinishedAt:       finAt,
 			TaskName:         r.TaskName,
 			TaskMode:         r.TaskMode,
 			SourceRemote:     r.SourceRemote,

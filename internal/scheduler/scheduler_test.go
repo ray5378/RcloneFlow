@@ -7,10 +7,10 @@ import (
 
 func TestParseSpec(t *testing.T) {
 	tests := []struct {
-		name     string
-		spec     string
-		wantOK   bool
-		wantDur  time.Duration
+		name    string
+		spec    string
+		wantOK  bool
+		wantDur time.Duration
 	}{
 		{
 			name:    "valid 5m",
@@ -67,7 +67,7 @@ func TestParseSpec(t *testing.T) {
 			wantDur: 10 * time.Minute,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dur, ok := parseSpec(tt.spec)

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
-	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -22,26 +22,26 @@ type Config struct {
 
 // RcloneConfig rclone连接配置
 type RcloneConfig struct {
-	RCURL  string        `yaml:"rc_url"`
-	RCUser string        `yaml:"rc_user"`
-	RCPass string        `yaml:"rc_pass"`
+	RCURL   string        `yaml:"rc_url"`
+	RCUser  string        `yaml:"rc_user"`
+	RCPass  string        `yaml:"rc_pass"`
 	Timeout time.Duration `yaml:"timeout"`
 }
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
-	Addr       string `yaml:"addr"`
-	StaticDir  string `yaml:"static_dir"`
-	ReadTimeout  int `yaml:"read_timeout"`  // 秒
-	WriteTimeout int `yaml:"write_timeout"` // 秒
+	Addr         string `yaml:"addr"`
+	StaticDir    string `yaml:"static_dir"`
+	ReadTimeout  int    `yaml:"read_timeout"`  // 秒
+	WriteTimeout int    `yaml:"write_timeout"` // 秒
 }
 
 // SyncConfig 同步配置
 type SyncConfig struct {
-	PoolInterval      int `yaml:"pool_interval"`       // 任务状态同步间隔（秒）
-	ScheduleInterval int `yaml:"schedule_interval"`   // 定时任务检查间隔（分钟）
-	CleanupInterval  int `yaml:"cleanup_interval"`    // 历史记录清理间隔（小时），0表示不清理
-	CleanupRetention int `yaml:"cleanup_retention"`   // 历史记录保留天数
+	PoolInterval     int `yaml:"pool_interval"`     // 任务状态同步间隔（秒）
+	ScheduleInterval int `yaml:"schedule_interval"` // 定时任务检查间隔（分钟）
+	CleanupInterval  int `yaml:"cleanup_interval"`  // 历史记录清理间隔（小时），0表示不清理
+	CleanupRetention int `yaml:"cleanup_retention"` // 历史记录保留天数
 }
 
 // StorageConfig 存储配置
@@ -59,7 +59,7 @@ type LogConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Rclone: RcloneConfig{
-			RCURL:  "http://127.0.0.1:5572",
+			RCURL:   "http://127.0.0.1:5572",
 			Timeout: 120 * time.Second,
 		},
 		Server: ServerConfig{
@@ -76,10 +76,10 @@ func DefaultConfig() *Config {
 			Output: "stdout",
 		},
 		Sync: SyncConfig{
-			PoolInterval:      30,      // 30秒
-			ScheduleInterval:   1,      // 1分钟
-			CleanupInterval:  24,      // 24小时清理一次
-			CleanupRetention: 30,      // 保留30天
+			PoolInterval:     30, // 30秒
+			ScheduleInterval: 1,  // 1分钟
+			CleanupInterval:  24, // 24小时清理一次
+			CleanupRetention: 30, // 保留30天
 		},
 	}
 }
@@ -87,22 +87,22 @@ func DefaultConfig() *Config {
 // Load 加载配置文件
 func Load(configPath string) (*Config, error) {
 	cfg := DefaultConfig()
-	
+
 	// 如果没有指定配置文件路径，尝试查找默认位置
 	if configPath == "" {
 		configPath = findConfigFile()
 	}
-	
+
 	// 如果找到配置文件，则加载
 	if configPath != "" {
 		if err := loadFromFile(cfg, configPath); err != nil {
 			return nil, fmt.Errorf("加载配置文件失败 %s: %w", configPath, err)
 		}
 	}
-	
+
 	// 使用环境变量覆盖配置
 	loadFromEnv(cfg)
-	
+
 	return cfg, nil
 }
 
@@ -115,7 +115,7 @@ func findConfigFile() string {
 		"./.config/rcloneflow/config.yaml",
 		filepath.Join(os.Getenv("HOME"), ".config", "rcloneflow", "config.yaml"),
 	}
-	
+
 	for _, p := range paths {
 		if _, err := os.Stat(p); err == nil {
 			return p
@@ -150,7 +150,7 @@ func loadFromEnv(cfg *Config) {
 			cfg.Rclone.Timeout = d
 		}
 	}
-	
+
 	// 服务器配置
 	if v := os.Getenv("APP_ADDR"); v != "" {
 		cfg.Server.Addr = v
@@ -158,12 +158,12 @@ func loadFromEnv(cfg *Config) {
 	if v := os.Getenv("APP_STATIC_DIR"); v != "" {
 		cfg.Server.StaticDir = v
 	}
-	
+
 	// 存储配置
 	if v := os.Getenv("APP_DATA_DIR"); v != "" {
 		cfg.Storage.DataDir = v
 	}
-	
+
 	// 日志配置
 	if v := os.Getenv("LOG_LEVEL"); v != "" {
 		cfg.Log.Level = v
@@ -175,12 +175,18 @@ func loadFromEnv(cfg *Config) {
 	// 清理策略（运行记录/最终总结）
 	// 优先级：FINAL_SUMMARY_RETENTION_DAYS > CLEANUP_RETENTION_DAYS > cfg.Sync.CleanupRetention
 	if v := os.Getenv("FINAL_SUMMARY_RETENTION_DAYS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 { cfg.Sync.CleanupRetention = n }
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			cfg.Sync.CleanupRetention = n
+		}
 	} else if v := os.Getenv("CLEANUP_RETENTION_DAYS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 { cfg.Sync.CleanupRetention = n }
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			cfg.Sync.CleanupRetention = n
+		}
 	}
 	if v := os.Getenv("CLEANUP_INTERVAL_HOURS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 { cfg.Sync.CleanupInterval = n }
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			cfg.Sync.CleanupInterval = n
+		}
 	}
 }
 
@@ -252,7 +258,7 @@ func (c *Config) GetCleanupRetention() int {
 // ToEnvMap 转换为环境变量映射（用于传递给子组件）
 func (c *Config) ToEnvMap() map[string]string {
 	m := make(map[string]string)
-	
+
 	if c.Rclone.RCURL != "" {
 		m["RCLONE_RC_URL"] = c.Rclone.RCURL
 	}
@@ -263,14 +269,14 @@ func (c *Config) ToEnvMap() map[string]string {
 		m["RCLONE_RC_PASS"] = c.Rclone.RCPass
 	}
 	m["RCLONE_RC_TIMEOUT"] = c.Rclone.Timeout.String()
-	
+
 	m["APP_ADDR"] = c.Server.Addr
 	m["APP_STATIC_DIR"] = c.Server.StaticDir
 	m["APP_DATA_DIR"] = c.Storage.DataDir
-	
+
 	m["LOG_LEVEL"] = c.Log.Level
 	m["LOG_OUTPUT"] = c.Log.Output
-	
+
 	return m
 }
 

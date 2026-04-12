@@ -53,7 +53,7 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPut:
 		var req struct {
-			ID int64 `json:"id"`
+			ID   int64      `json:"id"`
 			Task store.Task `json:"task"`
 		}
 		if err := DecodeRequest(r, &req); err != nil {
@@ -68,16 +68,21 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPatch:
 		// PATCH /api/tasks { id, options }
-		var req struct{
-			ID int64 `json:"id"`
+		var req struct {
+			ID      int64          `json:"id"`
 			Options map[string]any `json:"options"`
 		}
 		if err := DecodeRequest(r, &req); err != nil {
-			WriteJSON(w, 400, map[string]any{"error":"invalid body"}); return
+			WriteJSON(w, 400, map[string]any{"error": "invalid body"})
+			return
 		}
-		if req.ID == 0 { WriteJSON(w, 400, map[string]any{"error":"missing id"}); return }
+		if req.ID == 0 {
+			WriteJSON(w, 400, map[string]any{"error": "missing id"})
+			return
+		}
 		if err := c.taskSvc.UpdateTaskOptions(req.ID, req.Options); err != nil {
-			WriteJSON(w, 500, map[string]any{"error": err.Error()}); return
+			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			return
 		}
 		WriteJSON(w, 200, map[string]any{"ok": true})
 

@@ -25,12 +25,12 @@ func (d *TaskDAO) Create(task store.Task) (store.Task, error) {
 	if err != nil {
 		return store.Task{}, err
 	}
-	
+
 	id, err := result.LastInsertId()
 	if err != nil {
 		return store.Task{}, err
 	}
-	
+
 	return d.GetByID(id)
 }
 
@@ -59,7 +59,7 @@ func (d *TaskDAO) GetAll() ([]store.Task, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var tasks []store.Task
 	for rows.Next() {
 		var t store.Task

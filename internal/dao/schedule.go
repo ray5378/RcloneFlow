@@ -26,12 +26,12 @@ func (d *ScheduleDAO) Create(schedule store.Schedule) (store.Schedule, error) {
 	if err != nil {
 		return store.Schedule{}, err
 	}
-	
+
 	id, err := result.LastInsertId()
 	if err != nil {
 		return store.Schedule{}, err
 	}
-	
+
 	return d.GetByID(id)
 }
 
@@ -61,7 +61,7 @@ func (d *ScheduleDAO) GetAll() ([]store.Schedule, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var schedules []store.Schedule
 	for rows.Next() {
 		var s store.Schedule
@@ -86,7 +86,7 @@ func (d *ScheduleDAO) GetByTaskID(taskID int64) ([]store.Schedule, error) {
 		return nil, err
 	}
 	defer rows.Close()
-	
+
 	var schedules []store.Schedule
 	for rows.Next() {
 		var s store.Schedule

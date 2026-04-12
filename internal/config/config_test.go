@@ -7,19 +7,19 @@ import (
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	if cfg.Rclone.RCURL != "http://127.0.0.1:5572" {
 		t.Errorf("expected default RCURL http://127.0.0.1:5572, got %s", cfg.Rclone.RCURL)
 	}
-	
+
 	if cfg.Server.Addr != ":17870" {
 		t.Errorf("expected default addr :17870, got %s", cfg.Server.Addr)
 	}
-	
+
 	if cfg.Storage.DataDir != "./data" {
 		t.Errorf("expected default data_dir ./data, got %s", cfg.Storage.DataDir)
 	}
-	
+
 	if cfg.Log.Level != "info" {
 		t.Errorf("expected default log level info, got %s", cfg.Log.Level)
 	}
@@ -35,18 +35,18 @@ func TestLoadFromEnv(t *testing.T) {
 		os.Unsetenv("APP_ADDR")
 		os.Unsetenv("LOG_LEVEL")
 	}()
-	
+
 	cfg := DefaultConfig()
 	loadFromEnv(cfg)
-	
+
 	if cfg.Rclone.RCURL != "http://localhost:8080" {
 		t.Errorf("expected RCURL http://localhost:8080 from env, got %s", cfg.Rclone.RCURL)
 	}
-	
+
 	if cfg.Server.Addr != ":9000" {
 		t.Errorf("expected addr :9000 from env, got %s", cfg.Server.Addr)
 	}
-	
+
 	if cfg.Log.Level != "debug" {
 		t.Errorf("expected log level debug from env, got %s", cfg.Log.Level)
 	}
@@ -58,7 +58,7 @@ func TestGetRcloneAddr(t *testing.T) {
 			RCURL: "http://test:9090",
 		},
 	}
-	
+
 	if cfg.GetRcloneAddr() != "http://test:9090" {
 		t.Errorf("expected http://test:9090, got %s", cfg.GetRcloneAddr())
 	}
@@ -70,7 +70,7 @@ func TestGetDataDir(t *testing.T) {
 			DataDir: "/tmp/data",
 		},
 	}
-	
+
 	if cfg.GetDataDir() != "/tmp/data" {
 		t.Errorf("expected /tmp/data, got %s", cfg.GetDataDir())
 	}
@@ -94,17 +94,17 @@ func TestToEnvMap(t *testing.T) {
 			Output: "stdout",
 		},
 	}
-	
+
 	envMap := cfg.ToEnvMap()
-	
+
 	if envMap["RCLONE_RC_URL"] != "http://test:9090" {
 		t.Errorf("expected RCLONE_RC_URL http://test:9090, got %s", envMap["RCLONE_RC_URL"])
 	}
-	
+
 	if envMap["APP_ADDR"] != ":9000" {
 		t.Errorf("expected APP_ADDR :9000, got %s", envMap["APP_ADDR"])
 	}
-	
+
 	if envMap["LOG_LEVEL"] != "debug" {
 		t.Errorf("expected LOG_LEVEL debug, got %s", envMap["LOG_LEVEL"])
 	}

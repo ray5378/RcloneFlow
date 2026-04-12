@@ -76,7 +76,7 @@ func TestTaskService_ListTasks(t *testing.T) {
 		},
 	}
 	runner := &mockTaskRunner{}
-	
+
 	// 由于TaskService依赖store.DB，我们直接测试DAO层
 	_ = db
 	_ = runner
@@ -95,10 +95,10 @@ func TestTaskService_UpdateTask(t *testing.T) {
 			{ID: 1, Name: "original", Mode: "copy"},
 		},
 	}
-	
+
 	// 测试更新逻辑
 	db.UpdateTask(1, store.Task{ID: 1, Name: "updated", Mode: "sync"})
-	
+
 	task, _ := db.GetTask(1)
 	if task.Name != "updated" {
 		t.Errorf("expected Name 'updated', got '%s'", task.Name)
@@ -115,14 +115,14 @@ func TestTaskService_DeleteTask(t *testing.T) {
 			{ID: 2, Name: "task2"},
 		},
 	}
-	
+
 	db.DeleteTask(1)
-	
+
 	tasks, _ := db.ListTasks()
 	if len(tasks) != 1 {
 		t.Errorf("expected 1 task after delete, got %d", len(tasks))
 	}
-	
+
 	_, ok := db.GetTask(1)
 	if ok {
 		t.Error("expected task 1 to be deleted")
@@ -135,7 +135,7 @@ func TestMockTaskRunner(t *testing.T) {
 			return 999, nil
 		},
 	}
-	
+
 	jobID, err := runner.RunTask(context.Background(), 1, "copy", "local", "/src", "gdrive", "/dst", "manual")
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
@@ -151,7 +151,7 @@ func TestMockTaskRunnerError(t *testing.T) {
 			return 0, ErrTaskNotFound
 		},
 	}
-	
+
 	_, err := runner.RunTask(context.Background(), 999, "copy", "local", "/src", "gdrive", "/dst", "manual")
 	if err != ErrTaskNotFound {
 		t.Errorf("expected ErrTaskNotFound, got %v", err)

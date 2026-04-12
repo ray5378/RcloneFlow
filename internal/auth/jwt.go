@@ -27,7 +27,9 @@ type Claims struct {
 
 func parseTTL(envKey string, def time.Duration) time.Duration {
 	v := strings.TrimSpace(os.Getenv(envKey))
-	if v == "" { return def }
+	if v == "" {
+		return def
+	}
 	// 支持标准 time.ParseDuration，如 "24h"；也支持 "90d"（天）
 	if strings.HasSuffix(v, "d") {
 		num := strings.TrimSuffix(v, "d")
@@ -35,7 +37,9 @@ func parseTTL(envKey string, def time.Duration) time.Duration {
 			return time.Duration(n) * 24 * time.Hour
 		}
 	}
-	if d, err := time.ParseDuration(v); err == nil { return d }
+	if d, err := time.ParseDuration(v); err == nil {
+		return d
+	}
 	return def
 }
 

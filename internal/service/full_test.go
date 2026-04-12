@@ -127,13 +127,13 @@ func (m *TaskRunnerMock) RunTask(ctx context.Context, taskID int64, mode, srcRem
 func TestTaskService_CreateTask(t *testing.T) {
 	taskDAO := &TaskDAOMock{}
 	runner := &TaskRunnerMock{}
-	
+
 	// 创建一个简化的service来测试
 	svc := &testTaskService{
 		taskDAO: taskDAO,
 		runner:  runner,
 	}
-	
+
 	task := store.Task{
 		Name:         "test-task",
 		Mode:         "copy",
@@ -142,20 +142,20 @@ func TestTaskService_CreateTask(t *testing.T) {
 		TargetRemote: "gdrive",
 		TargetPath:   "/dst",
 	}
-	
+
 	created, err := svc.CreateTask(task)
 	if err != nil {
 		t.Fatalf("CreateTask() error = %v", err)
 	}
-	
+
 	if created.Name != "test-task" {
 		t.Errorf("expected Name 'test-task', got %s", created.Name)
 	}
-	
+
 	if created.ID == 0 {
 		t.Error("expected non-zero ID")
 	}
-	
+
 	if len(taskDAO.tasks) != 1 {
 		t.Errorf("expected 1 task in DAO, got %d", len(taskDAO.tasks))
 	}
@@ -169,17 +169,17 @@ func TestTaskService_ListTasks(t *testing.T) {
 			{ID: 2, Name: "task2", Mode: "sync"},
 		},
 	}
-	
+
 	svc := &testTaskService{
 		taskDAO: taskDAO,
 		runner:  &TaskRunnerMock{},
 	}
-	
+
 	tasks, err := svc.ListTasks()
 	if err != nil {
 		t.Fatalf("ListTasks() error = %v", err)
 	}
-	
+
 	if len(tasks) != 2 {
 		t.Errorf("expected 2 tasks, got %d", len(tasks))
 	}
@@ -192,12 +192,12 @@ func TestTaskService_UpdateTask(t *testing.T) {
 			{ID: 1, Name: "original", Mode: "copy"},
 		},
 	}
-	
+
 	svc := &testTaskService{
 		taskDAO: taskDAO,
 		runner:  &TaskRunnerMock{},
 	}
-	
+
 	updated := store.Task{
 		Name:         "updated",
 		Mode:         "sync",
@@ -206,17 +206,17 @@ func TestTaskService_UpdateTask(t *testing.T) {
 		TargetRemote: "gdrive",
 		TargetPath:   "/newdst",
 	}
-	
+
 	err := svc.UpdateTask(1, updated)
 	if err != nil {
 		t.Fatalf("UpdateTask() error = %v", err)
 	}
-	
+
 	task, _ := taskDAO.GetByID(1)
 	if task.Name != "updated" {
 		t.Errorf("expected Name 'updated', got %s", task.Name)
 	}
-	
+
 	if task.Mode != "sync" {
 		t.Errorf("expected Mode 'sync', got %s", task.Mode)
 	}
@@ -230,21 +230,21 @@ func TestTaskService_DeleteTask(t *testing.T) {
 			{ID: 2, Name: "task2"},
 		},
 	}
-	
+
 	svc := &testTaskService{
 		taskDAO: taskDAO,
 		runner:  &TaskRunnerMock{},
 	}
-	
+
 	err := svc.DeleteTask(1)
 	if err != nil {
 		t.Fatalf("DeleteTask() error = %v", err)
 	}
-	
+
 	if len(taskDAO.tasks) != 1 {
 		t.Errorf("expected 1 task after delete, got %d", len(taskDAO.tasks))
 	}
-	
+
 	_, ok := taskDAO.GetByID(1)
 	if ok {
 		t.Error("expected task 1 to be deleted")
@@ -270,26 +270,26 @@ func TestTaskService_RunTask(t *testing.T) {
 			return 123, nil
 		},
 	}
-	
+
 	svc := &testTaskServiceWithRun{
 		taskDAO: taskDAO,
 		runDAO:  runDAO,
 		runner:  runner,
 	}
-	
+
 	err := svc.RunTask(context.Background(), 1, "manual")
 	if err != nil {
 		t.Fatalf("RunTask() error = %v", err)
 	}
-	
+
 	if len(runDAO.runs) != 1 {
 		t.Errorf("expected 1 run record, got %d", len(runDAO.runs))
 	}
-	
+
 	if runDAO.runs[0].RcJobID != 123 {
 		t.Errorf("expected RcJobID 123, got %d", runDAO.runs[0].RcJobID)
 	}
-	
+
 	if runDAO.runs[0].Status != "running" {
 		t.Errorf("expected Status 'running', got %s", runDAO.runs[0].Status)
 	}
@@ -300,13 +300,13 @@ func TestTaskService_RunTask_NotFound(t *testing.T) {
 	taskDAO := &TaskDAOMock{tasks: []store.Task{}}
 	runDAO := &RunDAOMock{}
 	runner := &TaskRunnerMock{}
-	
+
 	svc := &testTaskServiceWithRun{
 		taskDAO: taskDAO,
 		runDAO:  runDAO,
 		runner:  runner,
 	}
-	
+
 	err := svc.RunTask(context.Background(), 999, "manual")
 	if err != ErrTaskNotFound {
 		t.Errorf("expected ErrTaskNotFound, got %v", err)
@@ -316,7 +316,7 @@ func TestTaskService_RunTask_NotFound(t *testing.T) {
 // testTaskService 简化版任务服务（用于测试）
 type testTaskService struct {
 	taskDAO *TaskDAOMock
-	runner *TaskRunnerMock
+	runner  *TaskRunnerMock
 }
 
 func (s *testTaskService) CreateTask(task store.Task) (store.Task, error) {
