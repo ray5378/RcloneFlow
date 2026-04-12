@@ -662,7 +662,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 	}
 }
 
-var oneLineRe = regexp.MustCompile(`(?i)^\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s\s*,\s*(?:ETA\s*([0-9hms:.-]+)|ETA\s*-|([0-9]{1,3})%)`) 
+var oneLineRe = regexp.MustCompile(`(?i)^\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s\s*,\s*(?:ETA\s*([0-9hms:.-]+)|ETA\s*-|([0-9]{1,3})%)`) // kept for reference
 
 func unitToMul(u string) float64 {
 	u = strings.ToUpper(u)
@@ -714,9 +714,17 @@ var etaTokenRe   = regexp.MustCompile(`(?i)ETA\s*([0-9hms:.-]+|-)`)
 
 func parseOneLineProgress(line string) (map[string]any, bool) {
 	l := strings.TrimSpace(line)
-	// 去掉尾部 (xfr#...)
+	// 提取 (xfr#a/b) 的已完成数 a
+	xfrDone := float64(0)
 	if i := strings.Index(l, "("); i >= 0 {
+		// 截取括号段与主段
+		paren := l[i:]
 		l = strings.TrimSpace(l[:i])
+		if j := strings.Index(strings.ToLower(paren), "xfr#"); j >= 0 {
+			var a int
+			fmt.Sscanf(paren[j:], "xfr#%d", &a)
+			if a > 0 { xfrDone = float64(a) }
+		}
 	}
 	// 按多段拼接处理：取最后一个匹配片段作为当前进度
 	bps := bytesPairRe.FindAllStringSubmatch(l, -1)
@@ -747,6 +755,7 @@ func parseOneLineProgress(line string) (map[string]any, bool) {
 		fmt.Sscanf(pm[1], "%f", &pct)
 		prog["percentage"] = pct
 	}
+	if xfrDone > 0 { prog["completedFiles"] = xfrDone }
 	return prog, true
 }
 
