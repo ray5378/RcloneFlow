@@ -1107,17 +1107,21 @@ var etaTokenRe = regexp.MustCompile(`(?i)ETA\s*([0-9hms:.-]+|-)`)
 
 func parseOneLineProgress(line string) (map[string]any, bool) {
 	l := strings.TrimSpace(line)
-	// 提取 (xfr#a/b) 的已完成数 a
+	// 提取 (xfr#a/b) 的已完成数 a 和计划总数 b
 	xfrDone := float64(0)
+	planned := float64(0)
 	if i := strings.Index(l, "("); i >= 0 {
 		// 截取括号段与主段
 		paren := l[i:]
 		l = strings.TrimSpace(l[:i])
 		if j := strings.Index(strings.ToLower(paren), "xfr#"); j >= 0 {
-			var a int
-			fmt.Sscanf(paren[j:], "xfr#%d", &a)
-			if a > 0 {
-				xfrDone = float64(a)
+			var a, b int
+			n, _ := fmt.Sscanf(paren[j:], "xfr#%d/%d", &a, &b)
+			if n >= 1 && a > 0 { xfrDone = float64(a) }
+			if n == 2 && b > 0 { planned = float64(b) }
+			if n == 0 { // 旧格式仅含 a
+				var aa int
+				if _, err := fmt.Sscanf(paren[j:], "xfr#%d", &aa); err == nil && aa > 0 { xfrDone = float64(aa) }
 			}
 		}
 	}
@@ -1158,9 +1162,8 @@ func parseOneLineProgress(line string) (map[string]any, bool) {
 		fmt.Sscanf(pm[1], "%f", &pct)
 		prog["percentage"] = pct
 	}
-	if xfrDone > 0 {
-		prog["completedFiles"] = xfrDone
-	}
+	if xfrDone > 0 { prog["completedFiles"] = xfrDone }
+	if planned > 0 { prog["plannedFiles"] = planned }
 	return prog, true
 }
 
