@@ -452,27 +452,29 @@ function getLiveSummaryFromDB(run:any){
   return null
 }
 // 以“开始时间 + 平均速度”计算更稳健的 ETA（剩余时间，秒）
-// 预估完成（剩余时间）：剩余字节 / 最近一次“任务卡片中已显示”的非 0 速度
-// 判定：优先取 lastStableByTask[taskId].sp.speed（任务卡片经过抗噪合并后的速度）；仅当 formatBytesPerSec(speed) 不是 '-' 时采信
+// 预估完成：使用“固定总量（preflight.totalBytes）- 抗噪后的已传 bytes” / 抗噪后的速度
 const lastNonZeroSpeedByTask: Record<number, number> = {}
 function calcEtaFromAvg(run:any, live:any){
   try{
     if (!run?.startedAt || !live) return null
-    const bytes = Number(live.bytes||0)
-    const total = Number(live.totalBytes||0)
-    if (!total || bytes<=0) return null
-    const remaining = Math.max(0, total - bytes)
     const tid = (run.taskId || run.taskID || run.task_id || run.runRecord?.taskId) as number
-    // 优先使用“任务卡片显示”的速度（已抗噪合并）
-    let displayedSpeed = 0
-    if (tid && lastStableByTask.value && lastStableByTask.value[tid] && lastStableByTask.value[tid].sp){
-      displayedSpeed = Number(lastStableByTask.value[tid].sp.speed || 0)
-    }
-    // 若卡片速度不可用，再退回当前帧 live.speed
-    const curSpeed = displayedSpeed>0 ? displayedSpeed : Number(live.speed||0)
-    const curSpeedShown = formatBytesPerSec(curSpeed) !== '-' ? curSpeed : 0
-    if (tid){ if (curSpeedShown>0) lastNonZeroSpeedByTask[tid] = curSpeedShown }
-    const sp = tid ? (lastNonZeroSpeedByTask[tid] || 0) : curSpeedShown
+    // 固定总量：优先 preflight.totalBytes；无则用卡片稳态的 totalBytes；再无则返回 null
+    const pf = getPreflight(run)
+    let total = Number(pf?.totalBytes || 0)
+    if (!total && tid && lastStableByTask.value?.[tid]?.sp){ total = Number(lastStableByTask.value[tid].sp.totalBytes || 0) }
+    if (!total) return null
+    // 抗噪后的已传 bytes
+    let bytes = Number(live.bytes || 0)
+    if (tid && lastStableByTask.value?.[tid]?.sp){ bytes = Number(lastStableByTask.value[tid].sp.bytes || bytes) }
+    if (bytes<=0) return null
+    const remaining = Math.max(0, total - bytes)
+    // 抗噪后的速度（任务卡片显示），可渲染时才采信
+    let speed = 0
+    if (tid && lastStableByTask.value?.[tid]?.sp){ speed = Number(lastStableByTask.value[tid].sp.speed || 0) }
+    if (speed<=0) speed = Number(live.speed || 0)
+    if (formatBytesPerSec(speed) === '-') return null
+    if (tid && speed>0) lastNonZeroSpeedByTask[tid] = speed
+    const sp = tid ? (lastNonZeroSpeedByTask[tid] || 0) : speed
     if (!sp || sp<=0) return null
     const etaSec = Math.floor(remaining / sp)
     if (etaSec > 99*3600) return null
