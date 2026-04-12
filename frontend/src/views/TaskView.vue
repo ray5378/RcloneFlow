@@ -289,12 +289,25 @@ async function loadActiveRuns() {
   try {
     const data = await api.getActiveRuns()
     const now = Date.now()
-    // 更新最后稳态快照
+    // 更新最后稳态快照（保持向前：非递减合并，避免抖动）
     for (const it of data || []){
       const tid = it.runRecord?.taskId
-      const sp = it.stableProgress
+      const sp:any = it.stableProgress || {}
       if (tid && sp && typeof sp === 'object'){
-        lastStableByTask.value[tid] = { sp, at: now }
+        const prev = lastStableByTask.value[tid]?.sp || {}
+        const merged:any = { ...prev, ...sp }
+        // 非递减合并
+        merged.bytes = Math.max(Number(prev.bytes||0), Number(sp.bytes||0))
+        merged.totalBytes = Number(sp.totalBytes||prev.totalBytes||0)
+        merged.percentage = Math.max(Number(prev.percentage||0), Number(sp.percentage||0))
+        merged.completedFiles = Math.max(Number(prev.completedFiles||0), Number(sp.completedFiles||0))
+        // totalCount：若本帧为 0，沿用上一帧
+        merged.totalCount = Number(sp.totalCount||prev.totalCount||0)
+        // 速度：若本帧为 0，则沿用上一帧的非零速度，减少闪烁
+        merged.speed = Number(sp.speed||prev.speed||0)
+        lastStableByTask.value[tid] = { sp: merged, at: now }
+        // 同步回 it 以便本次渲染即用稳定值
+        it.stableProgress = merged
       }
     }
     activeRuns.value = data || []
