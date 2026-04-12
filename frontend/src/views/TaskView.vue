@@ -47,8 +47,8 @@ const activeRuns = ref<any[]>([])
 // 任务卡片：完成后保留最近稳态进度的观察期（默认 15s）
 const LINGER_MS = 15000
 const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
-// 简化：直接用 DB 的 summary.progress；DB 暂无时回退 active
-// 保留非递减守护可选，如需再加
+// 仅用 DB 的 summary.progress；DB 暂无时保留上一帧，不再回退 active
+const lastDbFrameByRunId: Record<number, any> = {}
 const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
 // 仅在 phase 前进时更新：记录每个 task 的最新 phase
 const lastPhaseByTaskId: Record<number, string> = {}
@@ -318,11 +318,12 @@ function getActiveRunByTaskId(taskId: number) {
   return undefined as any
 }
 
-function getDbOrActiveProgress(run:any){
+function getDbProgressStable(run:any){
   const db = getLiveSummaryFromDB(run)
-  if (db) return db
-  const act = getActiveRunByTaskId(run.taskId)?.stableProgress
-  return act || null
+  const id = run?.id
+  if (db && id){ lastDbFrameByRunId[id] = db; return db }
+  if (id && lastDbFrameByRunId[id]) return lastDbFrameByRunId[id]
+  return db || null
 }
 
 
@@ -1152,7 +1153,7 @@ import TransferOptions from '../components/TransferOptions.vue'
         <!-- 运行中卡片的实时概览（优先读 active 的 stableProgress，缺失再用 DB 的 summary.progress） -->
         <div class="summary-mini" v-else-if="run.status==='running'">
           <!-- 全部用 DB：百分比/体量/速度/ETA 均取 DB 的 summary.progress；实时完成文件计数也取 DB（progress.completedFiles） -->
-          <template v-if="getDbOrActiveProgress(run) as dp">
+          <template v-if="getDbProgressStable(run) as dp">
             <span class="chip">进度 {{ (dp.percentage||0).toFixed(2) }}%</span>
             <span class="chip meta">速度 {{ formatBytesPerSec(dp.speed || 0) }}</span>
             <span class="chip meta">已传 {{ formatBytes(dp.bytes || 0) }}</span>
