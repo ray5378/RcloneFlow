@@ -441,19 +441,24 @@ function getLiveSummaryFromDB(run:any){
   return null
 }
 // 以“开始时间 + 平均速度”计算更稳健的 ETA（剩余时间，秒）
+// 预估完成（剩余时间）：剩余字节 / 最近一次非 0 速度
+const lastNonZeroSpeedByTask: Record<number, number> = {}
 function calcEtaFromAvg(run:any, live:any){
   try{
     if (!run?.startedAt || !live) return null
-    const start = new Date(run.startedAt).getTime()
-    const now = Date.now()
-    const elapsedSec = Math.max(1, Math.floor((now - start)/1000))
     const bytes = Number(live.bytes||0)
     const total = Number(live.totalBytes||0)
     if (!total || bytes<=0) return null
-    const avgBps = bytes / elapsedSec
-    if (avgBps <= 0) return null
     const remaining = Math.max(0, total - bytes)
-    return Math.floor(remaining / avgBps)
+    // 记录并使用最近一次非 0 的速度
+    const tid = (run.taskId || run.taskID || run.task_id || run.runRecord?.taskId) as number
+    const curSpeed = Number(live.speed||0)
+    if (tid){
+      if (curSpeed>0) lastNonZeroSpeedByTask[tid] = curSpeed
+    }
+    const sp = tid ? (lastNonZeroSpeedByTask[tid] || 0) : curSpeed
+    if (!sp || sp<=0) return null
+    return Math.floor(remaining / sp)
   }catch{ return null }
 }
 
@@ -1198,7 +1203,7 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip meta">速度 {{ formatBytesPerSec((getDbProgressStable(run) as any)?.speed || 0) }}</span>
             <span class="chip meta">已传 {{ formatBytes((getDbProgressStable(run) as any)?.bytes || 0) }}</span>
             <span class="chip meta">总量 {{ formatBytes((getDbProgressStable(run) as any)?.totalBytes || 0) }}</span>
-            <span class="chip meta" v-if="calcEtaFromAvg(run, (getDbProgressStable(run) as any))">ETA {{ formatEta(calcEtaFromAvg(run, (getDbProgressStable(run) as any))||0) }}</span>
+            <span class="chip meta" v-if="calcEtaFromAvg(run, (getDbProgressStable(run) as any))">预估完成 {{ formatEta(calcEtaFromAvg(run, (getDbProgressStable(run) as any))||0) }}</span>
             
             <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDbProgressStable(run) as any)?.bytes || 0) }}</span></span>
             <!-- 恢复：总数量 / 实时已传输文件数量（总数来自预检 size，已传来自 DB 的 progress.completedFiles） -->
