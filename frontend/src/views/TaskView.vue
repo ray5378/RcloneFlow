@@ -1165,9 +1165,9 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
           <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
           <!-- 预估 vs 实际（数量） -->
-          <span class="chip meta" v-if="getPreflight(run)">数量 约 {{ getPreflight(run).totalCount }} ／ 实 {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
+          <span class="chip meta" v-if="getPreflight(run)">数量 <span class="est">约 {{ getPreflight(run).totalCount }}</span> ／ <span class="act">实 {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span></span>
           <!-- 预估 vs 实际（体量） -->
-          <span class="chip meta" v-if="getPreflight(run)">体量 约 {{ formatBytes(getPreflight(run).totalBytes || 0) }} ／ 实 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span>
+          <span class="chip meta" v-if="getPreflight(run)">体量 <span class="est">约 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">实 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span></span>
           <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
           <span class="chip meta">总量 {{ formatBytes(getFinalSummary(run).totalBytes || 0) }}</span>
         </div>
@@ -1235,19 +1235,19 @@ import TransferOptions from '../components/TransferOptions.vue'
                 </div>
                 <div class="summary-cell" v-if="getPreflight(runDetail)">
                   <div class="summary-key">预估数量</div>
-                  <div class="summary-val">约 {{ getPreflight(runDetail).totalCount }}</div>
+                  <div class="summary-val est">约 {{ getPreflight(runDetail).totalCount }}</div>
                 </div>
                 <div class="summary-cell">
                   <div class="summary-key">实际数量</div>
-                  <div class="summary-val">{{ runDetail.taskMode==='move' ? (getFinalSummary(runDetail).counts?.copied || 0) : ((getFinalSummary(runDetail).counts?.copied || 0) + (getFinalSummary(runDetail).counts?.deleted || 0)) }}</div>
+                  <div class="summary-val act">{{ runDetail.taskMode==='move' ? (getFinalSummary(runDetail).counts?.copied || 0) : ((getFinalSummary(runDetail).counts?.copied || 0) + (getFinalSummary(runDetail).counts?.deleted || 0)) }}</div>
                 </div>
                 <div class="summary-cell" v-if="getPreflight(runDetail)">
                   <div class="summary-key">预估体量</div>
-                  <div class="summary-val">约 {{ formatBytes(getPreflight(runDetail).totalBytes || 0) }}</div>
+                  <div class="summary-val est">约 {{ formatBytes(getPreflight(runDetail).totalBytes || 0) }}</div>
                 </div>
                 <div class="summary-cell">
                   <div class="summary-key">实际体量</div>
-                  <div class="summary-val">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
+                  <div class="summary-val act">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
                 </div>
                 <div class="summary-cell">
                   <div class="summary-key">开始时间</div>
@@ -2024,4 +2024,8 @@ body.light .files-row .name,body.light .files-row .status,body.light .files-row 
 .pager-inline{display:flex;align-items:center;gap:8px}
 .page-input{width:64px;padding:6px 8px;border:1px solid #333;border-radius:8px;background:#252525;color:#e0e0e0}
 body.light .page-input{ background:#fff; color:#111827; border-color:#ddd }
+.chip .est{ color:#ef4444 }
+.chip .act{ color:#16a34a }
+.summary-val.est{ color:#ef4444 }
+.summary-val.act{ color:#16a34a }
 </style>
