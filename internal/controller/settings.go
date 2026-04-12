@@ -29,6 +29,8 @@ type settingsResponse struct {
 	Precheck  map[string]map[string]string `json:"precheck"`
 	Progress  map[string]map[string]string `json:"progress"`
 	Webdav    map[string]map[string]string `json:"webdav"`
+	Stored    map[string]string            `json:"stored"`   // raw overrides from settings.json
+	Meta      map[string]string            `json:"meta"`     // APP_DATA_DIR, settingsPath
 }
 
 func defaultsMap() map[string]string {
@@ -117,6 +119,8 @@ func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
 			"FINISH_WAIT_INTERVAL": {"effective": eff("FINISH_WAIT_INTERVAL"), "default": defs["FINISH_WAIT_INTERVAL"]},
 			"FINISH_WAIT_TIMEOUT":  {"effective": eff("FINISH_WAIT_TIMEOUT"),  "default": defs["FINISH_WAIT_TIMEOUT"]},
 		},
+		Stored: over,
+		Meta: map[string]string{"APP_DATA_DIR": os.Getenv("APP_DATA_DIR"), "settingsPath": settingsPath()},
 	}
 	WriteJSON(w, http.StatusOK, resp)
 }
