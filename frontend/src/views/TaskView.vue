@@ -50,6 +50,8 @@ const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
 // DB 稳态进度去抖缓存（非响应式）：保证百分比/已传不回退，避免在渲染期写响应式导致重渲
 const lastDbProgressByRunId: Record<number, { bytes:number; totalBytes:number; percentage:number; speed:number }> = {}
 const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
+// 仅在 phase 前进时更新：记录每个 task 的最新 phase
+const lastPhaseByTaskId: Record<number, string> = {}
 
 // 传输日志弹窗
 const showLogModal = ref(false)
@@ -327,12 +329,23 @@ function getDbProgressDejitter(run:any){
     }
     if (!id) return p
     const last = lastDbProgressByRunId[id]
+    // 仅在 phase 前进时更新缓存与展示
+    const phase = (p as any).phase || ''
+    const taskId = run?.taskId
+    if (taskId){
+      const lastPhase = lastPhaseByTaskId[taskId] || ''
+      if (phase && lastPhase && phase === lastPhase){
+        // phase 未前进：返回上一帧，避免在单一阶段内细粒度波动引发的“跳动/假死感”
+        if (last) return last
+      } else {
+        lastPhaseByTaskId[taskId] = phase
+      }
+    }
     if (last){
       // 非递减守护
       p.bytes = Math.max(last.bytes, p.bytes||0)
       p.totalBytes = Math.max(last.totalBytes, p.totalBytes||0)
       p.percentage = Math.max(last.percentage, p.percentage||0)
-      // 速度保留原值（不做非递减）
     }
     lastDbProgressByRunId[id] = { bytes: p.bytes||0, totalBytes: p.totalBytes||0, percentage: p.percentage||0, speed: p.speed||0 }
     return p
