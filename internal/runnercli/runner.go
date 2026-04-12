@@ -982,6 +982,8 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						}
 					}
 					rr.Summary["progress"] = prog
+					// 同步到 stableProgress，前端统一读取 DB-only 稳态（包含 completedFiles）
+					rr.Summary["stableProgress"] = prog
 					rr.BytesTransferred = int64(prog["bytes"].(float64))
 					rr.Speed = fmt.Sprintf("%d B/s", int64(prog["speed"].(float64)))
 					// 同步部分文件列表快照（最近 100 条）
