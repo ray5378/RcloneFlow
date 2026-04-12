@@ -846,23 +846,40 @@ func sizeOf(r *adapter.CmdRunner, cfg, target string, opts map[string]any) (byte
 
 // sizeOfPaged: sequential directory pagination — sum sizes per top-level dir + root files
 func sizeOfPaged(r *adapter.CmdRunner, cfg, target string, opts map[string]any) (int64, int64, error) {
-	// list top-level dirs
-	lsArgs := []string{"lsf", target, "--config", cfg, "--dirs-only"}
+	// list top-level dirs (depth=1)
+	lsArgs := []string{"lsf", target, "--config", cfg, "--dirs-only", "--max-depth", "1"}
 	lsArgs = addFilterFlags(lsArgs, opts, true)
 	out, _, e := r.Run(context.Background(), lsArgs...)
 	if e != nil {
 		// fallback: single shot size
 		return sizeOf(r, cfg, target, opts)
 	}
-	lines := []string{}
-	for _, ln := range strings.Split(out, "\n") {
-		ln = strings.TrimSpace(ln)
-		if ln == "" { continue }
-		// lsf returns dirs with trailing '/'
-		lines = append(lines, strings.TrimSuffix(ln, "/"))
+	collectDirs := func(s string) []string {
+		arr := []string{}
+		for _, ln := range strings.Split(s, "\n") {
+			ln = strings.TrimSpace(ln)
+			if ln == "" { continue }
+			arr = append(arr, strings.TrimSuffix(ln, "/"))
+		}
+		return arr
+	}
+	lines := collectDirs(out)
+	// auto-descend: if no top-level dirs, try second-level dirs (depth=2), select those that contain one '/'
+	if len(lines) == 0 {
+		ls2 := []string{"lsf", target, "--config", cfg, "--dirs-only", "--max-depth", "2"}
+		ls2 = addFilterFlags(ls2, opts, true)
+		if out2, _, e2 := r.Run(context.Background(), ls2...); e2 == nil {
+			all := collectDirs(out2)
+			// keep only second-level like "a/b"
+			sec := []string{}
+			for _, d := range all {
+				if strings.Count(d, "/") == 1 { sec = append(sec, d) }
+			}
+			lines = sec
+		}
 	}
 	if len(lines) == 0 {
-		// no subdirs — try single shot
+		// no subdirs even after descend — try single shot
 		return sizeOf(r, cfg, target, opts)
 	}
 	var totalBytes, totalCount int64
@@ -877,7 +894,7 @@ func sizeOfPaged(r *adapter.CmdRunner, cfg, target string, opts map[string]any) 
 			}
 		}
 	}
-	// sum each subdir sequentially
+	// sum each (sub)dir sequentially
 	for _, d := range lines {
 		child := target
 		if !strings.HasSuffix(child, "/") { child += "/" }
