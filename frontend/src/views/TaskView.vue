@@ -1185,6 +1185,9 @@ import TransferOptions from '../components/TransferOptions.vue'
         <div class="name">
           <strong>{{ run.taskName || `任务 #${run.taskId}` }}</strong>
           <span class="mode-tag" v-if="run.taskMode">{{ run.taskMode }}</span>
+          <span class="trigger-tag" v-if="run.trigger === 'schedule'">定时</span>
+          <span class="trigger-tag" v-else-if="run.trigger === 'webhook'">Webhook</span>
+          <span class="trigger-tag" v-else>手动</span>
         </div>
         <span 
           :class="['status', getStatusClass(run.status), 'clickable']"
@@ -1250,7 +1253,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           </div>
           <div class="detail-item">
             <label>触发方式：</label>
-            <span>{{ runDetail.trigger === 'schedule' ? '定时任务' : '手动执行' }}</span>
+            <span>{{ runDetail.trigger === 'schedule' ? '定时任务' : (runDetail.trigger === 'webhook' ? 'Webhook 触发' : '手动执行') }}</span>
           </div>
           <div class="detail-item full-width">
             <label>源路径：</label>
