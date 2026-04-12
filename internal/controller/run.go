@@ -808,15 +808,19 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		}
 		_ = eta
 
+		// 实时已传输文件数：优先取 progress.completedFiles，其次取上一帧 stable.completedFiles
+		cf := float64(0)
+		if v, ok := progress["completedFiles"].(float64); ok { cf = v }
 		// 稳态进度：从 summary.stableProgress 读取上一帧
 		var stablePrev map[string]any
 		if summary != nil {
 			if sp, ok := summary["stableProgress"].(map[string]any); ok {
 				stablePrev = sp
+				if cf == 0 { if vv, ok2 := sp["completedFiles"].(float64); ok2 { cf = vv } }
 			}
 		}
-		// 计算稳态候选
-		stable := map[string]any{"bytes": bytes, "totalBytes": total, "speed": speed, "percentage": pct, "phase": "transferring", "lastUpdatedAt": time.Now().Format(time.RFC3339)}
+		// 计算稳态候选（包含 completedFiles，供前端 DB-only 流直接使用）
+		stable := map[string]any{"bytes": bytes, "totalBytes": total, "speed": speed, "percentage": pct, "phase": "transferring", "lastUpdatedAt": time.Now().Format(time.RFC3339), "completedFiles": cf}
 		// 阶段：preparing
 		if total == 0 {
 			stable["phase"] = "preparing"
