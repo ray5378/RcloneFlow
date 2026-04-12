@@ -174,6 +174,12 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		rr.Summary["stderrFile"] = stderrPath
 		if rr.Summary["startedAt"] == nil { rr.Summary["startedAt"] = time.Now().Local().Format(time.RFC3339) }
 		if cmd.Process != nil { rr.Summary["pid"] = cmd.Process.Pid }
+		// 初始化运行中统计：已完成文件数
+		if p, ok := rr.Summary["progress"].(map[string]any); ok {
+			if _, ok2 := p["completedFiles"]; !ok2 { p["completedFiles"] = float64(0) }
+		} else {
+			rr.Summary["progress"] = map[string]any{"completedFiles": float64(0)}
+		}
 	})
 
 	// 两路都写入同一日志文件，并启用 one-line 解析 + 按文件统计
