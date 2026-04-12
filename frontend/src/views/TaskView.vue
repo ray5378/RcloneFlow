@@ -310,7 +310,20 @@ async function loadActiveRuns() {
         it.stableProgress = merged
       }
     }
-    activeRuns.value = data || []
+    // 如果本帧没有 active（比如刚点击停止），用最近 15 秒内的 lastStable 合成占位，避免模块空白
+    const list:any[] = data || []
+    if (list.length === 0) {
+      const synth:any[] = []
+      for (const [k, v] of Object.entries(lastStableByTask.value || {})){
+        const rec:any = (v as any)
+        if (rec && now - rec.at <= 15000){
+          synth.push({ runRecord: { taskId: Number(k), status: 'stopping', rcJobId: 0, bytesTransferred: 0, error: '' }, stableProgress: rec.sp })
+        }
+      }
+      activeRuns.value = synth
+      return
+    }
+    activeRuns.value = list
   } catch (e) {
     console.error(e)
   }
