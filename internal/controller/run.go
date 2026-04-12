@@ -790,10 +790,19 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		if v, ok := progress["bytes"].(float64); ok {
 			bytes = int64(v)
 		}
+		// 总体积：强制使用 preflight.totalBytes（若有），否则保持上一帧的非零值；最后才回退 progress.totalBytes
 		total := int64(0)
-		if v, ok := progress["totalBytes"].(float64); ok {
-			total = int64(v)
+		if summary != nil {
+			if pf, ok := summary["preflight"].(map[string]any); ok {
+				if v, ok2 := pf["totalBytes"].(float64); ok2 { total = int64(v) }
+			}
+			if total == 0 {
+				if sp, ok := summary["stableProgress"].(map[string]any); ok {
+					if v, ok2 := sp["totalBytes"].(float64); ok2 { total = int64(v) }
+				}
+			}
 		}
+		if total == 0 { if v, ok := progress["totalBytes"].(float64); ok { total = int64(v) } }
 		speed := int64(0)
 		if v, ok := progress["speed"].(float64); ok {
 			speed = int64(v)
