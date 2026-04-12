@@ -1997,6 +1997,8 @@ body.light .summary-cell.clickable:hover{background:#f0f4f8;border-color:#cbd5e1
 .files-row{padding:12px 16px;border-top:1px solid #333}
 /* 修正黑底黑字：表格内文字统一亮色，浅色主题时再覆盖 */
 .files-row .name,.files-row .status,.files-row .time,.files-row .size { color:#e5e7eb }
+/* 文件名单行省略，避免换行导致高度抖动 */
+.files-row .name{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
 body.light .files-header{ background:#f5f5f5; color:#4b5563 }
 body.light .files-row .name,body.light .files-row .status,body.light .files-row .time,body.light .files-row .size { color:#1f2937 }
 /* 表格内的 status 仅作为结果文本，不用徽章底色 */
