@@ -1140,20 +1140,21 @@ import TransferOptions from '../components/TransferOptions.vue'
         <div class="info" v-if="getFinalSummary(run)"></div>
         <!-- 运行中卡片的实时概览（优先读 active 的 stableProgress，缺失再用 DB 的 summary.progress） -->
         <div class="summary-mini" v-else-if="run.status==='running'">
-          <template v-if="getActiveRunByTaskId(run.taskId)?.stableProgress">
+          <!-- 混合口径：优先用 DB 的稳态进度显示百分比/体量；速度/ETA 优先取 active 的即时值（可选） -->
+          <template v-if="getLiveSummaryFromDB(run)">
+            <span class="chip">进度 {{ (getLiveSummaryFromDB(run)?.percentage||0).toFixed(2) }}%</span>
+            <span class="chip meta">速度 {{ formatBytesPerSec((getActiveRunByTaskId(run.taskId)?.stableProgress?.speed) || (getLiveSummaryFromDB(run)?.speed || 0)) }}</span>
+            <span class="chip meta">已传 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span>
+            <span class="chip meta">总量 {{ formatBytes(getLiveSummaryFromDB(run)?.totalBytes || 0) }}</span>
+            <span class="chip meta" v-if="calcEtaFromAvg(run, getLiveSummaryFromDB(run))">ETA {{ formatEta(calcEtaFromAvg(run, getLiveSummaryFromDB(run))||0) }}</span>
+            <span class="chip meta" v-if="getPreflight(run)">需完成约 {{ getPreflight(run).totalCount }}</span>
+          </template>
+          <template v-else-if="getActiveRunByTaskId(run.taskId)?.stableProgress">
             <span class="chip">进度 {{ ((getActiveRunByTaskId(run.taskId)?.stableProgress?.percentage)||0).toFixed(2) }}%</span>
             <span class="chip meta">速度 {{ formatBytesPerSec(getActiveRunByTaskId(run.taskId)?.stableProgress?.speed || 0) }}</span>
             <span class="chip meta">已传 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes || 0) }}</span>
             <span class="chip meta">总量 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.totalBytes || 0) }}</span>
             <span class="chip meta" v-if="getActiveRunByTaskId(run.taskId)?.stableProgress?.eta">ETA {{ formatEta(getActiveRunByTaskId(run.taskId)?.stableProgress?.eta) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">需完成约 {{ getPreflight(run).totalCount }}</span>
-          </template>
-          <template v-else-if="getLiveSummaryFromDB(run)">
-            <span class="chip">进度 {{ (getLiveSummaryFromDB(run)?.percentage||0).toFixed(2) }}%</span>
-            <span class="chip meta">速度 {{ formatBytesPerSec(getLiveSummaryFromDB(run)?.speed || 0) }}</span>
-            <span class="chip meta">已传 {{ formatBytes(getLiveSummaryFromDB(run)?.bytes || 0) }}</span>
-            <span class="chip meta">总量 {{ formatBytes(getLiveSummaryFromDB(run)?.totalBytes || 0) }}</span>
-            <span class="chip meta" v-if="calcEtaFromAvg(run, getLiveSummaryFromDB(run))">ETA {{ formatEta(calcEtaFromAvg(run, getLiveSummaryFromDB(run))||0) }}</span>
             <span class="chip meta" v-if="getPreflight(run)">需完成约 {{ getPreflight(run).totalCount }}</span>
           </template>
         </div>
