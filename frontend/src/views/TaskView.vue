@@ -47,8 +47,8 @@ const activeRuns = ref<any[]>([])
 // 任务卡片：完成后保留最近稳态进度的观察期（默认 15s）
 const LINGER_MS = 15000
 const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
-// DB 稳态进度去抖缓存（非响应式）：保证百分比/已传不回退，避免在渲染期写响应式导致重渲
-const lastDbProgressByRunId: Record<number, { bytes:number; totalBytes:number; percentage:number; speed:number }> = {}
+// 简化：直接用 DB 的 summary.progress；DB 暂无时回退 active
+// 保留非递减守护可选，如需再加
 const webhookModal = ref<{show:boolean, id:number|null, value:string}>({show:false, id:null, value:''})
 // 仅在 phase 前进时更新：记录每个 task 的最新 phase
 const lastPhaseByTaskId: Record<number, string> = {}
@@ -318,38 +318,11 @@ function getActiveRunByTaskId(taskId: number) {
   return undefined as any
 }
 
-function getDbProgressDejitter(run:any){
-  try{
-    const id = run?.id
-    const p = getLiveSummaryFromDB(run)
-    if (!p){
-      // 没有新帧时，保留上一帧（非响应式读取）
-      if (id && lastDbProgressByRunId[id]) return lastDbProgressByRunId[id]
-      return null
-    }
-    if (!id) return p
-    const last = lastDbProgressByRunId[id]
-    // 仅在 phase 前进时更新缓存与展示
-    const phase = (p as any).phase || ''
-    const taskId = run?.taskId
-    if (taskId){
-      const lastPhase = lastPhaseByTaskId[taskId] || ''
-      if (phase && lastPhase && phase === lastPhase){
-        // phase 未前进：返回上一帧，避免在单一阶段内细粒度波动引发的“跳动/假死感”
-        if (last) return last
-      } else {
-        lastPhaseByTaskId[taskId] = phase
-      }
-    }
-    if (last){
-      // 非递减守护
-      p.bytes = Math.max(last.bytes, p.bytes||0)
-      p.totalBytes = Math.max(last.totalBytes, p.totalBytes||0)
-      p.percentage = Math.max(last.percentage, p.percentage||0)
-    }
-    lastDbProgressByRunId[id] = { bytes: p.bytes||0, totalBytes: p.totalBytes||0, percentage: p.percentage||0, speed: p.speed||0 }
-    return p
-  }catch{ return null }
+function getDbOrActiveProgress(run:any){
+  const db = getLiveSummaryFromDB(run)
+  if (db) return db
+  const act = getActiveRunByTaskId(run.taskId)?.stableProgress
+  return act || null
 }
 
 
@@ -1179,25 +1152,14 @@ import TransferOptions from '../components/TransferOptions.vue'
         <!-- 运行中卡片的实时概览（优先读 active 的 stableProgress，缺失再用 DB 的 summary.progress） -->
         <div class="summary-mini" v-else-if="run.status==='running'">
           <!-- 全部用 DB：百分比/体量/速度/ETA 均取 DB 的 summary.progress；实时完成文件计数也取 DB（progress.completedFiles） -->
-          <template v-if="getDbProgressDejitter(run) as dp">
+          <template v-if="getDbOrActiveProgress(run) as dp">
             <span class="chip">进度 {{ (dp.percentage||0).toFixed(2) }}%</span>
             <span class="chip meta">速度 {{ formatBytesPerSec(dp.speed || 0) }}</span>
             <span class="chip meta">已传 {{ formatBytes(dp.bytes || 0) }}</span>
             <span class="chip meta">总量 {{ formatBytes(dp.totalBytes || 0) }}</span>
             <span class="chip meta" v-if="calcEtaFromAvg(run, dp)">ETA {{ formatEta(calcEtaFromAvg(run, dp)||0) }}</span>
             <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span> ／ <span class="act">已传输 {{ dp.completedFiles ?? 0 }}</span></span>
-            <!-- 体量（运行中）：总体积/已传输 -->
             <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(dp.bytes || 0) }}</span></span>
-          </template>
-          <template v-else-if="getActiveRunByTaskId(run.taskId)?.stableProgress">
-            <!-- DB 暂无时才回退 active -->
-            <span class="chip">进度 {{ ((getActiveRunByTaskId(run.taskId)?.stableProgress?.percentage)||0).toFixed(2) }}%</span>
-            <span class="chip meta">速度 {{ formatBytesPerSec(getActiveRunByTaskId(run.taskId)?.stableProgress?.speed || 0) }}</span>
-            <span class="chip meta">已传 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes || 0) }}</span>
-            <span class="chip meta">总量 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.totalBytes || 0) }}</span>
-            <span class="chip meta" v-if="getActiveRunByTaskId(run.taskId)?.stableProgress?.eta">ETA {{ formatEta(getActiveRunByTaskId(run.taskId)?.stableProgress?.eta) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount }}</span></span>
-            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getActiveRunByTaskId(run.taskId)?.stableProgress?.bytes || 0) }}</span></span>
           </template>
         </div>
         <!-- 历史卡片内的一目了然统计概览（完成态） -->
