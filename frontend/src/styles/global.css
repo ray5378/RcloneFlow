@@ -327,8 +327,9 @@ body.light .theme-btn:hover {
   flex-direction: column;
   gap: 16px;
   min-height: 0;
-  width: 100%;
-  max-width: 1800px;
+  width: 95%;
+  width: 95%;
+    max-width: 2200px;
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -968,7 +969,7 @@ body.light .menu-pop {
 }
 
 .menu-pop button {
-  width: 100%;
+  width: 95%;
   text-align: left;
   padding: 12px 16px;
   border-radius: 0;
@@ -1008,7 +1009,7 @@ body.light .menu-pop button.danger:hover {
 
 /* Input */
 input, select {
-  width: 100%;
+  width: 95%;
   padding: 10px 14px;
   border-radius: 8px;
   border: 1px solid #333;
@@ -1301,7 +1302,7 @@ body.light .modal-close:hover {
 
 /* Progress bar (container = track, inner bar = fill) */
 .progress-bar-container {
-  width: 100%;
+  width: 95%;
   height: 8px;
   margin-top: 8px;
   background: #222; /* dark track */
@@ -1435,7 +1436,7 @@ body.light .theme-toggle button {
     flex-direction: column;
   }
   .sidebar {
-    width: 100%;
+    width: 95%;
     flex-direction: row;
     overflow-x: auto;
     border-right: none;
@@ -1554,7 +1555,7 @@ body.light .modal-footer {
     font-size: 14px;
     -webkit-tap-highlight-color: transparent;
     overflow-x: hidden;
-    width: 100%;
+    width: 95%;
   }
 
   body {
@@ -1618,7 +1619,7 @@ body.light .modal-footer {
   .card {
     border-radius: 12px;
     margin: 0;
-    max-width: 100%;
+    max-width: 95%;
     overflow-x: hidden;
   }
 
@@ -1658,7 +1659,7 @@ body.light .modal-footer {
   }
 
   .item .meta {
-    width: 100%;
+    width: 95%;
     justify-content: space-between;
     gap: 12px;
     font-size: 12px;
@@ -1675,7 +1676,7 @@ body.light .modal-footer {
     grid-template-columns: repeat(2, 1fr);
     gap: 10px;
     padding: 12px;
-    max-width: 100%;
+    max-width: 95%;
     overflow-x: hidden;
   }
 
@@ -1683,7 +1684,7 @@ body.light .modal-footer {
     min-width: 0;
     padding: 12px;
     border-radius: 10px;
-    max-width: 100%;
+    max-width: 95%;
     overflow-x: hidden;
   }
 
@@ -1764,7 +1765,7 @@ body.light .modal-footer {
 
   .modal,
   .modal-content {
-    width: 100%;
+    width: 95%;
     max-width: min(560px, 95vw);
     max-height: 85vh;
     border-radius: 16px;
@@ -1825,22 +1826,22 @@ body.light .modal-footer {
   }
 
   .task-main .name {
-    width: 100%;
+    width: 95%;
   }
 
   .task-main .schedule-info {
-    width: 100%;
+    width: 95%;
     min-width: auto;
   }
 
   .task-main .item-actions {
-    width: 100%;
+    width: 95%;
   }
 
   .task-paths {
     padding: 8px 10px;
     font-size: 11px;
-    max-width: 100%;
+    max-width: 95%;
     overflow-x: auto;
   }
 
@@ -1864,7 +1865,7 @@ body.light .modal-footer {
 
   .run-item .name {
     min-width: auto;
-    width: 100%;
+    width: 95%;
   }
 
   .run-item .status {
@@ -1874,7 +1875,7 @@ body.light .modal-footer {
 
   .run-item .path-full {
     min-width: auto;
-    width: 100%;
+    width: 95%;
   }
 
   .run-item .time {
@@ -1883,7 +1884,7 @@ body.light .modal-footer {
   }
 
   .run-item .row-actions {
-    width: 100%;
+    width: 95%;
     justify-content: flex-start;
     flex-wrap: wrap;
     gap: 6px;
@@ -1891,7 +1892,7 @@ body.light .modal-footer {
 
   /* 统计概览 chips */
   .summary-mini {
-    width: 100%;
+    width: 95%;
     gap: 6px;
   }
 
@@ -2000,7 +2001,7 @@ body.light .modal-footer {
   }
 
   .path-browse {
-    width: 100%;
+    width: 95%;
   }
 
   .path-list {
@@ -2145,9 +2146,13 @@ body.light .modal-footer {
 }
 
 /* === 大屏优化�?440px+�?=== */
+.main { width: 95%;
+    max-width: 2200px; }
+
 @media (min-width: 1440px) {
   .main {
-    max-width: 1800px;
+    width: 95%;
+    max-width: 2200px;
     margin: 0 auto;
     padding-left: 32px;
     padding-right: 32px;
