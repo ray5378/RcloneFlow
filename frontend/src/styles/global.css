@@ -328,8 +328,6 @@ body.light .theme-btn:hover {
   gap: 16px;
   min-height: 0;
   width: 95%;
-  width: 95%;
-    max-width: 2200px;
   margin: 0 auto;
   box-sizing: border-box;
 }
@@ -2147,12 +2145,10 @@ body.light .modal-footer {
 
 /* === 大屏优化�?440px+�?=== */
 .main { width: 95%;
-    max-width: 2200px; }
 
 @media (min-width: 1440px) {
   .main {
     width: 95%;
-    max-width: 2200px;
     margin: 0 auto;
     padding-left: 32px;
     padding-right: 32px;
