@@ -322,12 +322,15 @@ body.light .theme-btn:hover {
 /* Main content */
 .main {
   flex: 1;
-  padding: 16px 24px;
+  padding: 16px 24px 60px;
   display: flex;
   flex-direction: column;
   gap: 16px;
   min-height: 0;
-  padding-bottom: 60px;
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  box-sizing: border-box;
 }
 
 /* App container */
@@ -2144,7 +2147,7 @@ body.light .modal-footer {
 /* === 大屏优化�?440px+�?=== */
 @media (min-width: 1440px) {
   .main {
-    max-width: 1400px;
+    max-width: 1600px;
     margin: 0 auto;
     padding-left: 32px;
     padding-right: 32px;

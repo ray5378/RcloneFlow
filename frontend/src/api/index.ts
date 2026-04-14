@@ -21,7 +21,7 @@ export { getSchedules, createSchedule, updateSchedule, deleteSchedule } from './
 export { getSchedules as listSchedules } from './schedule'
 
 // ============ Run API ============
-export { getRuns, getRun, clearRun, clearAllRuns, clearRunsByTask, getJobStatus, getActiveRuns, getGlobalStats, stopJob } from './run'
+export { getRuns, getRun, clearRun, clearAllRuns, clearRunsByTask, getJobStatus, getActiveRuns, getGlobalStats, stopJob, getRunFiles } from './run'
 export { getRuns as listRuns } from './run'
 
 // ============ Remote API ============
