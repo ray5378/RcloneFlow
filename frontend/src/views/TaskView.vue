@@ -388,7 +388,7 @@ onMounted(async () => {
   await loadActiveRuns()
   activeRunsTimer = window.setInterval(() => { loadActiveRuns().catch(console.error) }, 2000)
   // 历史列表也轮询，保证新 run 及时出现（避免必须手动刷新）
-  runsTimer = window.setInterval(() => { api.listRuns().then(v=> runs.value = v||[]).catch(()=>{}) }, 3000)
+  runsTimer = window.setInterval(() => { api.listRuns().then(v=> runs.value = v?.length ? v : runs.value).catch(()=>{}) }, 3000)
 })
 
 let loadSeq = 0
@@ -402,10 +402,10 @@ async function loadData() {
       api.listRuns(),
     ])
     if (seq !== loadSeq) return // 只接受最新一轮
-    tasks.value = taskData || (tasks.value?.length ? tasks.value : [])
-    remotes.value = remoteData?.remotes || (remotes.value?.length ? remotes.value : [])
-    schedules.value = scheduleData || (schedules.value?.length ? schedules.value : [])
-    runs.value = runData || (runs.value?.length ? runs.value : [])
+    tasks.value = taskData?.length ? taskData : tasks.value
+    remotes.value = remoteData?.remotes?.length ? remoteData.remotes : remotes.value
+    schedules.value = scheduleData?.length ? scheduleData : schedules.value
+    runs.value = runData?.length ? runData : runs.value
     // 本地快照：成功后保存
     try { localStorage.setItem('lastTasksSnapshot', JSON.stringify(tasks.value||[])) } catch {}
   } catch (e:any) {
