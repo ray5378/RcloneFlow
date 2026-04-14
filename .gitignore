@@ -1,0 +1,45 @@
+# Binaries
+server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+
+# Dependency directories
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local data
+data/
+*.log
+*.pid
+
+# Environment
+.env
+.env.local
+
+# Backup files
+*.bak
+*.backup
+
+# Frontend build output
+frontend/dist/
+frontend/node_modules/
+frontend/package-lock.json

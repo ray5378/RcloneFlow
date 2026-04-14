@@ -1,0 +1,35 @@
+version: "3.8"
+services:
+  rcloneflow:
+    image: ray5378/rcloneflow:master
+    platform: linux/amd64
+    container_name: rcloneflow
+    environment:
+      - TZ=Asia/Shanghai
+      - APP_ADDR=:17870
+      - APP_DATA_DIR=/app/data
+      - RCLONE_CONFIG=/app/data/rclone.conf
+      # 内置 RC（用于 remotes/providers/browser）。如无需内置，可移除 EMBED_RC 并自行提供 RC。
+      - EMBED_RC=true
+      - RCLONE_RC_URL=http://127.0.0.1:5572
+      - RCLONE_RC_USER=rc
+      - RCLONE_RC_PASS=rcpass
+      # 可选：启用 rclone JSON 日志（默认关闭）。
+      # - RCLONE_USE_JSON_LOG=true
+    volumes:
+      - ./data:/app/data # 确保宿主目录对 UID 1000 可写
+    ports:
+      - 17870:17870
+    restart: unless-stopped
+
+  # 如需独立 rclone RC 服务，可启用以下示例，并把 RCLONE_RC_URL 指向 rclone:5572
+  # rclone:
+  #   image: rclone/rclone:1.65.2
+  #   container_name: rclone-rc
+  #   command: ["rcd", "--rc-addr=:5572", "--rc-user=rc", "--rc-pass=rcpass"]
+  #   ports:
+  #     - 5572:5572
+  #   volumes:
+  #     - ./data/rclone:/config/rclone
+  #   environment:
+  #     - TZ=Asia/Shanghai
