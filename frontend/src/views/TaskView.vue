@@ -1298,11 +1298,6 @@ import TransferOptions from '../components/TransferOptions.vue'
         <button class="primary small" @click="goToAddTask">+ 添加任务</button>
       </div>
     </div>
-    <div class="list-header">
-      <span class="col-name">任务</span>
-      <span class="col-schedule">定时</span>
-      <span class="col-action">操作</span>
-    </div>
     <div class="list">
       <div v-for="task in filteredTasks" :key="task.id" class="task-item">
         <div class="task-main">
@@ -1452,13 +1447,6 @@ import TransferOptions from '../components/TransferOptions.vue'
           ← 返回
         </button>
       </div>
-    </div>
-    <div class="list-header">
-      <span class="col-name">任务</span>
-      <span class="col-status">状态</span>
-      <span class="col-path-full">路径</span>
-      <span class="col-time">开始</span>
-      <span class="col-action">操作</span>
     </div>
     <div class="list">
       <div v-for="run in filteredRuns" :key="run.id" class="item run-item">
