@@ -140,13 +140,8 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	// 单例模式检查：如果开启了单例模式，且有其他传输任务在运行，则放弃本次执行
 	// 使用锁防止竞态条件（两个任务同时检查都看到0个活动任务）
 	s.runMu.Lock()
-	checked := false
-	defer func() {
-		if !checked {
-			s.runMu.Unlock()
-		}
-	}()
-
+	defer s.runMu.Unlock()
+	
 	if singletonMode, ok := effectiveOptions["singletonMode"].(bool); ok && singletonMode {
 		// 检查是否有该任务或其他任务正在运行
 		activeRuns, err := s.db.ListActiveRuns()
@@ -163,8 +158,6 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			return fmt.Errorf("单例模式：检测到有其他传输任务正在运行，跳过本次执行")
 		}
 	}
-	checked = true
-	s.runMu.Unlock()
 
 	// 切换为 CLI：先记录运行，再异步启动（可中断/进度）
 	run, err := s.db.AddRun(store.Run{
