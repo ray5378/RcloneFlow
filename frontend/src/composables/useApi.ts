@@ -53,7 +53,8 @@ export const taskApi = {
 
   async stop(id: number) {
     try {
-      return await api.stopTask(id)
+      await api.stopTaskTransfer(id)
+      return true
     } catch (err) {
       handleError(err, { module: 'Task', operation: '停止任务' })
       return false
