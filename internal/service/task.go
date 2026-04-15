@@ -137,8 +137,18 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 
 	// 单例模式检查：如果开启了单例模式，且有其他传输任务在运行，则放弃本次执行
 	if singletonMode, ok := effectiveOptions["singletonMode"].(bool); ok && singletonMode {
-		hasActive, err := s.runner.HasActiveJobs(ctx)
-		if err == nil && hasActive {
+		// 检查是否有该任务或其他任务正在运行
+		activeRuns, err := s.db.ListActiveRuns()
+		if err != nil {
+			return fmt.Errorf("单例模式：检查运行状态失败，%w", err)
+		}
+		for _, r := range activeRuns {
+			if r.TaskID == taskID && r.Status == "running" {
+				return fmt.Errorf("单例模式：该任务正在运行中，跳过本次执行")
+			}
+		}
+		// 检查是否有其他任务在运行
+		if len(activeRuns) > 0 {
 			return fmt.Errorf("单例模式：检测到有其他传输任务正在运行，跳过本次执行")
 		}
 	}
