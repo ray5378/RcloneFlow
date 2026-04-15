@@ -1,5 +1,7 @@
 # RcloneFlow
 
+[English](./README-en.md) | [中文](./README.md)
+
 RcloneFlow is a file sync management tool with scheduling, Webhook triggers, real-time progress tracking, and history management.
 
 ## Features

@@ -1,5 +1,7 @@
 # RcloneFlow
 
+[English](./README-en.md) | 中文
+
 RcloneFlow 是一个实用的文件同步管理工具，支持定时同步、Webhook 触发、实时进度查看和历史记录管理。
 
 ## 主要功能
