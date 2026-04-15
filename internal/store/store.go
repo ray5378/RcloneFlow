@@ -518,12 +518,18 @@ func (db *DB) TryAcquireRun(run *Run) (*Run, bool, error) {
 		return nil, true, nil // 已有任务在运行
 	}
 
+	// 序列化 Summary 为 JSON
+	summaryJSON, err := json.Marshal(run.Summary)
+	if err != nil {
+		return nil, false, err
+	}
+
 	// 插入新记录
 	_, err = db.db.Exec(`
 		INSERT INTO runs (task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
 		                 task_name, task_mode, source_remote, source_path, target_remote, target_path, bytes_transferred, speed)
 		VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?, ?, ?, ?, ?, 0, '')`,
-		run.TaskID, run.RcJobID, run.Status, run.Trigger, run.Summary, run.Error,
+		run.TaskID, run.RcJobID, run.Status, run.Trigger, string(summaryJSON), run.Error,
 		run.TaskName, run.TaskMode, run.SourceRemote, run.SourcePath, run.TargetRemote, run.TargetPath)
 	if err != nil {
 		return nil, false, err
