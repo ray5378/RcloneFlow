@@ -42,9 +42,9 @@ services:
     image: ray5378/rcloneflow:latest
     container_name: rcloneflow
     ports:
-      - "17871:17871"
+      - "17870:17870"
     environment:
-      - APP_ADDR=:17871
+      - APP_ADDR=:17870
       - APP_DATA_DIR=/app/data
     volumes:
       - ./data:/app/data
@@ -57,7 +57,12 @@ services:
 
 ### 访问界面
 
-打开浏览器访问 `http://<服务器IP>:17871`
+打开浏览器访问 `http://<服务器IP>:17870`
+
+### 默认账号
+
+- 用户名：`admin`
+- 密码：`admin`
 
 ## 界面说明
 

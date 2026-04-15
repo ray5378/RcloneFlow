@@ -78,7 +78,7 @@ docker build --no-cache -t ray5378/rcloneflow:dev .
 
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
-| APP_ADDR | :17871 | 服务地址 |
+| APP_ADDR | :17870 | 服务地址 |
 | APP_DATA_DIR | /app/data | 数据目录 |
 | LOG_LEVEL | info | 日志级别 |
 | PRECHECK_MODE | none | 预检模式 |
