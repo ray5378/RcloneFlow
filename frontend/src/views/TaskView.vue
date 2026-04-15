@@ -44,7 +44,7 @@ const filteredTasks = computed(() => {
 const remotes = ref<string[]>([])
 const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const historyFilterTaskId = ref<number | null>(null)
-const historyStatusFilter = ref<string>('all') // 'all' | 'finished' | 'failed' | 'skipped'
+const historyStatusFilter = ref<string>('all') // 'all' | 'finished' | 'failed' | 'skipped' | 'hasTransfer'
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
 // 运行中提示小窗（不切换主窗口，不弹出完整详情）
@@ -889,7 +889,12 @@ function toCamel(s: string){ return s.replace(/-([a-z])/g, (_,c)=>c.toUpperCase(
 // 过滤后的历史记录
 const filteredRuns = computed(() => {
   let result = historyFilterTaskId.value === null ? runs.value : runs.value.filter(r => r.taskId === historyFilterTaskId.value)
-  if (historyStatusFilter.value !== 'all') {
+  if (historyStatusFilter.value === 'hasTransfer') {
+    result = result.filter(r => {
+      const sum = getFinalSummary(r)
+      return sum && (sum.totalCount > 1 || sum.transferredBytes > 0)
+    })
+  } else if (historyStatusFilter.value !== 'all') {
     result = result.filter(r => r.status === historyStatusFilter.value)
   }
   return result
@@ -1522,6 +1527,7 @@ import TransferOptions from '../components/TransferOptions.vue'
         <button :class="['filter-btn', historyStatusFilter==='finished' && 'active']" @click="historyStatusFilter='finished'">成功</button>
         <button :class="['filter-btn', historyStatusFilter==='failed' && 'active']" @click="historyStatusFilter='failed'">失败</button>
         <button :class="['filter-btn', historyStatusFilter==='skipped' && 'active']" @click="historyStatusFilter='skipped'">跳过</button>
+        <button :class="['filter-btn', historyStatusFilter==='hasTransfer' && 'active']" @click="historyStatusFilter='hasTransfer'">有传输</button>
       </div>
       <div class="pagination" v-if="runsTotal > runsPageSize">
         <button class="page-btn" :disabled="runsPage <= 1" @click="runsPage--; loadData()">上一页</button>
