@@ -30,7 +30,7 @@ describe('run API', () => {
 
       const result = await getRuns()
 
-      expect(get).toHaveBeenCalledWith('/api/runs')
+      expect(get).toHaveBeenCalledWith('/api/runs?page=1&pageSize=50')
       expect(result).toEqual(mockRuns)
     })
   })
@@ -68,7 +68,7 @@ describe('run API', () => {
 
       const result = await getJobStatus(123)
 
-      expect(get).toHaveBeenCalledWith('/api/fs/jobStatus?jobId=123')
+      expect(get).toHaveBeenCalledWith('/api/jobs/123/status')
       expect(result).toEqual(mockStatus)
     })
   })
