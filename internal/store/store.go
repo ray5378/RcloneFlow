@@ -505,12 +505,16 @@ func (db *DB) ClearAllRunningStatus() error {
 // existed=true 表示已有任务在运行，run=nil
 // existed=false 表示成功创建，run 为新记录
 func (db *DB) TryAcquireRun(run *Run) (*Run, bool, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	// 使用 BEGIN EXCLUSIVE 事务确保跨实例原子性
+	tx, err := db.db.Begin()
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback()
 
 	// 检查是否有正在运行的任务
 	var count int
-	err := db.db.QueryRow(`SELECT COUNT(*) FROM runs WHERE status = 'running'`).Scan(&count)
+	err = tx.QueryRow(`SELECT COUNT(*) FROM runs WHERE status = 'running'`).Scan(&count)
 	if err != nil {
 		return nil, false, err
 	}
@@ -525,7 +529,7 @@ func (db *DB) TryAcquireRun(run *Run) (*Run, bool, error) {
 	}
 
 	// 插入新记录
-	_, err = db.db.Exec(`
+	_, err = tx.Exec(`
 		INSERT INTO runs (task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
 		                 task_name, task_mode, source_remote, source_path, target_remote, target_path, bytes_transferred, speed)
 		VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?, ?, ?, ?, ?, 0, '')`,
@@ -537,11 +541,16 @@ func (db *DB) TryAcquireRun(run *Run) (*Run, bool, error) {
 
 	// 获取刚插入的记录ID
 	var id int64
-	err = db.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&id)
+	err = tx.QueryRow(`SELECT last_insert_rowid()`).Scan(&id)
 	if err != nil {
 		return nil, false, err
 	}
 	run.ID = id
+
+	// 提交事务
+	if err = tx.Commit(); err != nil {
+		return nil, false, err
+	}
 	return run, false, nil
 }
 

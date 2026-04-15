@@ -895,7 +895,10 @@ async function stopTaskAny(taskId: number) {
 
 
 async function runTask(taskId: number) {
-  if (runningTaskId.value !== null) return
+  if (runningTaskId.value !== null) {
+    alert('已有任务正在运行，请等待完成后再试')
+    return
+  }
   runningTaskId.value = taskId
   try {
     await api.runTask(taskId)
