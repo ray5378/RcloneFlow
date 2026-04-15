@@ -4,6 +4,23 @@ import * as api from '../api'
 import { getToken } from '../api/auth'
 import type { Task, Schedule, Run } from '../types'
 
+// Toast 通知系统
+interface Toast {
+  id: number
+  message: string
+  type: 'info' | 'success' | 'error'
+}
+const toasts = ref<Toast[]>([])
+let toastId = 0
+
+function showToast(message: string, type: 'info' | 'success' | 'error' = 'info') {
+  const id = ++toastId
+  toasts.value.push({ id, message, type })
+  setTimeout(() => {
+    toasts.value = toasts.value.filter(t => t.id !== id)
+  }, 3000)
+}
+
 const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
 const runs = ref<Run[]>([])
@@ -123,7 +140,7 @@ async function saveWebhook(){
     showWebhookModal.value = false
     await loadData()
   }catch(e:any){
-    alert(e?.message||String(e))
+    showToast(e?.message||String(e), 'error')
   }
 }
 
@@ -151,7 +168,7 @@ async function saveSingleton(){
     showSingletonModal.value = false
     await loadData()
   }catch(e:any){
-    alert(e?.message||String(e))
+    showToast(e?.message||String(e), 'error')
   }
 }
 
@@ -183,7 +200,7 @@ async function testWebhook(){
   try{
     const url1 = (webhookForm.value.postUrl||'').trim()
     const url2 = String((webhookForm.value as any)['wecomUrl']||'').trim()
-    if (!url1 && !url2){ alert('请先填写对外 POST 地址或企业微信地址'); return }
+    if (!url1 && !url2){ showToast('请先填写对外 POST 地址或企业微信地址', 'error'); return }
     const payload:any = {
       title: 'RcloneFlow 测试通知',
       triggerZh: '测试',
@@ -210,9 +227,9 @@ async function testWebhook(){
     const fails:string[] = []
     if (url1){ try{ await send(url1) } catch(e:any){ fails.push(`通用: ${e?.message||e}`) } }
     if (url2){ try{ await send(url2) } catch(e:any){ fails.push(`企业微信: ${e?.message||e}`) } }
-    if (fails.length){ alert(`测试部分失败：${fails.join('；')}`) } else { alert('测试通知已发送（请在接收端查看）') }
+    if (fails.length){ showToast(`测试部分失败：${fails.join('；')}`, 'error') } else { showToast('测试通知已发送（请在接收端查看）', 'success') }
   }catch(e:any){
-    alert(`测试发送失败：${e?.message||e}`)
+    showToast(`测试发送失败：${e?.message||e}`, 'error')
   }
 }
 
@@ -731,7 +748,7 @@ async function createTask() {
   }
 
   if (!createForm.value.name) {
-    alert('请输入任务名称')
+    showToast('请输入任务名称', 'error')
     return
   }
 
@@ -746,13 +763,13 @@ async function createTask() {
       createForm.value.targetPath = parsed.dst.path
       createForm.value.options = { ...normalizeTaskOptions(createForm.value.options), ...parsed.options }
     } catch (e) {
-      alert('命令解析失败：' + (e as Error).message)
+      showToast('命令解析失败：' + (e as Error).message, 'error')
       return
     }
   }
 
   if (!createForm.value.sourceRemote || !createForm.value.targetRemote) {
-    alert('请选择源和目标存储')
+    showToast('请选择源和目标存储', 'error')
     return
   }
 
@@ -812,7 +829,7 @@ async function createTask() {
     creatingState.value = 'done'
   } catch (e) {
     creatingState.value = 'idle'
-    alert((e as Error).message)
+    showToast((e as Error).message, 'error')
   }
 }
 
@@ -889,14 +906,14 @@ async function stopTaskAny(taskId: number) {
     await loadData()
   } catch (e) {
     stoppedTaskId.value = null
-    alert((e as Error).message)
+    showToast((e as Error).message, 'error')
   }
 }
 
 
 async function runTask(taskId: number) {
   if (runningTaskId.value !== null) {
-    alert('单例模式：已有任务正在运行，跳过本次执行')
+    showToast('单例模式：已有任务正在运行，跳过本次执行', 'error')
     return
   }
   runningTaskId.value = taskId
@@ -910,7 +927,7 @@ async function runTask(taskId: number) {
     }, 5000)
   } catch (e) {
     runningTaskId.value = null
-    alert((e as Error).message)
+    showToast((e as Error).message, 'error')
   }
 }
 
@@ -1011,7 +1028,7 @@ async function deleteTask(id: number) {
       openMenuId.value = null
       await loadData()
     } catch (e) {
-      alert((e as Error).message)
+      showToast((e as Error).message, 'error')
     }
   })
 }
@@ -1027,7 +1044,7 @@ async function toggleSchedule(taskId: number) {
     await api.updateSchedule(schedule.id, !schedule.enabled)
     await loadData()
   } catch (e) {
-    alert((e as Error).message)
+    showToast((e as Error).message, 'error')
   }
 }
 
@@ -1058,7 +1075,7 @@ async function deleteSchedule(id: number) {
     await api.deleteSchedule(id)
     await loadData()
   } catch (e) {
-    alert((e as Error).message)
+    showToast((e as Error).message, 'error')
   }
 }
 
@@ -1151,13 +1168,13 @@ async function clearRun(id: number) {
     await api.clearRun(id)
     await loadData()
   } catch (e) {
-    alert((e as Error).message)
+    showToast((e as Error).message, 'error')
   }
 }
 
 async function clearAllRuns() {
   if (historyFilterTaskId.value === null) {
-    alert('请先选择任务')
+    showToast('请先选择任务', 'error')
     return
   }
   showConfirm('删除所有历史', '确定删除该任务所有历史记录？此操作不可恢复！', async () => {
@@ -1165,7 +1182,7 @@ async function clearAllRuns() {
       await api.clearRunsByTask(historyFilterTaskId.value)
       await loadData()
     } catch (e) {
-      alert((e as Error).message)
+      showToast((e as Error).message, 'error')
     }
   })
 }
@@ -1306,6 +1323,13 @@ import TransferOptions from '../components/TransferOptions.vue'
 
 
 <template>
+  <!-- Toast 通知容器 -->
+  <div class="toast-container">
+    <div v-for="toast in toasts" :key="toast.id" :class="['toast', toast.type]">
+      {{ toast.message }}
+    </div>
+  </div>
+
   <div v-if="currentModule === 'tasks'" class="card">
     <div class="card-header">
       <div class="title">任务列表</div>
@@ -2367,5 +2391,32 @@ body.light .page-input{ background:#fff; color:#111827; border-color:#ddd }
   .task-main .item-actions button {
     min-width: 0;
   }
+}
+
+/* Toast 通知 */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  min-width: 200px;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: slideIn 0.2s ease;
+}
+.toast.info { background: #3b82f6; color: #fff; }
+.toast.success { background: #10b981; color: #fff; }
+.toast.error { background: #ef4444; color: #fff; }
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 </style>
