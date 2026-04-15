@@ -155,14 +155,26 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		TargetPath:   t.TargetPath,
 	}
 
-	// 单例模式：使用原子操作
+	// 单例模式：使用原子操作，只检查同一任务是否在运行
 	if isSingleton && singletonMode {
-		run, existed, err := s.db.TryAcquireRun(&newRun)
-		if err != nil {
-			return fmt.Errorf("单例模式：申请运行记录失败，%w", err)
+		// 先检查这个任务是否已经在运行
+		existingRun, err := s.db.GetActiveRunByTaskID(taskID)
+		if err == nil && existingRun.ID > 0 {
+			return fmt.Errorf("单例模式：该任务正在运行中，跳过本次执行")
 		}
-		if existed {
-			return fmt.Errorf("单例模式：检测到有其他传输任务正在运行，跳过本次执行")
+		// 检查是否有同名任务在运行
+		activeRuns, err := s.db.ListActiveRuns()
+		if err == nil {
+			for _, r := range activeRuns {
+				if r.TaskID == taskID && r.Status == "running" {
+					return fmt.Errorf("单例模式：该任务正在运行中，跳过本次执行")
+				}
+			}
+		}
+		// 创建运行记录
+		run, err := s.db.AddRun(newRun)
+		if err != nil {
+			return err
 		}
 		// 成功创建记录，run 已填充
 		// 合并全局传输设置
@@ -176,7 +188,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		}
 		// 异步启动任务
 		go func() {
-			_ = runnercli.New(s.db).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+			_ = runnercli.New(s.db).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
 		}()
 		return nil
 	}
