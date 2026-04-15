@@ -182,6 +182,7 @@ func (db *DB) migrate() error {
 				
 				CREATE INDEX IF NOT EXISTS idx_runs_task_id ON runs(task_id);
 				CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at);
+				CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
 				CREATE INDEX IF NOT EXISTS idx_schedules_task_id ON schedules(task_id);
 			`,
 		},
@@ -443,20 +444,30 @@ func (db *DB) UpdateScheduleSpec(id int64, spec string) error {
 
 // ===== Runs =====
 
-func (db *DB) ListRuns() ([]Run, error) {
+func (db *DB) ListRuns(page, pageSize int) ([]Run, int, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
+	// 获取总数
+	var total int
+	err := db.db.QueryRow(`SELECT COUNT(*) FROM runs`).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 分页查询
+	offset := (page - 1) * pageSize
 	rows, err := db.db.Query(`
 		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
-		FROM runs ORDER BY id DESC LIMIT 100`)
+		FROM runs ORDER BY id DESC LIMIT ? OFFSET ?`, pageSize, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
-	return db.scanRuns(rows)
+	runs, err := db.scanRuns(rows)
+	return runs, total, err
 }
 
 func (db *DB) ListRunsByTask(taskID int64) ([]Run, error) {

@@ -25,6 +25,9 @@ const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
 const runs = ref<Run[]>([])
 const taskSearch = ref('')
+const runsTotal = ref(0)
+const runsPage = ref(1)
+const runsPageSize = 50
 
 // 过滤后的任务列表
 const filteredTasks = computed(() => {
@@ -442,18 +445,21 @@ let loadSeq = 0
 async function loadData() {
   const seq = ++loadSeq
   try {
-    const [taskData, remoteData, scheduleData, runData] = await Promise.all([
+    const [taskData, remoteData, scheduleData, runResult] = await Promise.all([
       api.listTasks(),
       api.listRemotes(),
       api.listSchedules(),
-      api.listRuns(),
+      api.listRuns(runsPage.value, runsPageSize),
     ])
     if (seq !== loadSeq) return // 只接受最新一轮
     // 防御：只有明确有数据才更新，防止空数据覆盖
     if (Array.isArray(taskData) && taskData.length > 0) tasks.value = taskData
     if (Array.isArray(remoteData?.remotes) && remoteData.remotes.length > 0) remotes.value = remoteData.remotes
     if (Array.isArray(scheduleData) && scheduleData.length > 0) schedules.value = scheduleData
-    if (Array.isArray(runData) && runData.length > 0) runs.value = runData
+    if (runResult?.runs) {
+      runs.value = runResult.runs
+      runsTotal.value = runResult.total
+    }
     // 本地快照：成功后保存
     try { localStorage.setItem('lastTasksSnapshot', JSON.stringify(tasks.value||[])) } catch {}
   } catch (e:any) {
@@ -1516,6 +1522,11 @@ import TransferOptions from '../components/TransferOptions.vue'
         <button :class="['filter-btn', historyStatusFilter==='finished' && 'active']" @click="historyStatusFilter='finished'">成功</button>
         <button :class="['filter-btn', historyStatusFilter==='failed' && 'active']" @click="historyStatusFilter='failed'">失败</button>
         <button :class="['filter-btn', historyStatusFilter==='skipped' && 'active']" @click="historyStatusFilter='skipped'">跳过</button>
+      </div>
+      <div class="pagination" v-if="runsTotal > runsPageSize">
+        <button class="page-btn" :disabled="runsPage <= 1" @click="runsPage--; loadData()">上一页</button>
+        <span class="page-info">{{ runsPage }} / {{ Math.ceil(runsTotal / runsPageSize) }}</span>
+        <button class="page-btn" :disabled="runsPage * runsPageSize >= runsTotal" @click="runsPage++; loadData()">下一页</button>
       </div>
       <div class="header-actions">
         <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click="clearAllRuns">删除所有</button>

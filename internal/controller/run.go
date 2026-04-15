@@ -138,7 +138,21 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	runs, err := c.runSvc.ListRuns()
+	// 解析分页参数
+	page := 1
+	pageSize := 50
+	if p := r.URL.Query().Get("page"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil && v > 0 {
+			page = v
+		}
+	}
+	if ps := r.URL.Query().Get("pageSize"); ps != "" {
+		if v, err := strconv.Atoi(ps); err == nil && v > 0 && v <= 100 {
+			pageSize = v
+		}
+	}
+
+	runs, total, err := c.runSvc.ListRuns(page, pageSize)
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
@@ -214,7 +228,12 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, obj)
 	}
-	WriteJSON(w, 200, out)
+	WriteJSON(w, 200, map[string]any{
+		"runs": out,
+		"total": total,
+		"page": page,
+		"pageSize": pageSize,
+	})
 }
 
 // HandleRunsByTask 处理按任务ID删除历史记录
