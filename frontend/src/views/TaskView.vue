@@ -2,6 +2,9 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
 import { TaskCard, RunItem } from '../components/task'
+import { ToastItem } from '../components/toast'
+import { FileItem } from '../components/files'
+import { PathItem } from '../components/path'
 import { taskApi, remoteApi, runApi, queueApi, jobApi } from '../composables/useApi'
 import { handleError, showSuccess } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
@@ -1320,9 +1323,7 @@ import TransferOptions from '../components/TransferOptions.vue'
 <template>
   <!-- Toast 通知容器 -->
   <div class="toast-container">
-    <div v-for="toast in toasts" :key="toast.id" :class="['toast', toast.type]">
-      {{ toast.message }}
-    </div>
+    <ToastItem v-for="toast in toasts" :key="toast.id" :toast="toast" />
   </div>
 
   <div v-if="currentModule === 'tasks'" class="card">
@@ -1591,20 +1592,10 @@ import TransferOptions from '../components/TransferOptions.vue'
                 </div>
                 <div class="files-body">
                   <template v-if="finalFiles && finalFiles.length">
-                    <div v-for="it in pagedFinalFiles" :key="(it.path||it.name) + (it.at||'') + (it.status||'')" class="files-row">
-                      <span class="name" :title="it.path||it.name">{{ ((it.path || it.name || '').replace(/\\/g,'/').split('/').pop()) }}</span>
-                      <span class="status" :class="it.status">{{ it.status }}</span>
-                      <span class="time">{{ it.at || '-' }}</span>
-                      <span class="size">{{ it.sizeBytes ? formatBytes(it.sizeBytes) : '-' }}</span>
-                    </div>
+                    <FileItem v-for="it in pagedFinalFiles" :key="(it.path||it.name) + (it.at||'') + (it.status||'')" :item="it" />
                   </template>
                   <template v-else>
-                    <div v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" class="files-row">
-                      <span class="name" :title="it.name">{{ it.name }}</span>
-                      <span class="status" :class="it.status">{{ it.status }}</span>
-                      <span class="time">{{ it.at || '-' }}</span>
-                      <span class="size">{{ it.sizeBytes ? formatBytes(it.sizeBytes) : '-' }}</span>
-                    </div>
+                    <FileItem v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" :item="it" />
                     <div v-if="!pagedRunFiles.length" class="path-empty">无明细（可能日志为空或历史记录较旧）</div>
                   </template>
                 </div>
@@ -1688,11 +1679,13 @@ import TransferOptions from '../components/TransferOptions.vue'
               <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onSourceClick(item)">
-                <span v-if="item.IsDir" class="folder-icon" @click.stop="onSourceArrow(item)">📁</span>
-                <span v-else class="file-icon">📄</span>
-                <span class="item-name">{{ item.Name }}</span>
-              </div>
+              <PathItem 
+                v-for="item in sourcePathOptions" 
+                :key="item.Path" 
+                :item="item"
+                @click="onSourceClick(item)"
+                @arrow-click="onSourceArrow(item)"
+              />
               <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
             </div>
           </div>
@@ -1717,11 +1710,13 @@ import TransferOptions from '../components/TransferOptions.vue'
               <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
             </div>
             <div class="path-list">
-              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onTargetClick(item)">
-                <span v-if="item.IsDir" class="folder-icon" @click.stop="onTargetArrow(item)">📁</span>
-                <span v-else class="file-icon">📄</span>
-                <span class="item-name">{{ item.Name }}</span>
-              </div>
+              <PathItem 
+                v-for="item in targetPathOptions" 
+                :key="item.Path" 
+                :item="item"
+                @click="onTargetClick(item)"
+                @arrow-click="onTargetArrow(item)"
+              />
               <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
             </div>
           </div>
