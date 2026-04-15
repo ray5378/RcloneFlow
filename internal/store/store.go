@@ -500,6 +500,45 @@ func (db *DB) ClearAllRunningStatus() error {
 	return err
 }
 
+// TryAcquireRun 尝试原子性地创建运行记录（单例模式用）
+// 返回 (run, existed, error)
+// existed=true 表示已有任务在运行，run=nil
+// existed=false 表示成功创建，run 为新记录
+func (db *DB) TryAcquireRun(run *Run) (*Run, bool, error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	// 检查是否有正在运行的任务
+	var count int
+	err := db.db.QueryRow(`SELECT COUNT(*) FROM runs WHERE status = 'running'`).Scan(&count)
+	if err != nil {
+		return nil, false, err
+	}
+	if count > 0 {
+		return nil, true, nil // 已有任务在运行
+	}
+
+	// 插入新记录
+	_, err = db.db.Exec(`
+		INSERT INTO runs (task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		                 task_name, task_mode, source_remote, source_path, target_remote, target_path, bytes_transferred, speed)
+		VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?, ?, ?, ?, ?, 0, '')`,
+		run.TaskID, run.RcJobID, run.Status, run.Trigger, run.Summary, run.Error,
+		run.TaskName, run.TaskMode, run.SourceRemote, run.SourcePath, run.TargetRemote, run.TargetPath)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// 获取刚插入的记录ID
+	var id int64
+	err = db.db.QueryRow(`SELECT last_insert_rowid()`).Scan(&id)
+	if err != nil {
+		return nil, false, err
+	}
+	run.ID = id
+	return run, false, nil
+}
+
 // GetActiveRunByTaskID 获取任务当前运行中的记录
 func (db *DB) GetActiveRunByTaskID(taskID int64) (Run, error) {
 	db.mu.Lock()
