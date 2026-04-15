@@ -25,7 +25,7 @@ type RunRecord struct {
 
 // RunServiceInterface 运行记录服务接口
 type RunServiceInterface interface {
-	ListRuns() ([]RunRecord, error)
+	ListRuns(page, pageSize int) ([]RunRecord, int, error)
 	ListRunsByTask(taskId int64) ([]RunRecord, error)
 	ListActiveRuns() ([]RunRecord, error)
 	GetActiveRunByTaskID(taskID int64) (RunRecord, error)
@@ -47,9 +47,9 @@ func NewRunService(db RunServiceInterface) *RunService {
 	return &RunService{db: db}
 }
 
-// ListRuns 获取所有运行记录
-func (s *RunService) ListRuns() ([]RunRecord, error) {
-	return s.db.ListRuns()
+// ListRuns 获取所有运行记录（分页）
+func (s *RunService) ListRuns(page, pageSize int) ([]RunRecord, int, error) {
+	return s.db.ListRuns(page, pageSize)
 }
 
 func (s *RunService) ListRunsByTask(taskId int64) ([]RunRecord, error) {

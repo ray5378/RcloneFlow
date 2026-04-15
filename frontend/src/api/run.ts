@@ -18,9 +18,9 @@ export async function getRunFiles(runId: number, offset=0, limit=50): Promise<{ 
   return get<{ total:number; items: RunFileRow[] }>(`/api/runs/${runId}/files?offset=${offset}&limit=${limit}`)
 }
 
-/** 获取所有运行记录 */
-export async function getRuns(): Promise<Run[]> {
-  return get<Run[]>('/api/runs')
+/** 获取所有运行记录（分页） */
+export async function getRuns(page = 1, pageSize = 50): Promise<{ runs: Run[], total: number, page: number, pageSize: number }> {
+  return get<{ runs: Run[], total: number, page: number, pageSize: number }>(`/api/runs?page=${page}&pageSize=${pageSize}`)
 }
 
 /** 获取单个运行记录 */
