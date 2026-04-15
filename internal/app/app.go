@@ -48,6 +48,11 @@ func Run(cfg *config.Config) error {
 	// 初始化rclone客户端
 	rc := rclone.NewFromEnv()
 
+	// 清空所有运行状态（容器重启后恢复，防止单例模式误判）
+	if err := db.ClearAllRunningStatus(); err != nil {
+		logger.Warn("清空运行状态失败", zap.Error(err))
+	}
+
 	// 初始化服务层（定时任务采用 TaskService 以使用 CLI Runner，确保产生日志 stderrFile）
 	taskSvc := service.NewTaskService(db, rc)
 	scheduleSvc := service.NewScheduleService(db)

@@ -491,6 +491,15 @@ func (db *DB) ListActiveRuns() ([]Run, error) {
 	return db.scanRuns(rows)
 }
 
+// ClearAllRunningStatus 清空所有运行状态（容器重启后恢复时调用）
+func (db *DB) ClearAllRunningStatus() error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	_, err := db.db.Exec(`UPDATE runs SET status = 'stopped', finished_at = datetime('now') WHERE status = 'running'`)
+	return err
+}
+
 // GetActiveRunByTaskID 获取任务当前运行中的记录
 func (db *DB) GetActiveRunByTaskID(taskID int64) (Run, error) {
 	db.mu.Lock()
