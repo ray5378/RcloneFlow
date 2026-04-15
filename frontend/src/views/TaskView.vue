@@ -41,7 +41,7 @@ const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
 const showGlobalStatsModal = ref(false)
 const globalStats = ref<any>({}) // 全局实时数据保留为独立弹窗，与历史态无关
-// 已移除“实时进度”弹窗逻辑，卡片直接显示稳态进度
+// 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度
 
 const activeRuns = ref<any[]>([])
 // 任务卡片：完成后保留最近稳态进度的观察期（默认 15s）
@@ -140,7 +140,7 @@ function buildWecomMarkdown(p:any){
   const bytesFmt = formatBytes(Number(s.totalBytes||0))
   const txFmt = formatBytes(Number(s.transferredBytes||0))
   const spFmt = formatBytesPerSec(Number(s.avgSpeedBps||0))
-  const dur = p?.run?.durationText || '—'
+  const dur = p?.run?.durationText || '-'
   let md = `**任务** <font color="info">${taskName}</font> 已${statusZh}（${triggerZh}）\n`
   md += `> 总计: ${total}  ${okLabel}: ${ok}  失败: ${fail}  其他: ${skipped}\n`
   md += `> 体积: ${bytesFmt} / 已传: ${txFmt}\n`
@@ -246,7 +246,7 @@ function pickFilesFromRun(run:any){
 
 function showRunDetail(run:any){
   if (run.status === 'running'){
-    // 不切主窗口：给出轻量提示小窗，引导去“任务日志”查看实时内容
+    // 不切主窗口：给出轻量提示小窗，引导去"任务日志"查看实时内容
     runningHintRun.value = run
     showRunningHint.value = true
     return
@@ -281,7 +281,7 @@ const finalCountSuccess = computed(()=> finalFiles.value.filter(it=> (it.status|
 const finalCountFailed = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='failed').length)
 const finalCountOther = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='skipped').length)
 // move 模式时，成功数量代表 Moved 条数；已在后端合并 Copied+Deleted 为 Moved
-// 预估总数（preflight），用于“需完成多少”
+// 预估总数（preflight），用于"需完成多少"
 function getPreflight(run:any){
   try{
     const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
@@ -470,7 +470,7 @@ function getDbProgressStable(run:any){
   return db || null
 }
 
-// 历史“运行中”卡片也使用任务卡片的抗噪稳态：优先 lastStableByTask，再回退 DB
+// 历史"运行中"卡片也使用任务卡片的抗噪稳态：优先 lastStableByTask，再回退 DB
 function getDeNoisedStableByRun(run:any){
   try{
     const tid = run?.taskId as number
@@ -507,29 +507,29 @@ function calcEtaForTaskCard(taskId:number){
 
 // 抗噪稳态读取（任务卡片用）：优先 lastStableByTask，再回退当前 active 的 stableProgress
 function getDeNoisedStableByTask(taskId:number){
-  try{
-    const raw = lastStableByTask.value?.[taskId]?.sp || getActiveRunByTaskId(taskId)?.stableProgress
-    if (!raw) return raw as any
-    // clone & normalize for UI
-    const st:any = { ...raw }
-    const totalBytes = Number(st.totalBytes || 0)
-    const bytes = Number(st.bytes || 0)
-    const totalCount = Number(st.totalCount || 0)
-    const completedFiles = Number(st.completedFiles || 0)
-    let pct = Number(st.percentage || 0)
-    // clamp bytes within [0,totalBytes]
-    if (totalBytes > 0) st.bytes = Math.min(bytes, totalBytes)
-    // when near 100% or files已达总数，钳制为完成，避免“卡最后1个”错觉
-    if ((totalCount > 0 && completedFiles >= totalCount) || pct >= 99.999) {
-      st.completedFiles = totalCount > 0 ? totalCount : completedFiles
-      st.percentage = 100
-    } else {
-      // also cap percentage at 100
-      st.percentage = Math.min(100, pct)
-    }
-    return st
-  }catch{}
-  return getActiveRunByTaskId(taskId)?.stableProgress
+  // 只返回活跃任务的进度，不返回已完成的数据
+  const active = getActiveRunByTaskId(taskId)
+  if (!active) return null
+  const raw = active.stableProgress
+  if (!raw) return null
+  // clone & normalize for UI
+  const st:any = { ...raw }
+  const totalBytes = Number(st.totalBytes || 0)
+  const bytes = Number(st.bytes || 0)
+  const totalCount = Number(st.totalCount || 0)
+  const completedFiles = Number(st.completedFiles || 0)
+  let pct = Number(st.percentage || 0)
+  // clamp bytes within [0,totalBytes]
+  if (totalBytes > 0) st.bytes = Math.min(bytes, totalBytes)
+  // when near 100% or files已达总数，钳制为完成，避免"卡最后1个"错觉
+  if ((totalCount > 0 && completedFiles >= totalCount) || pct >= 99.999) {
+    st.completedFiles = totalCount > 0 ? totalCount : completedFiles
+    st.percentage = 100
+  } else {
+    // also cap percentage at 100
+    st.percentage = Math.min(100, pct)
+  }
+  return st
 }
 
 
@@ -602,7 +602,7 @@ function getLiveSummaryFromDB(run:any){
       const speed = Number(p.speed || 0)
       let percentage = Number(p.percentage || 0)
       if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
-      // 补充实时“已传输数量”：优先 progress.completedFiles，其次 stableProgress.completedFiles
+      // 补充实时"已传输数量"：优先 progress.completedFiles，其次 stableProgress.completedFiles
       const completedFiles = Number(p.completedFiles ?? sum?.stableProgress?.completedFiles ?? 0)
       return { bytes, totalBytes, speed, percentage, completedFiles }
     }
@@ -620,8 +620,8 @@ function getLiveSummaryFromDB(run:any){
   }catch{}
   return null
 }
-// 以“开始时间 + 平均速度”计算更稳健的 ETA（剩余时间，秒）
-// 预估完成：使用“固定总量（preflight.totalBytes）- 抗噪后的已传 bytes” / 抗噪后的速度
+// 以"开始时间 + 平均速度"计算更稳健的 ETA（剩余时间，秒）
+// 预估完成：使用"固定总量（preflight.totalBytes）- 抗噪后的已传 bytes" / 抗噪后的速度
 const lastNonZeroSpeedByTask: Record<number, number> = {}
 function calcEtaFromAvg(run:any, live:any){
   try{
@@ -669,13 +669,13 @@ function getStatusText(status: string) {
   }
 }
 
-// 当某任务的稳定进度达 100% 附近时，触发一次“延迟刷新”，拉取最终状态
+// 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
 let refreshLocks: Record<number, boolean> = {}
 async function triggerAutoRefresh(taskId: number){
   if (refreshLocks[taskId]) return ''
   refreshLocks[taskId] = true
   try{
-    // 达到 100% 后等待 20 秒再刷新，给用户留出“完成”可视停留时间
+    // 达到 100% 后等待 20 秒再刷新，给用户留出"完成"可视停留时间
     await new Promise(r=>setTimeout(r, 20000))
     await Promise.all([loadActiveRuns(), loadData()])
     // 兜底：再延迟 1s 后再拉一次，避免偶发落库延迟卡一帧
@@ -852,7 +852,7 @@ async function stopTaskAny(taskId: number) {
     if (cur?.runRecord?.rcJobId) {
       await api.stopJob(cur.runRecord.rcJobId)
     }
-    // 按钮状态反馈：红色“已经停止”，10秒后恢复
+    // 按钮状态反馈：红色"已经停止"，10秒后恢复
     stoppedTaskId.value = taskId
     setTimeout(()=>{ if (stoppedTaskId.value===taskId) stoppedTaskId.value=null }, 10000)
     // 轻量刷新列表
@@ -895,10 +895,10 @@ async function goToAddTask() {
 
 function editTask(task: Task) {
   editingTask.value = task
-  
+
   // 查找该任务的定时规则
   const schedule = getScheduleByTaskId(task.id)
-  
+
   if (schedule) {
     // 解析 spec: minute|hour|day|month|week
     const parts = schedule.spec.split('|')
@@ -943,7 +943,7 @@ function editTask(task: Task) {
     }
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
   }
-  
+
   // 加载源路径选项 - 加载父目录以便显示文件
   if (task.sourceRemote) {
     const parentPath = getParentPath(task.sourcePath || '')
@@ -1002,11 +1002,11 @@ function formatScheduleSpec(spec: string): string {
   if (!spec) return ''
   const parts = spec.split('|')
   if (parts.length !== 5) return spec
-  
+
   // 标准cron格式: minute hour day month week
   // 例如: "43|17,19|*|**|*" 显示为 "43 17,19 * * *"
   const [minute, hour, day, month, week] = parts
-  
+
   // 显示为标准cron格式
   return `${minute} ${hour} ${day} ${month} ${week}`
 }
@@ -1043,7 +1043,7 @@ function formatSummary(summary: any): string {
     }
   }
   if (typeof summary !== 'object') return String(summary)
-  
+
   const parts: string[] = []
   const hp = historyProgressFromSummary(summary)
   if (hp){
@@ -1306,8 +1306,8 @@ import TransferOptions from '../components/TransferOptions.vue'
             <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
               {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭定时' : '▶ 开启定时' }}
             </button>
-            <button 
-              class="ghost small" 
+            <button
+              class="ghost small"
               :class="{ 'btn-running': runningTaskId === task.id }"
               :disabled="runningTaskId === task.id"
               @click.stop="runTask(task.id)"
@@ -1440,7 +1440,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="trigger-tag" v-else-if="run.trigger === 'webhook'">Webhook</span>
           <span class="trigger-tag" v-else>手动</span>
         </div>
-        <span 
+        <span
           :class="['status', getStatusClass(run.status), 'clickable']"
           @click="showRunDetail(run)"
         >{{ getStatusText(run.status) }}</span>
@@ -1455,10 +1455,10 @@ import TransferOptions from '../components/TransferOptions.vue'
           <template v-if="(getDbProgressStable(run) as any) && true">
             <span class="chip">进度 {{ ((getDeNoisedStableByRun(run) as any)?.percentage||0).toFixed(2) }}%</span>
             <span class="chip meta">速度 {{ formatBytesPerSec((getDeNoisedStableByRun(run) as any)?.speed || 0) }}</span>
-            <!-- 移除“总量/已传”冗余，统一用“总体积/已传输” -->
+            <!-- 移除"总量/已传"冗余，统一用"总体积/已传输" -->
             <span class="chip meta" v-if="calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))">预估完成 {{ formatEta(calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))||0) }}</span>
             <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDeNoisedStableByRun(run) as any)?.bytes || 0) }}</span></span>
-            <!-- 仅保留“总数量/已传输数量”，去掉“总量/已传”重复口径 -->
+            <!-- 仅保留"总数量/已传输数量"，去掉"总量/已传"重复口径 -->
             <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount || 0 }}</span> ／ <span class="act">已传输 {{ (getDeNoisedStableByRun(run) as any)?.completedFiles || 0 }}</span></span>
           </template>
         </div>
@@ -1468,7 +1468,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
           <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
           <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
-          <!-- 总数量/已传输、总体积/已传输（仅保留总体积，不再重复“总量”） -->
+          <!-- 总数量/已传输、总体积/已传输（仅保留总体积，不再重复"总量"） -->
 
           <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span></span>
           <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
@@ -1636,7 +1636,7 @@ import TransferOptions from '../components/TransferOptions.vue'
       </div>
       <div class="modal-body">
         <p>该任务仍在传输中，运行详情（历史）仅展示最终信息。</p>
-        <p>实时日志与进度请点击“传输日志”或查看任务卡片上的实时进度。</p>
+        <p>实时日志与进度请点击"传输日志"或查看任务卡片上的实时进度。</p>
         <div class="hint-box">
           <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
           <div class="detail-item"><label>阶段：</label><span>{{ getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.phase || '-' }}</span></div>
@@ -1659,7 +1659,7 @@ import TransferOptions from '../components/TransferOptions.vue'
           <span style="margin-left:8px">命令行模式（可粘贴 rclone 命令）</span>
         </label>
         <textarea v-if="commandMode" v-model="commandText" class="cmd-textarea" rows="4" placeholder='例如: rclone copy FNOS:/HDD/media openlist:/影音媒体/天翼5050 --bwlimit "07:30,2M;17:40,2M;23:00,2M" --use-server-modtime --size-only --verbose --transfers 2'></textarea>
-        <p v-if="commandMode" class="hint">保存时将自动解析命令，填充“模式/源/目标/选项”。任务名称仍需手动填写。</p>
+        <p v-if="commandMode" class="hint">保存时将自动解析命令，填充"模式/源/目标/选项"。任务名称仍需手动填写。</p>
       </div>
       <div class="field-item">
         <label>任务名称 <span style="color: #dc2626">*</span></label>
@@ -1972,8 +1972,8 @@ import TransferOptions from '../components/TransferOptions.vue'
       </div>
 
       <div class="form-actions">
-        <button 
-          class="primary" 
+        <button
+          class="primary"
           :class="{ 'btn-success': creatingState === 'done' }"
           :disabled="creatingState === 'loading'"
           @click="createTask"
