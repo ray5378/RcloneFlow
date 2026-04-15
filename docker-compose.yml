@@ -1,37 +1,22 @@
-version: "3.8"
 services:
-  rclone:
-    image: rclone/rclone:latest
-    container_name: rclone
-    restart: always
-    command:
-      - rcd
-      - --rc-addr=:5572
-      - --rc-user=你的用户名
-      - --rc-pass=你的密码
-      - --config=/config/rclone/rclone.conf
-      - --log-level=INFO
-    ports:
-      - "5572:5572"
-    volumes:
-      - /path/to/rclone/config:/config/rclone
-      - /path/to/rclone/cache:/root/.cache/rclone
-    environment:
-      - TZ=Asia/Shanghai
-
   rcloneflow:
     image: ray5378/rcloneflow:latest
+    platform: linux/amd64
     container_name: rcloneflow
-    restart: always
-    ports:
-      - "17870:17870"
-    volumes:
-      - ./data:/app/data
     environment:
       - TZ=Asia/Shanghai
       - APP_ADDR=:17870
-      - RCLONE_RC_URL=http://rclone:5572
-      - RCLONE_RC_USER=你的用户名
-      - RCLONE_RC_PASS=你的密码
-    depends_on:
-      - rclone
+      - APP_DATA_DIR=/app/data
+      - RCLONE_CONFIG=/app/data/rclone.conf
+      # 内置 RC（用于 remotes/providers/config/browser）
+      - EMBED_RC=true
+      - RCLONE_RC_URL=http://127.0.0.1:5572
+      - RCLONE_RC_USER=rc
+      - RCLONE_RC_PASS=rcpass
+      # 日志级别：debug|info|warn|error
+      - LOG_LEVEL=info
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "17870:17870"
+    restart: always
