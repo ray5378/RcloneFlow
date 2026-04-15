@@ -1540,7 +1540,8 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip meta">速度 {{ formatBytesPerSec((getDeNoisedStableByRun(run) as any)?.speed || 0) }}</span>
             <!-- 移除"总量/已传"冗余，统一用"总体积/已传输" -->
             <span class="chip meta" v-if="calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))">预估完成 {{ formatEta(calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))||0) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDeNoisedStableByRun(run) as any)?.bytes || 0) }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总体积 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span>
+            <span class="chip meta">已传输 {{ formatBytes((getDeNoisedStableByRun(run) as any)?.bytes || 0) }}</span>
             <!-- 仅保留"总数量/已传输数量"，去掉"总量/已传"重复口径 -->
             <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount || 0 }}</span> ／ <span class="act">已传输 {{ (getDeNoisedStableByRun(run) as any)?.completedFiles || 0 }}</span></span>
           </template>
@@ -1558,7 +1559,8 @@ import TransferOptions from '../components/TransferOptions.vue'
             <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
             <!-- 总数量/已传输、总体积/已传输（仅保留总体积，不再重复"总量"） -->
 
-            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span></span>
+            <span class="chip meta" v-if="getPreflight(run)">总体积 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span>
+            <span class="chip meta">已传输 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span>
             <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
           </template>
         </div>
