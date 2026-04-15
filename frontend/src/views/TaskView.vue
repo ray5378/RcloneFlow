@@ -402,10 +402,11 @@ async function loadData() {
       api.listRuns(),
     ])
     if (seq !== loadSeq) return // 只接受最新一轮
-    tasks.value = taskData?.length ? taskData : tasks.value
-    remotes.value = remoteData?.remotes?.length ? remoteData.remotes : remotes.value
-    schedules.value = scheduleData?.length ? scheduleData : schedules.value
-    runs.value = runData?.length ? runData : runs.value
+    // 防御：只有明确有数据才更新，防止空数据覆盖
+    if (Array.isArray(taskData) && taskData.length > 0) tasks.value = taskData
+    if (Array.isArray(remoteData?.remotes) && remoteData.remotes.length > 0) remotes.value = remoteData.remotes
+    if (Array.isArray(scheduleData) && scheduleData.length > 0) schedules.value = scheduleData
+    if (Array.isArray(runData) && runData.length > 0) runs.value = runData
     // 本地快照：成功后保存
     try { localStorage.setItem('lastTasksSnapshot', JSON.stringify(tasks.value||[])) } catch {}
   } catch (e:any) {
