@@ -155,21 +155,12 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		TargetPath:   t.TargetPath,
 	}
 
-	// 单例模式：使用原子操作，只检查同一任务是否在运行
+	// 单例模式：使用原子操作，如果有任任务在运行则跳过
 	if isSingleton && singletonMode {
-		// 先检查这个任务是否已经在运行
-		existingRun, err := s.db.GetActiveRunByTaskID(taskID)
-		if err == nil && existingRun.ID > 0 {
-			return fmt.Errorf("单例模式：该任务正在运行中，跳过本次执行")
-		}
-		// 检查是否有同名任务在运行
+		// 检查是否有任何任务在运行
 		activeRuns, err := s.db.ListActiveRuns()
-		if err == nil {
-			for _, r := range activeRuns {
-				if r.TaskID == taskID && r.Status == "running" {
-					return fmt.Errorf("单例模式：该任务正在运行中，跳过本次执行")
-				}
-			}
+		if err == nil && len(activeRuns) > 0 {
+			return fmt.Errorf("单例模式：有其他任务正在运行，跳过本次执行")
 		}
 		// 创建运行记录
 		run, err := s.db.AddRun(newRun)
