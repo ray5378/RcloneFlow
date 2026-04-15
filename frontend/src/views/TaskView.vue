@@ -41,6 +41,7 @@ const filteredTasks = computed(() => {
 const remotes = ref<string[]>([])
 const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const historyFilterTaskId = ref<number | null>(null)
+const historyStatusFilter = ref<string>('all') // 'all' | 'finished' | 'failed' | 'skipped'
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
 // 运行中提示小窗（不切换主窗口，不弹出完整详情）
@@ -881,8 +882,11 @@ function toCamel(s: string){ return s.replace(/-([a-z])/g, (_,c)=>c.toUpperCase(
 
 // 过滤后的历史记录
 const filteredRuns = computed(() => {
-  if (historyFilterTaskId.value === null) return runs.value
-  return runs.value.filter(r => r.taskId === historyFilterTaskId.value)
+  let result = historyFilterTaskId.value === null ? runs.value : runs.value.filter(r => r.taskId === historyFilterTaskId.value)
+  if (historyStatusFilter.value !== 'all') {
+    result = result.filter(r => r.status === historyStatusFilter.value)
+  }
+  return result
 })
 
 function viewTaskHistory(taskId: number) {
@@ -1507,6 +1511,12 @@ import TransferOptions from '../components/TransferOptions.vue'
   <div v-if="currentModule === 'history'" class="card">
     <div class="card-header">
       <div class="title">任务历史记录</div>
+      <div class="history-filters">
+        <button :class="['filter-btn', historyStatusFilter==='all' && 'active']" @click="historyStatusFilter='all'">全部</button>
+        <button :class="['filter-btn', historyStatusFilter==='finished' && 'active']" @click="historyStatusFilter='finished'">成功</button>
+        <button :class="['filter-btn', historyStatusFilter==='failed' && 'active']" @click="historyStatusFilter='failed'">失败</button>
+        <button :class="['filter-btn', historyStatusFilter==='skipped' && 'active']" @click="historyStatusFilter='skipped'">跳过</button>
+      </div>
       <div class="header-actions">
         <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click="clearAllRuns">删除所有</button>
         <button v-if="historyFilterTaskId !== null" class="ghost small" @click="currentModule = 'tasks'">
@@ -1515,7 +1525,7 @@ import TransferOptions from '../components/TransferOptions.vue'
       </div>
     </div>
     <div class="list">
-      <div v-for="run in filteredRuns" :key="run.id" class="item run-item">
+      <div v-for="run in filteredRuns" :key="run.id" class="item run-item" @click.stop="showRunDetail(run)">
         <div class="name">
           <strong>{{ run.taskName || `任务 #${run.taskId}` }}</strong>
           <span class="mode-tag" v-if="run.taskMode">{{ run.taskMode }}</span>
