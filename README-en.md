@@ -4,6 +4,18 @@ RcloneFlow is a file sync management tool with scheduling, Webhook triggers, rea
 
 ## Features
 
+### 📂 Storage Management
+- Add/remove rclone remotes
+- Support various storage types (S3, Azure, Google Drive, etc.)
+- View storage usage
+
+### 📁 File Operations
+- Browse remote files
+- Copy, move, rename files
+- Delete files/folders
+- Create folders
+- Generate public sharing links
+
 ### 📁 Task Management
 - Create sync tasks (copy/move)
 - Set source and target paths
