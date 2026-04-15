@@ -172,7 +172,7 @@ async function saveSingleton(){
   try{
     const id = singletonForm.value.taskId
     const opts = { singletonMode: singletonForm.value.singletonEnabled }
-    await api.updateTaskOptions(id, opts)
+    await taskApi.updateOptions(id, opts)
     showSingletonModal.value = false
     await loadData()
   }catch(e:any){
@@ -284,7 +284,7 @@ async function reloadRunFiles(){
   try{
     if (!runDetail.value?.id) return
     const pageOffset = (runFilesPage.value-1) * runFilesPageSize.value
-    const res = await api.getRunFiles(runDetail.value.id, pageOffset, runFilesPageSize.value)
+    const res = await runApi.getFiles(runDetail.value.id, pageOffset, runFilesPageSize.value)
     runFiles.value = res.items || []
     runFilesTotal.value = res.total || 0
   }catch(e){ console.error(e) }
@@ -442,7 +442,7 @@ onMounted(async () => {
   await loadActiveRuns()
   activeRunsTimer = window.setInterval(() => { loadActiveRuns().catch(console.error) }, 2000)
   // 历史列表也轮询，保证新 run 及时出现（避免必须手动刷新）
-  runsTimer = window.setInterval(() => { api.listRuns().then(v=> runs.value = v?.length ? v : runs.value).catch(()=>{}) }, 3000)
+  runsTimer = window.setInterval(() => { runApi.list(runsPage.value, runsPageSize).then(v=> { if(v?.runs) { runs.value = v.runs; runsTotal.value = v.total } }).catch(()=>{}) }, 3000)
 })
 
 let loadSeq = 0
@@ -450,10 +450,10 @@ async function loadData() {
   const seq = ++loadSeq
   try {
     const [taskData, remoteData, scheduleData, runResult] = await Promise.all([
-      api.listTasks(),
-      api.listRemotes(),
-      api.listSchedules(),
-      api.listRuns(runsPage.value, runsPageSize),
+      taskApi.list(),
+      remoteApi.list(),
+      scheduleApi.list(),
+      runApi.list(runsPage.value, runsPageSize),
     ])
     if (seq !== loadSeq) return // 只接受最新一轮
     // 防御：只有明确有数据才更新，防止空数据覆盖
@@ -477,7 +477,7 @@ async function loadData() {
 
 async function loadActiveRuns() {
   try {
-    const data = await api.getActiveRuns()
+    const data = await jobApi.list()
     const now = Date.now()
     // 更新最后稳态快照（保持向前：非递减合并，避免抖动）
     for (const it of data || []){
@@ -801,7 +801,7 @@ async function createTask() {
 
     if (editingTask.value) {
       // 更新任务
-      await api.updateTask(editingTask.value.id, taskData)
+      await taskApi.update(editingTask.value.id, taskData)
       // 更新定时规则：先删除旧的在创建新的
       const oldSchedule = getScheduleByTaskId(editingTask.value.id)
       if (createForm.value.enableSchedule) {
@@ -813,18 +813,18 @@ async function createTask() {
           createForm.value.scheduleWeek || '*',
         ].join('|')
         if (oldSchedule) {
-          await api.updateSchedule(oldSchedule.id, true, spec)
+          await scheduleApi.update(oldSchedule.id, true, spec)
         } else {
-          await api.createSchedule({ taskId: editingTask.value.id, spec, enabled: true })
+          await scheduleApi.create({ taskId: editingTask.value.id, spec, enabled: true })
         }
       } else if (oldSchedule) {
         // 关闭并保留记录
-        await api.updateSchedule(oldSchedule.id, false)
+        await scheduleApi.update(oldSchedule.id, false)
       }
       editingTask.value = null
     } else {
       // 新建任务
-      const task = await api.createTask(taskData)
+      const task = await taskApi.create(taskData)
       // 如果启用了定时任务，创建定时规则
       if (createForm.value.enableSchedule) {
         const spec = [
@@ -834,7 +834,7 @@ async function createTask() {
           createForm.value.scheduleMonth || '*',
           createForm.value.scheduleWeek || '*',
         ].join('|')
-        await api.createSchedule({ taskId: task.id, spec, enabled: true })
+        await scheduleApi.create({ taskId: task.id, spec, enabled: true })
       }
     }
     await loadData()
@@ -913,12 +913,12 @@ const stoppedTaskId = ref<number|null>(null)
 async function stopTaskAny(taskId: number) {
   try {
     // 直接按任务 ID kill（后端会定位最近 run 并发信号）
-    await api.killTask(taskId)
+    await taskApi.kill(taskId)
     // 兼容 RC：如仍有 rcJobId，则再尝试停止
-    const active = await api.getActiveRuns().catch(()=>[])
+    const active = await jobApi.list()
     const cur:any = Array.isArray(active) ? active.find(x => x?.runRecord?.taskId === taskId && x?.runRecord?.rcJobId) : null
     if (cur?.runRecord?.rcJobId) {
-      await api.stopJob(cur.runRecord.rcJobId)
+      await jobApi.stop(cur.runRecord.rcJobId)
     }
     // 按钮状态反馈：红色"已经停止"，10秒后恢复
     stoppedTaskId.value = taskId
@@ -950,12 +950,8 @@ async function runTask(taskId: number) {
 
 async function goToAddTask() {
   // Reload remotes before switching to add mode
-  try {
-    const remoteData = await api.listRemotes()
-    remotes.value = remoteData?.remotes || []
-  } catch (e) {
-    console.error('Failed to load remotes:', e)
-  }
+  const remoteData = await remoteApi.list()
+  remotes.value = remoteData?.remotes || []
   currentModule.value = 'add'
   openMenuId.value = null
 }
@@ -1055,12 +1051,8 @@ function getScheduleByTaskId(taskId: number) {
 async function toggleSchedule(taskId: number) {
   const schedule = getScheduleByTaskId(taskId)
   if (!schedule) return
-  try {
-    await api.updateSchedule(schedule.id, !schedule.enabled)
-    await loadData()
-  } catch (e) {
-    showToast((e as Error).message, 'error')
-  }
+  await scheduleApi.update(schedule.id, !schedule.enabled)
+  await loadData()
 }
 
 function formatScheduleSpec(spec: string): string {
@@ -1086,12 +1078,8 @@ function closeMenus() {
 
 async function deleteSchedule(id: number) {
   if (!confirm('确定删除此定时任务？')) return
-  try {
-    await api.deleteSchedule(id)
-    await loadData()
-  } catch (e) {
-    showToast((e as Error).message, 'error')
-  }
+  await scheduleApi.delete(id)
+  await loadData()
 }
 
 // duplicate old implementation removed (showRunDetail)
@@ -1179,12 +1167,8 @@ function formatEta(seconds: number | null): string {
 }
 
 async function clearRun(id: number) {
-  try {
-    await api.clearRun(id)
-    await loadData()
-  } catch (e) {
-    showToast((e as Error).message, 'error')
-  }
+  await runApi.delete(id)
+  await loadData()
 }
 
 async function clearAllRuns() {
@@ -1193,12 +1177,8 @@ async function clearAllRuns() {
     return
   }
   showConfirm('删除所有历史', '确定删除该任务所有历史记录？此操作不可恢复！', async () => {
-    try {
-      await api.clearRunsByTask(historyFilterTaskId.value)
-      await loadData()
-    } catch (e) {
-      showToast((e as Error).message, 'error')
-    }
+    await runApi.deleteByTask(historyFilterTaskId.value)
+    await loadData()
   })
 }
 

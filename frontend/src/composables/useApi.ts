@@ -58,6 +58,26 @@ export const taskApi = {
       handleError(err, { module: 'Task', operation: '停止任务' })
       return false
     }
+  },
+
+  async kill(id: number) {
+    try {
+      await api.killTask(id)
+      return true
+    } catch (err) {
+      handleError(err, { module: 'Task', operation: '强制停止任务' })
+      return false
+    }
+  },
+
+  async updateOptions(id: number, options: Record<string, any>) {
+    try {
+      await api.updateTaskOptions(id, options)
+      return true
+    } catch (err) {
+      handleError(err, { module: 'Task', operation: '更新任务配置' })
+      return false
+    }
   }
 }
 
@@ -85,6 +105,33 @@ export const scheduleApi = {
     } catch (err) {
       handleError(err, { module: 'Schedule', operation: '获取定时任务列表' })
       return []
+    }
+  },
+
+  async create(schedule: any) {
+    try {
+      return await api.createSchedule(schedule)
+    } catch (err) {
+      handleError(err, { module: 'Schedule', operation: '创建定时任务' })
+      return null
+    }
+  },
+
+  async update(id: number, enabled: boolean, spec?: string) {
+    try {
+      return await api.updateSchedule(id, enabled, spec)
+    } catch (err) {
+      handleError(err, { module: 'Schedule', operation: '更新定时任务' })
+      return false
+    }
+  },
+
+  async delete(id: number) {
+    try {
+      return await api.deleteSchedule(id)
+    } catch (err) {
+      handleError(err, { module: 'Schedule', operation: '删除定时任务' })
+      return false
     }
   }
 }
@@ -134,6 +181,16 @@ export const runApi = {
       return await api.clearAllRuns()
     } catch (err) {
       handleError(err, { module: 'Run', operation: '清空历史记录' })
+      return false
+    }
+  },
+
+  async deleteByTask(taskId: number) {
+    try {
+      await api.clearRunsByTask(taskId)
+      return true
+    } catch (err) {
+      handleError(err, { module: 'Run', operation: '删除任务历史记录' })
       return false
     }
   }
