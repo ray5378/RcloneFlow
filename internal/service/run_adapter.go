@@ -1,37 +1,248 @@
 package service
 
 import (
+	"encoding/json"
+	"time"
+
 	"rcloneflow/internal/store"
 )
 
+// storeRunAdapter store.DB到RunServiceInterface的适配器
 type storeRunAdapter struct {
 	db *store.DB
 }
 
-func newStoreRunAdapter(db *store.DB) *storeRunAdapter {
+// NewStoreRunAdapter 创建适配器
+func NewStoreRunAdapter(db *store.DB) RunServiceInterface {
 	return &storeRunAdapter{db: db}
 }
 
-func (a *storeRunAdapter) ListRuns(page, pageSize int) ([]RunRecord, int, error) {
-	return a.db.ListRuns(page, pageSize)
+// formatTime 格式化时间（保留原时区偏移，RFC3339）
+func formatTime(t time.Time) string {
+	return t.Format(time.RFC3339)
+}
+
+// formatOptTime 格式化可选时间（保留原时区偏移，RFC3339）
+func formatOptTime(t *time.Time) string {
+	if t == nil {
+		return ""
+	}
+	return t.Format(time.RFC3339)
+}
+
+// ListRuns 获取所有运行记录
+func (a *storeRunAdapter) ListRuns() ([]RunRecord, error) {
+	runs, err := a.db.ListRuns()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]RunRecord, len(runs))
+	for i, r := range runs {
+		summaryStr := ""
+		if r.Summary != nil {
+			bs, _ := json.Marshal(r.Summary)
+			summaryStr = string(bs)
+		}
+		finAt := formatOptTime(r.FinishedAt)
+		if finAt == "" && r.Summary != nil {
+			if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+				finAt = v
+			}
+		}
+		result[i] = RunRecord{
+			ID:               r.ID,
+			TaskID:           r.TaskID,
+			RcJobID:          r.RcJobID,
+			Status:           r.Status,
+			Trigger:          r.Trigger,
+			StartedAt:        formatTime(r.CreatedAt),
+			FinishedAt:       finAt,
+			TaskName:         r.TaskName,
+			TaskMode:         r.TaskMode,
+			SourceRemote:     r.SourceRemote,
+			SourcePath:       r.SourcePath,
+			TargetRemote:     r.TargetRemote,
+			TargetPath:       r.TargetPath,
+			BytesTransferred: r.BytesTransferred,
+			Speed:            r.Speed,
+			Error:            r.Error,
+			Summary:          summaryStr,
+		}
+	}
+	return result, nil
 }
 
 func (a *storeRunAdapter) ListRunsByTask(taskId int64) ([]RunRecord, error) {
-	return a.db.ListRunsByTask(taskId)
+	runs, err := a.db.ListRunsByTask(taskId)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]RunRecord, len(runs))
+	for i, r := range runs {
+		summaryStr := ""
+		if r.Summary != nil {
+			bs, _ := json.Marshal(r.Summary)
+			summaryStr = string(bs)
+		}
+		finAt := formatOptTime(r.FinishedAt)
+		if finAt == "" && r.Summary != nil {
+			if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+				finAt = v
+			}
+		}
+		result[i] = RunRecord{
+			ID:               r.ID,
+			TaskID:           r.TaskID,
+			RcJobID:          r.RcJobID,
+			Status:           r.Status,
+			Trigger:          r.Trigger,
+			StartedAt:        formatTime(r.CreatedAt),
+			FinishedAt:       finAt,
+			TaskName:         r.TaskName,
+			TaskMode:         r.TaskMode,
+			SourceRemote:     r.SourceRemote,
+			SourcePath:       r.SourcePath,
+			TargetRemote:     r.TargetRemote,
+			TargetPath:       r.TargetPath,
+			BytesTransferred: r.BytesTransferred,
+			Speed:            r.Speed,
+			Error:            r.Error,
+			Summary:          summaryStr,
+		}
+	}
+	return result, nil
 }
 
+// ListActiveRuns 获取所有运行中的任务
 func (a *storeRunAdapter) ListActiveRuns() ([]RunRecord, error) {
-	return a.db.ListActiveRuns()
+	runs, err := a.db.ListActiveRuns()
+	if err != nil {
+		return nil, err
+	}
+	result := make([]RunRecord, len(runs))
+	for i, r := range runs {
+		summaryStr := ""
+		if r.Summary != nil {
+			bs, _ := json.Marshal(r.Summary)
+			summaryStr = string(bs)
+		}
+		finAt := formatOptTime(r.FinishedAt)
+		if finAt == "" && r.Summary != nil {
+			if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+				finAt = v
+			}
+		}
+		result[i] = RunRecord{
+			ID:               r.ID,
+			TaskID:           r.TaskID,
+			RcJobID:          r.RcJobID,
+			Status:           r.Status,
+			Trigger:          r.Trigger,
+			StartedAt:        formatTime(r.CreatedAt),
+			FinishedAt:       finAt,
+			TaskName:         r.TaskName,
+			TaskMode:         r.TaskMode,
+			SourceRemote:     r.SourceRemote,
+			SourcePath:       r.SourcePath,
+			TargetRemote:     r.TargetRemote,
+			TargetPath:       r.TargetPath,
+			BytesTransferred: r.BytesTransferred,
+			Speed:            r.Speed,
+			Error:            r.Error,
+			Summary:          summaryStr,
+		}
+	}
+	return result, nil
 }
 
+// GetActiveRunByTaskID 获取任务当前运行中的记录
 func (a *storeRunAdapter) GetActiveRunByTaskID(taskID int64) (RunRecord, error) {
-	return a.db.GetActiveRunByTaskID(taskID)
+	r, err := a.db.GetActiveRunByTaskID(taskID)
+	if err != nil {
+		return RunRecord{}, err
+	}
+	summaryStr := ""
+	if r.Summary != nil {
+		bs, _ := json.Marshal(r.Summary)
+		summaryStr = string(bs)
+	}
+	finAt := formatOptTime(r.FinishedAt)
+	if finAt == "" && r.Summary != nil {
+		if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+			finAt = v
+		}
+	}
+	return RunRecord{
+		ID:               r.ID,
+		TaskID:           r.TaskID,
+		RcJobID:          r.RcJobID,
+		Status:           r.Status,
+		Trigger:          r.Trigger,
+		StartedAt:        formatTime(r.CreatedAt),
+		FinishedAt:       finAt,
+		TaskName:         r.TaskName,
+		TaskMode:         r.TaskMode,
+		SourceRemote:     r.SourceRemote,
+		SourcePath:       r.SourcePath,
+		TargetRemote:     r.TargetRemote,
+		TargetPath:       r.TargetPath,
+		BytesTransferred: r.BytesTransferred,
+		Speed:            r.Speed,
+		Error:            r.Error,
+		Summary:          summaryStr,
+	}, nil
 }
 
+// UpdateRun 更新运行记录
 func (a *storeRunAdapter) UpdateRun(id int64, updateFn func(*RunRecord)) {
-	a.db.UpdateRun(id, updateFn)
+	a.db.UpdateRun(id, func(r *store.Run) {
+		finAt := formatOptTime(r.FinishedAt)
+		if finAt == "" && r.Summary != nil {
+			if v, ok := r.Summary["finishedAt"].(string); ok && v != "" {
+				finAt = v
+			}
+		}
+		record := &RunRecord{
+			ID:               r.ID,
+			TaskID:           r.TaskID,
+			RcJobID:          r.RcJobID,
+			Status:           r.Status,
+			Trigger:          r.Trigger,
+			StartedAt:        formatTime(r.CreatedAt),
+			FinishedAt:       finAt,
+			TaskName:         r.TaskName,
+			TaskMode:         r.TaskMode,
+			SourceRemote:     r.SourceRemote,
+			SourcePath:       r.SourcePath,
+			TargetRemote:     r.TargetRemote,
+			TargetPath:       r.TargetPath,
+			BytesTransferred: r.BytesTransferred,
+			Speed:            r.Speed,
+			Error:            r.Error,
+		}
+		if r.Summary != nil {
+			bs, _ := json.Marshal(r.Summary)
+			record.Summary = string(bs)
+		}
+		updateFn(record)
+		r.Status = record.Status
+		r.FinishedAt = nil
+		if record.FinishedAt != "" {
+			t, _ := time.Parse("2006-01-02T15:04:05Z", record.FinishedAt)
+			r.FinishedAt = &t
+		}
+		r.Speed = record.Speed
+		r.BytesTransferred = record.BytesTransferred
+		r.Error = record.Error
+		if record.Summary != "" {
+			var summary map[string]any
+			json.Unmarshal([]byte(record.Summary), &summary)
+			r.Summary = summary
+		}
+	})
 }
 
+// DeleteRun 删除运行记录
 func (a *storeRunAdapter) DeleteRun(id int64) error {
 	return a.db.DeleteRun(id)
 }
@@ -44,10 +255,17 @@ func (a *storeRunAdapter) DeleteRunsByTask(taskId int64) error {
 	return a.db.DeleteRunsByTask(taskId)
 }
 
+// CleanOldRuns 删除指定天数之前的运行记录
 func (a *storeRunAdapter) CleanOldRuns(days int) (int64, error) {
 	return a.db.CleanOldRuns(days)
 }
 
+// UpdateRunProgress 更新运行进度（bytes和speed）
+func (a *storeRunAdapter) UpdateRunProgress(id int64, bytesTransferred int64, speed string) error {
+	return a.db.UpdateRunProgress(id, bytesTransferred, speed)
+}
+
+// UpdateRunStatusByJobId 根据 JobID 更新运行状态
 func (a *storeRunAdapter) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error {
 	return a.db.UpdateRunStatusByJobId(jobId, status, errorMsg)
 }
