@@ -17,6 +17,7 @@
   --accent-strong: #1e88e5;
   --danger: #ef5350;
   --success: #4caf50;
+  --warning: #f59e0b;
 }
 /* Light theme tokens */
 body.light{
@@ -31,6 +32,7 @@ body.light{
   --accent-strong: #1e88e5;
   --danger: #d32f2f;
   --success: #388e3c;
+  --warning: #f59e0b;
 }
 
 body {

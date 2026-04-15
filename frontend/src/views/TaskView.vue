@@ -703,6 +703,7 @@ function getStatusClass(status: string) {
     case 'running': return 'running'
     case 'finished': return 'success'
     case 'failed': return 'failed'
+    case 'skipped': return 'skipped'
     default: return ''
   }
 }
@@ -2188,6 +2189,7 @@ body.light .item { border-color: #f0f0f0; }
 .status.running { background: var(--accent); color: #fff; }
 .status.success { background: var(--success); color: #fff; }
 .status.failed { background: var(--danger); color: #fff; }
+.status.skipped { background: var(--warning); color: #fff; }
 .status.clickable { cursor: pointer; }
 .status.clickable:hover { opacity: 0.8; }
 .time { width: 150px; text-align: right; color: var(--muted); font-size: 13px; }
