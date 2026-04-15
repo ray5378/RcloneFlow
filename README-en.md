@@ -13,9 +13,11 @@ RcloneFlow is a file sync management tool with scheduling, Webhook triggers, rea
 - Cron expression support for timed triggers
 - Multiple scheduled tasks supported
 
-### 🔗 Webhook Trigger
-- Trigger sync via Webhook URL
+### 🔗 Webhook Features
+- Trigger sync via Webhook URL (POST)
 - Configure trigger sources (manual/scheduled/webhook)
+- Webhook POST notifications (push when task completes)
+- WeCom and Markdown format support
 
 ### 📊 Real-time Progress
 - Live percentage, speed, and ETA display
