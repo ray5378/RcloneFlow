@@ -22,7 +22,7 @@ type TaskService struct {
 
 // NewTaskService 创建任务服务
 func NewTaskService(db *store.DB, runner adapter.TaskRunner) *TaskService {
-	return &TaskService{db: db, runner: runner}
+	return &TaskService{db: db, runner: runner, runMu: sync.Mutex{}}
 }
 
 // ListTasks 获取所有任务
