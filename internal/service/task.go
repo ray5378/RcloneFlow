@@ -137,7 +137,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 
 	// 单例模式检查：如果开启了单例模式，且有其他传输任务在运行，则放弃本次执行
 	if singletonMode, ok := effectiveOptions["singletonMode"].(bool); ok && singletonMode {
-		hasActive, err := s.rcloneClient.HasActiveJobs(ctx)
+		hasActive, err := s.runner.HasActiveJobs(ctx)
 		if err == nil && hasActive {
 			return fmt.Errorf("单例模式：检测到有其他传输任务正在运行，跳过本次执行")
 		}

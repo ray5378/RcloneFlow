@@ -677,6 +677,15 @@ func (c *RcloneClient) ListJobs(ctx context.Context) (*JobListResponse, error) {
 	return &resp, nil
 }
 
+// HasActiveJobs 检查是否有正在运行的任务
+func (c *RcloneClient) HasActiveJobs(ctx context.Context) (bool, error) {
+	resp, err := c.ListJobs(ctx)
+	if err != nil {
+		return false, err
+	}
+	return len(resp.RunningIDs) > 0, nil
+}
+
 // StopJobRequest 停止任务请求
 type StopJobRequest struct {
 	JobID int64 `json:"jobid"`
