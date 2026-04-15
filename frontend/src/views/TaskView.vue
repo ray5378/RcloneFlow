@@ -938,18 +938,14 @@ async function runTask(taskId: number) {
     return
   }
   runningTaskId.value = taskId
-  try {
-    await api.runTask(taskId)
-    // 5秒后恢复
-    setTimeout(() => {
-      if (runningTaskId.value === taskId) {
-        runningTaskId.value = null
-      }
-    }, 5000)
-  } catch (e) {
-    runningTaskId.value = null
-    showToast((e as Error).message, 'error')
-  }
+  const result = await taskApi.run(taskId)
+  // 5秒后恢复
+  setTimeout(() => {
+    if (runningTaskId.value === taskId) {
+      runningTaskId.value = null
+    }
+  }, 5000)
+  return result
 }
 
 async function goToAddTask() {
@@ -1044,12 +1040,10 @@ function showConfirm(title: string, message: string, onConfirm: () => void) {
 
 async function deleteTask(id: number) {
   showConfirm('删除任务', '确定删除此任务？此操作不可恢复！', async () => {
-    try {
-      await api.deleteTask(id)
+    const success = await taskApi.delete(id)
+    if (success) {
       openMenuId.value = null
       await loadData()
-    } catch (e) {
-      showToast((e as Error).message, 'error')
     }
   })
 }

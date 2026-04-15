@@ -98,7 +98,7 @@ export const runApi = {
       return await api.listRuns(page, pageSize)
     } catch (err) {
       handleError(err, { module: 'Run', operation: '获取历史记录' })
-      return []
+      return { runs: [], total: 0, page, pageSize }
     }
   },
 
