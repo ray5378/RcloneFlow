@@ -168,8 +168,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 				Status:  "skipped",
 				Trigger: trigger,
 				Summary: map[string]any{
-					"reason": "singleton_mode",
-					"message": "单例模式：有其他任务正在运行，跳过本次执行",
+					"finalSummary": map[string]any{
+						"message": "单例模式：有其他任务正在运行，跳过本次执行",
+					},
 				},
 				TaskName:     t.Name,
 				TaskMode:     t.Mode,

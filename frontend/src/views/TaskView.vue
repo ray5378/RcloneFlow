@@ -712,6 +712,7 @@ function getStatusText(status: string) {
     case 'running': return '运行中'
     case 'finished': return '已完成'
     case 'failed': return '失败'
+    case 'skipped': return '已跳过'
     default: return status
   }
 }
@@ -1545,14 +1546,20 @@ import TransferOptions from '../components/TransferOptions.vue'
         </div>
         <!-- 历史卡片内的一目了然统计概览（完成态） -->
         <div class="summary-mini" v-if="run.status!=='running' && getFinalSummary(run)">
-          <span class="chip">总计 {{ (getFinalSummary(run).files?.length || 0) }}</span>
-          <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
-          <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
-          <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
-          <!-- 总数量/已传输、总体积/已传输（仅保留总体积，不再重复"总量"） -->
+          <!-- 跳过消息 -->
+          <div v-if="getFinalSummary(run).message" class="skipped-message">
+            {{ getFinalSummary(run).message }}
+          </div>
+          <template v-else>
+            <span class="chip">总计 {{ (getFinalSummary(run).files?.length || 0) }}</span>
+            <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
+            <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
+            <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
+            <!-- 总数量/已传输、总体积/已传输（仅保留总体积，不再重复"总量"） -->
 
-          <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span></span>
-          <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
+            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span></span>
+            <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
+          </template>
         </div>
         <div class="row-actions">
           <button class="ghost small" @click="showRunDetail(run)">运行详情</button>
@@ -2191,6 +2198,8 @@ body.light .item { border-color: #f0f0f0; }
 .summary-mini .chip.failed{ background:#2b0a0a; border-color:#7f1d1d; color:#f87171 }
 .summary-mini .chip.other{ background:#2b1a04; border-color:#92400e; color:#fbbf24 }
 .summary-mini .chip.meta{ background:#111827; border-color:#374151; color:#cbd5e1 }
+.skipped-message{ padding:8px 12px; background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; color:#92400e; font-size:13px; margin-bottom:8px; }
+body.light .skipped-message{ background:#fffbeb; color:#78350f; }
 .item-actions { display: flex; gap: 8px; }
 .danger-text { color: var(--danger) !important; }
 .form-content { padding: 20px; }
