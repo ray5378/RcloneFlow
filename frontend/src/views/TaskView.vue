@@ -1436,14 +1436,14 @@ import TransferOptions from '../components/TransferOptions.vue'
 
   <!-- 单例模式配置弹窗 -->
   <div v-if="showSingletonModal" class="modal-overlay" @click.self="showSingletonModal=false">
-    <div class="modal-content" style="max-width:400px">
+    <div class="modal-content" style="max-width:560px">
       <div class="modal-header">
         <h3>单例模式</h3>
         <button class="close-btn" @click="showSingletonModal=false">×</button>
       </div>
       <div class="modal-body">
         <div class="detail-item full-width">
-          <label class="checkbox-label">
+          <label class="trigger-opt">
             <input type="checkbox" v-model="singletonForm.singletonEnabled" />
             <span>开启单例模式</span>
           </label>
