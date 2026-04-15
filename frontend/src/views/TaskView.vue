@@ -442,20 +442,11 @@ async function loadActiveRuns() {
         it.stableProgress = merged
       }
     }
-    // 如果本帧没有 active（比如刚点击停止），用最近 15 秒内的 lastStable 合成占位，避免模块空白
+    // 如果本帧没有 active，立即清空，不要维持旧进度
     const list:any[] = data || []
     if (list.length === 0) {
-      const synth:any[] = []
-      for (const [k, v] of Object.entries(lastStableByTask.value || {})){
-        const rec:any = (v as any)
-        if (rec && now - rec.at <= LINGER_MS){
-          synth.push({ runRecord: { taskId: Number(k), status: 'stopping', rcJobId: 0, bytesTransferred: 0, error: '' }, stableProgress: rec.sp })
-        }
-      }
-      // 若仍为空，不要用空数组覆盖上一帧，维持上一帧的 activeRuns 以避免空白
-      if (synth.length > 0) {
-        activeRuns.value = synth
-      }
+      // 直接清空，让进度条立即消失
+      activeRuns.value = []
       return
     }
     activeRuns.value = list
@@ -465,17 +456,9 @@ async function loadActiveRuns() {
 }
 
 function getActiveRunByTaskId(taskId: number) {
-  // 优先返回活跃项
+  // 只返回活跃项，不返回最后稳态快照
   const cur = activeRuns.value.find(item => item.runRecord?.taskId === taskId)
   if (cur) return cur
-  // 否则在观察期内返回最后稳态快照（仅当确实完成：>=99.9%）
-  const st = lastStableByTask.value[taskId]
-  if (st && Date.now()-st.at <= LINGER_MS){
-    const pct = Number((st.sp||{}).percentage || 0)
-    if (!isNaN(pct) && pct >= 99.9) {
-      return { runRecord: { taskId }, stableProgress: { ...(st.sp||{}), phase: 'completed', percentage: pct } }
-    }
-  }
   return undefined as any
 }
 
