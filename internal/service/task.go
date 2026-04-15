@@ -162,6 +162,22 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			return fmt.Errorf("单例模式：申请运行记录失败，%w", err)
 		}
 		if existed {
+			// 记录跳过到历史
+			s.db.AddRun(store.Run{
+				TaskID:  taskID,
+				Status:  "skipped",
+				Trigger: trigger,
+				Summary: map[string]any{
+					"reason": "singleton_mode",
+					"message": "单例模式：有其他任务正在运行，跳过本次执行",
+				},
+				TaskName:     t.Name,
+				TaskMode:     t.Mode,
+				SourceRemote: t.SourceRemote,
+				SourcePath:   t.SourcePath,
+				TargetRemote: t.TargetRemote,
+				TargetPath:   t.TargetPath,
+			})
 			return fmt.Errorf("单例模式：有其他任务正在运行，跳过本次执行")
 		}
 		// 成功创建记录，run 已填充
