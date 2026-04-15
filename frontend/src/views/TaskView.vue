@@ -1334,77 +1334,23 @@ import TransferOptions from '../components/TransferOptions.vue'
       </div>
     </div>
     <div class="list">
-      <div v-for="task in filteredTasks" :key="task.id" class="task-item">
-        <div class="task-main">
-          <div class="name">
-            <strong>{{ task.name }}</strong>
-            <span class="mode-tag">{{ task.mode }}</span>
-          </div>
-          <div class="schedule-info">
-            <template v-if="getScheduleByTaskId(task.id)">
-              <span :class="['schedule-badge', getScheduleByTaskId(task.id)?.enabled ? 'enabled' : 'disabled']">
-                {{ getScheduleByTaskId(task.id)?.enabled ? '已启用' : '已禁用' }}
-              </span>
-              <span class="schedule-rule">{{ formatScheduleSpec(getScheduleByTaskId(task.id)?.spec || '') }}</span>
-            </template>
-            <span v-else class="no-schedule">未设置</span>
-          </div>
-          <div class="item-actions">
-            <button class="ghost small" @click.stop="viewTaskHistory(task.id)">📋 任务历史记录</button>
-            <button class="ghost small" :class="{ 'danger-text': stoppedTaskId===task.id }" @click.stop="stopTaskAny(task.id)">
-              <template v-if="stoppedTaskId===task.id">⏹ 已经停止</template>
-              <template v-else>⏹ 停止传输</template>
-            </button>
-            <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
-              {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭定时' : '▶ 开启定时' }}
-            </button>
-            <button
-              class="ghost small"
-              :class="{ 'btn-running': runningTaskId === task.id }"
-              :disabled="runningTaskId === task.id"
-              @click.stop="runTask(task.id)"
-            >
-              <template v-if="runningTaskId === task.id">运行成功</template>
-              <template v-else>▶ 手动运行</template>
-            </button>
-            <button class="ghost small" @click.stop="() => setWebhook(task)">🔗 Webhook</button>
-            <button class="ghost small" @click.stop="() => setSingletonMode(task)">🔒 单例</button>
-            <button class="ghost small" @click.stop="editTask(task)">✏️</button>
-            <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
-          </div>
-        </div>
-        <div class="task-paths">
-          <div class="path-row">
-            <span class="path-label">源:</span>
-            <span class="path-value">{{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }}</span>
-          </div>
-          <div class="path-row">
-            <span class="path-label">目标:</span>
-            <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
-          </div>
-          <div class="path-row">
-            <span class="path-label">进度:</span>
-            <span class="path-value">
-              <template v-if="getActiveRunByTaskId(task.id)?.stableProgress?.phase === 'preparing'">
-                准备中 · 已传 {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.bytes || 0) }} · 速度 {{ formatBytesPerSec(getActiveRunByTaskId(task.id)?.stableProgress?.speed || 0) }}
-              </template>
-              <template v-else>
-                {{ ((getDeNoisedStableByTask(task.id)?.percentage) || 0).toFixed(2) }}% ·
-                {{ formatBytes(getDeNoisedStableByTask(task.id)?.bytes || 0) }} /
-                {{ formatBytes(getDeNoisedStableByTask(task.id)?.totalBytes || 0) }} ·
-                {{ formatBytesPerSec(getDeNoisedStableByTask(task.id)?.speed || 0) }} ·
-                总数量 {{ getDeNoisedStableByTask(task.id)?.totalCount || 0 }} ／ 已传输 {{ getDeNoisedStableByTask(task.id)?.completedFiles || 0 }} ·
-                <span v-if="calcEtaForTaskCard(task.id)">预估完成 {{ formatEta(calcEtaForTaskCard(task.id) || 0) }}</span>
-              </template>
-            </span>
-          </div>
-          <div class="progress-bar-container" style="margin-top:8px" v-if="getActiveRunByTaskId(task.id)?.stableProgress && getActiveRunByTaskId(task.id)?.stableProgress?.phase !== 'preparing'">
-            <div class="progress-bar" :style="{ width: ((getActiveRunByTaskId(task.id)?.stableProgress?.percentage || 0)) + '%' }"></div>
-            <!-- 当状态为 finished 或进度接近 100% 时，触发一次性刷新以拉取最终状态，避免停留在最后一帧 -->
-            <span v-if="getActiveRunByTaskId(task.id)?.runRecord?.status==='finished' || (getActiveRunByTaskId(task.id)?.stableProgress?.percentage||0) >= 99.999" style="display:none">{{ triggerAutoRefresh(task.id) }}</span>
-          </div>
-        </div>
-      </div>
+      <TaskCard
+        v-for="task in filteredTasks"
+        :key="task.id"
+        :task="task"
+        :schedule="getScheduleByTaskId(task.id)"
+        :active-run="getActiveRunByTaskId(task.id)"
+        :running-task-id="runningTaskId"
+        :stopped-task-id="stoppedTaskId"
+        @run="runTask(task.id)"
+        @edit="editTask(task)"
+        @delete="deleteTask(task.id)"
+        @toggle-schedule="toggleSchedule(task.id)"
+        @view-history="viewTaskHistory(task.id)"
+        @stop="stopTaskAny(task.id)"
+        @set-webhook="setWebhook(task)"
+        @set-singleton="setSingletonMode(task)"
+      />
       <div v-if="!filteredTasks.length" class="empty">暂无任务</div>
     </div>
   </div>
@@ -1520,61 +1466,17 @@ import TransferOptions from '../components/TransferOptions.vue'
       </div>
     </div>
     <div class="list">
-      <div v-for="run in filteredRuns" :key="run.id" class="item run-item" @click.stop="showRunDetail(run)">
-        <div class="name">
-          <strong>{{ run.taskName || `任务 #${run.taskId}` }}</strong>
-          <span class="mode-tag" v-if="run.taskMode">{{ run.taskMode }}</span>
-          <span class="trigger-tag" v-if="run.trigger === 'schedule'">定时</span>
-          <span class="trigger-tag" v-else-if="run.trigger === 'webhook'">Webhook</span>
-          <span class="trigger-tag" v-else>手动</span>
-        </div>
-        <span
-          :class="['status', getStatusClass(run.status), 'clickable']"
-          @click="showRunDetail(run)"
-        >{{ getStatusText(run.status) }}</span>
-        <div class="path-full">
-          <span class="path-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
-        </div>
-        <span class="time">{{ formatTime(run.startedAt) }}</span>
-        <div class="info" v-if="getFinalSummary(run)"></div>
-        <!-- 运行中卡片的实时概览（优先读 active 的 stableProgress，缺失再用 DB 的 summary.progress） -->
-        <div class="summary-mini" v-else-if="run.status==='running'">
-          <!-- 全部用 DB：百分比/体量/速度/ETA 均取 DB 的 summary.progress；实时完成文件计数也取 DB（progress.completedFiles） -->
-          <template v-if="(getDbProgressStable(run) as any) && true">
-            <span class="chip">进度 {{ ((getDeNoisedStableByRun(run) as any)?.percentage||0).toFixed(2) }}%</span>
-            <span class="chip meta">速度 {{ formatBytesPerSec((getDeNoisedStableByRun(run) as any)?.speed || 0) }}</span>
-            <!-- 移除"总量/已传"冗余，统一用"总体积/已传输" -->
-            <span class="chip meta" v-if="calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))">预估完成 {{ formatEta(calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))||0) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">总体积 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span>
-            <span class="chip meta">已传输 {{ formatBytes((getDeNoisedStableByRun(run) as any)?.bytes || 0) }}</span>
-            <!-- 仅保留"总数量/已传输数量"，去掉"总量/已传"重复口径 -->
-            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount || 0 }}</span> ／ <span class="act">已传输 {{ (getDeNoisedStableByRun(run) as any)?.completedFiles || 0 }}</span></span>
-          </template>
-        </div>
-        <!-- 历史卡片内的一目了然统计概览（完成态） -->
-        <div class="summary-mini" v-if="run.status!=='running' && getFinalSummary(run)">
-          <!-- 跳过消息 -->
-          <div v-if="getFinalSummary(run).message" class="skipped-message">
-            {{ getFinalSummary(run).message }}
-          </div>
-          <template v-else>
-            <span class="chip">总计 {{ (getFinalSummary(run).files?.length || 0) }}</span>
-            <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
-            <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
-            <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
-            <!-- 总数量/已传输、总体积/已传输（仅保留总体积，不再重复"总量"） -->
-
-            <span class="chip meta" v-if="getPreflight(run)">总体积 {{ formatBytes(getPreflight(run).totalBytes || 0) }}</span>
-            <span class="chip meta">已传输 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span>
-            <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
-          </template>
-        </div>
-        <div class="row-actions">
-          <button class="ghost small" @click="showRunDetail(run)">运行详情</button>
-          <button class="ghost small" @click="openRunLog(run)">传输日志</button>
-          <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
-        </div>
-      </div>
+      <RunItem
+        v-for="run in filteredRuns"
+        :key="run.id"
+        :run="run"
+        :progress="run.status === 'running' ? getDbProgressStable(run) : undefined"
+        :summary="getFinalSummary(run)"
+        @click="showRunDetail(run)"
+        @view-detail="showRunDetail(run)"
+        @view-log="openRunLog(run)"
+        @clear="clearRun(run.id)"
+      />
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>
     </div>
 

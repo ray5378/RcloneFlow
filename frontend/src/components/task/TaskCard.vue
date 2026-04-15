@@ -1,114 +1,253 @@
 <script setup lang="ts">
-import type { Task } from './types'
+import { computed } from 'vue'
+import { formatBytes, formatBytesPerSec, formatEta } from '../../utils/format'
+
+interface Progress {
+  percentage?: number
+  bytes?: number
+  totalBytes?: number
+  speed?: number
+  completedFiles?: number
+  totalCount?: number
+  phase?: string
+}
+
+interface Schedule {
+  enabled?: boolean
+  spec?: string
+}
+
+interface ActiveRun {
+  stableProgress?: Progress
+  runRecord?: { status?: string }
+}
+
+interface Task {
+  id?: number
+  name: string
+  mode: string
+  sourceRemote: string
+  sourcePath: string
+  targetRemote: string
+  targetPath: string
+  singleton?: boolean
+  schedule?: string
+  scheduleEnabled?: boolean
+}
 
 const props = defineProps<{
   task: Task
-  isActive: boolean
+  schedule?: Schedule | null
+  activeRun?: ActiveRun | null
+  runningTaskId?: number | null
+  stoppedTaskId?: number | null
 }>()
 
 const emit = defineEmits<{
   run: [task: Task]
   edit: [task: Task]
-  del: [task: Task]
+  delete: [task: Task]
   toggleSchedule: [task: Task]
+  viewHistory: [taskId: number]
+  stop: [taskId: number]
+  setWebhook: [task: Task]
+  setSingleton: [task: Task]
 }>()
+
+function getProgressPercent(): string {
+  if (!props.activeRun?.stableProgress) return '0.00'
+  return (props.activeRun.stableProgress.percentage || 0).toFixed(2)
+}
+
+function getProgressText(): string {
+  const p = props.activeRun?.stableProgress
+  if (!p) return '-'
+  if (p.phase === 'preparing') {
+    return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
+  }
+  return `${getProgressPercent()}% · ${formatBytes(p.bytes || 0)} / ${formatBytes(p.totalBytes || 0)} · ${formatBytesPerSec(p.speed || 0)} · 总数量 ${p.totalCount || 0} ／ 已传输 ${p.completedFiles || 0}`
+}
+
+function formatSpec(spec: string): string {
+  if (!spec) return '-'
+  const parts = spec.split('|')
+  if (parts.length !== 5) return spec
+  const [min, hour, day, month, week] = parts
+  const weekDay = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][parseInt(week) % 7] || ''
+  const monthStr = month !== '*' ? `${month}月` : ''
+  const dayStr = day !== '*' ? `${day}日` : ''
+  return `${hour}:${min} ${weekDay} ${monthStr}${dayStr}`.trim()
+}
+
+function isRunning(): boolean {
+  return props.runningTaskId === props.task.id
+}
+
+function isStopped(): boolean {
+  return props.stoppedTaskId === props.task.id
+}
 </script>
 
 <template>
-  <div class="task-card" :class="{ active: isActive }">
-    <div class="task-header">
-      <span class="task-name">{{ task.name }}</span>
-      <span class="chip mode">{{ task.mode }}</span>
-      <span v-if="task.singleton" class="chip singleton" title="单例模式">🔒</span>
+  <div class="task-card" :class="{ active: activeRun }">
+    <div class="task-main">
+      <div class="name">
+        <strong>{{ task.name }}</strong>
+        <span class="mode-tag">{{ task.mode }}</span>
+      </div>
+      
+      <div class="schedule-info">
+        <template v-if="schedule">
+          <span :class="['schedule-badge', schedule.enabled ? 'enabled' : 'disabled']">
+            {{ schedule.enabled ? '已启用' : '已禁用' }}
+          </span>
+          <span class="schedule-rule">{{ formatSpec(schedule.spec || '') }}</span>
+        </template>
+        <span v-else class="no-schedule">未设置</span>
+      </div>
+      
+      <div class="item-actions">
+        <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 任务历史记录</button>
+        <button class="ghost small" :class="{ 'danger-text': isStopped() }" @click.stop="emit('stop', task.id!)">
+          {{ isStopped() ? '⏹ 已经停止' : '⏹ 停止传输' }}
+        </button>
+        <button v-if="schedule" class="ghost small" @click.stop="emit('toggleSchedule', task)">
+          {{ schedule.enabled ? '⏸ 关闭定时' : '▶ 开启定时' }}
+        </button>
+        <button
+          class="ghost small"
+          :class="{ 'btn-running': isRunning() }"
+          :disabled="isRunning()"
+          @click.stop="emit('run', task)"
+        >
+          {{ isRunning() ? '运行成功' : '▶ 手动运行' }}
+        </button>
+        <button class="ghost small" @click.stop="emit('setWebhook', task)">🔗 Webhook</button>
+        <button class="ghost small" @click.stop="emit('setSingleton', task)">🔒 单例</button>
+        <button class="ghost small" @click.stop="emit('edit', task)">✏️</button>
+        <button class="ghost small danger-text" @click.stop="emit('delete', task)">🗑️</button>
+      </div>
     </div>
     
     <div class="task-paths">
       <div class="path-row">
-        <span class="label">源:</span>
-        <span class="path">{{ task.sourceRemote }}:{{ task.sourcePath }}</span>
+        <span class="path-label">源:</span>
+        <span class="path-value">{{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }}</span>
       </div>
       <div class="path-row">
-        <span class="label">目标:</span>
-        <span class="path">{{ task.targetRemote }}:{{ task.targetPath }}</span>
+        <span class="path-label">目标:</span>
+        <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
       </div>
-    </div>
-
-    <div v-if="task.scheduleEnabled" class="task-schedule">
-      <span class="chip mini">📅 {{ task.schedule }}</span>
-    </div>
-
-    <div class="task-actions">
-      <button class="btn primary small" @click.stop="emit('run', task)">▶ 运行</button>
-      <button class="btn ghost small" @click.stop="emit('edit', task)">✏️</button>
-      <button class="btn ghost small danger-text" @click.stop="emit('del', task)">🗑️</button>
-      <button 
-        class="btn ghost small" 
-        :class="{ 'text-success': task.scheduleEnabled }"
-        @click.stop="emit('toggleSchedule', task)"
-        :title="task.scheduleEnabled ? '禁用定时' : '启用定时'"
-      >
-        📅
-      </button>
+      <div class="path-row">
+        <span class="path-label">进度:</span>
+        <span class="path-value">{{ getProgressText() }}</span>
+      </div>
+      <div class="progress-bar-container" v-if="activeRun?.stableProgress && activeRun.stableProgress.phase !== 'preparing'">
+        <div class="progress-bar" :style="{ width: getProgressPercent() + '%' }"></div>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .task-card {
-  background: var(--card-bg, #1a1a1a);
-  border: 1px solid #333;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  border-bottom: 1px solid #333;
+  padding: 12px 16px;
 }
 .task-card.active {
-  border-color: var(--accent, #4f46e5);
+  border-left: 3px solid var(--accent, #4f46e5);
 }
-.task-header {
+.task-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.name {
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 150px;
 }
-.task-name {
-  font-weight: 600;
-  flex: 1;
+.name strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.mode-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #333;
+  color: #aaa;
+}
+.schedule-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.schedule-badge {
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+}
+.schedule-badge.enabled {
+  background: #22c55e33;
+  color: #22c55e;
+}
+.schedule-badge.disabled {
+  background: #666633;
+  color: #999;
+}
+.schedule-rule {
+  color: #888;
+}
+.no-schedule {
+  color: #666;
+  font-size: 12px;
+}
+.item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-left: auto;
+}
 .task-paths {
+  margin-top: 8px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  font-size: 12px;
 }
 .path-row {
   display: flex;
-  gap: 4px;
-  overflow: hidden;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
 }
-.label {
+.path-label {
   color: #888;
-  flex-shrink: 0;
+  min-width: 40px;
 }
-.path {
+.path-value {
+  color: #ccc;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: #aaa;
 }
-.task-schedule {
-  margin-top: 4px;
-}
-.task-actions {
-  display: flex;
-  gap: 8px;
+.progress-bar-container {
+  height: 4px;
+  background: #333;
+  border-radius: 2px;
   margin-top: 8px;
+  overflow: hidden;
 }
-.chip.mini {
-  padding: 2px 6px;
-  font-size: 10px;
+.progress-bar {
+  height: 100%;
+  background: var(--accent, #4f46e5);
+  transition: width 0.3s;
+}
+.btn-running {
+  color: #22c55e !important;
 }
 </style>
