@@ -273,7 +273,7 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// GET 请求
-	runs, err := c.runSvc.ListRuns()
+	runs, _, err := c.runSvc.ListRuns(1, 1000)
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
@@ -371,7 +371,7 @@ func (c *RunController) HandleRunKillCLI(w http.ResponseWriter, r *http.Request)
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 
 	// 读出 run，尝试从 summary 取 pid
-	runs, err := c.runSvc.ListRuns()
+	runs, _, err := c.runSvc.ListRuns(1, 1000)
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
@@ -486,7 +486,7 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	runs, err := c.runSvc.ListRuns()
+	runs, _, err := c.runSvc.ListRuns(1, 1000)
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
@@ -692,7 +692,7 @@ func humanDuration(sec int64) string {
 func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/log")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
-	runs, err := c.runSvc.ListRuns()
+	runs, _, err := c.runSvc.ListRuns(1, 1000)
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
