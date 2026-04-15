@@ -126,6 +126,35 @@ async function saveWebhook(){
     alert(e?.message||String(e))
   }
 }
+
+// 单例模式配置
+const showSingletonModal = ref(false)
+const singletonForm = ref<{taskId:number|null, singletonEnabled:boolean}>({ taskId: null, singletonEnabled: false })
+
+function setSingletonMode(task: Task){
+  singletonForm.value.taskId = task.id
+  try{
+    const opts = (task.options||task.Options||{}) as any
+    singletonForm.value.singletonEnabled = !!opts.singletonMode
+  }catch{
+    singletonForm.value.singletonEnabled = false
+  }
+  showSingletonModal.value = true
+}
+
+async function saveSingleton(){
+  if (!singletonForm.value.taskId){ showSingletonModal.value=false; return }
+  try{
+    const id = singletonForm.value.taskId
+    const opts = { singletonMode: singletonForm.value.singletonEnabled }
+    await api.updateTaskOptions(id, opts)
+    showSingletonModal.value = false
+    await loadData()
+  }catch(e:any){
+    alert(e?.message||String(e))
+  }
+}
+
 function buildWecomMarkdown(p:any){
   const taskName = p?.task?.name || '测试任务'
   const statusZh = p?.statusZh || '演示'
@@ -1317,6 +1346,7 @@ import TransferOptions from '../components/TransferOptions.vue'
               <template v-else>▶ 手动运行</template>
             </button>
             <button class="ghost small" @click.stop="() => setWebhook(task)">🔗 Webhook</button>
+            <button class="ghost small" @click.stop="() => setSingletonMode(task)">🔒 单例</button>
             <button class="ghost small" @click.stop="editTask(task)">✏️</button>
             <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
           </div>
@@ -1400,6 +1430,29 @@ import TransferOptions from '../components/TransferOptions.vue'
         <button class="primary" @click="saveWebhook">保存</button>
         <button class="ghost" @click="testWebhook" :disabled="!webhookForm.postUrl">发送测试</button>
         <button class="ghost" @click="showWebhookModal=false">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 单例模式配置弹窗 -->
+  <div v-if="showSingletonModal" class="modal-overlay" @click.self="showSingletonModal=false">
+    <div class="modal-content" style="max-width:400px">
+      <div class="modal-header">
+        <h3>单例模式</h3>
+        <button class="close-btn" @click="showSingletonModal=false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-item full-width">
+          <label class="checkbox-label">
+            <input type="checkbox" v-model="singletonForm.singletonEnabled" />
+            <span>开启单例模式</span>
+          </label>
+          <p class="hint">开启后，该任务触发时会检测全局是否有其他传输任务在运行。有则放弃本次执行，不排队，不等待，不重试。</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="primary" @click="saveSingleton">保存</button>
+        <button class="ghost" @click="showSingletonModal=false">取消</button>
       </div>
     </div>
   </div>
