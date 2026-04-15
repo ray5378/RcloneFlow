@@ -36,19 +36,28 @@ RcloneFlow 是一个实用的文件同步管理工具，支持定时同步、Web
 ### Docker Compose 部署
 
 ```yaml
-version: '3.8'
 services:
   rcloneflow:
     image: ray5378/rcloneflow:latest
+    platform: linux/amd64
     container_name: rcloneflow
-    ports:
-      - "17870:17870"
     environment:
+      - TZ=Asia/Shanghai
       - APP_ADDR=:17870
       - APP_DATA_DIR=/app/data
+      - RCLONE_CONFIG=/app/data/rclone.conf
+      # 内置 RC（用于 remotes/providers/config/browser）
+      - EMBED_RC=true
+      - RCLONE_RC_URL=http://127.0.0.1:5572
+      - RCLONE_RC_USER=rc
+      - RCLONE_RC_PASS=rcpass
+      # 日志级别：debug|info|warn|error
+      - LOG_LEVEL=info
     volumes:
       - ./data:/app/data
-    restart: unless-stopped
+    ports:
+      - "17870:17870"
+    restart: always
 ```
 
 ### 配置 rclone
