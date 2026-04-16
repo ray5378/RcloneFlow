@@ -1750,8 +1750,8 @@ import TransferOptions from '../components/TransferOptions.vue'
                 v-for="item in sourcePathOptions" 
                 :key="item.Path" 
                 :item="item"
+                @enter="onSourceArrow(item)"
                 @click="onSourceClick(item)"
-                @arrow-click="onSourceArrow(item)"
               />
               <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
             </div>
@@ -1788,8 +1788,8 @@ import TransferOptions from '../components/TransferOptions.vue'
                 v-for="item in targetPathOptions" 
                 :key="item.Path" 
                 :item="item"
+                @enter="onTargetArrow(item)"
                 @click="onTargetClick(item)"
-                @arrow-click="onTargetArrow(item)"
               />
               <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
             </div>

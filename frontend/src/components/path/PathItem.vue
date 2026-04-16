@@ -11,14 +11,17 @@ defineProps<{
 
 const emit = defineEmits<{
   click: [item: PathItem]
-  arrowClick: [item: PathItem]
+  enter: [item: PathItem]
 }>()
 </script>
 
 <template>
-  <div class="path-item" :class="{ 'is-dir': item.IsDir }" @click="emit('click', item)">
-    <span v-if="item.IsDir" class="folder-icon" @click.stop="emit('arrowClick', item)">📁</span>
-    <span v-else class="file-icon">📄</span>
+  <div 
+    class="path-item" 
+    :class="{ 'is-dir': item.IsDir }" 
+    @click="emit('enter', item)"
+  >
+    <span class="item-icon">{{ item.IsDir ? '📁' : '📄' }}</span>
     <span class="item-name">{{ item.Name }}</span>
   </div>
 </template>
@@ -42,9 +45,9 @@ const emit = defineEmits<{
 .path-item:not(.is-dir) {
   color: #9ca3af;
 }
-.folder-icon, .file-icon {
+.item-icon {
   font-size: 16px;
-  cursor: pointer;
+  flex-shrink: 0;
 }
 .item-name {
   flex: 1;
