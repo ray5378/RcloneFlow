@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
-import { TaskCard, RunItem } from '../components/task'
+import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions } from '../components/task'
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
 import { PathItem } from '../components/path'
@@ -1694,68 +1694,7 @@ const targetBreadcrumbs = computed(() => {
       </div>
 
       <!-- 定时任务设置 -->
-      <div class="schedule-section">
-        <div class="section-header">
-          <label class="schedule-toggle">
-            <input type="checkbox" v-model="createForm.enableSchedule" />
-            <span>启用定时任务</span>
-          </label>
-        </div>
-        <div v-if="createForm.enableSchedule" class="schedule-grid">
-          <!-- 月 -->
-          <div class="schedule-item">
-            <label>月</label>
-            <select v-model="tempSchedule.month" multiple size="6" @dblclick="confirmField('month')">
-              <option value="*">每月</option>
-              <option v-for="m in [1,2,3,4,5,6,7,8,9,10,11,12]" :key="m" :value="String(m)">{{ m }}月</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('month')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleMonth === '*' ? '每月' : (createForm.scheduleMonth || '每月') }}</span>
-          </div>
-          <!-- 周 -->
-          <div class="schedule-item">
-            <label>周</label>
-            <select v-model="tempSchedule.week" multiple size="6" @dblclick="confirmField('week')">
-              <option value="*">每日</option>
-              <option value="">不设置</option>
-              <option v-for="(w, idx) in ['周一','周二','周三','周四','周五','周六','周日']" :key="w" :value="String(idx+1)">{{ w }}</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('week')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleWeek === '*' ? '每日' : (createForm.scheduleWeek || '不设置') }}</span>
-          </div>
-          <!-- 日 -->
-          <div class="schedule-item">
-            <label>日</label>
-            <select v-model="tempSchedule.day" multiple size="6" @dblclick="confirmField('day')">
-              <option value="*">每日</option>
-              <option value="">不设置</option>
-              <option v-for="d in 31" :key="d" :value="String(d)">{{ d }}日</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('day')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleDay === '*' ? '每日' : (createForm.scheduleDay || '不设置') }}</span>
-          </div>
-          <!-- 时 -->
-          <div class="schedule-item">
-            <label>时</label>
-            <select v-model="tempSchedule.hour" multiple size="6" @dblclick="confirmField('hour')">
-              <option value="*">每时</option>
-              <option v-for="h in 24" :key="h-1" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}时</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('hour')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleHour === '*' ? '每时' : (createForm.scheduleHour || '00') + '时' }}</span>
-          </div>
-          <!-- 分 -->
-          <div class="schedule-item">
-            <label>分</label>
-            <select v-model="tempSchedule.minute" multiple size="6" @dblclick="confirmField('minute')">
-              <option value="*">每分</option>
-              <option v-for="m in 60" :key="m-1" :value="String(m-1).padStart(2,'0')">{{ String(m-1).padStart(2,'0') }}分</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('minute')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleMinute === '*' ? '每分' : (createForm.scheduleMinute || '00') + '分' }}</span>
-          </div>
-        </div>
-      </div>
+      <ScheduleOptions v-model="createForm" />
 
       <!-- 高级选项 -->
       <button type="button" class="ghost small" @click="showAdvancedOptions = !showAdvancedOptions">
