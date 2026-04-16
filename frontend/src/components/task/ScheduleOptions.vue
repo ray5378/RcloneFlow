@@ -70,8 +70,8 @@ function toggleEnable() {
   <div class="schedule-options">
     <div class="field-item">
       <label class="inline-label">
+        <span>启用定时调度</span>
         <input type="checkbox" :checked="modelValue?.enableSchedule" @change="toggleEnable" />
-        <span style="margin-left:8px">启用定时调度</span>
       </label>
     </div>
 
@@ -156,6 +156,20 @@ function toggleEnable() {
   padding: 12px;
   background: var(--surface);
   border-radius: 8px;
+}
+.field-item {
+  display: flex;
+  align-items: center;
+}
+.field-item .inline-label {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.field-item .inline-label input[type="checkbox"] {
+  margin: 0;
 }
 .schedule-row {
   display: flex;
