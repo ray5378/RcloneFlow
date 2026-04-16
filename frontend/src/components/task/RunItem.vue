@@ -146,6 +146,7 @@ function getTransferred(run: RunRecord): string {
           {{ (props.summary.counts?.copied || 0) + (props.summary.counts?.deleted || 0) }}
         </span>
         <span class="chip failed">失败 {{ props.summary.counts?.failed || 0 }}</span>
+        <span class="chip meta">总体积 {{ formatBytes(props.summary.totalBytes || 0) }}</span>
         <span class="chip meta">已传输 {{ formatBytes(props.summary.transferredBytes || 0) }}</span>
       </template>
     </div>
