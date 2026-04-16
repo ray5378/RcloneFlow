@@ -244,7 +244,7 @@ export const queueApi = {
 export const jobApi = {
   async list() {
     try {
-      return await api.listJobs()
+      return await api.getActiveRuns()
     } catch (err) {
       handleError(err, { module: 'Job', operation: '获取任务列表' })
       return []
