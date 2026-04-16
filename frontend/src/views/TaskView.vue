@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
-import { TaskCard, RunItem, ScheduleOptions } from '../components/task'
+import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions } from '../components/task'
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
 import { PathItem } from '../components/path'
@@ -1697,71 +1697,7 @@ const targetBreadcrumbs = computed(() => {
       <ScheduleOptions v-model="createForm" />
 
       <!-- 高级选项 -->
-      <button type="button" class="ghost small" @click="showAdvancedOptions = !showAdvancedOptions">
-        {{ showAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}
-      </button>
-      <div v-if="showAdvancedOptions" class="advanced-section">
-        <div class="advanced-group">
-          <div class="advanced-group-title">传输策略</div>
-          <div class="advanced-row inline">
-            <label>开启流式传输（推荐）</label>
-            <input type="checkbox" v-model="createForm.options.enableStreaming" />
-          </div>
-        </div>
-
-        <div class="advanced-group">
-          <div class="advanced-group-title">过滤参数</div>
-          <div class="advanced-row">
-            <label>排除 (exclude)</label>
-            <textarea v-model="createForm.options.exclude" placeholder="每行一个规则, 如: *.txt&#10;备份/**" rows="3"></textarea>
-          </div>
-          <div class="advanced-row">
-            <label>包含 (include)</label>
-            <textarea v-model="createForm.options.include" placeholder="每行一个规则, 如: *.pdf&#10;文档/**" rows="3"></textarea>
-          </div>
-          <div class="advanced-row">
-            <label>过滤规则 (filter)</label>
-            <textarea v-model="createForm.options.filter" placeholder="每行一个规则, 如: - *.tmp&#10;+ *.bak" rows="3"></textarea>
-          </div>
-          <div class="advanced-row inline">
-            <label>忽略大小写</label>
-            <input type="checkbox" v-model="createForm.options.ignoreCase" />
-          </div>
-          <div class="advanced-row inline">
-            <label>忽略已存在的文件</label>
-            <input type="checkbox" v-model="createForm.options.ignoreExisting" />
-          </div>
-          <div class="advanced-row inline">
-            <label>删除被排除的文件</label>
-            <input type="checkbox" v-model="createForm.options.deleteExcluded" />
-          </div>
-        </div>
-
-        <div class="advanced-group">
-          <div class="advanced-group-title">比较策略</div>
-          <div class="advanced-row inline">
-            <label>校验和比较</label>
-            <input type="checkbox" v-model="createForm.options.checksum" />
-          </div>
-          <div class="advanced-row inline">
-            <label>仅按大小</label>
-            <input type="checkbox" v-model="createForm.options.sizeOnly" />
-          </div>
-          <div class="advanced-row inline">
-            <label>忽略大小</label>
-            <input type="checkbox" v-model="createForm.options.ignoreSize" />
-          </div>
-          <div class="advanced-row inline">
-            <label>忽略时间</label>
-            <input type="checkbox" v-model="createForm.options.ignoreTimes" />
-          </div>
-          <div class="advanced-row inline">
-            <label>更新较新的</label>
-            <input type="checkbox" v-model="createForm.options.update" />
-          </div>
-          <div class="advanced-row">
-            <label>时间窗口</label>
-            <input type="text" v-model="createForm.options.modifyWindow" placeholder="如: 1h2s" />
+      <ScheduleOptions v-model="createForm" />
           </div>
         </div>
 
