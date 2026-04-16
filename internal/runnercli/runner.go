@@ -1213,7 +1213,7 @@ func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst,
 		if len(files) == 0 {
 			return
 		}
-		// 限制文件数量，超过 5000 个则跳过（避免远程目录过大导致超时）
+		// 限制文件数量，超过 5000 个则跳过
 		if len(files) > 5000 {
 			return
 		}
@@ -1247,26 +1247,20 @@ func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst,
 		if len(m) == 0 {
 			return
 		}
-		enriched := false
+		// 直接在传入的 files 上修改（切片是引用类型，修改会影响原数组）
 		for i := range files {
-			if szAny, ok := files[i]["sizeBytes"]; !ok || fmt.Sprint(szAny) == "0" {
-				p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
-				if sz, ok2 := m[p]; ok2 && sz > 0 {
-					files[i]["sizeBytes"] = sz
-					enriched = true
-				}
+			p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
+			if sz, ok := m[p]; ok && sz > 0 {
+				files[i]["sizeBytes"] = sz
 			}
 		}
-		if !enriched {
-			return
-		}
-		// 更新数据库中的 finalSummary
+		// 补全完成后，更新数据库中的 finalSummary
 		_ = r.db.UpdateRun(runID, func(rr *store.Run) {
-			if rr.Summary == nil {
+			if rr == nil || rr.Summary == nil {
 				return
 			}
-			rr.Summary["finalSummary"] = map[string]any{
-				"files": files,
+			if fs, ok := rr.Summary["finalSummary"].(map[string]any); ok {
+				fs["files"] = files
 			}
 		})
 	}()
