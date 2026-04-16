@@ -232,7 +232,7 @@ function getTransferred(run: RunRecord): string {
   color: #ccc;
 }
 .chip.meta {
-  background: #222;
+  background: transparent;
   color: #999;
 }
 .chip.success { background: #22c55e33; color: #22c55e; }
