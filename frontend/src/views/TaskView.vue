@@ -49,10 +49,22 @@ function jumpToPage() {
   jumpPage.value = page
   loadData()
 }
-const taskSearch = ref('')
 
-// 过滤后的任务列表
-const filteredTasks = computed(() => {
+// 任务分页
+const tasksPage = ref(1)
+const tasksPageSize = 20
+const tasksJumpPage = ref(1)
+const tasksTotal = computed(() => filteredTasksRaw.value.length)
+const currentTasksPages = computed(() => Math.max(1, Math.ceil(tasksTotal.value / tasksPageSize)))
+
+function jumpToTasksPage() {
+  const page = Math.min(Math.max(1, tasksJumpPage.value || 1), currentTasksPages.value)
+  tasksPage.value = page
+  tasksJumpPage.value = page
+}
+
+// 过滤后的任务列表（原始）
+const filteredTasksRaw = computed(() => {
   if (!taskSearch.value) return tasks.value
   const q = taskSearch.value.toLowerCase()
   return tasks.value.filter(t =>
@@ -61,6 +73,13 @@ const filteredTasks = computed(() => {
     t.targetRemote.toLowerCase().includes(q) ||
     t.mode.toLowerCase().includes(q)
   )
+})
+
+// 过滤后的任务列表（分页后）
+const filteredTasks = computed(() => {
+  const start = (tasksPage.value - 1) * tasksPageSize
+  const end = start + tasksPageSize
+  return filteredTasksRaw.value.slice(start, end)
 })
 
 const remotes = ref<string[]>([])
@@ -1328,6 +1347,14 @@ const targetBreadcrumbs = computed(() => {
         @set-singleton="setSingletonMode(task)"
       />
       <div v-if="!filteredTasks.length" class="empty">暂无任务</div>
+    </div>
+    <!-- 任务分页 -->
+    <div class="pagination" v-if="tasksTotal > tasksPageSize">
+      <span class="page-current">第 {{ tasksPage }} / {{ currentTasksPages }} 页</span>
+      <button class="page-btn" :disabled="tasksPage <= 1" @click="tasksPage--">上一页</button>
+      <button class="page-btn" :disabled="tasksPage >= currentTasksPages" @click="tasksPage++">下一页</button>
+      <input type="number" class="page-input" v-model.number="tasksJumpPage" :min="1" :max="currentTasksPages" @keyup.enter="jumpToTasksPage" />
+      <button class="page-btn" @click="jumpToTasksPage">跳转</button>
     </div>
   </div>
 
