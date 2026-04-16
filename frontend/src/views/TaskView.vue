@@ -921,6 +921,17 @@ const filteredRuns = computed(() => {
   return result
 })
 
+// 筛选后的总数（用于分页）
+const filteredRunsTotal = computed(() => filteredRuns.value.length)
+
+// 当前分页的总数（全局视图用 runsTotal，特定任务视图用 filteredRunsTotal）
+const currentTotal = computed(() => {
+  return historyFilterTaskId.value === null ? (runsTotal.value || 0) : filteredRunsTotal.value
+})
+
+// 当前总页数
+const currentTotalPages = computed(() => Math.max(1, Math.ceil(currentTotal.value / runsPageSize)))
+
 function viewTaskHistory(taskId: number) {
   runsPage.value = 1
   historyFilterTaskId.value = taskId
@@ -1474,13 +1485,13 @@ import TransferOptions from '../components/TransferOptions.vue'
         <button :class="['filter-btn', historyStatusFilter==='skipped' && 'active']" @click="historyStatusFilter='skipped'">跳过</button>
         <button :class="['filter-btn', historyStatusFilter==='hasTransfer' && 'active']" @click="historyStatusFilter='hasTransfer'">有传输</button>
       </div>
-      <!-- 全局历史分页 -->
-      <div class="pagination" v-if="historyFilterTaskId === null && (runsTotal || 0) > runsPageSize">
+      <!-- 历史记录分页 -->
+      <div class="pagination" v-if="currentTotal > runsPageSize">
         <button class="page-btn" :disabled="runsPage <= 1" @click="runsPage--; loadData()">上一页</button>
-        <input type="number" class="page-input" v-model.number="jumpPage" :min="1" :max="Math.max(1, Math.ceil((runsTotal || 0) / runsPageSize))" @keyup.enter="jumpToPage" />
-        <span class="page-info">/ {{ Math.max(1, Math.ceil((runsTotal || 0) / runsPageSize)) }}</span>
+        <input type="number" class="page-input" v-model.number="jumpPage" :min="1" :max="currentTotalPages" @keyup.enter="jumpToPage" />
+        <span class="page-info">/ {{ currentTotalPages }}</span>
         <button class="page-btn" @click="jumpToPage">跳转</button>
-        <button class="page-btn" :disabled="runsPage * runsPageSize >= (runsTotal || 0)" @click="runsPage++; loadData()">下一页</button>
+        <button class="page-btn" :disabled="runsPage >= currentTotalPages" @click="runsPage++; loadData()">下一页</button>
       </div>
       <div class="header-actions">
         <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click="clearAllRuns">删除所有</button>
