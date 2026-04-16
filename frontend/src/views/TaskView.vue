@@ -1431,10 +1431,8 @@ const targetBreadcrumbs = computed(() => {
       </div>
       <!-- 历史记录分页 -->
       <div class="pagination" v-if="currentTotal > runsPageSize">
+        <span class="page-current">第 {{ runsPage }} / {{ currentTotalPages }} 页</span>
         <button class="page-btn" :disabled="runsPage <= 1" @click="runsPage--; loadData()">上一页</button>
-        <input type="number" class="page-input" v-model.number="jumpPage" :min="1" :max="currentTotalPages" @keyup.enter="jumpToPage" />
-        <span class="page-info">/ {{ currentTotalPages }}</span>
-        <button class="page-btn" @click="jumpToPage">跳转</button>
         <button class="page-btn" :disabled="runsPage >= currentTotalPages" @click="runsPage++; loadData()">下一页</button>
       </div>
       <div class="header-actions">
