@@ -439,41 +439,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					counts["deleted"] = 0
 					counts["total"] = counts["copied"] + counts["failed"] + counts["skipped"]
 				}
-				// Fallback enrichment: lsjson target to fill missing sizeBytes
-				if len(files) > 0 {
-					cr := &adapter.CmdRunner{}
-					if out, _, e2 := cr.Run(context.Background(), []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}...); e2 == nil {
-						var arr []map[string]any
-						if json.Unmarshal([]byte(out), &arr) == nil {
-							m := map[string]int64{}
-							for _, it := range arr {
-								p, _ := it["Path"].(string)
-								if p == "" {
-									p, _ = it["path"].(string)
-								}
-								var sz int64
-								switch vv := it["Size"].(type) {
-								case float64:
-									sz = int64(vv)
-								}
-								if p != "" {
-									p = strings.ReplaceAll(p, "\\", "/")
-									m[p] = sz
-								}
-							}
-							if len(m) > 0 {
-								for i := range files {
-									if szAny, ok := files[i]["sizeBytes"]; !ok || fmt.Sprint(szAny) == "0" {
-										p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
-										if sz, ok2 := m[p]; ok2 && sz > 0 {
-											files[i]["sizeBytes"] = sz
-										}
-									}
-								}
-							}
-						}
-					}
-				}
+				// 异步补全文件大小，不阻塞状态更新
+				r.enrichFilesSizesAsync(run.ID, files, dst, cfg)
 				rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": humanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
 			})
 			// fire webhook for failed run
@@ -697,41 +664,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					}
 				}
 			}
-			// Fallback enrichment: lsjson target to fill missing sizeBytes
-			if len(files) > 0 {
-				cr := &adapter.CmdRunner{}
-				if out, _, e2 := cr.Run(context.Background(), []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}...); e2 == nil {
-					var arr []map[string]any
-					if json.Unmarshal([]byte(out), &arr) == nil {
-						m := map[string]int64{}
-						for _, it := range arr {
-							p, _ := it["Path"].(string)
-							if p == "" {
-								p, _ = it["path"].(string)
-							}
-							var sz int64
-							switch vv := it["Size"].(type) {
-							case float64:
-								sz = int64(vv)
-							}
-							if p != "" {
-								p = strings.ReplaceAll(p, "\\", "/")
-								m[p] = sz
-							}
-						}
-						if len(m) > 0 {
-							for i := range files {
-								if szAny, ok := files[i]["sizeBytes"]; !ok || fmt.Sprint(szAny) == "0" {
-									p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
-									if sz, ok2 := m[p]; ok2 && sz > 0 {
-										files[i]["sizeBytes"] = sz
-									}
-								}
-							}
-						}
-					}
-				}
-			}
+			// 异步补全文件大小，不阻塞状态更新
+			r.enrichFilesSizesAsync(run.ID, files, dst, cfg)
 			finalSummary["counts"] = counts
 			finalSummary["files"] = files
 			rr.Summary["finalSummary"] = finalSummary
@@ -1271,4 +1205,69 @@ func spmValue(m []string, i int) string {
 		return m[i]
 	}
 	return ""
+}
+
+// enrichFilesSizesAsync 异步补全文件大小，不阻塞数据库更新和 webhook
+func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst, cfg string) {
+	go func() {
+		if len(files) == 0 {
+			return
+		}
+		// 限制文件数量，超过 5000 个则跳过（避免远程目录过大导致超时）
+		if len(files) > 5000 {
+			return
+		}
+		cr := &adapter.CmdRunner{}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		out, _, e2 := cr.Run(ctx, []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}...)
+		if e2 != nil {
+			return
+		}
+		var arr []map[string]any
+		if json.Unmarshal([]byte(out), &arr) != nil {
+			return
+		}
+		m := map[string]int64{}
+		for _, it := range arr {
+			p, _ := it["Path"].(string)
+			if p == "" {
+				p, _ = it["path"].(string)
+			}
+			var sz int64
+			switch vv := it["Size"].(type) {
+			case float64:
+				sz = int64(vv)
+			}
+			if p != "" {
+				p = strings.ReplaceAll(p, "\\", "/")
+				m[p] = sz
+			}
+		}
+		if len(m) == 0 {
+			return
+		}
+		enriched := false
+		for i := range files {
+			if szAny, ok := files[i]["sizeBytes"]; !ok || fmt.Sprint(szAny) == "0" {
+				p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
+				if sz, ok2 := m[p]; ok2 && sz > 0 {
+					files[i]["sizeBytes"] = sz
+					enriched = true
+				}
+			}
+		}
+		if !enriched {
+			return
+		}
+		// 更新数据库中的 finalSummary
+		_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+			if rr.Summary == nil {
+				return
+			}
+			rr.Summary["finalSummary"] = map[string]any{
+				"files": files,
+			}
+		})
+	}()
 }
