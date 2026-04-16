@@ -1446,26 +1446,26 @@ const targetBreadcrumbs = computed(() => {
   </div>
 
   <div v-if="currentModule === 'history'" class="card">
-    <div class="card-header clickable" @click="currentModule = 'tasks'">
-      <div class="title">任务历史记录 ←</div>
-      <div class="history-filters">
-        <button :class="['filter-btn', historyStatusFilter==='all' && 'active']" @click="historyStatusFilter='all'">全部</button>
-        <button :class="['filter-btn', historyStatusFilter==='finished' && 'active']" @click="historyStatusFilter='finished'">成功</button>
-        <button :class="['filter-btn', historyStatusFilter==='failed' && 'active']" @click="historyStatusFilter='failed'">失败</button>
-        <button :class="['filter-btn', historyStatusFilter==='skipped' && 'active']" @click="historyStatusFilter='skipped'">跳过</button>
-        <button :class="['filter-btn', historyStatusFilter==='hasTransfer' && 'active']" @click="historyStatusFilter='hasTransfer'">有传输</button>
+    <div class="card-header">
+      <div class="title clickable" @click.stop="currentModule = 'tasks'">任务历史记录 ←</div>
+      <div class="history-filters" @click.stop>
+        <button :class="['filter-btn', historyStatusFilter==='all' && 'active']" @click.stop="historyStatusFilter='all'">全部</button>
+        <button :class="['filter-btn', historyStatusFilter==='finished' && 'active']" @click.stop="historyStatusFilter='finished'">成功</button>
+        <button :class="['filter-btn', historyStatusFilter==='failed' && 'active']" @click.stop="historyStatusFilter='failed'">失败</button>
+        <button :class="['filter-btn', historyStatusFilter==='skipped' && 'active']" @click.stop="historyStatusFilter='skipped'">跳过</button>
+        <button :class="['filter-btn', historyStatusFilter==='hasTransfer' && 'active']" @click.stop="historyStatusFilter='hasTransfer'">有传输</button>
       </div>
       <!-- 历史记录分页 -->
-      <div class="pagination" v-if="currentTotal > runsPageSize">
+      <div class="pagination" v-if="currentTotal > runsPageSize" @click.stop>
         <span class="page-current">第 {{ runsPage }} / {{ currentTotalPages }} 页</span>
-        <button class="page-btn" :disabled="runsPage <= 1" @click="runsPage--; loadData()">上一页</button>
-        <button class="page-btn" :disabled="runsPage >= currentTotalPages" @click="runsPage++; loadData()">下一页</button>
-        <input type="number" class="page-input" v-model.number="jumpPage" :min="1" :max="currentTotalPages" @keyup.enter="jumpToPage" />
-        <button class="page-btn" @click="jumpToPage">跳转</button>
+        <button class="page-btn" :disabled="runsPage <= 1" @click.stop="runsPage--; loadData()">上一页</button>
+        <button class="page-btn" :disabled="runsPage >= currentTotalPages" @click.stop="runsPage++; loadData()">下一页</button>
+        <input type="number" class="page-input" v-model.number="jumpPage" :min="1" :max="currentTotalPages" @keyup.enter.stop="jumpToPage" />
+        <button class="page-btn" @click.stop="jumpToPage">跳转</button>
       </div>
-      <div class="header-actions">
-        <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click="clearAllRuns">删除所有</button>
-        <button v-if="historyFilterTaskId !== null" class="ghost small" @click="currentModule = 'tasks'">
+      <div class="header-actions" @click.stop>
+        <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click.stop="clearAllRuns">删除所有</button>
+        <button v-if="historyFilterTaskId !== null" class="ghost small" @click.stop="currentModule = 'tasks'">
           ← 返回
         </button>
       </div>
