@@ -5,10 +5,18 @@ export interface ErrorContext {
   module?: string
   operation?: string
   fallbackValue?: any
+  onError?: (message: string) => void
+}
+
+// Global error handler callback
+let globalErrorHandler: ((message: string, type: 'error' | 'success' | 'info' | 'warning') => void) | null = null
+
+export function setErrorHandler(handler: (message: string, type: 'error' | 'success' | 'info' | 'warning') => void) {
+  globalErrorHandler = handler
 }
 
 /**
- * Handle error - logs to console and shows toast via ElMessage
+ * Handle error - logs to console and calls global error handler if set
  */
 export function handleError(err: any, context: ErrorContext = {}): void {
   const message = context.operation 
@@ -17,16 +25,23 @@ export function handleError(err: any, context: ErrorContext = {}): void {
   
   console.error(`[${context.module || 'Unknown'}] ${context.operation}:`, err)
   
-  // Use setTimeout to avoid blocking and allow toast to show
-  setTimeout(() => {
-    try {
-      // Dynamically import element-plus only on client side
-      const { ElMessage } = require('element-plus')
-      ElMessage.error(message)
-    } catch {
-      // Fallback - ElMessage not available
-    }
-  }, 0)
+  if (globalErrorHandler) {
+    globalErrorHandler(message, 'error')
+  } else {
+    // Fallback to console.error if no handler set
+    console.error(message)
+  }
+}
+
+/**
+ * Show toast message via global handler
+ */
+export function showToastMessage(message: string, type: 'error' | 'success' | 'info' | 'warning' = 'error'): void {
+  if (globalErrorHandler) {
+    globalErrorHandler(message, type)
+  } else {
+    console.log(`[${type}] ${message}`)
+  }
 }
 
 /**
@@ -48,40 +63,19 @@ export async function withErrorHandling<T>(
  * Toast success message
  */
 export function showSuccess(message: string): void {
-  setTimeout(() => {
-    try {
-      const { ElMessage } = require('element-plus')
-      ElMessage.success(message)
-    } catch {
-      console.log(message)
-    }
-  }, 0)
+  showToastMessage(message, 'success')
 }
 
 /**
  * Toast info message
  */
 export function showInfo(message: string): void {
-  setTimeout(() => {
-    try {
-      const { ElMessage } = require('element-plus')
-      ElMessage.info(message)
-    } catch {
-      console.log(message)
-    }
-  }, 0)
+  showToastMessage(message, 'info')
 }
 
 /**
  * Toast warning message
  */
 export function showWarning(message: string): void {
-  setTimeout(() => {
-    try {
-      const { ElMessage } = require('element-plus')
-      ElMessage.warning(message)
-    } catch {
-      console.warn(message)
-    }
-  }, 0)
+  showToastMessage(message, 'warning')
 }

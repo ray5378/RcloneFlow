@@ -6,7 +6,7 @@ import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
 import { PathItem } from '../components/path'
 import { taskApi, remoteApi, runApi, queueApi, jobApi, scheduleApi } from '../composables/useApi'
-import { handleError, showSuccess } from '../composables/useError'
+import { handleError, showSuccess, setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
 import { getToken } from '../api/auth'
 import type { Task, Schedule, Run } from '../types'
@@ -27,6 +27,11 @@ function showToast(message: string, type: 'info' | 'success' | 'error' = 'info')
     toasts.value = toasts.value.filter(t => t.id !== id)
   }, 3000)
 }
+
+// Set up global error handler for composables
+setErrorHandler((message, type) => {
+  showToast(message, type as 'info' | 'success' | 'error')
+})
 
 const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
@@ -952,6 +957,11 @@ async function runTask(taskId: number) {
   }
   runningTaskId.value = taskId
   const result = await taskApi.run(taskId)
+  if (!result) {
+    showToast('任务启动失败，可能单例模式有其他任务正在运行', 'error')
+    runningTaskId.value = null
+    return
+  }
   // 5秒后恢复
   setTimeout(() => {
     if (runningTaskId.value === taskId) {
