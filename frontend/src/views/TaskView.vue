@@ -488,15 +488,22 @@ let loadSeq = 0
 async function loadData() {
   const seq = ++loadSeq
   try {
+    console.log('[loadData] start, seq:', seq)
     const [taskData, remoteData, scheduleData, runResult] = await Promise.all([
       taskApi.list(),
       remoteApi.list(),
       scheduleApi.list(),
       runApi.list(runsPage.value, runsPageSize),
     ])
+    console.log('[loadData] results:', { taskData, remoteData, scheduleData, runResult })
     if (seq !== loadSeq) return // 只接受最新一轮
     // 更新任务列表（允许空数组清空旧数据）
-    if (Array.isArray(taskData)) tasks.value = taskData
+    if (Array.isArray(taskData)) {
+      tasks.value = taskData
+      console.log('[loadData] tasks updated:', taskData.length)
+    } else {
+      console.warn('[loadData] taskData is not an array:', taskData)
+    }
     if (Array.isArray(remoteData?.remotes) && remoteData.remotes.length > 0) remotes.value = remoteData.remotes
     if (Array.isArray(scheduleData) && scheduleData.length > 0) schedules.value = scheduleData
     if (runResult?.runs) {
@@ -506,10 +513,11 @@ async function loadData() {
     // 本地快照：成功后保存
     try { localStorage.setItem('lastTasksSnapshot', JSON.stringify(tasks.value||[])) } catch {}
   } catch (e:any) {
-    console.error(e)
+    console.error('[loadData] error:', e)
+    showToast('加载数据失败: ' + (e.message || e), 'error')
     // 失败不覆写：保留上一帧；若当前为空，尝试用本地快照兜底
     if (!tasks.value || tasks.value.length===0) {
-      try { const snap = JSON.parse(localStorage.getItem('lastTasksSnapshot')||'[]'); if (Array.isArray(snap)) tasks.value = snap } catch {}
+      try { const snap = JSON.parse(localStorage.getItem('lastTasksSnapshot')||'[]'); if (Array.isArray(snap)) { tasks.value = snap; console.log('[loadData] restored from snapshot:', snap.length) } } catch {}
     }
   }
 }
