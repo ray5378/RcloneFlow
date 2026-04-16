@@ -42,8 +42,7 @@ const runsPageSize = 50
 const jumpPage = ref(1)
 
 function jumpToPage() {
-  const totalPages = Math.max(1, Math.ceil((runsTotal.value || 0) / runsPageSize))
-  const page = Math.min(Math.max(1, jumpPage.value || 1), totalPages)
+  const page = Math.min(Math.max(1, jumpPage.value || 1), currentTotalPages.value)
   runsPage.value = page
   jumpPage.value = page
   loadData()
