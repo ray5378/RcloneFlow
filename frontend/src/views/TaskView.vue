@@ -1057,13 +1057,6 @@ function editTask(task: Task) {
   openMenuId.value = null
 }
 
-function getParentPath(path: string): string {
-  if (!path) return ''
-  const parts = path.split('/')
-  parts.pop()
-  return parts.join('/')
-}
-
 function showConfirm(title: string, message: string, onConfirm: () => void) {
   confirmModal.value = { show: true, title, message, onConfirm }
 }
@@ -1334,20 +1327,6 @@ function selectTargetFile(item: any) {
   }
 }
 
-function goBackSource() {
-  const parts = sourceCurrentPath.value.split('/')
-  parts.pop()
-  const parentPath = parts.join('/')
-  loadSourcePath(createForm.value.sourceRemote, parentPath)
-}
-
-function goBackTarget() {
-  const parts = targetCurrentPath.value.split('/')
-  parts.pop()
-  const parentPath = parts.join('/')
-  loadTargetPath(createForm.value.targetRemote, parentPath)
-}
-
 // 源路径面包屑
 const sourceBreadcrumbs = computed(() => {
   if (!createForm.value.sourceRemote) return []
@@ -1373,7 +1352,6 @@ const targetBreadcrumbs = computed(() => {
   }
   return crumbs
 })
-import TransferOptions from '../components/TransferOptions.vue'
 </script>
 
 
