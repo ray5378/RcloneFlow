@@ -89,7 +89,7 @@ function isStopped(): boolean {
 </script>
 
 <template>
-  <div class="task-card" :class="{ active: activeRun }">
+  <div class="task-card" :class="{ active: activeRun }" @click="emit('viewHistory', task.id!)">
     <div class="task-main">
       <div class="name">
         <strong>{{ task.name }}</strong>
