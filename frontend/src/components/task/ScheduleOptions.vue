@@ -55,8 +55,8 @@ function confirmField(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
   <div class="schedule-section">
     <div class="section-header">
       <label class="schedule-toggle">
-        <input type="checkbox" :checked="modelValue?.enableSchedule" @change="emit('update:modelValue', { ...modelValue, enableSchedule: !modelValue.enableSchedule })" />
         <span>启用定时任务</span>
+        <input type="checkbox" :checked="modelValue?.enableSchedule" @change="emit('update:modelValue', { ...modelValue, enableSchedule: !modelValue.enableSchedule })" />
       </label>
     </div>
 

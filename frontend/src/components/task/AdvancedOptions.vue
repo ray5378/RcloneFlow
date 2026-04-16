@@ -54,8 +54,8 @@ function update(key: keyof Options, value: any) {
     <div class="advanced-group">
       <div class="advanced-group-title">传输策略</div>
       <div class="advanced-row inline">
-        <label>开启流式传输（推荐）</label>
-        <input type="checkbox" :checked="modelValue?.enableStreaming" @change="update('enableStreaming', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.enableStreaming" @change="update('enableStreaming', ($event.target as HTMLInputElement).checked)" />
+          <label>开启流式传输（推荐）</label>
       </div>
     </div>
 
@@ -75,16 +75,16 @@ function update(key: keyof Options, value: any) {
         <textarea :value="modelValue?.filter" @input="update('filter', ($event.target as HTMLTextAreaElement).value)" placeholder="每行一个规则, 如: - *.tmp&#10;+ *.bak" rows="3"></textarea>
       </div>
       <div class="advanced-row inline">
-        <label>忽略大小写</label>
-        <input type="checkbox" :checked="modelValue?.ignoreCase" @change="update('ignoreCase', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.ignoreCase" @change="update('ignoreCase', ($event.target as HTMLInputElement).checked)" />
+          <label>忽略大小写</label>
       </div>
       <div class="advanced-row inline">
-        <label>忽略已存在的文件</label>
-        <input type="checkbox" :checked="modelValue?.ignoreExisting" @change="update('ignoreExisting', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.ignoreExisting" @change="update('ignoreExisting', ($event.target as HTMLInputElement).checked)" />
+          <label>忽略已存在的文件</label>
       </div>
       <div class="advanced-row inline">
-        <label>删除被排除的文件</label>
-        <input type="checkbox" :checked="modelValue?.deleteExcluded" @change="update('deleteExcluded', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.deleteExcluded" @change="update('deleteExcluded', ($event.target as HTMLInputElement).checked)" />
+          <label>删除被排除的文件</label>
       </div>
     </div>
 
@@ -92,24 +92,24 @@ function update(key: keyof Options, value: any) {
     <div class="advanced-group">
       <div class="advanced-group-title">比较策略</div>
       <div class="advanced-row inline">
-        <label>校验和比较</label>
-        <input type="checkbox" :checked="modelValue?.checksum" @change="update('checksum', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.checksum" @change="update('checksum', ($event.target as HTMLInputElement).checked)" />
+          <label>校验和比较</label>
       </div>
       <div class="advanced-row inline">
-        <label>仅按大小</label>
-        <input type="checkbox" :checked="modelValue?.sizeOnly" @change="update('sizeOnly', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.sizeOnly" @change="update('sizeOnly', ($event.target as HTMLInputElement).checked)" />
+          <label>仅按大小</label>
       </div>
       <div class="advanced-row inline">
-        <label>忽略大小</label>
-        <input type="checkbox" :checked="modelValue?.ignoreSize" @change="update('ignoreSize', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.ignoreSize" @change="update('ignoreSize', ($event.target as HTMLInputElement).checked)" />
+          <label>忽略大小</label>
       </div>
       <div class="advanced-row inline">
-        <label>忽略时间</label>
-        <input type="checkbox" :checked="modelValue?.ignoreTimes" @change="update('ignoreTimes', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.ignoreTimes" @change="update('ignoreTimes', ($event.target as HTMLInputElement).checked)" />
+          <label>忽略时间</label>
       </div>
       <div class="advanced-row inline">
-        <label>更新较新的</label>
-        <input type="checkbox" :checked="modelValue?.update" @change="update('update', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.update" @change="update('update', ($event.target as HTMLInputElement).checked)" />
+          <label>更新较新的</label>
       </div>
       <div class="advanced-row">
         <label>时间窗口</label>
@@ -121,12 +121,12 @@ function update(key: keyof Options, value: any) {
     <div class="advanced-group">
       <div class="advanced-group-title">路径策略</div>
       <div class="advanced-row inline">
-        <label>不遍历</label>
-        <input type="checkbox" :checked="modelValue?.noTraverse" @change="update('noTraverse', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.noTraverse" @change="update('noTraverse', ($event.target as HTMLInputElement).checked)" />
+          <label>不遍历</label>
       </div>
       <div class="advanced-row inline">
-        <label>不检查目标</label>
-        <input type="checkbox" :checked="modelValue?.noCheckDest" @change="update('noCheckDest', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.noCheckDest" @change="update('noCheckDest', ($event.target as HTMLInputElement).checked)" />
+          <label>不检查目标</label>
       </div>
       <div class="advanced-row">
         <label>比较目录</label>
@@ -150,8 +150,8 @@ function update(key: keyof Options, value: any) {
         <input type="text" :value="modelValue?.bwLimit" @input="update('bwLimit', ($event.target as HTMLInputElement).value)" placeholder="如: 10M" />
       </div>
       <div class="advanced-row inline">
-        <label>多线程传输</label>
-        <input type="checkbox" :checked="modelValue?.multiThreadStreams" @change="update('multiThreadStreams', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.multiThreadStreams" @change="update('multiThreadStreams', ($event.target as HTMLInputElement).checked)" />
+          <label>多线程传输</label>
       </div>
       <div class="advanced-row">
         <label>最大传输</label>
@@ -167,20 +167,20 @@ function update(key: keyof Options, value: any) {
     <div class="advanced-group">
       <div class="advanced-group-title">其他参数</div>
       <div class="advanced-row inline">
-        <label>模拟运行 (dry-run)</label>
-        <input type="checkbox" :checked="modelValue?.dryRun" @change="update('dryRun', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.dryRun" @change="update('dryRun', ($event.target as HTMLInputElement).checked)" />
+          <label>模拟运行 (dry-run)</label>
       </div>
       <div class="advanced-row inline">
-        <label>交互模式</label>
-        <input type="checkbox" :checked="modelValue?.interactive" @change="update('interactive', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.interactive" @change="update('interactive', ($event.target as HTMLInputElement).checked)" />
+          <label>交互模式</label>
       </div>
       <div class="advanced-row inline">
-        <label>检查前先检查</label>
-        <input type="checkbox" :checked="modelValue?.checkFirst" @change="update('checkFirst', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.checkFirst" @change="update('checkFirst', ($event.target as HTMLInputElement).checked)" />
+          <label>检查前先检查</label>
       </div>
       <div class="advanced-row inline">
-        <label>服务器端跨配置</label>
-        <input type="checkbox" :checked="modelValue?.serverSideAcrossConfigs" @change="update('serverSideAcrossConfigs', ($event.target as HTMLInputElement).checked)" />
+          <input type="checkbox" :checked="modelValue?.serverSideAcrossConfigs" @change="update('serverSideAcrossConfigs', ($event.target as HTMLInputElement).checked)" />
+          <label>服务器端跨配置</label>
       </div>
       <div class="advanced-row">
         <label>检查器数</label>
