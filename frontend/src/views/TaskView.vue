@@ -487,7 +487,6 @@ onMounted(async () => {
 let loadSeq = 0
 async function loadData() {
   const seq = ++loadSeq
-  console.log('[loadData] start, seq:', seq, 'current loadSeq:', loadSeq)
   try {
     const [taskData, remoteData, scheduleData, runResult] = await Promise.all([
       taskApi.list(),
@@ -495,32 +494,19 @@ async function loadData() {
       scheduleApi.list(),
       runApi.list(runsPage.value, runsPageSize),
     ])
-    console.log('[loadData] after await, seq:', seq, 'loadSeq:', loadSeq, 'match:', seq === loadSeq)
-    if (seq !== loadSeq) {
-      console.log('[loadData] rejected by seq guard, returning early')
-      return
-    }
-    // 更新任务列表（允许空数组清空旧数据）
-    if (Array.isArray(taskData)) {
-      tasks.value = taskData
-      console.log('[loadData] tasks.value assigned, length:', taskData.length, 'tasks.value.length:', tasks.value.length)
-    } else {
-      console.warn('[loadData] taskData is not an array:', typeof taskData, taskData)
-    }
+    if (seq !== loadSeq) return
+    if (Array.isArray(taskData)) tasks.value = taskData
     if (Array.isArray(remoteData?.remotes) && remoteData.remotes.length > 0) remotes.value = remoteData.remotes
     if (Array.isArray(scheduleData) && scheduleData.length > 0) schedules.value = scheduleData
     if (runResult?.runs) {
       runs.value = runResult.runs
       runsTotal.value = typeof runResult.total === 'number' ? runResult.total : (runResult.runs?.length || 0)
     }
-    // 本地快照：成功后保存
     try { localStorage.setItem('lastTasksSnapshot', JSON.stringify(tasks.value||[])) } catch {}
   } catch (e:any) {
-    console.error('[loadData] error:', e)
-    showToast('加载数据失败: ' + (e.message || e), 'error')
-    // 失败不覆写：保留上一帧；若当前为空，尝试用本地快照兜底
+    console.error(e)
     if (!tasks.value || tasks.value.length===0) {
-      try { const snap = JSON.parse(localStorage.getItem('lastTasksSnapshot')||'[]'); if (Array.isArray(snap)) { tasks.value = snap; console.log('[loadData] restored from snapshot:', snap.length) } } catch {}
+      try { const snap = JSON.parse(localStorage.getItem('lastTasksSnapshot')||'[]'); if (Array.isArray(snap)) tasks.value = snap } catch {}
     }
   }
 }
