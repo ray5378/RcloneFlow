@@ -495,8 +495,8 @@ async function loadData() {
       runApi.list(runsPage.value, runsPageSize),
     ])
     if (seq !== loadSeq) return // 只接受最新一轮
-    // 防御：只有明确有数据才更新，防止空数据覆盖
-    if (Array.isArray(taskData) && taskData.length > 0) tasks.value = taskData
+    // 更新任务列表（允许空数组清空旧数据）
+    if (Array.isArray(taskData)) tasks.value = taskData
     if (Array.isArray(remoteData?.remotes) && remoteData.remotes.length > 0) remotes.value = remoteData.remotes
     if (Array.isArray(scheduleData) && scheduleData.length > 0) schedules.value = scheduleData
     if (runResult?.runs) {
