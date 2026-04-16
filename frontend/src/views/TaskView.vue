@@ -1347,6 +1347,32 @@ function goBackTarget() {
   const parentPath = parts.join('/')
   loadTargetPath(createForm.value.targetRemote, parentPath)
 }
+
+// 源路径面包屑
+const sourceBreadcrumbs = computed(() => {
+  if (!createForm.value.sourceRemote) return []
+  const parts = (sourceCurrentPath.value || '').split('/').filter(Boolean)
+  const crumbs = [{ name: createForm.value.sourceRemote + ':', path: '' }]
+  let current = ''
+  for (const p of parts) {
+    current += '/' + p
+    crumbs.push({ name: p, path: current })
+  }
+  return crumbs
+})
+
+// 目标路径面包屑
+const targetBreadcrumbs = computed(() => {
+  if (!createForm.value.targetRemote) return []
+  const parts = (targetCurrentPath.value || '').split('/').filter(Boolean)
+  const crumbs = [{ name: createForm.value.targetRemote + ':', path: '' }]
+  let current = ''
+  for (const p of parts) {
+    current += '/' + p
+    crumbs.push({ name: p, path: current })
+  }
+  return crumbs
+})
 import TransferOptions from '../components/TransferOptions.vue'
 </script>
 
@@ -1707,10 +1733,17 @@ import TransferOptions from '../components/TransferOptions.vue'
         <label>源路径</label>
         <div class="path-selector">
           <div class="path-browse">
-            <div class="path-bar">
-              <span class="path-selected">已选: /{{ createForm.sourcePath || '未选择' }}</span>
-              <span class="path-label" @click="sourceCurrentPath && loadSourcePath(createForm.sourceRemote, sourceCurrentPath)">当前: /{{ sourceCurrentPath || '根目录' }}</span>
-              <button v-if="sourceCurrentPath" type="button" class="ghost small" style="flex-shrink:0" @click="goBackSource">↑返回</button>
+            <div class="pathbar">
+              <template v-for="(crumb, i) in sourceBreadcrumbs" :key="crumb.path">
+                <span v-if="i > 0" class="sep">/</span>
+                <button
+                  class="crumb"
+                  :class="{ current: i === sourceBreadcrumbs.length - 1 }"
+                  @click="crumb.path !== sourceCurrentPath && loadSourcePath(createForm.sourceRemote, crumb.path)"
+                >
+                  {{ crumb.name }}
+                </button>
+              </template>
             </div>
             <div class="path-list">
               <PathItem 
@@ -1738,10 +1771,17 @@ import TransferOptions from '../components/TransferOptions.vue'
         <label>目标路径</label>
         <div class="path-selector">
           <div class="path-browse">
-            <div class="path-bar">
-              <span class="path-selected">已选: /{{ createForm.targetPath || '未选择' }}</span>
-              <span class="path-label" @click="targetCurrentPath && loadTargetPath(createForm.targetRemote, targetCurrentPath)">当前: /{{ targetCurrentPath || '根目录' }}</span>
-              <button v-if="targetCurrentPath" type="button" class="ghost small" style="flex-shrink:0" @click="goBackTarget">↑返回</button>
+            <div class="pathbar">
+              <template v-for="(crumb, i) in targetBreadcrumbs" :key="crumb.path">
+                <span v-if="i > 0" class="sep">/</span>
+                <button
+                  class="crumb"
+                  :class="{ current: i === targetBreadcrumbs.length - 1 }"
+                  @click="crumb.path !== targetCurrentPath && loadTargetPath(createForm.targetRemote, crumb.path)"
+                >
+                  {{ crumb.name }}
+                </button>
+              </template>
             </div>
             <div class="path-list">
               <PathItem 
