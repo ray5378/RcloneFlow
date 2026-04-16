@@ -63,6 +63,8 @@ function jumpToTasksPage() {
   tasksJumpPage.value = page
 }
 
+const taskSearch = ref('')
+
 // 过滤后的任务列表（原始）
 const filteredTasksRaw = computed(() => {
   if (!taskSearch.value) return tasks.value
