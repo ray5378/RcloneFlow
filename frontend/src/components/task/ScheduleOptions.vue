@@ -18,187 +18,101 @@ const emit = defineEmits<{
   'update:modelValue': [value: ScheduleForm]
 }>()
 
-const temp = ref({
-  minute: [] as string[],
-  hour: [] as string[],
-  day: [] as string[],
+const tempSchedule = ref({
   month: [] as string[],
   week: [] as string[],
+  day: [] as string[],
+  hour: [] as string[],
+  minute: [] as string[],
 })
 
 watch(() => props.modelValue, (val) => {
   if (val) {
-    temp.value = {
-      minute: val.scheduleMinute && val.scheduleMinute !== '*' ? val.scheduleMinute.split(',') : [],
-      hour: val.scheduleHour && val.scheduleHour !== '*' ? val.scheduleHour.split(',') : [],
-      day: val.scheduleDay && val.scheduleDay !== '*' ? val.scheduleDay.split(',') : [],
+    tempSchedule.value = {
       month: val.scheduleMonth && val.scheduleMonth !== '*' ? val.scheduleMonth.split(',') : [],
       week: val.scheduleWeek && val.scheduleWeek !== '*' ? val.scheduleWeek.split(',') : [],
+      day: val.scheduleDay && val.scheduleDay !== '*' ? val.scheduleDay.split(',') : [],
+      hour: val.scheduleHour && val.scheduleHour !== '*' ? val.scheduleHour.split(',') : [],
+      minute: val.scheduleMinute && val.scheduleMinute !== '*' ? val.scheduleMinute.split(',') : [],
     }
   }
 }, { immediate: true })
 
-function updateSchedule(field: string, val: string[]) {
-  const parts = {
-    minute: temp.value.minute.join(',') || '*',
-    hour: temp.value.hour.join(',') || '*',
-    day: temp.value.day.join(',') || '*',
-    month: temp.value.month.join(',') || '*',
-    week: temp.value.week.join(',') || '*',
-  }
-  parts[field as keyof typeof parts] = val.join(',') || '*'
-  
+function confirmField(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
+  const val = tempSchedule.value[field].join(',') || '*'
   emit('update:modelValue', {
     ...props.modelValue,
-    scheduleMinute: parts.minute,
-    scheduleHour: parts.hour,
-    scheduleDay: parts.day,
-    scheduleMonth: parts.month,
-    scheduleWeek: parts.week,
-  })
-}
-
-function toggleEnable() {
-  emit('update:modelValue', {
-    ...props.modelValue,
-    enableSchedule: !props.modelValue.enableSchedule,
+    scheduleMonth: field === 'month' ? val : props.modelValue.scheduleMonth,
+    scheduleWeek: field === 'week' ? val : props.modelValue.scheduleWeek,
+    scheduleDay: field === 'day' ? val : props.modelValue.scheduleDay,
+    scheduleHour: field === 'hour' ? val : props.modelValue.scheduleHour,
+    scheduleMinute: field === 'minute' ? val : props.modelValue.scheduleMinute,
   })
 }
 </script>
 
 <template>
-  <div class="schedule-options">
-    <div class="field-item">
-      <label class="inline-label">
-        <input type="checkbox" :checked="modelValue?.enableSchedule" @change="toggleEnable" />
-        <span style="margin-left:8px">启用定时调度</span>
+  <div class="schedule-section">
+    <div class="section-header">
+      <label class="schedule-toggle">
+        <input type="checkbox" :checked="modelValue?.enableSchedule" @change="emit('update:modelValue', { ...modelValue, enableSchedule: !modelValue.enableSchedule })" />
+        <span>启用定时任务</span>
       </label>
     </div>
 
-    <div v-if="modelValue?.enableSchedule" class="schedule-fields">
-      <div class="schedule-row">
-        <label>月份</label>
-        <div class="chip-select">
-          <button 
-            v-for="m in ['1','2','3','4','5','6','7','8','9','10','11','12']" 
-            :key="m"
-            :class="['chip-btn', temp.month.includes(m) && 'active']"
-            @click="temp.month.includes(m) ? temp.month = temp.month.filter(x=>x!==m) : temp.month.push(m); updateSchedule('month', temp.month)"
-          >{{ m }}月</button>
-        </div>
+    <div v-if="modelValue?.enableSchedule" class="schedule-grid">
+      <!-- 月 -->
+      <div class="schedule-item">
+        <label>月</label>
+        <select v-model="tempSchedule.month" multiple size="6" @dblclick="confirmField('month')">
+          <option value="*">每月</option>
+          <option v-for="m in [1,2,3,4,5,6,7,8,9,10,11,12]" :key="m" :value="String(m)">{{ m }}月</option>
+        </select>
+        <button type="button" class="ghost small" @click="confirmField('month')">确定</button>
+        <span class="selected-val">{{ modelValue.scheduleMonth === '*' ? '每月' : (modelValue.scheduleMonth || '每月') }}</span>
       </div>
-
-      <div class="schedule-row">
-        <label>日期</label>
-        <div class="chip-select">
-          <button 
-            v-for="d in ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31']" 
-            :key="d"
-            :class="['chip-btn', temp.day.includes(d) && 'active']"
-            @click="temp.day.includes(d) ? temp.day = temp.day.filter(x=>x!==d) : temp.day.push(d); updateSchedule('day', temp.day)"
-          >{{ d }}</button>
-        </div>
+      <!-- 周 -->
+      <div class="schedule-item">
+        <label>周</label>
+        <select v-model="tempSchedule.week" multiple size="6" @dblclick="confirmField('week')">
+          <option value="*">每日</option>
+          <option value="">不设置</option>
+          <option v-for="(w, idx) in ['周一','周二','周三','周四','周五','周六','周日']" :key="w" :value="String(idx+1)">{{ w }}</option>
+        </select>
+        <button type="button" class="ghost small" @click="confirmField('week')">确定</button>
+        <span class="selected-val">{{ modelValue.scheduleWeek === '*' ? '每日' : (modelValue.scheduleWeek || '不设置') }}</span>
       </div>
-
-      <div class="schedule-row">
-        <label>星期</label>
-        <div class="chip-select">
-          <button 
-            v-for="(w, i) in ['周日','周一','周二','周三','周四','周五','周六']" 
-            :key="i"
-            :class="['chip-btn', temp.week.includes(String(i)) && 'active']"
-            @click="temp.week.includes(String(i)) ? temp.week = temp.week.filter(x=>x!==String(i)) : temp.week.push(String(i)); updateSchedule('week', temp.week)"
-          >{{ w }}</button>
-        </div>
+      <!-- 日 -->
+      <div class="schedule-item">
+        <label>日</label>
+        <select v-model="tempSchedule.day" multiple size="6" @dblclick="confirmField('day')">
+          <option value="*">每日</option>
+          <option value="">不设置</option>
+          <option v-for="d in 31" :key="d" :value="String(d)">{{ d }}日</option>
+        </select>
+        <button type="button" class="ghost small" @click="confirmField('day')">确定</button>
+        <span class="selected-val">{{ modelValue.scheduleDay === '*' ? '每日' : (modelValue.scheduleDay || '不设置') }}</span>
       </div>
-
-      <div class="schedule-row inline">
-        <div class="time-field">
-          <label>时</label>
-          <select multiple v-model="temp.hour" @change="updateSchedule('hour', temp.hour)">
-            <option v-for="h in Array.from({length:24},(_,i)=>i)" :key="h" :value="String(h).padStart(2,'0')">{{ String(h).padStart(2,'0') }}</option>
-          </select>
-        </div>
-        <div class="time-field">
-          <label>分</label>
-          <select multiple v-model="temp.minute" @change="updateSchedule('minute', temp.minute)">
-            <option v-for="m in [0,5,10,15,20,25,30,35,40,45,50,55]" :key="m" :value="String(m).padStart(2,'0')">{{ String(m).padStart(2,'0') }}</option>
-          </select>
-        </div>
+      <!-- 时 -->
+      <div class="schedule-item">
+        <label>时</label>
+        <select v-model="tempSchedule.hour" multiple size="6" @dblclick="confirmField('hour')">
+          <option value="*">每时</option>
+          <option v-for="h in 24" :key="h-1" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}时</option>
+        </select>
+        <button type="button" class="ghost small" @click="confirmField('hour')">确定</button>
+        <span class="selected-val">{{ modelValue.scheduleHour === '*' ? '每时' : (modelValue.scheduleHour || '00') + '时' }}</span>
       </div>
-
-      <div class="schedule-preview">
-        <span class="hint">格式: {{ modelValue?.scheduleMinute || '*' }}|{{ modelValue?.scheduleHour || '*' }}|{{ modelValue?.scheduleDay || '*' }}|{{ modelValue?.scheduleMonth || '*' }}|{{ modelValue?.scheduleWeek || '*' }}</span>
+      <!-- 分 -->
+      <div class="schedule-item">
+        <label>分</label>
+        <select v-model="tempSchedule.minute" multiple size="6" @dblclick="confirmField('minute')">
+          <option value="*">每分</option>
+          <option v-for="m in 60" :key="m-1" :value="String(m-1).padStart(2,'0')">{{ String(m-1).padStart(2,'0') }}分</option>
+        </select>
+        <button type="button" class="ghost small" @click="confirmField('minute')">确定</button>
+        <span class="selected-val">{{ modelValue.scheduleMinute === '*' ? '每分' : (modelValue.scheduleMinute || '00') + '分' }}</span>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.schedule-options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.schedule-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  background: var(--surface);
-  border-radius: 8px;
-}
-.schedule-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.schedule-row label {
-  font-size: 12px;
-  color: #888;
-}
-.chip-select {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
-.chip-btn {
-  padding: 4px 8px;
-  font-size: 11px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.chip-btn:hover {
-  border-color: var(--accent);
-}
-.chip-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-}
-.schedule-row.inline {
-  flex-direction: row;
-  gap: 16px;
-}
-.time-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.time-field select {
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--surface);
-  color: var(--text);
-  min-width: 80px;
-  height: 100px;
-}
-.schedule-preview {
-  margin-top: 8px;
-}
-</style>
