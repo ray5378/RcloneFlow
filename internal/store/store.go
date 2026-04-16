@@ -66,7 +66,7 @@ type Run struct {
 
 type DB struct {
 	db *sql.DB
-	mu sync.Mutex
+	mu sync.RWMutex
 }
 
 // NewDB 创建数据库实例
@@ -445,8 +445,8 @@ func (db *DB) UpdateScheduleSpec(id int64, spec string) error {
 // ===== Runs =====
 
 func (db *DB) ListRuns(page, pageSize int) ([]Run, int, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	// 获取总数
 	var total int
@@ -471,8 +471,8 @@ func (db *DB) ListRuns(page, pageSize int) ([]Run, int, error) {
 }
 
 func (db *DB) ListRunsByTask(taskID int64) ([]Run, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	rows, err := db.db.Query(`
 		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
@@ -567,8 +567,8 @@ func (db *DB) TryAcquireRun(run *Run) (*Run, bool, error) {
 
 // GetActiveRunByTaskID 获取任务当前运行中的记录
 func (db *DB) GetActiveRunByTaskID(taskID int64) (Run, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	var r Run
 	var summaryJSON string
@@ -746,8 +746,8 @@ func (db *DB) UpdateRun(id int64, fn func(*Run)) error {
 }
 
 func (db *DB) GetRun(id int64) (Run, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	var r Run
 	var summaryJSON string
@@ -766,8 +766,8 @@ func (db *DB) GetRun(id int64) (Run, error) {
 
 // ListRunningRuns 获取所有运行中的任务（供JobSyncService使用）
 func (db *DB) ListRunningRuns() ([]JobStatus, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	rows, err := db.db.Query(`
 		SELECT id, rc_job_id, status, summary, error 
