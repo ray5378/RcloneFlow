@@ -23,6 +23,11 @@ export async function getRuns(page = 1, pageSize = 50): Promise<{ runs: Run[], t
   return get<{ runs: Run[], total: number, page: number, pageSize: number }>(`/api/runs?page=${page}&pageSize=${pageSize}`)
 }
 
+/** 获取指定任务的历史记录 */
+export async function getRunsByTask(taskId: number): Promise<Run[]> {
+  return get<Run[]>(`/api/runs/task/${taskId}`)
+}
+
 /** 获取单个运行记录 */
 export async function getRun(runId: number): Promise<Run> {
   return get<Run>(`/api/runs/${runId}`)

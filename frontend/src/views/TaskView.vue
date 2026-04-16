@@ -37,6 +37,8 @@ const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
 const runs = ref<Run[]>([])
 const runsTotal = ref(0)
+// 任务特定的历史记录（用于分页）
+const taskRuns = ref<Run[]>([])
 const runsPage = ref(1)
 const runsPageSize = 50
 const jumpPage = ref(1)
@@ -908,7 +910,9 @@ function toCamel(s: string){ return s.replace(/-([a-z])/g, (_,c)=>c.toUpperCase(
 
 // 过滤后的历史记录
 const filteredRuns = computed(() => {
-  let result = historyFilterTaskId.value === null ? runs.value : runs.value.filter(r => r.taskId === historyFilterTaskId.value)
+  // 全局视图用 runs.value，任务视图用 taskRuns.value
+  let source = historyFilterTaskId.value === null ? runs.value : taskRuns.value
+  let result = [...source]
   if (historyStatusFilter.value === 'hasTransfer') {
     result = result.filter(r => {
       const sum = getFinalSummary(r)
@@ -917,11 +921,26 @@ const filteredRuns = computed(() => {
   } else if (historyStatusFilter.value !== 'all') {
     result = result.filter(r => r.status === historyStatusFilter.value)
   }
-  return result
+  // 客户端分页
+  const start = (runsPage.value - 1) * runsPageSize
+  const end = start + runsPageSize
+  return result.slice(start, end)
 })
 
 // 筛选后的总数（用于分页）
-const filteredRunsTotal = computed(() => filteredRuns.value.length)
+const filteredRunsTotal = computed(() => {
+  let source = historyFilterTaskId.value === null ? runs.value : taskRuns.value
+  let result = [...source]
+  if (historyStatusFilter.value === 'hasTransfer') {
+    result = result.filter(r => {
+      const sum = getFinalSummary(r)
+      return sum && (sum.totalCount > 1 || sum.transferredBytes > 0)
+    })
+  } else if (historyStatusFilter.value !== 'all') {
+    result = result.filter(r => r.status === historyStatusFilter.value)
+  }
+  return result.length
+})
 
 // 当前分页的总数（全局视图用 runsTotal，特定任务视图用 filteredRunsTotal）
 const currentTotal = computed(() => {
@@ -935,6 +954,12 @@ function viewTaskHistory(taskId: number) {
   runsPage.value = 1
   historyFilterTaskId.value = taskId
   currentModule.value = 'history'
+  // 获取该任务的历史记录
+  runApi.getRunsByTask(taskId).then(data => {
+    if (data && Array.isArray(data)) {
+      taskRuns.value = data
+    }
+  })
 }
 
 const stoppedTaskId = ref<number|null>(null)

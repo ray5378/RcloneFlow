@@ -194,6 +194,15 @@ export const runApi = {
       handleError(err, { module: 'Run', operation: '删除任务历史记录' })
       return false
     }
+  },
+
+  async getRunsByTask(taskId: number) {
+    try {
+      return await api.getRunsByTask(taskId)
+    } catch (err) {
+      handleError(err, { module: 'Run', operation: '获取任务历史记录' })
+      return []
+    }
   }
 }
 
