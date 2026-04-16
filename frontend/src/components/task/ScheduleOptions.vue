@@ -46,7 +46,24 @@ function updateSchedule(field: string, val: string[]) {
     month: temp.value.month.join(',') || '*',
     week: temp.value.week.join(',') || '*',
   }
-  parts[field as keyof typeof parts] = val.join(',') || '*'
+  
+  // 如果所有值都被选中，则用 * 代替
+  const allValues: Record<string, string[]> = {
+    month: ['1','2','3','4','5','6','7','8','9','10','11','12'],
+    week: ['0','1','2','3','4','5','6'],
+    day: ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31'],
+    hour: Array.from({length: 24}, (_, i) => String(i).padStart(2,'0')),
+    minute: Array.from({length: 60}, (_, i) => String(i).padStart(2,'0')),
+  }
+  
+  // 检查是否全部选中
+  const fieldVal = val.join(',')
+  const allForField = allValues[field]
+  if (fieldVal === allForField.join(',')) {
+    parts[field as keyof typeof parts] = '*'
+  } else {
+    parts[field as keyof typeof parts] = fieldVal || '*'
+  }
   
   emit('update:modelValue', {
     ...props.modelValue,
