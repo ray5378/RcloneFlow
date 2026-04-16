@@ -1218,7 +1218,7 @@ func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst,
 			return
 		}
 		cr := &adapter.CmdRunner{}
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 		defer cancel()
 		out, _, e2 := cr.Run(ctx, []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}...)
 		if e2 != nil {
