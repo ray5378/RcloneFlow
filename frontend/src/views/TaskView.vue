@@ -1709,8 +1709,8 @@ import TransferOptions from '../components/TransferOptions.vue'
           <div class="path-browse">
             <div class="path-bar">
               <span class="path-selected">已选: /{{ createForm.sourcePath || '未选择' }}</span>
-              <span class="path-label">当前: /{{ sourceCurrentPath || '根目录' }}</span>
-              <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
+              <span class="path-label" @click="sourceCurrentPath && loadSourcePath(createForm.sourceRemote, sourceCurrentPath)">当前: /{{ sourceCurrentPath || '根目录' }}</span>
+              <button v-if="sourceCurrentPath" type="button" class="ghost small" style="flex-shrink:0" @click="goBackSource">↑返回</button>
             </div>
             <div class="path-list">
               <PathItem 
@@ -1740,8 +1740,8 @@ import TransferOptions from '../components/TransferOptions.vue'
           <div class="path-browse">
             <div class="path-bar">
               <span class="path-selected">已选: /{{ createForm.targetPath || '未选择' }}</span>
-              <span class="path-label">当前: /{{ targetCurrentPath || '根目录' }}</span>
-              <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
+              <span class="path-label" @click="targetCurrentPath && loadTargetPath(createForm.targetRemote, targetCurrentPath)">当前: /{{ targetCurrentPath || '根目录' }}</span>
+              <button v-if="targetCurrentPath" type="button" class="ghost small" style="flex-shrink:0" @click="goBackTarget">↑返回</button>
             </div>
             <div class="path-list">
               <PathItem 
