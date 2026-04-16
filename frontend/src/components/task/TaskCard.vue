@@ -153,6 +153,7 @@ function isStopped(): boolean {
 .task-card {
   border-bottom: 1px solid #333;
   padding: 12px 16px;
+  cursor: pointer;
 }
 .task-card.active {
   border-left: 3px solid var(--accent, #4f46e5);

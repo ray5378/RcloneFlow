@@ -64,6 +64,25 @@ function toggleEnable() {
     enableSchedule: !props.modelValue.enableSchedule,
   })
 }
+
+function toggleAll(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
+  const allValues: Record<string, string[]> = {
+    month: ['1','2','3','4','5','6','7','8','9','10','11','12'],
+    week: ['0','1','2','3','4','5','6'],
+    day: ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31'],
+    hour: Array.from({length: 24}, (_, i) => String(i).padStart(2,'0')),
+    minute: Array.from({length: 60}, (_, i) => String(i).padStart(2,'0')),
+  }
+  const all = allValues[field]
+  const current = temp.value[field]
+  // 如果已全选则清空，否则全选
+  if (current.length === all.length) {
+    temp.value[field] = []
+  } else {
+    temp.value[field] = [...all]
+  }
+  updateSchedule(field, temp.value[field])
+}
 </script>
 
 <template>
@@ -85,6 +104,7 @@ function toggleEnable() {
             :class="['chip-btn', temp.month.includes(m) && 'active']"
             @click="temp.month.includes(m) ? temp.month = temp.month.filter(x=>x!==m) : temp.month.push(m); updateSchedule('month', temp.month)"
           >{{ m }}月</button>
+          <button class="chip-btn all-btn" @click="toggleAll('month')">全选</button>
         </div>
       </div>
 
@@ -97,6 +117,7 @@ function toggleEnable() {
             :class="['chip-btn', temp.day.includes(d) && 'active']"
             @click="temp.day.includes(d) ? temp.day = temp.day.filter(x=>x!==d) : temp.day.push(d); updateSchedule('day', temp.day)"
           >{{ d }}</button>
+          <button class="chip-btn all-btn" @click="toggleAll('day')">全选</button>
         </div>
       </div>
 
@@ -109,6 +130,7 @@ function toggleEnable() {
             :class="['chip-btn', temp.week.includes(String(i)) && 'active']"
             @click="temp.week.includes(String(i)) ? temp.week = temp.week.filter(x=>x!==String(i)) : temp.week.push(String(i)); updateSchedule('week', temp.week)"
           >{{ w }}</button>
+          <button class="chip-btn all-btn" @click="toggleAll('week')">全选</button>
         </div>
       </div>
 
@@ -121,6 +143,7 @@ function toggleEnable() {
             :class="['chip-btn', temp.hour.includes(String(h-1).padStart(2,'0')) && 'active']"
             @click="temp.hour.includes(String(h-1).padStart(2,'0')) ? temp.hour = temp.hour.filter(x=>x!==String(h-1).padStart(2,'0')) : temp.hour.push(String(h-1).padStart(2,'0')); updateSchedule('hour', temp.hour)"
           >{{ String(h-1).padStart(2,'0') }}时</button>
+          <button class="chip-btn all-btn" @click="toggleAll('hour')">全选</button>
         </div>
       </div>
 
@@ -133,6 +156,7 @@ function toggleEnable() {
             :class="['chip-btn', temp.minute.includes(String(m-1).padStart(2,'0')) && 'active']"
             @click="temp.minute.includes(String(m-1).padStart(2,'0')) ? temp.minute = temp.minute.filter(x=>x!==String(m-1).padStart(2,'0')) : temp.minute.push(String(m-1).padStart(2,'0')); updateSchedule('minute', temp.minute)"
           >{{ String(m-1).padStart(2,'0') }}</button>
+          <button class="chip-btn all-btn" @click="toggleAll('minute')">全选</button>
         </div>
       </div>
 
