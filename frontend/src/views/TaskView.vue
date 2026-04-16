@@ -1448,7 +1448,7 @@ const targetBreadcrumbs = computed(() => {
 
   <div v-if="currentModule === 'history'" class="card">
     <div class="card-header">
-      <div class="title">任务历史记录</div>
+      <div class="title clickable" @click="currentModule = 'tasks'">任务历史记录 ←</div>
       <div class="history-filters">
         <button :class="['filter-btn', historyStatusFilter==='all' && 'active']" @click="historyStatusFilter='all'">全部</button>
         <button :class="['filter-btn', historyStatusFilter==='finished' && 'active']" @click="historyStatusFilter='finished'">成功</button>
@@ -2291,5 +2291,11 @@ body.light .page-input{ background:#fff; color:#111827; border-color:#ddd }
 @keyframes slideIn {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
+}
+.title.clickable {
+  cursor: pointer;
+}
+.title.clickable:hover {
+  color: var(--accent, #4f46e5);
 }
 </style>
