@@ -34,6 +34,15 @@ const runs = ref<Run[]>([])
 const runsTotal = ref(0)
 const runsPage = ref(1)
 const runsPageSize = 50
+const jumpPage = ref(1)
+
+function jumpToPage() {
+  const totalPages = Math.max(1, Math.ceil((runsTotal.value || 0) / runsPageSize))
+  const page = Math.min(Math.max(1, jumpPage.value || 1), totalPages)
+  runsPage.value = page
+  jumpPage.value = page
+  loadData()
+}
 const taskSearch = ref('')
 
 // 过滤后的任务列表
@@ -908,6 +917,7 @@ const filteredRuns = computed(() => {
 })
 
 function viewTaskHistory(taskId: number) {
+  runsPage.value = 1
   historyFilterTaskId.value = taskId
   currentModule.value = 'history'
 }
@@ -1456,7 +1466,9 @@ import TransferOptions from '../components/TransferOptions.vue'
       </div>
       <div class="pagination" v-if="(runsTotal || 0) > runsPageSize">
         <button class="page-btn" :disabled="runsPage <= 1" @click="runsPage--; loadData()">上一页</button>
-        <span class="page-info">{{ runsPage }} / {{ Math.max(1, Math.ceil((runsTotal || 0) / runsPageSize)) }}</span>
+        <input type="number" class="page-input" v-model.number="jumpPage" :min="1" :max="Math.max(1, Math.ceil((runsTotal || 0) / runsPageSize))" @keyup.enter="jumpToPage" />
+        <span class="page-info">/ {{ Math.max(1, Math.ceil((runsTotal || 0) / runsPageSize)) }}</span>
+        <button class="page-btn" @click="jumpToPage">跳转</button>
         <button class="page-btn" :disabled="runsPage * runsPageSize >= (runsTotal || 0)" @click="runsPage++; loadData()">下一页</button>
       </div>
       <div class="header-actions">
