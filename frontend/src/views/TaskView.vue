@@ -1041,17 +1041,17 @@ function editTask(task: Task) {
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
   }
 
-  // 加载源路径选项 - 加载父目录以便显示文件
+  // 加载源路径选项 - 直接加载配置的路径
   if (task.sourceRemote) {
-    const parentPath = getParentPath(task.sourcePath || '')
-    sourceCurrentPath.value = parentPath
-    loadSourcePath(task.sourceRemote, parentPath)
+    const sourcePath = task.sourcePath || ''
+    sourceCurrentPath.value = sourcePath
+    loadSourcePath(task.sourceRemote, sourcePath)
   }
-  // 加载目标路径选项
+  // 加载目标路径选项 - 直接加载配置的路径
   if (task.targetRemote) {
-    const parentPath = getParentPath(task.targetPath || '')
-    targetCurrentPath.value = parentPath
-    loadTargetPath(task.targetRemote, parentPath)
+    const targetPath = task.targetPath || ''
+    targetCurrentPath.value = targetPath
+    loadTargetPath(task.targetRemote, targetPath)
   }
   currentModule.value = 'add'
   openMenuId.value = null
