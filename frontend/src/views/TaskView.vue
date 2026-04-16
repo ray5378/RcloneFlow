@@ -958,7 +958,7 @@ async function runTask(taskId: number) {
   runningTaskId.value = taskId
   const result = await taskApi.run(taskId)
   if (!result) {
-    showToast('任务启动失败，可能单例模式有其他任务正在运行', 'error')
+    // handleError already showed a toast, just reset state
     runningTaskId.value = null
     return
   }
@@ -1474,7 +1474,8 @@ import TransferOptions from '../components/TransferOptions.vue'
         <button :class="['filter-btn', historyStatusFilter==='skipped' && 'active']" @click="historyStatusFilter='skipped'">跳过</button>
         <button :class="['filter-btn', historyStatusFilter==='hasTransfer' && 'active']" @click="historyStatusFilter='hasTransfer'">有传输</button>
       </div>
-      <div class="pagination" v-if="(runsTotal || 0) > runsPageSize">
+      <!-- 全局历史分页 -->
+      <div class="pagination" v-if="historyFilterTaskId === null && (runsTotal || 0) > runsPageSize">
         <button class="page-btn" :disabled="runsPage <= 1" @click="runsPage--; loadData()">上一页</button>
         <input type="number" class="page-input" v-model.number="jumpPage" :min="1" :max="Math.max(1, Math.ceil((runsTotal || 0) / runsPageSize))" @keyup.enter="jumpToPage" />
         <span class="page-info">/ {{ Math.max(1, Math.ceil((runsTotal || 0) / runsPageSize)) }}</span>
