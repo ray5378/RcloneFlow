@@ -487,22 +487,25 @@ onMounted(async () => {
 let loadSeq = 0
 async function loadData() {
   const seq = ++loadSeq
+  console.log('[loadData] start, seq:', seq, 'current loadSeq:', loadSeq)
   try {
-    console.log('[loadData] start, seq:', seq)
     const [taskData, remoteData, scheduleData, runResult] = await Promise.all([
       taskApi.list(),
       remoteApi.list(),
       scheduleApi.list(),
       runApi.list(runsPage.value, runsPageSize),
     ])
-    console.log('[loadData] results:', { taskData, remoteData, scheduleData, runResult })
-    if (seq !== loadSeq) return // 只接受最新一轮
+    console.log('[loadData] after await, seq:', seq, 'loadSeq:', loadSeq, 'match:', seq === loadSeq)
+    if (seq !== loadSeq) {
+      console.log('[loadData] rejected by seq guard, returning early')
+      return
+    }
     // 更新任务列表（允许空数组清空旧数据）
     if (Array.isArray(taskData)) {
       tasks.value = taskData
-      console.log('[loadData] tasks updated:', taskData.length)
+      console.log('[loadData] tasks.value assigned, length:', taskData.length, 'tasks.value.length:', tasks.value.length)
     } else {
-      console.warn('[loadData] taskData is not an array:', taskData)
+      console.warn('[loadData] taskData is not an array:', typeof taskData, taskData)
     }
     if (Array.isArray(remoteData?.remotes) && remoteData.remotes.length > 0) remotes.value = remoteData.remotes
     if (Array.isArray(scheduleData) && scheduleData.length > 0) schedules.value = scheduleData
