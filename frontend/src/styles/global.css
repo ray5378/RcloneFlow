@@ -2090,17 +2090,6 @@ body.light .modal-footer {
     font-size: 15px;
   }
 
-  .advanced-row.inline {
-    display: flex;
-    align-items: center;
-    flex-direction: row;
-    gap: 8px;
-  }
-
-  .advanced-row.inline label {
-    margin: 0;
-  }
-
   /* === 路径选择�?=== */
   .path-selector {
     flex-direction: column;
