@@ -201,18 +201,3 @@ function update(key: keyof Options, value: any) {
     </div>
   </div>
 </template>
-
-<style scoped>
-.advanced-row.inline {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
-.advanced-row.inline input[type="checkbox"] {
-  flex-shrink: 0;
-}
-.advanced-row.inline label {
-  margin: 0;
-}
-</style>
