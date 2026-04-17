@@ -167,6 +167,10 @@ function isStopped(): boolean {
   border-bottom: 1px solid #333;
   padding: 12px 16px;
   cursor: pointer;
+  transition: background-color 0.18s ease;
+}
+.task-card:hover {
+  background: rgba(255,255,255,0.03);
 }
 /* 在卡片分割线中间留一个轻微断点，帮助辨认这是两张独立卡片 */
 .task-card::after {
