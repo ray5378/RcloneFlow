@@ -781,18 +781,10 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
 	}
-	// 扁平化关键字段：bytes/totalBytes/speed/eta，从 run.Summary.progress 提取
 	items := make([]map[string]any, 0, len(runs))
-	// 稳态进度阈值（环境变量可扩展，这里用常量）
-	const holdMs = 60000
-	const tinyPct = 0.1
-	const jumpFactor = 5.0
-	const tbBytes = 1 << 40 // 1TB
 	for _, run := range runs {
-		// 兼容前端旧形状：每项包含 runRecord + realtimeStatus + derivedProgress
 		var summary map[string]any
 		var progress map[string]any
-		// 兼容两种形态：store 层可能已将 summary 反序列化成 map，也可能是原始 JSON 字符串
 		switch v := any(run.Summary).(type) {
 		case map[string]any:
 			summary = v
@@ -810,118 +802,96 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				}
 			}
 		}
+
 		bytes := int64(0)
 		if v, ok := progress["bytes"].(float64); ok {
 			bytes = int64(v)
 		}
-		// 总体积：强制使用 preflight.totalBytes（若有），否则保持上一帧的非零值；最后才回退 progress.totalBytes
 		total := int64(0)
-		if summary != nil {
+		if v, ok := progress["totalBytes"].(float64); ok {
+			total = int64(v)
+		}
+		if total == 0 && summary != nil {
 			if pf, ok := summary["preflight"].(map[string]any); ok {
-				if v, ok2 := pf["totalBytes"].(float64); ok2 { total = int64(v) }
-			}
-			if total == 0 {
-				if sp, ok := summary["stableProgress"].(map[string]any); ok {
-					if v, ok2 := sp["totalBytes"].(float64); ok2 { total = int64(v) }
+				if v, ok2 := pf["totalBytes"].(float64); ok2 {
+					total = int64(v)
 				}
 			}
 		}
-		if total == 0 { if v, ok := progress["totalBytes"].(float64); ok { total = int64(v) } }
+		if total > 0 && bytes > total {
+			bytes = total
+		}
+
 		speed := int64(0)
 		if v, ok := progress["speed"].(float64); ok {
 			speed = int64(v)
 		}
-		var eta any
-		if v, ok := progress["eta"]; ok {
+		eta := float64(0)
+		if v, ok := progress["eta"].(float64); ok {
 			eta = v
 		}
+
 		pct := 0.0
-		if total > 0 && bytes >= 0 && bytes <= total {
+		if v, ok := progress["percentage"].(float64); ok {
+			pct = v
+		} else if total > 0 {
 			pct = float64(bytes) / float64(total) * 100
 		}
-		_ = eta
+		if pct < 0 {
+			pct = 0
+		}
+		if pct > 100 {
+			pct = 100
+		}
 
-		// 实时已传输文件数：优先取 progress.completedFiles，其次取上一帧 stable.completedFiles
-		cf := float64(0)
-		if v, ok := progress["completedFiles"].(float64); ok { cf = v }
-		// 稳态进度：从 summary.stableProgress 读取上一帧
-		var stablePrev map[string]any
-		if summary != nil {
-			if sp, ok := summary["stableProgress"].(map[string]any); ok {
-				stablePrev = sp
-				if cf == 0 { if vv, ok2 := sp["completedFiles"].(float64); ok2 { cf = vv } }
-			}
+		completedFiles := float64(0)
+		if v, ok := progress["completedFiles"].(float64); ok {
+			completedFiles = v
 		}
-		// 预估总数量：来自 summary.preflight.totalCount（若有）
 		totalCount := float64(0)
-		if summary != nil {
+		if v, ok := progress["plannedFiles"].(float64); ok {
+			totalCount = v
+		}
+		if totalCount == 0 && summary != nil {
 			if pf, ok := summary["preflight"].(map[string]any); ok {
-				if v, ok2 := pf["totalCount"].(float64); ok2 { totalCount = v }
+				if v, ok2 := pf["totalCount"].(float64); ok2 {
+					totalCount = v
+				}
 			}
 		}
-		// 计算稳态候选（包含 completedFiles/totalCount，供前端 DB-only 流直接使用）
-		stable := map[string]any{"bytes": bytes, "totalBytes": total, "speed": speed, "percentage": pct, "phase": "transferring", "lastUpdatedAt": time.Now().Format(time.RFC3339), "completedFiles": cf, "totalCount": totalCount}
-		// 阶段：preparing
-		if total == 0 {
-			stable["phase"] = "preparing"
+		if totalCount > 0 && completedFiles > totalCount {
+			completedFiles = totalCount
 		}
-		// 收尾：若有 finishWait 且未 done
+
+		phase := "transferring"
+		if total == 0 && bytes == 0 {
+			phase = "preparing"
+		}
 		if summary != nil {
 			if fw, ok := summary["finishWait"].(map[string]any); ok {
 				if en, ok2 := fw["enabled"].(bool); ok2 && en {
 					if done, ok3 := fw["done"].(bool); !ok3 || !done {
-						stable["phase"] = "finalizing"
+						phase = "finalizing"
 					}
 				}
-			}
-		}
-		// 应用稳态规则（仅当非 finalizing）
-		if stable["phase"] != "finalizing" {
-			// 取上一帧
-			var lastBytes, lastTotal int64
-			var lastPct float64
-			var lastAt int64
-			if stablePrev != nil {
-				if v, ok := stablePrev["bytes"].(float64); ok {
-					lastBytes = int64(v)
-				}
-				if v, ok := stablePrev["totalBytes"].(float64); ok {
-					lastTotal = int64(v)
-				}
-				if v, ok := stablePrev["percentage"].(float64); ok {
-					lastPct = v
-				}
-				if v, ok := stablePrev["lastUpdatedAt"].(string); ok {
-					if t, e := time.Parse(time.RFC3339, v); e == nil {
-						lastAt = t.UnixMilli()
-					}
-				}
-			}
-			// 规则判断
-			nowMs := time.Now().UnixMilli()
-			percentTiny := pct < tinyPct
-			totalJump := (lastTotal > 0 && float64(total) >= float64(lastTotal)*jumpFactor) || (lastTotal == 0 && total >= tbBytes)
-			speedZero := speed == 0
-			noMovement := bytes <= lastBytes && pct <= lastPct
-			holdWindow := (lastAt > 0 && (nowMs-lastAt) <= holdMs)
-			// clamp
-			if total > 0 && bytes > total {
-				bytes = total
-				stable["bytes"] = bytes
-				pct = float64(bytes) / float64(total) * 100
-				stable["percentage"] = pct
-			}
-			// 空窗/毛刺：优先保持上一帧
-			if stablePrev != nil && ((speedZero && holdWindow) || (speedZero && (percentTiny || totalJump || noMovement)) || (pct < lastPct)) {
-				stable = stablePrev
-				stable["phase"] = "between_files"
 			}
 		}
 
-		// 将 stableProgress 写回 summary，供下一次作为上一帧基线
+		stable := map[string]any{
+			"bytes":          bytes,
+			"totalBytes":     total,
+			"speed":          speed,
+			"eta":            eta,
+			"percentage":     pct,
+			"phase":          phase,
+			"lastUpdatedAt":  time.Now().Format(time.RFC3339),
+			"completedFiles": completedFiles,
+			"totalCount":     totalCount,
+		}
+
+		// 让 activeRuns/stableProgress 直接对齐当前日志解析结果
 		c.runSvc.UpdateRunStatus(run.ID, map[string]any{"stableProgress": stable})
 
-		// include basic times for duration calc
 		item := map[string]any{
 			"runRecord": map[string]any{
 				"id":               run.ID,
