@@ -1,0 +1,188 @@
+# Docs Index
+
+项目文档索引。
+
+这份文件的目的，是让后续开发时不用靠记忆去找规则，而是能先判断：
+
+- 我现在遇到的是什么问题
+- 我现在应该看哪份文档
+- 这份文档主要解决什么事
+
+---
+
+## 1. 如果你只想先看一份
+
+优先看：
+
+- `ENGINEERING_RULES.md`
+
+这是整个项目的总规范，定义了：
+- 分支规则
+- 修改范围边界
+- 模块边界
+- 测试规则
+- 提交规则
+- 回归处理规则
+- 运行中进度链的核心约束
+
+如果你不知道从哪开始，先看它。
+
+---
+
+## 2. 日常开发时最常用
+
+### `DEVELOPMENT_CHECKLIST.md`
+适合场景：
+- 开始改代码前快速过一遍
+- 提交前做自检
+- 拆分 / 修 bug / 文档更新前做检查
+- 出回归时快速按步骤处理
+
+这是最适合“真正开发时边做边对照”的文档。
+
+---
+
+## 3. 工程总规范
+
+### `ENGINEERING_RULES.md`
+适合场景：
+- 想知道这个项目长期遵守的工程规则是什么
+- 想知道拆分、测试、回退、提交流程的正式约束是什么
+- 想知道运行中进度链、主数据源、排查顺序等项目级规则
+
+如果你在判断“这样做合不合规范”，优先查这份。
+
+---
+
+## 4. 技术债与拆分进度
+
+### `TECH_DEBT.md`
+适合场景：
+- 想知道当前还剩哪些技术债
+- 想知道 `TaskView.vue` 已经拆了哪些、还剩哪些
+- 想知道哪些问题已经修过，后面不要再改回去
+- 想找后续继续推进的重构方向
+
+如果你要接着做未完成的拆分或治理工作，优先查这份。
+
+---
+
+## 5. 前端实现规则
+
+### `FRONTEND_RULES.md`
+适合场景：
+- 写 Vue / TypeScript 页面和组件
+- 判断一段逻辑该放 view、component、composable 还是 helper
+- 控制模板复杂度、响应式状态、组件通信、异步副作用
+- 避免前端再次堆出超大页面和双轨状态
+
+如果你正在改前端代码，这份应当常看。
+
+---
+
+## 6. 后端实现规则
+
+### `BACKEND_RULES.md`
+适合场景：
+- 写 Go 后端代码
+- 判断逻辑该放 controller、service、store 还是 runner
+- 处理接口契约、字段语义、回退逻辑、错误处理、typed struct、测试分层
+- 避免接口字段语义漂移和状态聚合混乱
+
+如果你正在改后端链路，这份应当常看。
+
+---
+
+## 7. Agent 与开发者协作文档
+
+### `AGENT_COLLABORATION_GUIDE.md`
+适合场景：
+- 开发者不会写代码，或不以写代码为主
+- 想知道怎样提需求、提 bug、做测试反馈最有效
+- 想知道怎样要求 Agent 小步开发、每步停测
+- 想在协作中逐步建立对项目和编程的理解
+
+如果你在思考“怎样跟 Agent 配合最高效”，优先看这份。
+
+---
+
+## 8. 推荐阅读顺序
+
+### 对新接手项目的人
+建议顺序：
+1. `README.md`
+2. `ENGINEERING_RULES.md`
+3. `DEVELOPMENT_CHECKLIST.md`
+4. `TECH_DEBT.md`
+5. 再按前后端方向看 `FRONTEND_RULES.md` 或 `BACKEND_RULES.md`
+
+### 对正在改前端的人
+建议顺序：
+1. `DEVELOPMENT_CHECKLIST.md`
+2. `FRONTEND_RULES.md`
+3. `ENGINEERING_RULES.md`
+4. `TECH_DEBT.md`
+
+### 对正在改后端的人
+建议顺序：
+1. `DEVELOPMENT_CHECKLIST.md`
+2. `BACKEND_RULES.md`
+3. `ENGINEERING_RULES.md`
+4. `TECH_DEBT.md`
+
+### 对主要负责提需求、验证和协作的人
+建议顺序：
+1. `AGENT_COLLABORATION_GUIDE.md`
+2. `DEVELOPMENT_CHECKLIST.md`
+3. `TECH_DEBT.md`
+
+---
+
+## 9. 遇到这些情况时看哪份
+
+### 我不知道这次改动合不合规范
+看：
+- `ENGINEERING_RULES.md`
+
+### 我准备开始改代码，想先自检
+看：
+- `DEVELOPMENT_CHECKLIST.md`
+
+### 我想知道这轮拆分做到哪了
+看：
+- `TECH_DEBT.md`
+
+### 我正在改 Vue / TS 页面，不知道逻辑该放哪
+看：
+- `FRONTEND_RULES.md`
+
+### 我正在改 Go 后端，不知道字段/回退/契约该怎么处理
+看：
+- `BACKEND_RULES.md`
+
+### 我不会写代码，但想更高效地和 Agent 配合
+看：
+- `AGENT_COLLABORATION_GUIDE.md`
+
+---
+
+## 10. 文档之间的关系
+
+可以把这几份文档理解成：
+
+- `ENGINEERING_RULES.md` = 总规则
+- `DEVELOPMENT_CHECKLIST.md` = 执行清单
+- `TECH_DEBT.md` = 当前问题与进度
+- `FRONTEND_RULES.md` = 前端实现规则
+- `BACKEND_RULES.md` = 后端实现规则
+- `AGENT_COLLABORATION_GUIDE.md` = 协作方式规则
+
+它们不是重复关系，而是不同层次的互补关系。
+
+---
+
+## 11. 一个建议
+
+后续如果再新增新的规则文档，最好也在这里补一条索引说明。
+
+这样整个文档体系才不会重新变成“规则都写了，但没人知道去哪找”。
