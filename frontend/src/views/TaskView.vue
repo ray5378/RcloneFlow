@@ -728,17 +728,13 @@ function getLiveSummaryFromDB(run:any){
   }catch{}
   return null
 }
-// 以当前 live 帧为准估算 ETA（剩余时间，秒）；仅在 live 缺总量时回退 preflight
+// 以当前 live 帧为准估算 ETA（剩余时间，秒）；运行中不再回退 preflight
 const lastNonZeroSpeedByTask: Record<number, number> = {}
 function calcEtaFromAvg(run:any, live:any){
   try{
     if (!run?.startedAt || !live) return null
     const tid = (run.taskId || run.taskID || run.task_id || run.runRecord?.taskId) as number
-    let total = Number(live.totalBytes || 0)
-    if (!total) {
-      const pf = getPreflight(run)
-      total = Number(pf?.totalBytes || 0)
-    }
+    const total = Number(live.totalBytes || 0)
     if (!total) return null
     const bytes = Number(live.bytes || 0)
     if (bytes <= 0) return null
