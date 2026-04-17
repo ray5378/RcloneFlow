@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	"rcloneflow/internal/adapter"
@@ -134,8 +135,11 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		streamingEnabled = v
 	}
 
-	// 切换为 CLI：先记录运行，再异步启动（可中断/进度）
-	run, err := s.db.AddRun(store.Run{
+	// 单例模式检查：如果开启了单例模式，使用原子操作确保只有一个任务运行
+	singletonMode, isSingleton := effectiveOptions["singletonMode"].(bool)
+
+	// 构建运行记录
+	newRun := store.Run{
 		TaskID:  taskID,
 		Status:  "running",
 		Trigger: trigger,
@@ -149,8 +153,58 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		SourcePath:   t.SourcePath,
 		TargetRemote: t.TargetRemote,
 		TargetPath:   t.TargetPath,
-	})
-	// 合并全局传输设置（用于 Runner 默认值回退）
+	}
+
+	// 单例模式：使用原子操作 TryAcquireRun
+	if isSingleton && singletonMode {
+		run, existed, err := s.db.TryAcquireRun(&newRun)
+		if err != nil {
+			return fmt.Errorf("单例模式：申请运行记录失败，%w", err)
+		}
+		if existed {
+			// 记录跳过到历史
+			s.db.AddRun(store.Run{
+				TaskID:  taskID,
+				Status:  "skipped",
+				Trigger: trigger,
+				Summary: map[string]any{
+					"finalSummary": map[string]any{
+						"message": "单例模式：有其他任务正在运行，跳过本次执行",
+					},
+				},
+				TaskName:     t.Name,
+				TaskMode:     t.Mode,
+				SourceRemote: t.SourceRemote,
+				SourcePath:   t.SourcePath,
+				TargetRemote: t.TargetRemote,
+				TargetPath:   t.TargetPath,
+			})
+			return fmt.Errorf("单例模式：有其他任务正在运行，跳过本次执行")
+		}
+		// 成功创建记录，run 已填充
+		// 成功创建记录，run 已填充
+		// 合并全局传输设置
+		if ts, err := settings.Load(); err == nil {
+			_ = s.db.UpdateRun(run.ID, func(rr *store.Run) {
+				if rr.Summary == nil {
+					rr.Summary = map[string]any{}
+				}
+				rr.Summary["transferDefaults"] = ts
+			})
+		}
+		// 异步启动任务
+		go func() {
+			_ = runnercli.New(s.db).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+		}()
+		return nil
+	}
+
+	// 非单例模式：直接创建运行记录
+	run, err := s.db.AddRun(newRun)
+	if err != nil {
+		return err
+	}
+	// 合并全局传输设置
 	if ts, err := settings.Load(); err == nil {
 		_ = s.db.UpdateRun(run.ID, func(rr *store.Run) {
 			if rr.Summary == nil {
@@ -158,9 +212,6 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			}
 			rr.Summary["transferDefaults"] = ts
 		})
-	}
-	if err != nil {
-		return err
 	}
 	go func() {
 		_ = runnercli.New(s.db).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)

@@ -17,6 +17,7 @@
   --accent-strong: #1e88e5;
   --danger: #ef5350;
   --success: #4caf50;
+  --warning: #f59e0b;
 }
 /* Light theme tokens */
 body.light{
@@ -31,6 +32,7 @@ body.light{
   --accent-strong: #1e88e5;
   --danger: #d32f2f;
   --success: #388e3c;
+  --warning: #f59e0b;
 }
 
 body {
@@ -414,6 +416,65 @@ body.light .card-header {
   white-space: nowrap;
 }
 
+.history-filters {
+  display: flex;
+  gap: 4px;
+}
+
+.filter-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.filter-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.page-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.page-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .search-input {
   padding: 6px 12px;
   border-radius: 6px;
@@ -742,6 +803,43 @@ body.light .task-paths {
   color: #666;
   font-size: 11px;
   min-width: 30px;
+}
+
+.path-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #2a2a2a;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-wrap: nowrap;
+}
+
+.path-bar .path-selected {
+  flex-shrink: 0;
+  font-weight: 500;
+  color: #ccc;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.path-bar .path-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #888;
+  font-size: 12px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.path-bar .path-label:hover {
+  color: var(--accent, #4f46e5);
+  text-decoration: underline;
 }
 
 .path-value {

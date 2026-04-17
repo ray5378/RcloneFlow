@@ -1,16 +1,73 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
+import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions } from '../components/task'
+import { ToastItem } from '../components/toast'
+import { FileItem } from '../components/files'
+import { PathItem } from '../components/path'
+import { taskApi, remoteApi, runApi, queueApi, jobApi, scheduleApi } from '../composables/useApi'
+import { handleError, showSuccess, setErrorHandler } from '../composables/useError'
+import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
 import { getToken } from '../api/auth'
+import { useWebSocket, onWsMessage } from '../composables/useWebSocket'
 import type { Task, Schedule, Run } from '../types'
+
+// Toast 通知系统
+interface Toast {
+  id: number
+  message: string
+  type: 'info' | 'success' | 'error'
+}
+const toasts = ref<Toast[]>([])
+let toastId = 0
+
+function showToast(message: string, type: 'info' | 'success' | 'error' = 'info') {
+  const id = ++toastId
+  toasts.value.push({ id, message, type })
+  setTimeout(() => {
+    toasts.value = toasts.value.filter(t => t.id !== id)
+  }, 3000)
+}
+
+// Set up global error handler for composables
+setErrorHandler((message, type) => {
+  showToast(message, type as 'info' | 'success' | 'error')
+})
 
 const tasks = ref<Task[]>([])
 const schedules = ref<Schedule[]>([])
 const runs = ref<Run[]>([])
+const runsTotal = ref(0)
+// 任务特定的历史记录（用于分页）
+const taskRuns = ref<Run[]>([])
+const runsPage = ref(1)
+const runsPageSize = 50
+const jumpPage = ref(1)
+
+function jumpToPage() {
+  const page = Math.min(Math.max(1, jumpPage.value || 1), currentTotalPages.value)
+  runsPage.value = page
+  jumpPage.value = page
+  loadData()
+}
+
+// 任务分页
+const tasksPage = ref(1)
+const tasksPageSize = 20
+const tasksJumpPage = ref(1)
+const tasksTotal = computed(() => filteredTasksRaw.value.length)
+const currentTasksPages = computed(() => Math.max(1, Math.ceil(tasksTotal.value / tasksPageSize)))
+
+function jumpToTasksPage() {
+  const page = Math.min(Math.max(1, tasksJumpPage.value || 1), currentTasksPages.value)
+  tasksPage.value = page
+  tasksJumpPage.value = page
+}
+
 const taskSearch = ref('')
 
-// 过滤后的任务列表
-const filteredTasks = computed(() => {
+// 过滤后的任务列表（原始）
+const filteredTasksRaw = computed(() => {
   if (!taskSearch.value) return tasks.value
   const q = taskSearch.value.toLowerCase()
   return tasks.value.filter(t =>
@@ -21,9 +78,17 @@ const filteredTasks = computed(() => {
   )
 })
 
+// 过滤后的任务列表（分页后）
+const filteredTasks = computed(() => {
+  const start = (tasksPage.value - 1) * tasksPageSize
+  const end = start + tasksPageSize
+  return filteredTasksRaw.value.slice(start, end)
+})
+
 const remotes = ref<string[]>([])
 const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const historyFilterTaskId = ref<number | null>(null)
+const historyStatusFilter = ref<string>('all') // 'all' | 'finished' | 'failed' | 'skipped' | 'hasTransfer'
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
 // 运行中提示小窗（不切换主窗口，不弹出完整详情）
@@ -50,9 +115,10 @@ const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
 // 监控帧是否停滞超过阈值（默认 25s），若是则强制刷新一次
 const STUCK_MS = 25000
 let lastRenderedSignature = ''
-let stuckTimer: any = null
+let stuckTimer: number | null = null
+let activePollTimer: number | null = null
 onMounted(() => {
-  stuckTimer = setInterval(() => {
+  stuckTimer = window.setInterval(() => {
     try{
       // 用任务卡片可见的核心字段拼接签名：任务数、每个任务的 id+pct+completedFiles
       const sigParts: string[] = []
@@ -77,9 +143,18 @@ onMounted(() => {
       }
     }catch{}
   }, 1000)
+  // 兜底轮询：即使 ws 没推到，也每 3 秒刷新一次 activeRuns
+  activePollTimer = window.setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      loadActiveRuns().catch(console.error)
+    }
+  }, 3000)
 })
-onUnmounted(() => { if (stuckTimer) clearInterval(stuckTimer) })
-// 仅用 DB 的 summary.progress；DB 暂无时保留上一帧，不再回退 active
+onUnmounted(() => {
+  if (stuckTimer) clearInterval(stuckTimer)
+  if (activePollTimer) clearInterval(activePollTimer)
+})
+// 仅用 DB 的 summary.progress 作为运行中 DB fallback；stableProgress 只保留最后兜底
 const lastDbFrameByRunId: Record<number, any> = {}
 // Webhook 配置（POST 地址 + 触发来源/状态勾选）
 const showWebhookModal = ref(false)
@@ -123,9 +198,38 @@ async function saveWebhook(){
     showWebhookModal.value = false
     await loadData()
   }catch(e:any){
-    alert(e?.message||String(e))
+    showToast(e?.message||String(e), 'error')
   }
 }
+
+// 单例模式配置
+const showSingletonModal = ref(false)
+const singletonForm = ref<{taskId:number|null, singletonEnabled:boolean}>({ taskId: null, singletonEnabled: false })
+
+function setSingletonMode(task: Task){
+  singletonForm.value.taskId = task.id
+  try{
+    const opts = (task.options||task.Options||{}) as any
+    singletonForm.value.singletonEnabled = !!opts.singletonMode
+  }catch{
+    singletonForm.value.singletonEnabled = false
+  }
+  showSingletonModal.value = true
+}
+
+async function saveSingleton(){
+  if (!singletonForm.value.taskId){ showSingletonModal.value=false; return }
+  try{
+    const id = singletonForm.value.taskId
+    const opts = { singletonMode: singletonForm.value.singletonEnabled }
+    await taskApi.updateOptions(id, opts)
+    showSingletonModal.value = false
+    await loadData()
+  }catch(e:any){
+    showToast(e?.message||String(e), 'error')
+  }
+}
+
 function buildWecomMarkdown(p:any){
   const taskName = p?.task?.name || '测试任务'
   const statusZh = p?.statusZh || '演示'
@@ -154,7 +258,7 @@ async function testWebhook(){
   try{
     const url1 = (webhookForm.value.postUrl||'').trim()
     const url2 = String((webhookForm.value as any)['wecomUrl']||'').trim()
-    if (!url1 && !url2){ alert('请先填写对外 POST 地址或企业微信地址'); return }
+    if (!url1 && !url2){ showToast('请先填写对外 POST 地址或企业微信地址', 'error'); return }
     const payload:any = {
       title: 'RcloneFlow 测试通知',
       triggerZh: '测试',
@@ -181,9 +285,9 @@ async function testWebhook(){
     const fails:string[] = []
     if (url1){ try{ await send(url1) } catch(e:any){ fails.push(`通用: ${e?.message||e}`) } }
     if (url2){ try{ await send(url2) } catch(e:any){ fails.push(`企业微信: ${e?.message||e}`) } }
-    if (fails.length){ alert(`测试部分失败：${fails.join('；')}`) } else { alert('测试通知已发送（请在接收端查看）') }
+    if (fails.length){ showToast(`测试部分失败：${fails.join('；')}`, 'error') } else { showToast('测试通知已发送（请在接收端查看）', 'success') }
   }catch(e:any){
-    alert(`测试发送失败：${e?.message||e}`)
+    showToast(`测试发送失败：${e?.message||e}`, 'error')
   }
 }
 
@@ -230,7 +334,7 @@ async function reloadRunFiles(){
   try{
     if (!runDetail.value?.id) return
     const pageOffset = (runFilesPage.value-1) * runFilesPageSize.value
-    const res = await api.getRunFiles(runDetail.value.id, pageOffset, runFilesPageSize.value)
+    const res = await runApi.getFiles(runDetail.value.id, pageOffset, runFilesPageSize.value)
     runFiles.value = res.items || []
     runFilesTotal.value = res.total || 0
   }catch(e){ console.error(e) }
@@ -265,8 +369,8 @@ function closeRunDetail(){
 }
 
 onUnmounted(()=>{
-  if (activeRunsTimer) { clearInterval(activeRunsTimer as any); activeRunsTimer = null }
-  if (runsTimer) { clearInterval(runsTimer as any); runsTimer = null }
+  if (runDetailTimer) { clearInterval(runDetailTimer); runDetailTimer = null }
+  if (stuckTimer) { clearInterval(stuckTimer); stuckTimer = null }
 })
 
 const pagedRunFiles = computed(()=> runFiles.value)
@@ -310,8 +414,6 @@ const finalFilesJump = ref<number | null>(null)
 function goPrevFinalFilesPage(){ if (finalFilesPage.value>1) finalFilesPage.value-- }
 function goNextFinalFilesPage(){ if (finalFilesPage.value<totalFinalFilesPages.value) finalFilesPage.value++ }
 function jumpFinalFilesPage(){ if (!finalFilesJump.value) return; const p = Math.min(Math.max(1, finalFilesJump.value), totalFinalFilesPages.value); finalFilesPage.value = p }
-let activeRunsTimer: number | null = null
-let runsTimer: number | null = null // 历史态仅为列表刷新，保留，其他实时逻辑已移除
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
   title: '',
@@ -386,32 +488,68 @@ function normalizeTaskOptions(raw: Record<string, any> | undefined | null) {
 onMounted(async () => {
   await loadData()
   await loadActiveRuns()
-  activeRunsTimer = window.setInterval(() => { loadActiveRuns().catch(console.error) }, 2000)
-  // 历史列表也轮询，保证新 run 及时出现（避免必须手动刷新）
-  runsTimer = window.setInterval(() => { api.listRuns().then(v=> runs.value = v?.length ? v : runs.value).catch(()=>{}) }, 3000)
+
+  // WebSocket 实时推送（替代轮询）
+  useWebSocket({
+    onMessage: (msg) => {
+      if (msg.type === 'run_status' && msg.data) {
+        // 更新对应 run 的状态
+        const idx = runs.value.findIndex(r => r.id === msg.data.run_id)
+        if (idx !== -1) {
+          runs.value[idx] = { ...runs.value[idx], status: msg.data.status }
+        }
+        // 刷新活跃传输和历史记录
+        loadActiveRuns().catch(console.error)
+      } else if (msg.type === 'run_progress' && msg.data) {
+        // 更新进度（用于实时显示传输进度）
+        const idx = activeRuns.value.findIndex(r => r.runRecord?.id === msg.data.run_id)
+        if (idx !== -1) {
+          const cur = activeRuns.value[idx] || {}
+          const prev = cur.progress || cur.stableProgress || {}
+          const nextProgress = {
+            ...prev,
+            bytes: Number(msg.data.bytes || 0),
+            totalBytes: Number(msg.data.total || prev.totalBytes || 0),
+            speed: Number(msg.data.speed || 0),
+            percentage: Number(msg.data.percent || prev.percentage || 0),
+          }
+          activeRuns.value[idx] = {
+            ...cur,
+            progress: nextProgress,
+            stableProgress: cur.stableProgress || nextProgress,
+          }
+        }
+      }
+    }
+  })
+
+  // 监听状态变化时刷新数据
+  onWsMessage('run_status', () => {
+    loadData().catch(console.error)
+  })
 })
 
 let loadSeq = 0
 async function loadData() {
   const seq = ++loadSeq
   try {
-    const [taskData, remoteData, scheduleData, runData] = await Promise.all([
-      api.listTasks(),
-      api.listRemotes(),
-      api.listSchedules(),
-      api.listRuns(),
+    const [taskData, remoteData, scheduleData, runResult] = await Promise.all([
+      taskApi.list(),
+      remoteApi.list(),
+      scheduleApi.list(),
+      runApi.list(runsPage.value, runsPageSize),
     ])
-    if (seq !== loadSeq) return // 只接受最新一轮
-    // 防御：只有明确有数据才更新，防止空数据覆盖
-    if (Array.isArray(taskData) && taskData.length > 0) tasks.value = taskData
+    if (seq !== loadSeq) return
+    if (Array.isArray(taskData)) tasks.value = taskData
     if (Array.isArray(remoteData?.remotes) && remoteData.remotes.length > 0) remotes.value = remoteData.remotes
     if (Array.isArray(scheduleData) && scheduleData.length > 0) schedules.value = scheduleData
-    if (Array.isArray(runData) && runData.length > 0) runs.value = runData
-    // 本地快照：成功后保存
+    if (runResult?.runs) {
+      runs.value = runResult.runs
+      runsTotal.value = typeof runResult.total === 'number' ? runResult.total : (runResult.runs?.length || 0)
+    }
     try { localStorage.setItem('lastTasksSnapshot', JSON.stringify(tasks.value||[])) } catch {}
   } catch (e:any) {
     console.error(e)
-    // 失败不覆写：保留上一帧；若当前为空，尝试用本地快照兜底
     if (!tasks.value || tasks.value.length===0) {
       try { const snap = JSON.parse(localStorage.getItem('lastTasksSnapshot')||'[]'); if (Array.isArray(snap)) tasks.value = snap } catch {}
     }
@@ -420,33 +558,31 @@ async function loadData() {
 
 async function loadActiveRuns() {
   try {
-    const data = await api.getActiveRuns()
+    const data = await jobApi.list()
     const now = Date.now()
-    // 更新最后稳态快照（保持向前：非递减合并，避免抖动）
-    for (const it of data || []){
+    const list:any[] = (data || []).map((it:any) => {
+      const raw:any = (it && typeof it.progress === 'object' && it.progress)
+        ? { ...it.progress }
+        : ((it && typeof it.stableProgress === 'object' && it.stableProgress) ? { ...it.stableProgress } : null)
+      if (!raw) return it
+      // 任务卡片运行中信息优先使用后端返回的 progress；stableProgress 仅保留兼容
+      raw.bytes = Number(raw.bytes || 0)
+      raw.totalBytes = Number(raw.totalBytes || 0)
+      raw.speed = Number(raw.speed || 0)
+      raw.percentage = Number(raw.percentage || 0)
+      raw.completedFiles = Number(raw.completedFiles || 0)
+      raw.totalCount = Number(raw.totalCount || 0)
+      raw.eta = Number(raw.eta || 0)
+      if (raw.percentage < 0) raw.percentage = 0
+      if (raw.percentage > 100) raw.percentage = 100
+      it.progress = raw
+      if (!it.stableProgress) it.stableProgress = raw
       const tid = it.runRecord?.taskId
-      const sp:any = it.stableProgress || {}
-      if (tid && sp && typeof sp === 'object'){
-        const prev = lastStableByTask.value[tid]?.sp || {}
-        const merged:any = { ...prev, ...sp }
-        // 非递减合并
-        merged.bytes = Math.max(Number(prev.bytes||0), Number(sp.bytes||0))
-        merged.totalBytes = Number(sp.totalBytes||prev.totalBytes||0)
-        merged.percentage = Math.max(Number(prev.percentage||0), Number(sp.percentage||0))
-        merged.completedFiles = Math.max(Number(prev.completedFiles||0), Number(sp.completedFiles||0))
-        // totalCount：若本帧为 0，沿用上一帧
-        merged.totalCount = Number(sp.totalCount||prev.totalCount||0)
-        // 速度：若本帧为 0，则沿用上一帧的非零速度，减少闪烁
-        merged.speed = Number(sp.speed||prev.speed||0)
-        lastStableByTask.value[tid] = { sp: merged, at: now }
-        // 同步回 it 以便本次渲染即用稳定值
-        it.stableProgress = merged
-      }
-    }
+      if (tid) lastStableByTask.value[tid] = { sp: raw, at: now }
+      return it
+    })
     // 如果本帧没有 active，立即清空，不要维持旧进度
-    const list:any[] = data || []
     if (list.length === 0) {
-      // 直接清空，让进度条立即消失
       activeRuns.value = []
       return
     }
@@ -471,65 +607,34 @@ function getDbProgressStable(run:any){
   return db || null
 }
 
-// 历史"运行中"卡片也使用任务卡片的抗噪稳态：优先 lastStableByTask，再回退 DB
+// 历史"运行中"卡片直接使用当前 activeRuns 的 progress；无 active 时再回退 DB
 function getDeNoisedStableByRun(run:any){
   try{
     const tid = run?.taskId as number
-    if (tid && lastStableByTask.value && lastStableByTask.value[tid] && lastStableByTask.value[tid].sp){
-      return lastStableByTask.value[tid].sp
+    if (tid){
+      const active = getActiveRunByTaskId(tid)
+      if (active?.progress) return active.progress
+      if (active?.stableProgress) return active.stableProgress
     }
   }catch{}
   return getDbProgressStable(run)
 }
 
-// 任务卡片的预估完成时间：使用卡片的抗噪稳态（sp.totalBytes/sp.bytes/sp.speed）
-function calcEtaForTaskCard(taskId:number){
-  try{
-    const st = lastStableByTask.value?.[taskId]?.sp || getActiveRunByTaskId(taskId)?.stableProgress
-    if (!st) return null
-    const total = Number(st.totalBytes||0)
-    const bytes = Number(st.bytes||0)
-    if (!total || bytes<=0) return null
-    let speed = Number(st.speed||0)
-    // 仅当可渲染时采信，否则使用最近一次有效速度
-    if (formatBytesPerSec(speed) === '-'){
-      const last = lastNonZeroSpeedByTask[taskId] || 0
-      if (!last || last<=0) return null
-      speed = last
-    } else {
-      lastNonZeroSpeedByTask[taskId] = speed
-    }
-    const remaining = Math.max(0, total - bytes)
-    const eta = Math.floor(remaining / speed)
-    if (eta > 99*3600) return null
-    return eta
-  }catch{ return null }
-}
-
-// 抗噪稳态读取（任务卡片用）：优先 lastStableByTask，再回退当前 active 的 stableProgress
+// 任务卡片直接使用后端 activeRuns 的 progress，不在前端做去噪拼接/完成态强行钳制
 function getDeNoisedStableByTask(taskId:number){
-  // 只返回活跃任务的进度，不返回已完成的数据
   const active = getActiveRunByTaskId(taskId)
-  if (!active) return null
-  const raw = active.stableProgress
+  const raw = active?.progress || active?.stableProgress
   if (!raw) return null
-  // clone & normalize for UI
   const st:any = { ...raw }
-  const totalBytes = Number(st.totalBytes || 0)
-  const bytes = Number(st.bytes || 0)
-  const totalCount = Number(st.totalCount || 0)
-  const completedFiles = Number(st.completedFiles || 0)
-  let pct = Number(st.percentage || 0)
-  // clamp bytes within [0,totalBytes]
-  if (totalBytes > 0) st.bytes = Math.min(bytes, totalBytes)
-  // when near 100% or files已达总数，钳制为完成，避免"卡最后1个"错觉
-  if ((totalCount > 0 && completedFiles >= totalCount) || pct >= 99.999) {
-    st.completedFiles = totalCount > 0 ? totalCount : completedFiles
-    st.percentage = 100
-  } else {
-    // also cap percentage at 100
-    st.percentage = Math.min(100, pct)
-  }
+  st.bytes = Number(st.bytes || 0)
+  st.totalBytes = Number(st.totalBytes || 0)
+  st.speed = Number(st.speed || 0)
+  st.percentage = Number(st.percentage || 0)
+  st.completedFiles = Number(st.completedFiles || 0)
+  st.totalCount = Number(st.totalCount || 0)
+  st.eta = Number(st.eta || 0)
+  if (st.percentage < 0) st.percentage = 0
+  if (st.percentage > 100) st.percentage = 100
   return st
 }
 
@@ -592,7 +697,7 @@ function formatBps(bps:number){
   if (!bps || bps<=0) return '-'
   return formatBytes(bps) + '/s'
 }
-// 从 DB 的 summary.progress 读取运行中实时（不落库也可兼容）
+// 从 DB 的 summary.progress 读取运行中实时（不落库也可兼容）；stableProgress 只作为最后兜底
 function getLiveSummaryFromDB(run:any){
   try{
     const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
@@ -601,51 +706,46 @@ function getLiveSummaryFromDB(run:any){
       const bytes = Number(p.bytes || 0)
       const totalBytes = Number(p.totalBytes || 0)
       const speed = Number(p.speed || 0)
+      const eta = Number(p.eta || 0)
+      const totalCount = Number(p.plannedFiles || 0)
       let percentage = Number(p.percentage || 0)
       if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
-      // 补充实时"已传输数量"：优先 progress.completedFiles，其次 stableProgress.completedFiles
-      const completedFiles = Number(p.completedFiles ?? sum?.stableProgress?.completedFiles ?? 0)
-      return { bytes, totalBytes, speed, percentage, completedFiles }
+      const completedFiles = Number(p.completedFiles || 0)
+      return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles }
     }
-    // 退路：直接从 stableProgress 取（DB-only 流）
     const sp = sum?.stableProgress
     if (sp && typeof sp === 'object'){
       const bytes = Number(sp.bytes || 0)
       const totalBytes = Number(sp.totalBytes || 0)
       const speed = Number(sp.speed || 0)
+      const eta = Number(sp.eta || 0)
+      const totalCount = Number(sp.totalCount || 0)
       let percentage = Number(sp.percentage || 0)
       if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
       const completedFiles = Number(sp.completedFiles || 0)
-      return { bytes, totalBytes, speed, percentage, completedFiles }
+      return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles }
     }
   }catch{}
   return null
 }
-// 以"开始时间 + 平均速度"计算更稳健的 ETA（剩余时间，秒）
-// 预估完成：使用"固定总量（preflight.totalBytes）- 抗噪后的已传 bytes" / 抗噪后的速度
+// 以当前 live 帧为准估算 ETA（剩余时间，秒），不再混入前端历史稳态
 const lastNonZeroSpeedByTask: Record<number, number> = {}
 function calcEtaFromAvg(run:any, live:any){
   try{
     if (!run?.startedAt || !live) return null
     const tid = (run.taskId || run.taskID || run.task_id || run.runRecord?.taskId) as number
-    // 固定总量：优先 preflight.totalBytes；无则用卡片稳态的 totalBytes；再无则返回 null
     const pf = getPreflight(run)
     let total = Number(pf?.totalBytes || 0)
-    if (!total && tid && lastStableByTask.value?.[tid]?.sp){ total = Number(lastStableByTask.value[tid].sp.totalBytes || 0) }
+    if (!total) total = Number(live.totalBytes || 0)
     if (!total) return null
-    // 抗噪后的已传 bytes
-    let bytes = Number(live.bytes || 0)
-    if (tid && lastStableByTask.value?.[tid]?.sp){ bytes = Number(lastStableByTask.value[tid].sp.bytes || bytes) }
-    if (bytes<=0) return null
+    const bytes = Number(live.bytes || 0)
+    if (bytes <= 0) return null
     const remaining = Math.max(0, total - bytes)
-    // 抗噪后的速度（任务卡片显示），可渲染时才采信
-    let speed = 0
-    if (tid && lastStableByTask.value?.[tid]?.sp){ speed = Number(lastStableByTask.value[tid].sp.speed || 0) }
-    if (speed<=0) speed = Number(live.speed || 0)
+    let speed = Number(live.speed || 0)
     if (formatBytesPerSec(speed) === '-') return null
-    if (tid && speed>0) lastNonZeroSpeedByTask[tid] = speed
+    if (tid && speed > 0) lastNonZeroSpeedByTask[tid] = speed
     const sp = tid ? (lastNonZeroSpeedByTask[tid] || 0) : speed
-    if (!sp || sp<=0) return null
+    if (!sp || sp <= 0) return null
     const etaSec = Math.floor(remaining / sp)
     if (etaSec > 99*3600) return null
     return etaSec
@@ -657,6 +757,7 @@ function getStatusClass(status: string) {
     case 'running': return 'running'
     case 'finished': return 'success'
     case 'failed': return 'failed'
+    case 'skipped': return 'skipped'
     default: return ''
   }
 }
@@ -666,8 +767,51 @@ function getStatusText(status: string) {
     case 'running': return '运行中'
     case 'finished': return '已完成'
     case 'failed': return '失败'
+    case 'skipped': return '已跳过'
     default: return status
   }
+}
+
+function getActiveProgressByTaskId(taskId:number){
+  const active = getActiveRunByTaskId(taskId)
+  return active?.progress || active?.stableProgress || null
+}
+
+function getActiveProgressTextByTaskId(taskId:number){
+  const p:any = getActiveProgressByTaskId(taskId)
+  if (!p) return '-'
+  if (p.phase === 'preparing') {
+    return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
+  }
+  let etaStr = ''
+  if (Number(p.eta || 0) > 0) etaStr = ` · 预计完成 ${formatEta(Number(p.eta || 0))}`
+  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · 总数量 ${Number(p.totalCount || 0)} ／ 已传输 ${Number(p.completedFiles || 0)}${etaStr}`
+}
+
+function getActiveProgressLineByTaskId(taskId:number){
+  const active = getActiveRunByTaskId(taskId)
+  return active?.progressLine || '-'
+}
+
+function getActiveProgressCheckByTaskId(taskId:number){
+  const active = getActiveRunByTaskId(taskId)
+  return active?.progressCheck || null
+}
+
+function getActiveProgressCheckTextByTaskId(taskId:number){
+  const check:any = getActiveProgressCheckByTaskId(taskId)
+  if (!check) return '-'
+  if (check.ok) return `OK · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
+  const parts:string[] = []
+  if (check.pctMismatch) parts.push('百分比异常')
+  if (check.countMismatch) parts.push('数量异常')
+  if (check.etaMismatch) parts.push('ETA异常')
+  return `${parts.join(' / ') || '异常'} · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
+}
+
+function getActiveProgressJsonByTaskId(taskId:number){
+  const p = getActiveProgressByTaskId(taskId)
+  try { return p ? JSON.stringify(p, null, 2) : '-' } catch { return '-' }
 }
 
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
@@ -702,7 +846,7 @@ async function createTask() {
   }
 
   if (!createForm.value.name) {
-    alert('请输入任务名称')
+    showToast('请输入任务名称', 'error')
     return
   }
 
@@ -717,13 +861,13 @@ async function createTask() {
       createForm.value.targetPath = parsed.dst.path
       createForm.value.options = { ...normalizeTaskOptions(createForm.value.options), ...parsed.options }
     } catch (e) {
-      alert('命令解析失败：' + (e as Error).message)
+      showToast('命令解析失败：' + (e as Error).message, 'error')
       return
     }
   }
 
   if (!createForm.value.sourceRemote || !createForm.value.targetRemote) {
-    alert('请选择源和目标存储')
+    showToast('请选择源和目标存储', 'error')
     return
   }
 
@@ -742,7 +886,7 @@ async function createTask() {
 
     if (editingTask.value) {
       // 更新任务
-      await api.updateTask(editingTask.value.id, taskData)
+      await taskApi.update(editingTask.value.id, taskData)
       // 更新定时规则：先删除旧的在创建新的
       const oldSchedule = getScheduleByTaskId(editingTask.value.id)
       if (createForm.value.enableSchedule) {
@@ -754,18 +898,18 @@ async function createTask() {
           createForm.value.scheduleWeek || '*',
         ].join('|')
         if (oldSchedule) {
-          await api.updateSchedule(oldSchedule.id, true, spec)
+          await scheduleApi.update(oldSchedule.id, true, spec)
         } else {
-          await api.createSchedule({ taskId: editingTask.value.id, spec, enabled: true })
+          await scheduleApi.create({ taskId: editingTask.value.id, spec, enabled: true })
         }
       } else if (oldSchedule) {
         // 关闭并保留记录
-        await api.updateSchedule(oldSchedule.id, false)
+        await scheduleApi.update(oldSchedule.id, false)
       }
       editingTask.value = null
     } else {
       // 新建任务
-      const task = await api.createTask(taskData)
+      const task = await taskApi.create(taskData)
       // 如果启用了定时任务，创建定时规则
       if (createForm.value.enableSchedule) {
         const spec = [
@@ -775,7 +919,7 @@ async function createTask() {
           createForm.value.scheduleMonth || '*',
           createForm.value.scheduleWeek || '*',
         ].join('|')
-        await api.createSchedule({ taskId: task.id, spec, enabled: true })
+        await scheduleApi.create({ taskId: task.id, spec, enabled: true })
       }
     }
     await loadData()
@@ -783,7 +927,7 @@ async function createTask() {
     creatingState.value = 'done'
   } catch (e) {
     creatingState.value = 'idle'
-    alert((e as Error).message)
+    showToast((e as Error).message, 'error')
   }
 }
 
@@ -833,25 +977,68 @@ function toCamel(s: string){ return s.replace(/-([a-z])/g, (_,c)=>c.toUpperCase(
 
 // 过滤后的历史记录
 const filteredRuns = computed(() => {
-  if (historyFilterTaskId.value === null) return runs.value
-  return runs.value.filter(r => r.taskId === historyFilterTaskId.value)
+  // 全局视图用 runs.value，任务视图用 taskRuns.value
+  let source = historyFilterTaskId.value === null ? runs.value : taskRuns.value
+  let result = [...source]
+  if (historyStatusFilter.value === 'hasTransfer') {
+    result = result.filter(r => {
+      const sum = getFinalSummary(r)
+      return sum && (sum.totalCount > 1 || sum.transferredBytes > 0)
+    })
+  } else if (historyStatusFilter.value !== 'all') {
+    result = result.filter(r => r.status === historyStatusFilter.value)
+  }
+  // 客户端分页
+  const start = (runsPage.value - 1) * runsPageSize
+  const end = start + runsPageSize
+  return result.slice(start, end)
 })
 
+// 筛选后的总数（用于分页）
+const filteredRunsTotal = computed(() => {
+  let source = historyFilterTaskId.value === null ? runs.value : taskRuns.value
+  let result = [...source]
+  if (historyStatusFilter.value === 'hasTransfer') {
+    result = result.filter(r => {
+      const sum = getFinalSummary(r)
+      return sum && (sum.totalCount > 1 || sum.transferredBytes > 0)
+    })
+  } else if (historyStatusFilter.value !== 'all') {
+    result = result.filter(r => r.status === historyStatusFilter.value)
+  }
+  return result.length
+})
+
+// 当前分页的总数（全局视图用 runsTotal，特定任务视图用 filteredRunsTotal）
+const currentTotal = computed(() => {
+  return historyFilterTaskId.value === null ? (runsTotal.value || 0) : filteredRunsTotal.value
+})
+
+// 当前总页数
+const currentTotalPages = computed(() => Math.max(1, Math.ceil(currentTotal.value / runsPageSize)))
+
 function viewTaskHistory(taskId: number) {
+  runsPage.value = 1
   historyFilterTaskId.value = taskId
   currentModule.value = 'history'
+  // 获取该任务的历史记录
+  runApi.getRunsByTask(taskId).then(data => {
+    if (data && Array.isArray(data)) {
+      taskRuns.value = data
+    }
+  })
 }
 
 const stoppedTaskId = ref<number|null>(null)
 async function stopTaskAny(taskId: number) {
   try {
     // 直接按任务 ID kill（后端会定位最近 run 并发信号）
-    await api.killTask(taskId)
+    await taskApi.kill(taskId)
     // 兼容 RC：如仍有 rcJobId，则再尝试停止
-    const active = await api.getActiveRuns().catch(()=>[])
+    const active = await jobApi.list()
     const cur:any = Array.isArray(active) ? active.find(x => x?.runRecord?.taskId === taskId && x?.runRecord?.rcJobId) : null
     if (cur?.runRecord?.rcJobId) {
-      await api.stopJob(cur.runRecord.rcJobId)
+      await jobApi.stop(cur.runRecord.rcJobId)
     }
     // 按钮状态反馈：红色"已经停止"，10秒后恢复
     stoppedTaskId.value = taskId
@@ -860,36 +1047,36 @@ async function stopTaskAny(taskId: number) {
     await loadData()
   } catch (e) {
     stoppedTaskId.value = null
-    alert((e as Error).message)
+    showToast((e as Error).message, 'error')
   }
 }
 
 
 async function runTask(taskId: number) {
-  if (runningTaskId.value !== null) return
-  runningTaskId.value = taskId
-  try {
-    await api.runTask(taskId)
-    // 5秒后恢复
-    setTimeout(() => {
-      if (runningTaskId.value === taskId) {
-        runningTaskId.value = null
-      }
-    }, 5000)
-  } catch (e) {
-    runningTaskId.value = null
-    alert((e as Error).message)
+  if (runningTaskId.value !== null) {
+    showToast('单例模式：已有任务正在运行，跳过本次执行', 'error')
+    return
   }
+  runningTaskId.value = taskId
+  const result = await taskApi.run(taskId)
+  if (!result) {
+    // handleError already showed a toast, just reset state
+    runningTaskId.value = null
+    return
+  }
+  // 5秒后恢复
+  setTimeout(() => {
+    if (runningTaskId.value === taskId) {
+      runningTaskId.value = null
+    }
+  }, 5000)
+  return result
 }
 
 async function goToAddTask() {
   // Reload remotes before switching to add mode
-  try {
-    const remoteData = await api.listRemotes()
-    remotes.value = remoteData?.remotes || []
-  } catch (e) {
-    console.error('Failed to load remotes:', e)
-  }
+  const remoteData = await remoteApi.list()
+  remotes.value = remoteData?.remotes || []
   currentModule.value = 'add'
   openMenuId.value = null
 }
@@ -945,27 +1132,20 @@ function editTask(task: Task) {
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
   }
 
-  // 加载源路径选项 - 加载父目录以便显示文件
+  // 加载源路径选项 - 直接加载配置的路径
   if (task.sourceRemote) {
-    const parentPath = getParentPath(task.sourcePath || '')
-    sourceCurrentPath.value = parentPath
-    loadSourcePath(task.sourceRemote, parentPath)
+    const sourcePath = task.sourcePath || ''
+    sourceCurrentPath.value = sourcePath
+    loadSourcePath(task.sourceRemote, sourcePath)
   }
-  // 加载目标路径选项
+  // 加载目标路径选项 - 直接加载配置的路径
   if (task.targetRemote) {
-    const parentPath = getParentPath(task.targetPath || '')
-    targetCurrentPath.value = parentPath
-    loadTargetPath(task.targetRemote, parentPath)
+    const targetPath = task.targetPath || ''
+    targetCurrentPath.value = targetPath
+    loadTargetPath(task.targetRemote, targetPath)
   }
   currentModule.value = 'add'
   openMenuId.value = null
-}
-
-function getParentPath(path: string): string {
-  if (!path) return ''
-  const parts = path.split('/')
-  parts.pop()
-  return parts.join('/')
 }
 
 function showConfirm(title: string, message: string, onConfirm: () => void) {
@@ -974,12 +1154,10 @@ function showConfirm(title: string, message: string, onConfirm: () => void) {
 
 async function deleteTask(id: number) {
   showConfirm('删除任务', '确定删除此任务？此操作不可恢复！', async () => {
-    try {
-      await api.deleteTask(id)
+    const success = await taskApi.delete(id)
+    if (success) {
       openMenuId.value = null
       await loadData()
-    } catch (e) {
-      alert((e as Error).message)
     }
   })
 }
@@ -991,12 +1169,8 @@ function getScheduleByTaskId(taskId: number) {
 async function toggleSchedule(taskId: number) {
   const schedule = getScheduleByTaskId(taskId)
   if (!schedule) return
-  try {
-    await api.updateSchedule(schedule.id, !schedule.enabled)
-    await loadData()
-  } catch (e) {
-    alert((e as Error).message)
-  }
+  await scheduleApi.update(schedule.id, !schedule.enabled)
+  await loadData()
 }
 
 function formatScheduleSpec(spec: string): string {
@@ -1022,119 +1196,23 @@ function closeMenus() {
 
 async function deleteSchedule(id: number) {
   if (!confirm('确定删除此定时任务？')) return
-  try {
-    await api.deleteSchedule(id)
-    await loadData()
-  } catch (e) {
-    alert((e as Error).message)
-  }
-}
-
-// duplicate old implementation removed (showRunDetail)
-
-// 已弃用的历史态实时解析已移除，历史仅展示 finalSummary（冻结信息）
-
-function formatSummary(summary: any): string {
-  if (!summary) return '-'
-  if (typeof summary === 'string') {
-    try {
-      summary = JSON.parse(summary)
-    } catch {
-      return summary
-    }
-  }
-  if (typeof summary !== 'object') return String(summary)
-
-  const parts: string[] = []
-  const hp = historyProgressFromSummary(summary)
-  if (hp){
-    parts.push(`进度: ${(hp.percentage||0).toFixed(2)}%`)
-    parts.push(`速度: ${formatBytesPerSec(hp.speed||0)}`)
-    parts.push(`已传输/总大小: ${formatBytes(hp.bytes||0)} / ${formatBytes(hp.totalBytes||0)}`)
-    parts.push(`ETA: ${formatEta(hp.eta||0)}`)
-  }
-  if (summary.transferred !== undefined) {
-    parts.push(`文件数: ${summary.transferred}`)
-  }
-  if (summary.deleted !== undefined) {
-    parts.push(`删除: ${summary.deleted}`)
-  }
-  if (summary.errors !== undefined) {
-    parts.push(`错误: ${summary.errors}`)
-  }
-  if (summary.elapsedTime !== undefined) {
-    parts.push(`耗时: ${summary.elapsedTime}`)
-  }
-  if (summary.finished !== undefined) {
-    parts.push(`完成: ${summary.finished ? '是' : '否'}`)
-  }
-  if (summary.success !== undefined) {
-    parts.push(`成功: ${summary.success ? '是' : '否'}`)
-  }
-  if (summary.streamingEnabled !== undefined) {
-    parts.push(`流式传输: ${summary.streamingEnabled ? '开启' : '关闭'}`)
-  }
-  if (summary.effectiveOptions && typeof summary.effectiveOptions === 'object') {
-    const opts = summary.effectiveOptions
-    const keyParts:string[] = []
-    if (opts.transfers !== undefined) keyParts.push(`transfers=${opts.transfers}`)
-    if (opts.multiThreadStreams !== undefined) keyParts.push(`multiThreadStreams=${opts.multiThreadStreams}`)
-    if (opts.multiThreadCutoff !== undefined) keyParts.push(`multiThreadCutoff=${opts.multiThreadCutoff}`)
-    if (opts.bufferSize !== undefined) keyParts.push(`bufferSize=${opts.bufferSize}`)
-    if (opts.timeout !== undefined) keyParts.push(`timeout=${opts.timeout}`)
-    if (keyParts.length) parts.push(`生效参数: ${keyParts.join(', ')}`)
-  }
-  return parts.length > 0 ? parts.join('\n') : JSON.stringify(summary, null, 2)
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-function formatBytesPerSec(bytesPerSec: number): string {
-  if (!bytesPerSec || bytesPerSec === 0) return '-'
-  return formatBytes(bytesPerSec) + '/s'
-}
-
-function formatEta(seconds: number | null): string {
-  if (!seconds || seconds <= 0) return '-'
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = Math.floor(seconds % 60)
-  if (hours > 0) {
-    return `${hours}小时${minutes}分${secs}秒`
-  }
-  if (minutes > 0) {
-    return `${minutes}分${secs}秒`
-  }
-  return `${secs}秒`
+  await scheduleApi.delete(id)
+  await loadData()
 }
 
 async function clearRun(id: number) {
-  try {
-    await api.clearRun(id)
-    await loadData()
-  } catch (e) {
-    alert((e as Error).message)
-  }
+  await runApi.delete(id)
+  await loadData()
 }
 
 async function clearAllRuns() {
   if (historyFilterTaskId.value === null) {
-    alert('请先选择任务')
+    showToast('请先选择任务', 'error')
     return
   }
   showConfirm('删除所有历史', '确定删除该任务所有历史记录？此操作不可恢复！', async () => {
-    try {
-      await api.clearRunsByTask(historyFilterTaskId.value)
-      await loadData()
-    } catch (e) {
-      alert((e as Error).message)
-    }
+    await runApi.deleteByTask(historyFilterTaskId.value)
+    await loadData()
   })
 }
 
@@ -1256,24 +1334,40 @@ function selectTargetFile(item: any) {
   }
 }
 
-function goBackSource() {
-  const parts = sourceCurrentPath.value.split('/')
-  parts.pop()
-  const parentPath = parts.join('/')
-  loadSourcePath(createForm.value.sourceRemote, parentPath)
-}
+// 源路径面包屑
+const sourceBreadcrumbs = computed(() => {
+  if (!createForm.value.sourceRemote) return []
+  const parts = (sourceCurrentPath.value || '').split('/').filter(Boolean)
+  const crumbs = [{ name: createForm.value.sourceRemote + ':', path: '' }]
+  let current = ''
+  for (const p of parts) {
+    current += '/' + p
+    crumbs.push({ name: p, path: current })
+  }
+  return crumbs
+})
 
-function goBackTarget() {
-  const parts = targetCurrentPath.value.split('/')
-  parts.pop()
-  const parentPath = parts.join('/')
-  loadTargetPath(createForm.value.targetRemote, parentPath)
-}
-import TransferOptions from '../components/TransferOptions.vue'
+// 目标路径面包屑
+const targetBreadcrumbs = computed(() => {
+  if (!createForm.value.targetRemote) return []
+  const parts = (targetCurrentPath.value || '').split('/').filter(Boolean)
+  const crumbs = [{ name: createForm.value.targetRemote + ':', path: '' }]
+  let current = ''
+  for (const p of parts) {
+    current += '/' + p
+    crumbs.push({ name: p, path: current })
+  }
+  return crumbs
+})
 </script>
 
 
 <template>
+  <!-- Toast 通知容器 -->
+  <div class="toast-container">
+    <ToastItem v-for="toast in toasts" :key="toast.id" :toast="toast" />
+  </div>
+
   <div v-if="currentModule === 'tasks'" class="card">
     <div class="card-header">
       <div class="title">任务列表</div>
@@ -1283,77 +1377,32 @@ import TransferOptions from '../components/TransferOptions.vue'
       </div>
     </div>
     <div class="list">
-      <div v-for="task in filteredTasks" :key="task.id" class="task-item">
-        <div class="task-main">
-          <div class="name">
-            <strong>{{ task.name }}</strong>
-            <span class="mode-tag">{{ task.mode }}</span>
-          </div>
-          <div class="schedule-info">
-            <template v-if="getScheduleByTaskId(task.id)">
-              <span :class="['schedule-badge', getScheduleByTaskId(task.id)?.enabled ? 'enabled' : 'disabled']">
-                {{ getScheduleByTaskId(task.id)?.enabled ? '已启用' : '已禁用' }}
-              </span>
-              <span class="schedule-rule">{{ formatScheduleSpec(getScheduleByTaskId(task.id)?.spec || '') }}</span>
-            </template>
-            <span v-else class="no-schedule">未设置</span>
-          </div>
-          <div class="item-actions">
-            <button class="ghost small" @click.stop="viewTaskHistory(task.id)">📋 任务历史记录</button>
-            <button class="ghost small" :class="{ 'danger-text': stoppedTaskId===task.id }" @click.stop="stopTaskAny(task.id)">
-              <template v-if="stoppedTaskId===task.id">⏹ 已经停止</template>
-              <template v-else>⏹ 停止传输</template>
-            </button>
-            <button v-if="getScheduleByTaskId(task.id)" class="ghost small" @click.stop="toggleSchedule(task.id)">
-              {{ getScheduleByTaskId(task.id)?.enabled ? '⏸ 关闭定时' : '▶ 开启定时' }}
-            </button>
-            <button
-              class="ghost small"
-              :class="{ 'btn-running': runningTaskId === task.id }"
-              :disabled="runningTaskId === task.id"
-              @click.stop="runTask(task.id)"
-            >
-              <template v-if="runningTaskId === task.id">运行成功</template>
-              <template v-else>▶ 手动运行</template>
-            </button>
-            <button class="ghost small" @click.stop="() => setWebhook(task)">🔗 Webhook</button>
-            <button class="ghost small" @click.stop="editTask(task)">✏️</button>
-            <button class="ghost small danger-text" @click.stop="deleteTask(task.id)">🗑️</button>
-          </div>
-        </div>
-        <div class="task-paths">
-          <div class="path-row">
-            <span class="path-label">源:</span>
-            <span class="path-value">{{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }}</span>
-          </div>
-          <div class="path-row">
-            <span class="path-label">目标:</span>
-            <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
-          </div>
-          <div class="path-row">
-            <span class="path-label">进度:</span>
-            <span class="path-value">
-              <template v-if="getActiveRunByTaskId(task.id)?.stableProgress?.phase === 'preparing'">
-                准备中 · 已传 {{ formatBytes(getActiveRunByTaskId(task.id)?.stableProgress?.bytes || 0) }} · 速度 {{ formatBytesPerSec(getActiveRunByTaskId(task.id)?.stableProgress?.speed || 0) }}
-              </template>
-              <template v-else>
-                {{ ((getDeNoisedStableByTask(task.id)?.percentage) || 0).toFixed(2) }}% ·
-                {{ formatBytes(getDeNoisedStableByTask(task.id)?.bytes || 0) }} /
-                {{ formatBytes(getDeNoisedStableByTask(task.id)?.totalBytes || 0) }} ·
-                {{ formatBytesPerSec(getDeNoisedStableByTask(task.id)?.speed || 0) }} ·
-                总数量 {{ getDeNoisedStableByTask(task.id)?.totalCount || 0 }} ／ 已传输 {{ getDeNoisedStableByTask(task.id)?.completedFiles || 0 }} ·
-                <span v-if="calcEtaForTaskCard(task.id)">预估完成 {{ formatEta(calcEtaForTaskCard(task.id) || 0) }}</span>
-              </template>
-            </span>
-          </div>
-          <div class="progress-bar-container" style="margin-top:8px" v-if="getActiveRunByTaskId(task.id)?.stableProgress && getActiveRunByTaskId(task.id)?.stableProgress?.phase !== 'preparing'">
-            <div class="progress-bar" :style="{ width: ((getActiveRunByTaskId(task.id)?.stableProgress?.percentage || 0)) + '%' }"></div>
-            <!-- 当状态为 finished 或进度接近 100% 时，触发一次性刷新以拉取最终状态，避免停留在最后一帧 -->
-            <span v-if="getActiveRunByTaskId(task.id)?.runRecord?.status==='finished' || (getActiveRunByTaskId(task.id)?.stableProgress?.percentage||0) >= 99.999" style="display:none">{{ triggerAutoRefresh(task.id) }}</span>
-          </div>
-        </div>
-      </div>
+      <TaskCard
+        v-for="task in filteredTasks"
+        :key="task.id"
+        :task="task"
+        :schedule="getScheduleByTaskId(task.id)"
+        :active-run="getActiveRunByTaskId(task.id)"
+        :running-task-id="runningTaskId"
+        :stopped-task-id="stoppedTaskId"
+        @run="runTask(task.id)"
+        @edit="editTask(task)"
+        @delete="deleteTask(task.id)"
+        @toggle-schedule="toggleSchedule(task.id)"
+        @view-history="viewTaskHistory(task.id)"
+        @stop="stopTaskAny(task.id)"
+        @set-webhook="setWebhook(task)"
+        @set-singleton="setSingletonMode(task)"
+      />
       <div v-if="!filteredTasks.length" class="empty">暂无任务</div>
+    </div>
+    <!-- 任务分页 -->
+    <div class="pagination" v-if="tasksTotal > tasksPageSize">
+      <span class="page-current">第 {{ tasksPage }} / {{ currentTasksPages }} 页</span>
+      <button class="page-btn" :disabled="tasksPage <= 1" @click="tasksPage--">上一页</button>
+      <button class="page-btn" :disabled="tasksPage >= currentTasksPages" @click="tasksPage++">下一页</button>
+      <input type="number" class="page-input" v-model.number="tasksJumpPage" :min="1" :max="currentTasksPages" @keyup.enter="jumpToTasksPage" />
+      <button class="page-btn" @click="jumpToTasksPage">跳转</button>
     </div>
   </div>
 
@@ -1404,6 +1453,29 @@ import TransferOptions from '../components/TransferOptions.vue'
     </div>
   </div>
 
+  <!-- 单例模式配置弹窗 -->
+  <div v-if="showSingletonModal" class="modal-overlay" @click.self="showSingletonModal=false">
+    <div class="modal-content" style="max-width:560px">
+      <div class="modal-header">
+        <h3>单例模式</h3>
+        <button class="close-btn" @click="showSingletonModal=false">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-item full-width">
+          <label class="trigger-opt">
+            <input type="checkbox" v-model="singletonForm.singletonEnabled" />
+            <span>开启单例模式</span>
+          </label>
+          <p class="hint">开启后，该任务触发时会检测全局是否有其他传输任务在运行。有则放弃本次执行，不排队，不等待，不重试。</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="primary" @click="saveSingleton">保存</button>
+        <button class="ghost" @click="showSingletonModal=false">取消</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 传输日志弹窗 -->
   <div v-if="showLogModal" class="modal-overlay" @click.self="showLogModal=false">
     <div class="modal-content log-modal">
@@ -1424,62 +1496,41 @@ import TransferOptions from '../components/TransferOptions.vue'
 
   <div v-if="currentModule === 'history'" class="card">
     <div class="card-header">
-      <div class="title">任务历史记录</div>
-      <div class="header-actions">
-        <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click="clearAllRuns">删除所有</button>
-        <button v-if="historyFilterTaskId !== null" class="ghost small" @click="currentModule = 'tasks'">
+      <div class="title clickable" @click.stop="currentModule = 'tasks'">任务历史记录 ←</div>
+      <div class="history-filters" @click.stop>
+        <button :class="['filter-btn', historyStatusFilter==='all' && 'active']" @click.stop="historyStatusFilter='all'">全部</button>
+        <button :class="['filter-btn', historyStatusFilter==='finished' && 'active']" @click.stop="historyStatusFilter='finished'">成功</button>
+        <button :class="['filter-btn', historyStatusFilter==='failed' && 'active']" @click.stop="historyStatusFilter='failed'">失败</button>
+        <button :class="['filter-btn', historyStatusFilter==='skipped' && 'active']" @click.stop="historyStatusFilter='skipped'">跳过</button>
+        <button :class="['filter-btn', historyStatusFilter==='hasTransfer' && 'active']" @click.stop="historyStatusFilter='hasTransfer'">有传输</button>
+      </div>
+      <!-- 历史记录分页 -->
+      <div class="pagination" v-if="currentTotal > runsPageSize" @click.stop>
+        <span class="page-current">第 {{ runsPage }} / {{ currentTotalPages }} 页</span>
+        <button class="page-btn" :disabled="runsPage <= 1" @click.stop="runsPage--; loadData()">上一页</button>
+        <button class="page-btn" :disabled="runsPage >= currentTotalPages" @click.stop="runsPage++; loadData()">下一页</button>
+        <input type="number" class="page-input" v-model.number="jumpPage" :min="1" :max="currentTotalPages" @keyup.enter.stop="jumpToPage" />
+        <button class="page-btn" @click.stop="jumpToPage">跳转</button>
+      </div>
+      <div class="header-actions" @click.stop>
+        <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click.stop="clearAllRuns">删除所有</button>
+        <button v-if="historyFilterTaskId !== null" class="ghost small" @click.stop="currentModule = 'tasks'">
           ← 返回
         </button>
       </div>
     </div>
     <div class="list">
-      <div v-for="run in filteredRuns" :key="run.id" class="item run-item">
-        <div class="name">
-          <strong>{{ run.taskName || `任务 #${run.taskId}` }}</strong>
-          <span class="mode-tag" v-if="run.taskMode">{{ run.taskMode }}</span>
-          <span class="trigger-tag" v-if="run.trigger === 'schedule'">定时</span>
-          <span class="trigger-tag" v-else-if="run.trigger === 'webhook'">Webhook</span>
-          <span class="trigger-tag" v-else>手动</span>
-        </div>
-        <span
-          :class="['status', getStatusClass(run.status), 'clickable']"
-          @click="showRunDetail(run)"
-        >{{ getStatusText(run.status) }}</span>
-        <div class="path-full">
-          <span class="path-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
-        </div>
-        <span class="time">{{ formatTime(run.startedAt) }}</span>
-        <div class="info" v-if="getFinalSummary(run)"></div>
-        <!-- 运行中卡片的实时概览（优先读 active 的 stableProgress，缺失再用 DB 的 summary.progress） -->
-        <div class="summary-mini" v-else-if="run.status==='running'">
-          <!-- 全部用 DB：百分比/体量/速度/ETA 均取 DB 的 summary.progress；实时完成文件计数也取 DB（progress.completedFiles） -->
-          <template v-if="(getDbProgressStable(run) as any) && true">
-            <span class="chip">进度 {{ ((getDeNoisedStableByRun(run) as any)?.percentage||0).toFixed(2) }}%</span>
-            <span class="chip meta">速度 {{ formatBytesPerSec((getDeNoisedStableByRun(run) as any)?.speed || 0) }}</span>
-            <!-- 移除"总量/已传"冗余，统一用"总体积/已传输" -->
-            <span class="chip meta" v-if="calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))">预估完成 {{ formatEta(calcEtaFromAvg(run, (getDeNoisedStableByRun(run) as any))||0) }}</span>
-            <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes((getDeNoisedStableByRun(run) as any)?.bytes || 0) }}</span></span>
-            <!-- 仅保留"总数量/已传输数量"，去掉"总量/已传"重复口径 -->
-            <span class="chip meta" v-if="getPreflight(run)">总数量 <span class="est">{{ getPreflight(run).totalCount || 0 }}</span> ／ <span class="act">已传输 {{ (getDeNoisedStableByRun(run) as any)?.completedFiles || 0 }}</span></span>
-          </template>
-        </div>
-        <!-- 历史卡片内的一目了然统计概览（完成态） -->
-        <div class="summary-mini" v-if="run.status!=='running' && getFinalSummary(run)">
-          <span class="chip">总计 {{ (getFinalSummary(run).files?.length || 0) }}</span>
-          <span class="chip success">{{ run.taskMode==='move' ? '移动' : '成功' }} {{ run.taskMode==='move' ? (getFinalSummary(run).counts?.copied || 0) : ((getFinalSummary(run).counts?.copied || 0) + (getFinalSummary(run).counts?.deleted || 0)) }}</span>
-          <span class="chip failed">失败 {{ getFinalSummary(run).counts?.failed || 0 }}</span>
-          <span class="chip other">其他 {{ getFinalSummary(run).counts?.skipped || 0 }}</span>
-          <!-- 总数量/已传输、总体积/已传输（仅保留总体积，不再重复"总量"） -->
-
-          <span class="chip meta" v-if="getPreflight(run)">总体积 <span class="est">{{ formatBytes(getPreflight(run).totalBytes || 0) }}</span> ／ <span class="act">已传输 {{ formatBytes(getFinalSummary(run).transferredBytes || 0) }}</span></span>
-          <span class="chip meta">均速 {{ formatBps(getFinalSummary(run).avgSpeedBps || 0) }}</span>
-        </div>
-        <div class="row-actions">
-          <button class="ghost small" @click="showRunDetail(run)">运行详情</button>
-          <button class="ghost small" @click="openRunLog(run)">传输日志</button>
-          <button class="ghost small danger-text" @click="clearRun(run.id)">清除</button>
-        </div>
-      </div>
+      <RunItem
+        v-for="run in filteredRuns"
+        :key="run.id"
+        :run="run"
+        :progress="run.status === 'running' ? getDbProgressStable(run) : undefined"
+        :summary="getFinalSummary(run)"
+        @click="showRunDetail(run)"
+        @view-detail="showRunDetail(run)"
+        @view-log="openRunLog(run)"
+        @clear="clearRun(run.id)"
+      />
       <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>
     </div>
 
@@ -1594,20 +1645,10 @@ import TransferOptions from '../components/TransferOptions.vue'
                 </div>
                 <div class="files-body">
                   <template v-if="finalFiles && finalFiles.length">
-                    <div v-for="it in pagedFinalFiles" :key="(it.path||it.name) + (it.at||'') + (it.status||'')" class="files-row">
-                      <span class="name" :title="it.path||it.name">{{ ((it.path || it.name || '').replace(/\\/g,'/').split('/').pop()) }}</span>
-                      <span class="status" :class="it.status">{{ it.status }}</span>
-                      <span class="time">{{ it.at || '-' }}</span>
-                      <span class="size">{{ it.sizeBytes ? formatBytes(it.sizeBytes) : '-' }}</span>
-                    </div>
+                    <FileItem v-for="it in pagedFinalFiles" :key="(it.path||it.name) + (it.at||'') + (it.status||'')" :item="it" />
                   </template>
                   <template v-else>
-                    <div v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" class="files-row">
-                      <span class="name" :title="it.name">{{ it.name }}</span>
-                      <span class="status" :class="it.status">{{ it.status }}</span>
-                      <span class="time">{{ it.at || '-' }}</span>
-                      <span class="size">{{ it.sizeBytes ? formatBytes(it.sizeBytes) : '-' }}</span>
-                    </div>
+                    <FileItem v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" :item="it" />
                     <div v-if="!pagedRunFiles.length" class="path-empty">无明细（可能日志为空或历史记录较旧）</div>
                   </template>
                 </div>
@@ -1640,8 +1681,11 @@ import TransferOptions from '../components/TransferOptions.vue'
         <p>实时日志与进度请点击"传输日志"或查看任务卡片上的实时进度。</p>
         <div class="hint-box">
           <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
-          <div class="detail-item"><label>阶段：</label><span>{{ getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.phase || '-' }}</span></div>
-          <div class="detail-item"><label>进度：</label><span>{{ ((getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.percentage)||0).toFixed(2) }}%</span></div>
+          <div class="detail-item"><label>阶段：</label><span>{{ getActiveProgressByTaskId(runningHintRun?.taskId)?.phase || '-' }}</span></div>
+          <div class="detail-item"><label>实时：</label><span>{{ getActiveProgressTextByTaskId(runningHintRun?.taskId) }}</span></div>
+          <div class="detail-item"><label>自检：</label><span>{{ getActiveProgressCheckTextByTaskId(runningHintRun?.taskId) }}</span></div>
+          <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ getActiveProgressLineByTaskId(runningHintRun?.taskId) }}</code></div>
+          <div class="detail-item full-width"><label>接口进度：</label><code class="inline-logline">{{ getActiveProgressJsonByTaskId(runningHintRun?.taskId) }}</code></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -1685,17 +1729,26 @@ import TransferOptions from '../components/TransferOptions.vue'
         <label>源路径</label>
         <div class="path-selector">
           <div class="path-browse">
-            <div class="path-bar">
-              <span class="path-selected">已选: /{{ createForm.sourcePath || '未选择' }}</span>
-              <span class="path-label">当前: /{{ sourceCurrentPath || '根目录' }}</span>
-              <button v-if="sourceCurrentPath" type="button" class="ghost small" @click="goBackSource">返回</button>
+            <div class="pathbar">
+              <template v-for="(crumb, i) in sourceBreadcrumbs" :key="crumb.path">
+                <span v-if="i > 0" class="sep">/</span>
+                <button
+                  class="crumb"
+                  :class="{ current: i === sourceBreadcrumbs.length - 1 }"
+                  @click="crumb.path !== sourceCurrentPath && loadSourcePath(createForm.sourceRemote, crumb.path)"
+                >
+                  {{ crumb.name }}
+                </button>
+              </template>
             </div>
             <div class="path-list">
-              <div v-for="item in sourcePathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onSourceClick(item)">
-                <span v-if="item.IsDir" class="folder-icon" @click.stop="onSourceArrow(item)">📁</span>
-                <span v-else class="file-icon">📄</span>
-                <span class="item-name">{{ item.Name }}</span>
-              </div>
+              <PathItem 
+                v-for="item in sourcePathOptions" 
+                :key="item.Path" 
+                :item="item"
+                @enter="onSourceArrow(item)"
+                @click="onSourceClick(item)"
+              />
               <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
             </div>
           </div>
@@ -1714,17 +1767,26 @@ import TransferOptions from '../components/TransferOptions.vue'
         <label>目标路径</label>
         <div class="path-selector">
           <div class="path-browse">
-            <div class="path-bar">
-              <span class="path-selected">已选: /{{ createForm.targetPath || '未选择' }}</span>
-              <span class="path-label">当前: /{{ targetCurrentPath || '根目录' }}</span>
-              <button v-if="targetCurrentPath" type="button" class="ghost small" @click="goBackTarget">返回</button>
+            <div class="pathbar">
+              <template v-for="(crumb, i) in targetBreadcrumbs" :key="crumb.path">
+                <span v-if="i > 0" class="sep">/</span>
+                <button
+                  class="crumb"
+                  :class="{ current: i === targetBreadcrumbs.length - 1 }"
+                  @click="crumb.path !== targetCurrentPath && loadTargetPath(createForm.targetRemote, crumb.path)"
+                >
+                  {{ crumb.name }}
+                </button>
+              </template>
             </div>
             <div class="path-list">
-              <div v-for="item in targetPathOptions" :key="item.Path" class="path-item" :class="{ 'is-dir': item.IsDir }" @click="onTargetClick(item)">
-                <span v-if="item.IsDir" class="folder-icon" @click.stop="onTargetArrow(item)">📁</span>
-                <span v-else class="file-icon">📄</span>
-                <span class="item-name">{{ item.Name }}</span>
-              </div>
+              <PathItem 
+                v-for="item in targetPathOptions" 
+                :key="item.Path" 
+                :item="item"
+                @enter="onTargetArrow(item)"
+                @click="onTargetClick(item)"
+              />
               <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
             </div>
           </div>
@@ -1734,68 +1796,7 @@ import TransferOptions from '../components/TransferOptions.vue'
       </div>
 
       <!-- 定时任务设置 -->
-      <div class="schedule-section">
-        <div class="section-header">
-          <label class="schedule-toggle">
-            <input type="checkbox" v-model="createForm.enableSchedule" />
-            <span>启用定时任务</span>
-          </label>
-        </div>
-        <div v-if="createForm.enableSchedule" class="schedule-grid">
-          <!-- 月 -->
-          <div class="schedule-item">
-            <label>月</label>
-            <select v-model="tempSchedule.month" multiple size="6" @dblclick="confirmField('month')">
-              <option value="*">每月</option>
-              <option v-for="m in [1,2,3,4,5,6,7,8,9,10,11,12]" :key="m" :value="String(m)">{{ m }}月</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('month')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleMonth === '*' ? '每月' : (createForm.scheduleMonth || '每月') }}</span>
-          </div>
-          <!-- 周 -->
-          <div class="schedule-item">
-            <label>周</label>
-            <select v-model="tempSchedule.week" multiple size="6" @dblclick="confirmField('week')">
-              <option value="*">每日</option>
-              <option value="">不设置</option>
-              <option v-for="(w, idx) in ['周一','周二','周三','周四','周五','周六','周日']" :key="w" :value="String(idx+1)">{{ w }}</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('week')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleWeek === '*' ? '每日' : (createForm.scheduleWeek || '不设置') }}</span>
-          </div>
-          <!-- 日 -->
-          <div class="schedule-item">
-            <label>日</label>
-            <select v-model="tempSchedule.day" multiple size="6" @dblclick="confirmField('day')">
-              <option value="*">每日</option>
-              <option value="">不设置</option>
-              <option v-for="d in 31" :key="d" :value="String(d)">{{ d }}日</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('day')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleDay === '*' ? '每日' : (createForm.scheduleDay || '不设置') }}</span>
-          </div>
-          <!-- 时 -->
-          <div class="schedule-item">
-            <label>时</label>
-            <select v-model="tempSchedule.hour" multiple size="6" @dblclick="confirmField('hour')">
-              <option value="*">每时</option>
-              <option v-for="h in 24" :key="h-1" :value="String(h-1).padStart(2,'0')">{{ String(h-1).padStart(2,'0') }}时</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('hour')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleHour === '*' ? '每时' : (createForm.scheduleHour || '00') + '时' }}</span>
-          </div>
-          <!-- 分 -->
-          <div class="schedule-item">
-            <label>分</label>
-            <select v-model="tempSchedule.minute" multiple size="6" @dblclick="confirmField('minute')">
-              <option value="*">每分</option>
-              <option v-for="m in 60" :key="m-1" :value="String(m-1).padStart(2,'0')">{{ String(m-1).padStart(2,'0') }}分</option>
-            </select>
-            <button type="button" class="ghost small" @click="confirmField('minute')">确定</button>
-            <span class="selected-val">{{ createForm.scheduleMinute === '*' ? '每分' : (createForm.scheduleMinute || '00') + '分' }}</span>
-          </div>
-        </div>
-      </div>
+      <ScheduleOptions v-model="createForm" />
 
       <!-- 高级选项 -->
       <button type="button" class="ghost small" @click="showAdvancedOptions = !showAdvancedOptions">
@@ -2101,6 +2102,7 @@ body.light .item { border-color: #f0f0f0; }
 .status.running { background: var(--accent); color: #fff; }
 .status.success { background: var(--success); color: #fff; }
 .status.failed { background: var(--danger); color: #fff; }
+.status.skipped { background: var(--warning); color: #fff; }
 .status.clickable { cursor: pointer; }
 .status.clickable:hover { opacity: 0.8; }
 .time { width: 150px; text-align: right; color: var(--muted); font-size: 13px; }
@@ -2111,6 +2113,8 @@ body.light .item { border-color: #f0f0f0; }
 .summary-mini .chip.failed{ background:#2b0a0a; border-color:#7f1d1d; color:#f87171 }
 .summary-mini .chip.other{ background:#2b1a04; border-color:#92400e; color:#fbbf24 }
 .summary-mini .chip.meta{ background:#111827; border-color:#374151; color:#cbd5e1 }
+.skipped-message{ padding:8px 12px; background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; color:#92400e; font-size:13px; margin-bottom:8px; }
+body.light .skipped-message{ background:#fffbeb; color:#78350f; }
 .item-actions { display: flex; gap: 8px; }
 .danger-text { color: var(--danger) !important; }
 .form-content { padding: 20px; }
@@ -2129,6 +2133,7 @@ body.light .item { border-color: #f0f0f0; }
 }
 .cmd-textarea{ width:100%; min-height:120px; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:14px; box-sizing:border-box; resize:vertical; }
 body.light .cmd-textarea{ background:var(--surface); border-color:var(--border); color:var(--text) }
+.inline-logline{ display:block; white-space:pre-wrap; word-break:break-all; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:8px 10px; font-size:12px; line-height:1.5; }
 .form-content label.inline-label{ display:flex !important; align-items:center; gap:8px; margin:0 0 6px 0; }
 .form-content label.inline-label input[type="checkbox"]{ width:16px; height:16px; }
 body.light .form-content input,
@@ -2311,5 +2316,38 @@ body.light .page-input{ background:#fff; color:#111827; border-color:#ddd }
   .task-main .item-actions button {
     min-width: 0;
   }
+}
+
+/* Toast 通知 */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toast {
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  min-width: 200px;
+  max-width: 400px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  animation: slideIn 0.2s ease;
+}
+.toast.info { background: #3b82f6; color: #fff; }
+.toast.success { background: #10b981; color: #fff; }
+.toast.error { background: #ef4444; color: #fff; }
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.title.clickable, .card-header.clickable {
+  cursor: pointer;
+}
+.title.clickable:hover, .card-header.clickable:hover {
+  color: var(--accent, #4f46e5);
 }
 </style>

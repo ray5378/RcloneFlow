@@ -6,6 +6,7 @@ import (
 
 	"rcloneflow/internal/auth"
 	"rcloneflow/internal/controller"
+	"rcloneflow/internal/websocket"
 )
 
 // Router 路由定义
@@ -44,6 +45,9 @@ func New(
 func (r *Router) Setup(mux *http.ServeMux) {
 	// 健康检查（公开）
 	mux.HandleFunc("/healthz", r.remoteCtrl.Healthz)
+
+	// WebSocket（公开，用于实时推送）
+	mux.Handle("/ws", websocket.NewHandler(websocket.GetHub()))
 
 	// Webhook 触发（公开）
 	mux.HandleFunc("/webhook/", controller.NewWebhookController(r.taskCtrl.Service()).HandleTrigger)

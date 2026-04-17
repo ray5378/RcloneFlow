@@ -48,6 +48,11 @@ func Run(cfg *config.Config) error {
 	// 初始化rclone客户端
 	rc := rclone.NewFromEnv()
 
+	// 清空所有运行状态（容器重启后恢复，防止单例模式误判）
+	if err := db.ClearAllRunningStatus(); err != nil {
+		logger.Warn("清空运行状态失败", zap.Error(err))
+	}
+
 	// 初始化服务层（定时任务采用 TaskService 以使用 CLI Runner，确保产生日志 stderrFile）
 	taskSvc := service.NewTaskService(db, rc)
 	scheduleSvc := service.NewScheduleService(db)
@@ -102,11 +107,13 @@ func Run(cfg *config.Config) error {
 			zap.Int("retention_days", cfg.GetCleanupRetention()))
 	}
 
-	// 启动日志清理服务（保留期默认 7 天，可用 LOG_RETENTION_DAYS 覆盖；周期默认 24 小时，可用 LOG_CLEANUP_INTERVAL_HOURS 覆盖）
+	// 启动日志清理服务
 	logsDir := filepath.Join(cfg.GetDataDir(), "logs")
-	logRetention := service.EnvLogRetentionDays(7)
-	logInterval := service.EnvLogCleanupInterval(24)
-	logCleanup := service.NewLogCleanupService(logsDir, logInterval, logRetention)
+	logRetention := cfg.GetLogRetention()
+	if logRetention <= 0 {
+		logRetention = 7 // 默认7天
+	}
+	logCleanup := service.NewLogCleanupService(logsDir, 24*time.Hour, logRetention) // 每天检查一次
 	go logCleanup.Start(ctx)
 
 	// 设置路由

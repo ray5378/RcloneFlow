@@ -51,8 +51,9 @@ type StorageConfig struct {
 
 // LogConfig 日志配置
 type LogConfig struct {
-	Level  string `yaml:"level"`
-	Output string `yaml:"output"`
+	Level     string `yaml:"level"`
+	Output    string `yaml:"output"`
+	Retention int    `yaml:"retention"` // 日志文件保留天数，默认7天
 }
 
 // DefaultConfig 返回默认配置
@@ -72,8 +73,9 @@ func DefaultConfig() *Config {
 			DataDir: "./data",
 		},
 		Log: LogConfig{
-			Level:  "info",
-			Output: "stdout",
+			Level:     "info",
+			Output:    "stdout",
+			Retention: 7, // 默认保留7天
 		},
 		Sync: SyncConfig{
 			PoolInterval:     30, // 30秒
@@ -171,6 +173,16 @@ func loadFromEnv(cfg *Config) {
 	if v := os.Getenv("LOG_OUTPUT"); v != "" {
 		cfg.Log.Output = v
 	}
+	if v := os.Getenv("LOG_RETENTION"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Log.Retention = n
+		}
+	}
+	if v := os.Getenv("LOG_RETENTION_DAYS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.Log.Retention = n
+		}
+	}
 
 	// 清理策略（运行记录/最终总结）
 	// 优先级：FINAL_SUMMARY_RETENTION_DAYS > CLEANUP_RETENTION_DAYS > cfg.Sync.CleanupRetention
@@ -253,6 +265,11 @@ func (c *Config) GetCleanupInterval() int {
 // GetCleanupRetention 返回历史记录保留天数
 func (c *Config) GetCleanupRetention() int {
 	return c.Sync.CleanupRetention
+}
+
+// GetLogRetention 返回日志文件保留天数
+func (c *Config) GetLogRetention() int {
+	return c.Log.Retention
 }
 
 // ToEnvMap 转换为环境变量映射（用于传递给子组件）

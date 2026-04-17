@@ -66,7 +66,7 @@ type Run struct {
 
 type DB struct {
 	db *sql.DB
-	mu sync.Mutex
+	mu sync.RWMutex
 }
 
 // NewDB 创建数据库实例
@@ -182,6 +182,7 @@ func (db *DB) migrate() error {
 				
 				CREATE INDEX IF NOT EXISTS idx_runs_task_id ON runs(task_id);
 				CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at);
+				CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
 				CREATE INDEX IF NOT EXISTS idx_schedules_task_id ON schedules(task_id);
 			`,
 		},
@@ -443,25 +444,35 @@ func (db *DB) UpdateScheduleSpec(id int64, spec string) error {
 
 // ===== Runs =====
 
-func (db *DB) ListRuns() ([]Run, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+func (db *DB) ListRuns(page, pageSize int) ([]Run, int, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
+	// 获取总数
+	var total int
+	err := db.db.QueryRow(`SELECT COUNT(*) FROM runs`).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// 分页查询
+	offset := (page - 1) * pageSize
 	rows, err := db.db.Query(`
 		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
-		FROM runs ORDER BY id DESC LIMIT 100`)
+		FROM runs ORDER BY id DESC LIMIT ? OFFSET ?`, pageSize, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
-	return db.scanRuns(rows)
+	runs, err := db.scanRuns(rows)
+	return runs, total, err
 }
 
 func (db *DB) ListRunsByTask(taskID int64) ([]Run, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	rows, err := db.db.Query(`
 		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
@@ -491,10 +502,73 @@ func (db *DB) ListActiveRuns() ([]Run, error) {
 	return db.scanRuns(rows)
 }
 
-// GetActiveRunByTaskID 获取任务当前运行中的记录
-func (db *DB) GetActiveRunByTaskID(taskID int64) (Run, error) {
+// ClearAllRunningStatus 清空所有运行状态（容器重启后恢复时调用）
+func (db *DB) ClearAllRunningStatus() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
+
+	_, err := db.db.Exec(`UPDATE runs SET status = 'stopped', finished_at = datetime('now') WHERE status = 'running'`)
+	return err
+}
+
+// TryAcquireRun 尝试原子性地创建运行记录（单例模式用）
+// 返回 (run, existed, error)
+// existed=true 表示已有任务在运行，run=nil
+// existed=false 表示成功创建，run 为新记录
+func (db *DB) TryAcquireRun(run *Run) (*Run, bool, error) {
+	// 使用 BEGIN EXCLUSIVE 事务确保跨实例原子性
+	tx, err := db.db.Begin()
+	if err != nil {
+		return nil, false, err
+	}
+	defer tx.Rollback()
+
+	// 检查是否有正在运行的任务
+	var count int
+	err = tx.QueryRow(`SELECT COUNT(*) FROM runs WHERE status = 'running'`).Scan(&count)
+	if err != nil {
+		return nil, false, err
+	}
+	if count > 0 {
+		return nil, true, nil // 已有任务在运行
+	}
+
+	// 序列化 Summary 为 JSON
+	summaryJSON, err := json.Marshal(run.Summary)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// 插入新记录
+	_, err = tx.Exec(`
+		INSERT INTO runs (task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		                 task_name, task_mode, source_remote, source_path, target_remote, target_path, bytes_transferred, speed)
+		VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?, ?, ?, ?, ?, 0, '')`,
+		run.TaskID, run.RcJobID, run.Status, run.Trigger, string(summaryJSON), run.Error,
+		run.TaskName, run.TaskMode, run.SourceRemote, run.SourcePath, run.TargetRemote, run.TargetPath)
+	if err != nil {
+		return nil, false, err
+	}
+
+	// 获取刚插入的记录ID
+	var id int64
+	err = tx.QueryRow(`SELECT last_insert_rowid()`).Scan(&id)
+	if err != nil {
+		return nil, false, err
+	}
+	run.ID = id
+
+	// 提交事务
+	if err = tx.Commit(); err != nil {
+		return nil, false, err
+	}
+	return run, false, nil
+}
+
+// GetActiveRunByTaskID 获取任务当前运行中的记录
+func (db *DB) GetActiveRunByTaskID(taskID int64) (Run, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	var r Run
 	var summaryJSON string
@@ -672,8 +746,8 @@ func (db *DB) UpdateRun(id int64, fn func(*Run)) error {
 }
 
 func (db *DB) GetRun(id int64) (Run, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	var r Run
 	var summaryJSON string
@@ -692,8 +766,8 @@ func (db *DB) GetRun(id int64) (Run, error) {
 
 // ListRunningRuns 获取所有运行中的任务（供JobSyncService使用）
 func (db *DB) ListRunningRuns() ([]JobStatus, error) {
-	db.mu.Lock()
-	defer db.mu.Unlock()
+	db.mu.RLock()
+	defer db.mu.RUnlock()
 
 	rows, err := db.db.Query(`
 		SELECT id, rc_job_id, status, summary, error 
@@ -744,15 +818,23 @@ func (db *DB) UpdateRunStatus(id int64, status, errorMsg string, summary map[str
 	return err
 }
 
-// UpdateRunProgress 更新运行进度（bytes和speed）
+// UpdateRunProgress 更新运行进度（bytes和speed），只有新进度大于旧进度时才更新，防止回退
 func (db *DB) UpdateRunProgress(id int64, bytesTransferred int64, speed string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	_, err := db.db.Exec(`
-		UPDATE runs SET bytes_transferred = ?, speed = ?, updated_at = ?
-		WHERE id = ?`,
-		bytesTransferred, speed, time.Now(), id)
+	// 先查询当前进度，只有新进度大于旧进度时才更新
+	var currentBytes int64
+	err := db.db.QueryRow("SELECT bytes_transferred FROM runs WHERE id = ?", id).Scan(&currentBytes)
+	if err != nil {
+		return err
+	}
+	if bytesTransferred > currentBytes {
+		_, err = db.db.Exec(`
+			UPDATE runs SET bytes_transferred = ?, speed = ?, updated_at = ?
+			WHERE id = ?`,
+			bytesTransferred, speed, time.Now(), id)
+	}
 	return err
 }
 

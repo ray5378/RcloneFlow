@@ -195,6 +195,15 @@ func (c *Client) JobStatus(ctx context.Context, jobID int64) (map[string]any, er
 	}, nil
 }
 
+// HasActiveJobs 检查是否有正在运行的 rclone 任务
+func (c *Client) HasActiveJobs(ctx context.Context) (bool, error) {
+	resp, err := c.cli.ListJobs(ctx)
+	if err != nil {
+		return false, err
+	}
+	return len(resp.RunningIDs) > 0, nil
+}
+
 // RunTask 运行任务
 func (c *Client) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string, opts *adapter.TaskOptions) (int64, error) {
 	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
