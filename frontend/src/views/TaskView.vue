@@ -115,9 +115,9 @@ const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
 // 监控帧是否停滞超过阈值（默认 25s），若是则强制刷新一次
 const STUCK_MS = 25000
 let lastRenderedSignature = ''
-let stuckTimer: any = null
+let stuckTimer: number | null = null
 onMounted(() => {
-  stuckTimer = setInterval(() => {
+  stuckTimer = window.setInterval(() => {
     try{
       // 用任务卡片可见的核心字段拼接签名：任务数、每个任务的 id+pct+completedFiles
       const sigParts: string[] = []
@@ -359,8 +359,8 @@ function closeRunDetail(){
 }
 
 onUnmounted(()=>{
-  if (activeRunsTimer) { clearInterval(activeRunsTimer as any); activeRunsTimer = null }
-  if (runsTimer) { clearInterval(runsTimer as any); runsTimer = null }
+  if (runDetailTimer) { clearInterval(runDetailTimer); runDetailTimer = null }
+  if (stuckTimer) { clearInterval(stuckTimer); stuckTimer = null }
 })
 
 const pagedRunFiles = computed(()=> runFiles.value)
@@ -404,8 +404,6 @@ const finalFilesJump = ref<number | null>(null)
 function goPrevFinalFilesPage(){ if (finalFilesPage.value>1) finalFilesPage.value-- }
 function goNextFinalFilesPage(){ if (finalFilesPage.value<totalFinalFilesPages.value) finalFilesPage.value++ }
 function jumpFinalFilesPage(){ if (!finalFilesJump.value) return; const p = Math.min(Math.max(1, finalFilesJump.value), totalFinalFilesPages.value); finalFilesPage.value = p }
-let activeRunsTimer: number | null = null
-let runsTimer: number | null = null // 历史态仅为列表刷新，保留，其他实时逻辑已移除
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
   title: '',
@@ -480,12 +478,9 @@ function normalizeTaskOptions(raw: Record<string, any> | undefined | null) {
 onMounted(async () => {
   await loadData()
   await loadActiveRuns()
-  activeRunsTimer = window.setInterval(() => { loadActiveRuns().catch(console.error) }, 2000)
-  // 历史列表也轮询，保证新 run 及时出现（避免必须手动刷新）
-  runsTimer = window.setInterval(() => { runApi.list(runsPage.value, runsPageSize).then(v=> { if(v?.runs) { runs.value = v.runs; runsTotal.value = typeof v.total === 'number' ? v.total : (v.runs?.length || 0) } }).catch(()=>{}) }, 3000)
 
-  // WebSocket 实时推送
-  const { isConnected } = useWebSocket({
+  // WebSocket 实时推送（替代轮询）
+  useWebSocket({
     onMessage: (msg) => {
       if (msg.type === 'run_status' && msg.data) {
         // 更新对应 run 的状态
@@ -493,12 +488,10 @@ onMounted(async () => {
         if (idx !== -1) {
           runs.value[idx] = { ...runs.value[idx], status: msg.data.status }
         }
-        // 如果任务列表视图，重新加载
-        if (currentModule.value === 'tasks') {
-          loadActiveRuns().catch(console.error)
-        }
+        // 刷新活跃传输和历史记录
+        loadActiveRuns().catch(console.error)
       } else if (msg.type === 'run_progress' && msg.data) {
-        // 更新进度（可选，用于实时显示传输进度）
+        // 更新进度（用于实时显示传输进度）
         const idx = activeRuns.value.findIndex(r => r.id === msg.data.run_id)
         if (idx !== -1) {
           activeRuns.value[idx] = {
@@ -513,10 +506,9 @@ onMounted(async () => {
     }
   })
 
-  // 监听 WebSocket 连接状态
-  onWsMessage('run_status', (data) => {
-    // Refresh active runs when status changes
-    loadActiveRuns().catch(console.error)
+  // 监听状态变化时刷新数据
+  onWsMessage('run_status', () => {
+    loadData().catch(console.error)
   })
 })
 
