@@ -65,7 +65,7 @@ RUN set -eux; \
       cp /usr/bin/rclone /out/rclone; \
       chmod +x /out/rclone; \
     fi
-RUN go build -o /out/server ./cmd/server
+RUN go build -ldflags="-s -w" -o /out/server ./cmd/server
 
 # Stage 3: runtime (Alpine)
 FROM alpine:3.19
