@@ -126,6 +126,7 @@ const {
 // 任务卡片：完成后保留最近稳态进度的观察期（默认 15s）
 const LINGER_MS = 20000
 const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
+const lastNonDecreasingTotalsByTask = ref<Record<number, { totalBytes:number; totalCount:number }>>({})
 // 监控帧是否停滞超过阈值（默认 25s），若是则强制刷新一次
 const STUCK_MS = 25000
 let lastRenderedSignature = ''
@@ -588,15 +589,32 @@ async function loadActiveRuns() {
       raw.eta = Number(raw.eta || 0)
       if (raw.percentage < 0) raw.percentage = 0
       if (raw.percentage > 100) raw.percentage = 100
+      const tid = it.runRecord?.taskId
+      if (tid) {
+        const prevTotals = lastNonDecreasingTotalsByTask.value[tid]
+        if (prevTotals) {
+          if (prevTotals.totalBytes > 0 && raw.totalBytes > 0 && raw.totalBytes < prevTotals.totalBytes) {
+            raw.totalBytes = prevTotals.totalBytes
+          }
+          if (prevTotals.totalCount > 0 && raw.totalCount > 0 && raw.totalCount < prevTotals.totalCount) {
+            raw.totalCount = prevTotals.totalCount
+          }
+        }
+        const nextTotals = {
+          totalBytes: Math.max(prevTotals?.totalBytes || 0, raw.totalBytes || 0),
+          totalCount: Math.max(prevTotals?.totalCount || 0, raw.totalCount || 0),
+        }
+        lastNonDecreasingTotalsByTask.value[tid] = nextTotals
+      }
       it.progress = raw
       if (!it.stableProgress) it.stableProgress = raw
-      const tid = it.runRecord?.taskId
       if (tid) lastStableByTask.value[tid] = { sp: raw, at: now }
       return it
     })
     // 如果本帧没有 active，立即清空，不要维持旧进度
     if (list.length === 0) {
       activeRuns.value = []
+      lastNonDecreasingTotalsByTask.value = {}
       return
     }
     activeRuns.value = list
