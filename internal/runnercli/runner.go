@@ -1160,6 +1160,7 @@ var bytesPairRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\
 var speedTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s`)
 var pctTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)%`)
 var etaTokenRe = regexp.MustCompile(`(?i)ETA\s*([0-9hms:.-]+|-)`)
+var aggregateOneLineRe = regexp.MustCompile(`(?i)^\s*(?:\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+)?(?:INFO|NOTICE)\s*:\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B\s*/\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B\s*,\s*\d+(?:\.\d+)?%\s*,\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B/s\s*,\s*ETA\s*[0-9hms:.-]+(?:\s*\(xfr#\d+(?:/\d+)?\))?\s*$`)
 
 func parseOneLineProgress(line string) (map[string]any, bool) {
 	l := strings.TrimSpace(line)
@@ -1167,8 +1168,8 @@ func parseOneLineProgress(line string) (map[string]any, bool) {
 	if fileLineRe.MatchString(l) || fileCopiedRe.MatchString(l) {
 		return nil, false
 	}
-	// 只接受像整体 one-line 统计那样的行：通常带 ETA 或 xfr#
-	if !strings.Contains(strings.ToLower(l), "eta") && !strings.Contains(strings.ToLower(l), "xfr#") {
+	// 只接受整体 one-line 统计的完整形态，避免碎片日志/文件级日志误入
+	if !aggregateOneLineRe.MatchString(l) {
 		return nil, false
 	}
 	// 提取 (xfr#a/b) 的已完成数 a 和计划总数 b
