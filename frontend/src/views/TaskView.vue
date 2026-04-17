@@ -93,10 +93,6 @@ const historyFilterTaskId = ref<number | null>(null)
 const historyStatusFilter = ref<string>('all') // 'all' | 'finished' | 'failed' | 'skipped' | 'hasTransfer'
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
-// 运行中提示小窗（不切换主窗口，不弹出完整详情）
-const showRunningHint = ref(false)
-const runningHintRun = ref<any>(null)
-const showRunDebug = ref(false)
 
 let runDetailTimer: any = null
 
@@ -1635,17 +1631,17 @@ const targetBreadcrumbs = computed(() => {
 
   <!-- 运行中轻量提示小窗（不切主窗口） -->
   <RunningHintModal
-    :visible="showRunningHint"
-    :run="runningHintRun"
-    :phase-text="getActiveProgressByTaskId(runningHintRun?.taskId)?.phase || '-'"
-    :progress-text="getActiveProgressTextByTaskId(runningHintRun?.taskId)"
-    :debug-open="showRunDebug"
-    :debug-check-text="getRunningHintDebug(runningHintRun?.taskId).checkText"
-    :debug-progress-line="getRunningHintDebug(runningHintRun?.taskId).progressLine"
-    :debug-progress-json="getRunningHintDebug(runningHintRun?.taskId).progressJson"
-    @close="() => { showRunningHint = false; showRunDebug = false }"
-    @toggle-debug="showRunDebug = !showRunDebug"
-    @open-log="(run) => { openRunLog(run); showRunningHint = false; showRunDebug = false }"
+    :visible="runningHint.visible"
+    :run="runningHint.run"
+    :phase-text="runningHint.phaseText"
+    :progress-text="runningHint.progressText"
+    :debug-open="runningHint.debugOpen"
+    :debug-check-text="runningHint.debugInfo.checkText"
+    :debug-progress-line="runningHint.debugInfo.progressLine"
+    :debug-progress-json="runningHint.debugInfo.progressJson"
+    @close="runningHint.close"
+    @toggle-debug="runningHint.toggleDebug"
+    @open-log="runningHint.openLog"
   />
 
     <div v-if="currentModule === 'add'" class="card">
