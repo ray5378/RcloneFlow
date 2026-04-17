@@ -903,6 +903,7 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				"startedAt":        run.StartedAt,
 				"finishedAt":       run.FinishedAt,
 			},
+			"progress":       stable,
 			"stableProgress": stable,
 		}
 		items = append(items, item)

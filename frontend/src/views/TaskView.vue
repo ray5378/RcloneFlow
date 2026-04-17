@@ -544,21 +544,24 @@ async function loadActiveRuns() {
     const data = await jobApi.list()
     const now = Date.now()
     const list:any[] = (data || []).map((it:any) => {
-      const sp:any = (it && typeof it.stableProgress === 'object' && it.stableProgress) ? { ...it.stableProgress } : null
-      if (!sp) return it
-      // 前端不再做"向前抗噪合并"，只做最小限度的数值归一化，尽量直出后端 activeRuns
-      sp.bytes = Number(sp.bytes || 0)
-      sp.totalBytes = Number(sp.totalBytes || 0)
-      sp.speed = Number(sp.speed || 0)
-      sp.percentage = Number(sp.percentage || 0)
-      sp.completedFiles = Number(sp.completedFiles || 0)
-      sp.totalCount = Number(sp.totalCount || 0)
-      sp.eta = Number(sp.eta || 0)
-      if (sp.percentage < 0) sp.percentage = 0
-      if (sp.percentage > 100) sp.percentage = 100
-      it.stableProgress = sp
+      const raw:any = (it && typeof it.progress === 'object' && it.progress)
+        ? { ...it.progress }
+        : ((it && typeof it.stableProgress === 'object' && it.stableProgress) ? { ...it.stableProgress } : null)
+      if (!raw) return it
+      // 任务卡片运行中信息优先使用后端返回的 progress；stableProgress 仅保留兼容
+      raw.bytes = Number(raw.bytes || 0)
+      raw.totalBytes = Number(raw.totalBytes || 0)
+      raw.speed = Number(raw.speed || 0)
+      raw.percentage = Number(raw.percentage || 0)
+      raw.completedFiles = Number(raw.completedFiles || 0)
+      raw.totalCount = Number(raw.totalCount || 0)
+      raw.eta = Number(raw.eta || 0)
+      if (raw.percentage < 0) raw.percentage = 0
+      if (raw.percentage > 100) raw.percentage = 100
+      it.progress = raw
+      if (!it.stableProgress) it.stableProgress = raw
       const tid = it.runRecord?.taskId
-      if (tid) lastStableByTask.value[tid] = { sp, at: now }
+      if (tid) lastStableByTask.value[tid] = { sp: raw, at: now }
       return it
     })
     // 如果本帧没有 active，立即清空，不要维持旧进度
@@ -587,23 +590,25 @@ function getDbProgressStable(run:any){
   return db || null
 }
 
-// 历史"运行中"卡片直接使用当前 activeRuns 的 stableProgress；无 active 时再回退 DB
+// 历史"运行中"卡片直接使用当前 activeRuns 的 progress；无 active 时再回退 DB
 function getDeNoisedStableByRun(run:any){
   try{
     const tid = run?.taskId as number
     if (tid){
       const active = getActiveRunByTaskId(tid)
+      if (active?.progress) return active.progress
       if (active?.stableProgress) return active.stableProgress
     }
   }catch{}
   return getDbProgressStable(run)
 }
 
-// 任务卡片直接使用后端 activeRuns 的 stableProgress，不在前端做去噪拼接/完成态强行钳制
+// 任务卡片直接使用后端 activeRuns 的 progress，不在前端做去噪拼接/完成态强行钳制
 function getDeNoisedStableByTask(taskId:number){
   const active = getActiveRunByTaskId(taskId)
-  if (!active?.stableProgress) return null
-  const st:any = { ...active.stableProgress }
+  const raw = active?.progress || active?.stableProgress
+  if (!raw) return null
+  const st:any = { ...raw }
   st.bytes = Number(st.bytes || 0)
   st.totalBytes = Number(st.totalBytes || 0)
   st.speed = Number(st.speed || 0)
@@ -1615,8 +1620,8 @@ const targetBreadcrumbs = computed(() => {
         <p>实时日志与进度请点击"传输日志"或查看任务卡片上的实时进度。</p>
         <div class="hint-box">
           <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
-          <div class="detail-item"><label>阶段：</label><span>{{ getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.phase || '-' }}</span></div>
-          <div class="detail-item"><label>进度：</label><span>{{ ((getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.percentage)||0).toFixed(2) }}%</span></div>
+          <div class="detail-item"><label>阶段：</label><span>{{ getActiveRunByTaskId(runningHintRun?.taskId)?.progress?.phase || getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.phase || '-' }}</span></div>
+          <div class="detail-item"><label>进度：</label><span>{{ (((getActiveRunByTaskId(runningHintRun?.taskId)?.progress?.percentage) ?? (getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.percentage) ?? 0)).toFixed(2) }}%</span></div>
         </div>
       </div>
       <div class="modal-footer">

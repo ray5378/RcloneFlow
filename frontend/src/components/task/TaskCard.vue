@@ -19,6 +19,7 @@ interface Schedule {
 }
 
 interface ActiveRun {
+  progress?: Progress
   stableProgress?: Progress
   runRecord?: { status?: string }
 }
@@ -55,13 +56,18 @@ const emit = defineEmits<{
   setSingleton: [task: Task]
 }>()
 
+function getLiveProgress(): Progress | null {
+  return props.activeRun?.progress || props.activeRun?.stableProgress || null
+}
+
 function getProgressPercent(): string {
-  if (!props.activeRun?.stableProgress) return '0.00'
-  return (props.activeRun.stableProgress.percentage || 0).toFixed(2)
+  const p = getLiveProgress()
+  if (!p) return '0.00'
+  return (p.percentage || 0).toFixed(2)
 }
 
 function getProgressText(): string {
-  const p = props.activeRun?.stableProgress
+  const p = getLiveProgress()
   if (!p) return '-'
   if (p.phase === 'preparing') {
     return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
@@ -148,7 +154,7 @@ function isStopped(): boolean {
         <span class="path-label">进度:</span>
         <span class="path-value">{{ getProgressText() }}</span>
       </div>
-      <div class="progress-bar-container" v-if="activeRun?.stableProgress && activeRun.stableProgress.phase !== 'preparing'">
+      <div class="progress-bar-container" v-if="getLiveProgress() && getLiveProgress()!.phase !== 'preparing'">
         <div class="progress-bar" :style="{ width: getProgressPercent() + '%' }"></div>
       </div>
     </div>
