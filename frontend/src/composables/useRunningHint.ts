@@ -13,8 +13,12 @@ export function useRunningHint(activeRuns: Ref<any[]>, openRunLog: (run: any) =>
   const debugOpen = ref(false)
 
   const active = computed(() => {
-    if (!run.value?.taskId) return null
-    return (activeRuns.value || []).find((item: any) => item?.taskId === run.value.taskId) || null
+    const taskId = run.value?.taskId
+    if (!taskId) return null
+    return (activeRuns.value || []).find((item: any) => {
+      const activeTaskId = item?.runRecord?.taskId ?? item?.taskId
+      return activeTaskId === taskId
+    }) || null
   })
 
   const phaseText = computed(() => getActiveProgress(active.value)?.phase || '-')
