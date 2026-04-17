@@ -163,9 +163,27 @@ function isStopped(): boolean {
 
 <style scoped>
 .task-card {
+  position: relative;
   border-bottom: 1px solid #333;
   padding: 12px 16px;
   cursor: pointer;
+}
+/* 在卡片分割线中间留一个轻微断点，帮助辨认这是两张独立卡片 */
+.task-card::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -1px;
+  width: 18px;
+  height: 3px;
+  transform: translateX(-50%);
+  background: var(--bg, #121212);
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0.95;
+}
+body.light .task-card::after {
+  background: var(--bg, #f0f2f5);
 }
 .task-card.active {
   border-left: 3px solid var(--accent, #4f46e5);
