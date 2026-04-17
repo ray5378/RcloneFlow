@@ -112,7 +112,7 @@ describe('useApi - runApi', () => {
   })
 })
 
-describe('useApi - queueApi', () => {
+useApi - queueApi', () => {
   beforeEach(() => {
     vi.clearAllMocks()
   })

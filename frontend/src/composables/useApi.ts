@@ -207,47 +207,6 @@ export const runApi = {
 }
 
 /**
- * Queue APIs with error handling
- */
-export const queueApi = {
-  async getStatus() {
-    try {
-      return await api.getQueueStatus()
-    } catch (err) {
-      handleError(err, { module: 'Queue', operation: '获取队列状态' })
-      return null
-    }
-  },
-
-  async add(taskId: number, options?: any) {
-    try {
-      return await api.addToQueue(taskId, options)
-    } catch (err) {
-      handleError(err, { module: 'Queue', operation: '添加到队列' })
-      return false
-    }
-  },
-
-  async remove(jobId: string) {
-    try {
-      return await api.removeFromQueue(jobId)
-    } catch (err) {
-      handleError(err, { module: 'Queue', operation: '从队列移除' })
-      return false
-    }
-  },
-
-  async clear() {
-    try {
-      return await api.clearQueue()
-    } catch (err) {
-      handleError(err, { module: 'Queue', operation: '清空队列' })
-      return false
-    }
-  }
-}
-
-/**
  * Job APIs with error handling
  */
 export const jobApi = {

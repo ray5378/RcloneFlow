@@ -5,7 +5,7 @@ import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions } from '../componen
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
 import { PathItem } from '../components/path'
-import { taskApi, remoteApi, runApi, queueApi, jobApi, scheduleApi } from '../composables/useApi'
+import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { handleError, showSuccess, setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
 import { getToken } from '../api/auth'
@@ -94,6 +94,7 @@ const runDetail = ref<any>({})
 // 运行中提示小窗（不切换主窗口，不弹出完整详情）
 const showRunningHint = ref(false)
 const runningHintRun = ref<any>(null)
+const showRunDebug = ref(false)
 
 let runDetailTimer: any = null
 
@@ -728,15 +729,13 @@ function getLiveSummaryFromDB(run:any){
   }catch{}
   return null
 }
-// 以当前 live 帧为准估算 ETA（剩余时间，秒），不再混入前端历史稳态
+// 以当前 live 帧为准估算 ETA（剩余时间，秒）；运行中不再回退 preflight
 const lastNonZeroSpeedByTask: Record<number, number> = {}
 function calcEtaFromAvg(run:any, live:any){
   try{
     if (!run?.startedAt || !live) return null
     const tid = (run.taskId || run.taskID || run.task_id || run.runRecord?.taskId) as number
-    const pf = getPreflight(run)
-    let total = Number(pf?.totalBytes || 0)
-    if (!total) total = Number(live.totalBytes || 0)
+    const total = Number(live.totalBytes || 0)
     if (!total) return null
     const bytes = Number(live.bytes || 0)
     if (bytes <= 0) return null
@@ -812,6 +811,14 @@ function getActiveProgressCheckTextByTaskId(taskId:number){
 function getActiveProgressJsonByTaskId(taskId:number){
   const p = getActiveProgressByTaskId(taskId)
   try { return p ? JSON.stringify(p, null, 2) : '-' } catch { return '-' }
+}
+
+function getRunningHintDebug(taskId:number){
+  return {
+    checkText: getActiveProgressCheckTextByTaskId(taskId),
+    progressLine: getActiveProgressLineByTaskId(taskId),
+    progressJson: getActiveProgressJsonByTaskId(taskId),
+  }
 }
 
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
@@ -1670,11 +1677,11 @@ const targetBreadcrumbs = computed(() => {
   </div>
 
   <!-- 运行中轻量提示小窗（不切主窗口） -->
-  <div v-if="showRunningHint" class="modal-overlay" @click.self="showRunningHint = false">
+  <div v-if="showRunningHint" class="modal-overlay" @click.self="showRunningHint = false; showRunDebug = false">
     <div class="modal-content" style="max-width:520px">
       <div class="modal-header">
         <h3>任务运行中</h3>
-        <button class="close-btn" @click="showRunningHint = false">×</button>
+        <button class="close-btn" @click="showRunningHint = false; showRunDebug = false">×</button>
       </div>
       <div class="modal-body">
         <p>该任务仍在传输中，运行详情（历史）仅展示最终信息。</p>
@@ -1683,14 +1690,21 @@ const targetBreadcrumbs = computed(() => {
           <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
           <div class="detail-item"><label>阶段：</label><span>{{ getActiveProgressByTaskId(runningHintRun?.taskId)?.phase || '-' }}</span></div>
           <div class="detail-item"><label>实时：</label><span>{{ getActiveProgressTextByTaskId(runningHintRun?.taskId) }}</span></div>
-          <div class="detail-item"><label>自检：</label><span>{{ getActiveProgressCheckTextByTaskId(runningHintRun?.taskId) }}</span></div>
-          <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ getActiveProgressLineByTaskId(runningHintRun?.taskId) }}</code></div>
-          <div class="detail-item full-width"><label>接口进度：</label><code class="inline-logline">{{ getActiveProgressJsonByTaskId(runningHintRun?.taskId) }}</code></div>
+          <div class="detail-item full-width">
+            <button class="ghost debug-toggle" @click="showRunDebug = !showRunDebug">
+              {{ showRunDebug ? '收起调试详情' : '展开调试详情' }}
+            </button>
+          </div>
+          <template v-if="showRunDebug">
+            <div class="detail-item"><label>自检：</label><span>{{ getRunningHintDebug(runningHintRun?.taskId).checkText }}</span></div>
+            <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ getRunningHintDebug(runningHintRun?.taskId).progressLine }}</code></div>
+            <div class="detail-item full-width"><label>接口进度：</label><code class="inline-logline">{{ getRunningHintDebug(runningHintRun?.taskId).progressJson }}</code></div>
+          </template>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="primary" @click="() => { openRunLog(runningHintRun); showRunningHint=false }">打开传输日志</button>
-        <button class="ghost" @click="showRunningHint=false">我知道了</button>
+        <button class="primary" @click="() => { openRunLog(runningHintRun); showRunningHint=false; showRunDebug=false }">打开传输日志</button>
+        <button class="ghost" @click="showRunningHint=false; showRunDebug=false">我知道了</button>
       </div>
     </div>
   </div>
@@ -2134,6 +2148,7 @@ body.light .skipped-message{ background:#fffbeb; color:#78350f; }
 .cmd-textarea{ width:100%; min-height:120px; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:14px; box-sizing:border-box; resize:vertical; }
 body.light .cmd-textarea{ background:var(--surface); border-color:var(--border); color:var(--text) }
 .inline-logline{ display:block; white-space:pre-wrap; word-break:break-all; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:8px 10px; font-size:12px; line-height:1.5; }
+.debug-toggle{ width:100%; justify-content:center; }
 .form-content label.inline-label{ display:flex !important; align-items:center; gap:8px; margin:0 0 6px 0; }
 .form-content label.inline-label input[type="checkbox"]{ width:16px; height:16px; }
 body.light .form-content input,

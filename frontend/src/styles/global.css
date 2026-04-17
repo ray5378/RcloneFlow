@@ -2241,8 +2241,8 @@ body.light .modal-footer {
   }
 }
 
-/* === 大屏优化�?440px+�?=== */
-.main { width: 100%;
+/* === 大屏优化（1440px+）=== */
+.main { width: 100%; }
 
 @media (min-width: 1440px) {
   .main {
