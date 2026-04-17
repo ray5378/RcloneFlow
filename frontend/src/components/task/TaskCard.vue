@@ -174,23 +174,6 @@ function isStopped(): boolean {
   background: #252525;
   border-left-color: rgba(99,102,241,0.55);
 }
-/* 在卡片分割线中间留一个轻微断点，帮助辨认这是两张独立卡片 */
-.task-card::after {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: -1px;
-  width: 18px;
-  height: 3px;
-  transform: translateX(-50%);
-  background: var(--bg, #121212);
-  border-radius: 999px;
-  pointer-events: none;
-  opacity: 0.95;
-}
-body.light .task-card::after {
-  background: var(--bg, #f0f2f5);
-}
 body.light .task-card:hover {
   background: #f8f8f8;
   border-left-color: rgba(25,118,210,0.38);
