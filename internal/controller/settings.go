@@ -114,8 +114,9 @@ func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
 			"REFRESH_TOKEN_TTL": {"effective": eff("REFRESH_TOKEN_TTL"), "default": defs["REFRESH_TOKEN_TTL"]},
 		},
 		Log: map[string]map[string]string{
-			"LOG_LEVEL":  {"effective": eff("LOG_LEVEL"), "default": defs["LOG_LEVEL"]},
-			"LOG_OUTPUT": {"effective": eff("LOG_OUTPUT"), "default": defs["LOG_OUTPUT"]},
+			"LOG_LEVEL":        {"effective": eff("LOG_LEVEL"), "default": defs["LOG_LEVEL"]},
+			"LOG_OUTPUT":       {"effective": eff("LOG_OUTPUT"), "default": defs["LOG_OUTPUT"]},
+			"LOG_RETENTION_DAYS": {"effective": eff("LOG_RETENTION_DAYS"), "default": defs["LOG_RETENTION_DAYS"]},
 		},
 		History: map[string]map[string]string{
 			"FINAL_SUMMARY_RETENTION_DAYS": {"effective": eff("FINAL_SUMMARY_RETENTION_DAYS"), "default": defs["FINAL_SUMMARY_RETENTION_DAYS"]},
