@@ -65,7 +65,17 @@ function getProgressText(): string {
   if (p.phase === 'preparing') {
     return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
   }
-  return `${getProgressPercent()}% · ${formatBytes(p.bytes || 0)} / ${formatBytes(p.totalBytes || 0)} · ${formatBytesPerSec(p.speed || 0)} · 总数量 ${p.totalCount || 0} ／ 已传输 ${p.completedFiles || 0}`
+  // 计算预计完成时间
+  let etaStr = ''
+  const speed = p.speed || 0
+  const bytes = p.bytes || 0
+  const totalBytes = p.totalBytes || 0
+  if (speed > 0 && totalBytes > bytes) {
+    const remaining = totalBytes - bytes
+    const etaSeconds = remaining / speed
+    etaStr = ` · 预计完成 ${formatEta(etaSeconds)}`
+  }
+  return `${getProgressPercent()}% · ${formatBytes(bytes)} / ${formatBytes(totalBytes)} · ${formatBytesPerSec(speed)} · 总数量 ${p.totalCount || 0} ／ 已传输 ${p.completedFiles || 0}${etaStr}`
 }
 
 function formatSpec(spec: string): string {
