@@ -1,6 +1,12 @@
 import { computed, ref, type Ref } from 'vue'
 import { getActiveProgress, getActiveProgressText, getRunningHintDebug } from '../components/task/runningHint'
 
+const EMPTY_DEBUG_INFO = {
+  checkText: '-',
+  progressLine: '-',
+  progressJson: '-',
+}
+
 export function useRunningHint(activeRuns: Ref<any[]>, openRunLog: (run: any) => void) {
   const visible = ref(false)
   const run = ref<any>(null)
@@ -13,7 +19,10 @@ export function useRunningHint(activeRuns: Ref<any[]>, openRunLog: (run: any) =>
 
   const phaseText = computed(() => getActiveProgress(active.value)?.phase || '-')
   const progressText = computed(() => getActiveProgressText(active.value))
-  const debugInfo = computed(() => getRunningHintDebug(active.value))
+  const debugInfo = computed(() => {
+    const info = getRunningHintDebug(active.value)
+    return info || EMPTY_DEBUG_INFO
+  })
 
   function open(nextRun: any) {
     run.value = nextRun
