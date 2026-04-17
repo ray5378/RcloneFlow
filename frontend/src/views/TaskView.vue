@@ -1633,17 +1633,17 @@ const targetBreadcrumbs = computed(() => {
 
   <!-- 运行中轻量提示小窗（不切主窗口） -->
   <RunningHintModal
-    :visible="runningHint.visible"
-    :run="runningHint.run"
-    :phase-text="runningHint.phaseText"
-    :progress-text="runningHint.progressText"
-    :debug-open="runningHint.debugOpen"
-    :debug-check-text="runningHint.debugInfo.checkText"
-    :debug-progress-line="runningHint.debugInfo.progressLine"
-    :debug-progress-json="runningHint.debugInfo.progressJson"
-    @close="runningHint.close"
-    @toggle-debug="runningHint.toggleDebug"
-    @open-log="runningHint.openLog"
+    :visible="runningHintVisible"
+    :run="runningHintRun"
+    :phase-text="runningHintPhaseText"
+    :progress-text="runningHintProgressText"
+    :debug-open="runningHintDebugOpen"
+    :debug-check-text="runningHintDebugInfo.checkText"
+    :debug-progress-line="runningHintDebugInfo.progressLine"
+    :debug-progress-json="runningHintDebugInfo.progressJson"
+    @close="closeRunningHint"
+    @toggle-debug="toggleRunningHintDebug"
+    @open-log="openRunningHintLog"
   />
 
     <div v-if="currentModule === 'add'" class="card">
@@ -2303,4 +2303,3 @@ body.light .page-input{ background:#fff; color:#111827; border-color:#ddd }
   color: var(--accent, #4f46e5);
 }
 </style>
-le>
