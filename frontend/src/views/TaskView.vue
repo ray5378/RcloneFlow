@@ -9,6 +9,7 @@ import { taskApi, remoteApi, runApi, queueApi, jobApi, scheduleApi } from '../co
 import { handleError, showSuccess, setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
 import { getToken } from '../api/auth'
+import { useWebSocket, onWsMessage } from '../composables/useWebSocket'
 import type { Task, Schedule, Run } from '../types'
 
 // Toast 通知系统
@@ -482,6 +483,41 @@ onMounted(async () => {
   activeRunsTimer = window.setInterval(() => { loadActiveRuns().catch(console.error) }, 2000)
   // 历史列表也轮询，保证新 run 及时出现（避免必须手动刷新）
   runsTimer = window.setInterval(() => { runApi.list(runsPage.value, runsPageSize).then(v=> { if(v?.runs) { runs.value = v.runs; runsTotal.value = typeof v.total === 'number' ? v.total : (v.runs?.length || 0) } }).catch(()=>{}) }, 3000)
+
+  // WebSocket 实时推送
+  const { isConnected } = useWebSocket({
+    onMessage: (msg) => {
+      if (msg.type === 'run_status' && msg.data) {
+        // 更新对应 run 的状态
+        const idx = runs.value.findIndex(r => r.id === msg.data.run_id)
+        if (idx !== -1) {
+          runs.value[idx] = { ...runs.value[idx], status: msg.data.status }
+        }
+        // 如果任务列表视图，重新加载
+        if (currentModule.value === 'tasks') {
+          loadActiveRuns().catch(console.error)
+        }
+      } else if (msg.type === 'run_progress' && msg.data) {
+        // 更新进度（可选，用于实时显示传输进度）
+        const idx = activeRuns.value.findIndex(r => r.id === msg.data.run_id)
+        if (idx !== -1) {
+          activeRuns.value[idx] = {
+            ...activeRuns.value[idx],
+            bytes: msg.data.bytes,
+            totalBytes: msg.data.total,
+            speed: msg.data.speed,
+            percent: msg.data.percent,
+          }
+        }
+      }
+    }
+  })
+
+  // 监听 WebSocket 连接状态
+  onWsMessage('run_status', (data) => {
+    // Refresh active runs when status changes
+    loadActiveRuns().catch(console.error)
+  })
 })
 
 let loadSeq = 0

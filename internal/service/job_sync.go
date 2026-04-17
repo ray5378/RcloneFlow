@@ -9,6 +9,7 @@ import (
 	"rcloneflow/internal/logger"
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/store"
+	"rcloneflow/internal/websocket"
 
 	"go.uber.org/zap"
 )
@@ -113,6 +114,19 @@ func (s *JobSyncService) syncRunningJobs() {
 				logger.Debug("更新任务进度失败",
 					zap.Int64("run_id", run.ID),
 					zap.Error(err))
+			} else {
+				// 广播进度更新（限流，避免太频繁）
+				var pct float64
+				if totalBytes > 0 {
+					pct = float64(bytes) / float64(totalBytes) * 100
+				}
+				websocket.Broadcast("run_progress", map[string]interface{}{
+					"run_id":   run.ID,
+					"bytes":    bytes,
+					"total":    totalBytes,
+					"speed":    speed,
+					"percent":  pct,
+				})
 			}
 		}
 
@@ -166,6 +180,11 @@ func (s *JobSyncService) syncRunningJobs() {
 					zap.Int64("run_id", run.ID),
 					zap.Int64("job_id", run.RcJobID),
 					zap.String("status", newStatus))
+				// 广播 WebSocket 通知
+				websocket.Broadcast("run_status", map[string]interface{}{
+					"run_id": run.ID,
+					"status": newStatus,
+				})
 			}
 		}
 	}
