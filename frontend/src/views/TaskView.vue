@@ -12,6 +12,7 @@ import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../ut
 import { getToken } from '../api/auth'
 import { useWebSocket, onWsMessage } from '../composables/useWebSocket'
 import { useActiveRunLookup } from '../composables/useActiveRunLookup'
+import { useRunningHint } from '../composables/useRunningHint'
 import type { Task, Schedule, Run } from '../types'
 
 // Toast 通知系统
