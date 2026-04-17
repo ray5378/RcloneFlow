@@ -116,6 +116,7 @@ const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
 const STUCK_MS = 25000
 let lastRenderedSignature = ''
 let stuckTimer: number | null = null
+let activePollTimer: number | null = null
 onMounted(() => {
   stuckTimer = window.setInterval(() => {
     try{
@@ -142,8 +143,17 @@ onMounted(() => {
       }
     }catch{}
   }, 1000)
+  // 兜底轮询：即使 ws 没推到，也每 3 秒刷新一次 activeRuns
+  activePollTimer = window.setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      loadActiveRuns().catch(console.error)
+    }
+  }, 3000)
 })
-onUnmounted(() => { if (stuckTimer) clearInterval(stuckTimer) })
+onUnmounted(() => {
+  if (stuckTimer) clearInterval(stuckTimer)
+  if (activePollTimer) clearInterval(activePollTimer)
+})
 // 仅用 DB 的 summary.progress 作为运行中 DB fallback；stableProgress 只保留最后兜底
 const lastDbFrameByRunId: Record<number, any> = {}
 // Webhook 配置（POST 地址 + 触发来源/状态勾选）
@@ -492,14 +502,21 @@ onMounted(async () => {
         loadActiveRuns().catch(console.error)
       } else if (msg.type === 'run_progress' && msg.data) {
         // 更新进度（用于实时显示传输进度）
-        const idx = activeRuns.value.findIndex(r => r.id === msg.data.run_id)
+        const idx = activeRuns.value.findIndex(r => r.runRecord?.id === msg.data.run_id)
         if (idx !== -1) {
+          const cur = activeRuns.value[idx] || {}
+          const prev = cur.progress || cur.stableProgress || {}
+          const nextProgress = {
+            ...prev,
+            bytes: Number(msg.data.bytes || 0),
+            totalBytes: Number(msg.data.total || prev.totalBytes || 0),
+            speed: Number(msg.data.speed || 0),
+            percentage: Number(msg.data.percent || prev.percentage || 0),
+          }
           activeRuns.value[idx] = {
-            ...activeRuns.value[idx],
-            bytes: msg.data.bytes,
-            totalBytes: msg.data.total,
-            speed: msg.data.speed,
-            percent: msg.data.percent,
+            ...cur,
+            progress: nextProgress,
+            stableProgress: cur.stableProgress || nextProgress,
           }
         }
       }
