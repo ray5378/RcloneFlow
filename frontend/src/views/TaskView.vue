@@ -779,13 +779,6 @@ function getStatusText(status: string) {
   }
 }
 
-function getActiveProgressByTaskId(taskId:number){
-  return activeRunLookup.getActiveProgressByTaskId(taskId)
-}
-
-function getActiveProgressTextByTaskId(taskId:number){
-  return activeRunLookup.getActiveProgressTextByTaskId(taskId)
-}
 
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
 let refreshLocks: Record<number, boolean> = {}
