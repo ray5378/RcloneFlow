@@ -101,7 +101,7 @@ function isStopped(): boolean {
 </script>
 
 <template>
-  <div class="item task-card" :class="{ active: activeRun }" @click="emit('viewHistory', task.id!)">
+  <div class="task-card" :class="{ active: activeRun }" @click="emit('viewHistory', task.id!)">
     <div class="task-main">
       <div class="name">
         <strong>{{ task.name }}</strong>
@@ -171,7 +171,7 @@ function isStopped(): boolean {
   border-left: 3px solid transparent;
 }
 .task-card:hover {
-  background: rgba(255,255,255,0.03);
+  background: #252525;
   border-left-color: rgba(99,102,241,0.55);
 }
 /* 在卡片分割线中间留一个轻微断点，帮助辨认这是两张独立卡片 */
@@ -192,7 +192,7 @@ body.light .task-card::after {
   background: var(--bg, #f0f2f5);
 }
 body.light .task-card:hover {
-  background: rgba(25,118,210,0.04);
+  background: #f8f8f8;
   border-left-color: rgba(25,118,210,0.38);
 }
 .task-card.active {
