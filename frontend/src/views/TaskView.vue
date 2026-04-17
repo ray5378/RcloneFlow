@@ -5,7 +5,7 @@ import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions } from '../componen
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
 import { PathItem } from '../components/path'
-import { taskApi, remoteApi, runApi, queueApi, jobApi, scheduleApi } from '../composables/useApi'
+import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { handleError, showSuccess, setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
 import { getToken } from '../api/auth'
