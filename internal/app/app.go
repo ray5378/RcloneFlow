@@ -113,7 +113,7 @@ func Run(cfg *config.Config) error {
 	if logRetention <= 0 {
 		logRetention = 7 // 默认7天
 	}
-	logCleanup := service.NewLogCleanupService(logsDir, time.Hour, logRetention) // 每小时检查一次
+	logCleanup := service.NewLogCleanupService(logsDir, 24*time.Hour, logRetention) // 每天检查一次
 	go logCleanup.Start(ctx)
 
 	// 设置路由
