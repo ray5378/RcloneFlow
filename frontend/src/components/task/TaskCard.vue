@@ -163,9 +163,20 @@ function isStopped(): boolean {
 
 <style scoped>
 .task-card {
+  position: relative;
   border-bottom: 1px solid #333;
   padding: 12px 16px;
   cursor: pointer;
+  transition: background-color 0.18s ease, border-left-color 0.18s ease;
+  border-left: 3px solid transparent;
+}
+.task-card:hover {
+  background: #252525;
+  border-left-color: rgba(99,102,241,0.55);
+}
+body.light .task-card:hover {
+  background: #f8f8f8;
+  border-left-color: rgba(25,118,210,0.38);
 }
 .task-card.active {
   border-left: 3px solid var(--accent, #4f46e5);
