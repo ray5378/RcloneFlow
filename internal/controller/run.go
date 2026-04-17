@@ -877,6 +877,13 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			}
 		}
 
+		progressLine := ""
+		if summary != nil {
+			if v, ok := summary["progressLine"].(string); ok {
+				progressLine = v
+			}
+		}
+
 		stable := map[string]any{
 			"bytes":          bytes,
 			"totalBytes":     total,
@@ -903,8 +910,10 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				"startedAt":        run.StartedAt,
 				"finishedAt":       run.FinishedAt,
 			},
-			"progress":       stable,
-			"stableProgress": stable,
+			"progress":         stable,
+			"stableProgress":   stable,
+			"progressLine":     progressLine,
+			"progressSource":   "summary.progress",
 		}
 		items = append(items, item)
 	}

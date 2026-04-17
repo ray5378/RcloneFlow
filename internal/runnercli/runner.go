@@ -1017,6 +1017,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						rr.Summary = map[string]any{}
 					}
 					rr.Summary["progress"] = prog
+					rr.Summary["progressLine"] = line
 					if b, ok := prog["bytes"].(float64); ok {
 						rr.BytesTransferred = int64(b)
 					}
@@ -1034,6 +1035,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
 					}
+					rr.Summary["progressLine"] = line
 					// preserve non-decreasing completedFiles; fallback to copied list if needed
 					if prev, ok := rr.Summary["progress"].(map[string]any); ok {
 						if pc, ok2 := prev["completedFiles"].(float64); ok2 {
