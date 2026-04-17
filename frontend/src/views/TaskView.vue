@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
-import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions } from '../components/task'
+import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal } from '../components/task'
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
 import { PathItem } from '../components/path'
@@ -1677,37 +1677,19 @@ const targetBreadcrumbs = computed(() => {
   </div>
 
   <!-- 运行中轻量提示小窗（不切主窗口） -->
-  <div v-if="showRunningHint" class="modal-overlay" @click.self="showRunningHint = false; showRunDebug = false">
-    <div class="modal-content" style="max-width:520px">
-      <div class="modal-header">
-        <h3>任务运行中</h3>
-        <button class="close-btn" @click="showRunningHint = false; showRunDebug = false">×</button>
-      </div>
-      <div class="modal-body">
-        <p>该任务仍在传输中，运行详情（历史）仅展示最终信息。</p>
-        <p>实时日志与进度请点击"传输日志"或查看任务卡片上的实时进度。</p>
-        <div class="hint-box">
-          <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
-          <div class="detail-item"><label>阶段：</label><span>{{ getActiveProgressByTaskId(runningHintRun?.taskId)?.phase || '-' }}</span></div>
-          <div class="detail-item"><label>实时：</label><span>{{ getActiveProgressTextByTaskId(runningHintRun?.taskId) }}</span></div>
-          <div class="detail-item full-width">
-            <button class="ghost debug-toggle" @click="showRunDebug = !showRunDebug">
-              {{ showRunDebug ? '收起调试详情' : '展开调试详情' }}
-            </button>
-          </div>
-          <template v-if="showRunDebug">
-            <div class="detail-item"><label>自检：</label><span>{{ getRunningHintDebug(runningHintRun?.taskId).checkText }}</span></div>
-            <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ getRunningHintDebug(runningHintRun?.taskId).progressLine }}</code></div>
-            <div class="detail-item full-width"><label>接口进度：</label><code class="inline-logline">{{ getRunningHintDebug(runningHintRun?.taskId).progressJson }}</code></div>
-          </template>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="primary" @click="() => { openRunLog(runningHintRun); showRunningHint=false; showRunDebug=false }">打开传输日志</button>
-        <button class="ghost" @click="showRunningHint=false; showRunDebug=false">我知道了</button>
-      </div>
-    </div>
-  </div>
+  <RunningHintModal
+    :visible="showRunningHint"
+    :run="runningHintRun"
+    :phase-text="getActiveProgressByTaskId(runningHintRun?.taskId)?.phase || '-'"
+    :progress-text="getActiveProgressTextByTaskId(runningHintRun?.taskId)"
+    :debug-open="showRunDebug"
+    :debug-check-text="getRunningHintDebug(runningHintRun?.taskId).checkText"
+    :debug-progress-line="getRunningHintDebug(runningHintRun?.taskId).progressLine"
+    :debug-progress-json="getRunningHintDebug(runningHintRun?.taskId).progressJson"
+    @close="() => { showRunningHint = false; showRunDebug = false }"
+    @toggle-debug="showRunDebug = !showRunDebug"
+    @open-log="(run) => { openRunLog(run); showRunningHint = false; showRunDebug = false }"
+  />
 
     <div v-if="currentModule === 'add'" class="card">
     <div class="card-header"><div class="title">添加任务</div></div>
