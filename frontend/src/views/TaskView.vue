@@ -11,6 +11,7 @@ import { handleError, showSuccess, setErrorHandler } from '../composables/useErr
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
 import { getToken } from '../api/auth'
 import { useWebSocket, onWsMessage } from '../composables/useWebSocket'
+import { useActiveRunLookup } from '../composables/useActiveRunLookup'
 import type { Task, Schedule, Run } from '../types'
 
 // Toast 通知系统
