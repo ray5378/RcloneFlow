@@ -101,7 +101,7 @@ function isStopped(): boolean {
 </script>
 
 <template>
-  <div class="task-card" :class="{ active: activeRun }" @click="emit('viewHistory', task.id!)">
+  <div class="item task-card" :class="{ active: activeRun }" @click="emit('viewHistory', task.id!)">
     <div class="task-main">
       <div class="name">
         <strong>{{ task.name }}</strong>
@@ -167,13 +167,12 @@ function isStopped(): boolean {
   border-bottom: 1px solid #333;
   padding: 12px 16px;
   cursor: pointer;
-  transition: background-color 0.18s ease, box-shadow 0.18s ease, border-left-color 0.18s ease;
+  transition: background-color 0.18s ease, border-left-color 0.18s ease;
   border-left: 3px solid transparent;
 }
 .task-card:hover {
-  background: rgba(255,255,255,0.05);
-  border-left-color: rgba(99,102,241,0.7);
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.03);
+  border-left-color: rgba(99,102,241,0.55);
 }
 /* 在卡片分割线中间留一个轻微断点，帮助辨认这是两张独立卡片 */
 .task-card::after {
@@ -193,9 +192,8 @@ body.light .task-card::after {
   background: var(--bg, #f0f2f5);
 }
 body.light .task-card:hover {
-  background: rgba(25,118,210,0.06);
-  border-left-color: rgba(25,118,210,0.45);
-  box-shadow: inset 0 0 0 1px rgba(25,118,210,0.08);
+  background: rgba(25,118,210,0.04);
+  border-left-color: rgba(25,118,210,0.38);
 }
 .task-card.active {
   border-left: 3px solid var(--accent, #4f46e5);
