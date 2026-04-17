@@ -543,31 +543,26 @@ async function loadActiveRuns() {
   try {
     const data = await jobApi.list()
     const now = Date.now()
-    // 更新最后稳态快照（保持向前：非递减合并，避免抖动）
-    for (const it of data || []){
+    const list:any[] = (data || []).map((it:any) => {
+      const sp:any = (it && typeof it.stableProgress === 'object' && it.stableProgress) ? { ...it.stableProgress } : null
+      if (!sp) return it
+      // 前端不再做"向前抗噪合并"，只做最小限度的数值归一化，尽量直出后端 activeRuns
+      sp.bytes = Number(sp.bytes || 0)
+      sp.totalBytes = Number(sp.totalBytes || 0)
+      sp.speed = Number(sp.speed || 0)
+      sp.percentage = Number(sp.percentage || 0)
+      sp.completedFiles = Number(sp.completedFiles || 0)
+      sp.totalCount = Number(sp.totalCount || 0)
+      sp.eta = Number(sp.eta || 0)
+      if (sp.percentage < 0) sp.percentage = 0
+      if (sp.percentage > 100) sp.percentage = 100
+      it.stableProgress = sp
       const tid = it.runRecord?.taskId
-      const sp:any = it.stableProgress || {}
-      if (tid && sp && typeof sp === 'object'){
-        const prev = lastStableByTask.value[tid]?.sp || {}
-        const merged:any = { ...prev, ...sp }
-        // 非递减合并
-        merged.bytes = Math.max(Number(prev.bytes||0), Number(sp.bytes||0))
-        merged.totalBytes = Number(sp.totalBytes||prev.totalBytes||0)
-        merged.percentage = Math.max(Number(prev.percentage||0), Number(sp.percentage||0))
-        merged.completedFiles = Math.max(Number(prev.completedFiles||0), Number(sp.completedFiles||0))
-        // totalCount：若本帧为 0，沿用上一帧
-        merged.totalCount = Number(sp.totalCount||prev.totalCount||0)
-        // 速度：若本帧为 0，则沿用上一帧的非零速度，减少闪烁
-        merged.speed = Number(sp.speed||prev.speed||0)
-        lastStableByTask.value[tid] = { sp: merged, at: now }
-        // 同步回 it 以便本次渲染即用稳定值
-        it.stableProgress = merged
-      }
-    }
+      if (tid) lastStableByTask.value[tid] = { sp, at: now }
+      return it
+    })
     // 如果本帧没有 active，立即清空，不要维持旧进度
-    const list:any[] = data || []
     if (list.length === 0) {
-      // 直接清空，让进度条立即消失
       activeRuns.value = []
       return
     }
@@ -592,41 +587,32 @@ function getDbProgressStable(run:any){
   return db || null
 }
 
-// 历史"运行中"卡片也使用任务卡片的抗噪稳态：优先 lastStableByTask，再回退 DB
+// 历史"运行中"卡片直接使用当前 activeRuns 的 stableProgress；无 active 时再回退 DB
 function getDeNoisedStableByRun(run:any){
   try{
     const tid = run?.taskId as number
-    if (tid && lastStableByTask.value && lastStableByTask.value[tid] && lastStableByTask.value[tid].sp){
-      return lastStableByTask.value[tid].sp
+    if (tid){
+      const active = getActiveRunByTaskId(tid)
+      if (active?.stableProgress) return active.stableProgress
     }
   }catch{}
   return getDbProgressStable(run)
 }
 
-// 抗噪稳态读取（任务卡片用）：优先 lastStableByTask，再回退当前 active 的 stableProgress
+// 任务卡片直接使用后端 activeRuns 的 stableProgress，不在前端做去噪拼接/完成态强行钳制
 function getDeNoisedStableByTask(taskId:number){
-  // 只返回活跃任务的进度，不返回已完成的数据
   const active = getActiveRunByTaskId(taskId)
-  if (!active) return null
-  const raw = active.stableProgress
-  if (!raw) return null
-  // clone & normalize for UI
-  const st:any = { ...raw }
-  const totalBytes = Number(st.totalBytes || 0)
-  const bytes = Number(st.bytes || 0)
-  const totalCount = Number(st.totalCount || 0)
-  const completedFiles = Number(st.completedFiles || 0)
-  let pct = Number(st.percentage || 0)
-  // clamp bytes within [0,totalBytes]
-  if (totalBytes > 0) st.bytes = Math.min(bytes, totalBytes)
-  // when near 100% or files已达总数，钳制为完成，避免"卡最后1个"错觉
-  if ((totalCount > 0 && completedFiles >= totalCount) || pct >= 99.999) {
-    st.completedFiles = totalCount > 0 ? totalCount : completedFiles
-    st.percentage = 100
-  } else {
-    // also cap percentage at 100
-    st.percentage = Math.min(100, pct)
-  }
+  if (!active?.stableProgress) return null
+  const st:any = { ...active.stableProgress }
+  st.bytes = Number(st.bytes || 0)
+  st.totalBytes = Number(st.totalBytes || 0)
+  st.speed = Number(st.speed || 0)
+  st.percentage = Number(st.percentage || 0)
+  st.completedFiles = Number(st.completedFiles || 0)
+  st.totalCount = Number(st.totalCount || 0)
+  st.eta = Number(st.eta || 0)
+  if (st.percentage < 0) st.percentage = 0
+  if (st.percentage > 100) st.percentage = 100
   return st
 }
 
@@ -718,31 +704,24 @@ function getLiveSummaryFromDB(run:any){
   }catch{}
   return null
 }
-// 以"开始时间 + 平均速度"计算更稳健的 ETA（剩余时间，秒）
-// 预估完成：使用"固定总量（preflight.totalBytes）- 抗噪后的已传 bytes" / 抗噪后的速度
+// 以当前 live 帧为准估算 ETA（剩余时间，秒），不再混入前端历史稳态
 const lastNonZeroSpeedByTask: Record<number, number> = {}
 function calcEtaFromAvg(run:any, live:any){
   try{
     if (!run?.startedAt || !live) return null
     const tid = (run.taskId || run.taskID || run.task_id || run.runRecord?.taskId) as number
-    // 固定总量：优先 preflight.totalBytes；无则用卡片稳态的 totalBytes；再无则返回 null
     const pf = getPreflight(run)
     let total = Number(pf?.totalBytes || 0)
-    if (!total && tid && lastStableByTask.value?.[tid]?.sp){ total = Number(lastStableByTask.value[tid].sp.totalBytes || 0) }
+    if (!total) total = Number(live.totalBytes || 0)
     if (!total) return null
-    // 抗噪后的已传 bytes
-    let bytes = Number(live.bytes || 0)
-    if (tid && lastStableByTask.value?.[tid]?.sp){ bytes = Number(lastStableByTask.value[tid].sp.bytes || bytes) }
-    if (bytes<=0) return null
+    const bytes = Number(live.bytes || 0)
+    if (bytes <= 0) return null
     const remaining = Math.max(0, total - bytes)
-    // 抗噪后的速度（任务卡片显示），可渲染时才采信
-    let speed = 0
-    if (tid && lastStableByTask.value?.[tid]?.sp){ speed = Number(lastStableByTask.value[tid].sp.speed || 0) }
-    if (speed<=0) speed = Number(live.speed || 0)
+    let speed = Number(live.speed || 0)
     if (formatBytesPerSec(speed) === '-') return null
-    if (tid && speed>0) lastNonZeroSpeedByTask[tid] = speed
+    if (tid && speed > 0) lastNonZeroSpeedByTask[tid] = speed
     const sp = tid ? (lastNonZeroSpeedByTask[tid] || 0) : speed
-    if (!sp || sp<=0) return null
+    if (!sp || sp <= 0) return null
     const etaSec = Math.floor(remaining / sp)
     if (etaSec > 99*3600) return null
     return etaSec
