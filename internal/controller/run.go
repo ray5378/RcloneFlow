@@ -816,11 +816,13 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				}
 			}
 		}
-		total := int64(0)
+		progressTotal := int64(0)
 		if v, ok := progress["totalBytes"].(float64); ok {
-			total = int64(v)
+			progressTotal = int64(v)
 		}
-		if preflightTotal > 0 && (total == 0 || total < preflightTotal) {
+		total := progressTotal
+		usePreflightTotal := preflightTotal > 0 && (total == 0 || total < preflightTotal)
+		if usePreflightTotal {
 			total = preflightTotal
 		}
 		if total > 0 && bytes > total {
@@ -837,8 +839,12 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		}
 
 		pct := 0.0
-		if v, ok := progress["percentage"].(float64); ok {
-			pct = v
+		if !usePreflightTotal {
+			if v, ok := progress["percentage"].(float64); ok {
+				pct = v
+			} else if total > 0 {
+				pct = float64(bytes) / float64(total) * 100
+			}
 		} else if total > 0 {
 			pct = float64(bytes) / float64(total) * 100
 		}

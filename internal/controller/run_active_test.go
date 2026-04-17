@@ -139,6 +139,9 @@ func TestHandleActiveRuns_PrefersPreflightTotalsWhenProgressTotalsRegress(t *tes
 	if got := int(prog["totalCount"].(float64)); got != 166 {
 		t.Fatalf("totalCount=%d, want 166", got)
 	}
+	if got := prog["percentage"].(float64); got < 9.7 || got > 9.8 {
+		t.Fatalf("percentage=%v, want about 9.76", got)
+	}
 }
 
 func TestHandleActiveRuns_FlagsProgressMismatch(t *testing.T) {
