@@ -776,6 +776,22 @@ function getActiveProgressLineByTaskId(taskId:number){
   return active?.progressLine || '-'
 }
 
+function getActiveProgressCheckByTaskId(taskId:number){
+  const active = getActiveRunByTaskId(taskId)
+  return active?.progressCheck || null
+}
+
+function getActiveProgressCheckTextByTaskId(taskId:number){
+  const check:any = getActiveProgressCheckByTaskId(taskId)
+  if (!check) return '-'
+  if (check.ok) return `OK · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
+  const parts:string[] = []
+  if (check.pctMismatch) parts.push('百分比异常')
+  if (check.countMismatch) parts.push('数量异常')
+  if (check.etaMismatch) parts.push('ETA异常')
+  return `${parts.join(' / ') || '异常'} · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
+}
+
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
 let refreshLocks: Record<number, boolean> = {}
 async function triggerAutoRefresh(taskId: number){
@@ -1645,6 +1661,7 @@ const targetBreadcrumbs = computed(() => {
           <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
           <div class="detail-item"><label>阶段：</label><span>{{ getActiveProgressByTaskId(runningHintRun?.taskId)?.phase || '-' }}</span></div>
           <div class="detail-item"><label>实时：</label><span>{{ getActiveProgressTextByTaskId(runningHintRun?.taskId) }}</span></div>
+          <div class="detail-item"><label>自检：</label><span>{{ getActiveProgressCheckTextByTaskId(runningHintRun?.taskId) }}</span></div>
           <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ getActiveProgressLineByTaskId(runningHintRun?.taskId) }}</code></div>
         </div>
       </div>
