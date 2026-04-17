@@ -65,24 +65,80 @@
 - 删除无效的 `queueApi` 包装和残留引用
 - 修复 `frontend/src/styles/global.css` 中缺失的 `}`
 
+## 拆分进度（截至当前主线）
+
+### `frontend/src/views/TaskView.vue` 已完成的拆分
+以下内容已经从 `TaskView.vue` 中拆出或收口：
+
+#### 1. 运行中提示小窗 UI
+- 已拆出：`frontend/src/components/task/RunningHintModal.vue`
+- 目的：将小窗模板、按钮、调试展开区从页面主文件中分离
+
+#### 2. 运行中提示相关格式化 / 调试 helper
+- 已拆出：`frontend/src/components/task/runningHint.ts`
+- 当前承载：
+  - `getActiveProgress()`
+  - `getActiveProgressText()`
+  - `getActiveProgressLine()`
+  - `getActiveProgressCheck()`
+  - `getActiveProgressCheckText()`
+  - `getActiveProgressJson()`
+  - `getRunningHintDebug()`
+
+#### 3. 运行中提示状态管理
+- 已拆出：`frontend/src/composables/useRunningHint.ts`
+- 当前承载：
+  - 小窗开关状态
+  - 当前 run 绑定
+  - debug 开关状态
+  - phase / progress / debugInfo 组装
+  - 打开日志动作
+
+#### 4. active run 基础读取
+- 已拆出：`frontend/src/composables/useActiveRunLookup.ts`
+- 当前承载：
+  - `getActiveRunByTaskId()`
+  - `getActiveProgressByTaskId()`
+  - `getActiveProgressTextByTaskId()`
+
+#### 5. active run fallback / 数值归一化
+- 已拆出：`frontend/src/composables/activeRunProgress.ts`
+- 当前承载：
+  - `getDeNoisedStableByRun()`
+  - `getDeNoisedStableByTask()`
+
+### 拆分过程中的关键回归修复（已完成）
+以下问题已在拆分过程中修正并验证：
+- running hint 小窗强制弹出
+- running hint 内容为空 / 调试详情全为 `-`
+- running hint 新旧接线混用导致页面空白
+- `useRunningHint` / `useActiveRunLookup` 漏导入导致页面运行时报错
+- 拆分过程中 `TaskView.vue` 残留旧引用或文件尾部脏片导致 build 失败
+
+### 运行中总量/总数/百分比源头修复（已完成）
+这部分不是前端 masking，而是已回到后端源头修复：
+- `/api/runs/active` 不再让 early live progress 的偏小 `totalBytes / plannedFiles` 覆盖正确 `preflight`
+- 当 `preflight` 接管总量时，百分比按 `bytes / totalBytes` 重新计算
+- 已移除前端为止血临时添加的“总量/总数防倒退显示保护”
+
 ## 待重构清单
 
 ### 高优先级
 
-#### 1. 拆分 `frontend/src/views/TaskView.vue`
+#### 1. 继续拆分 `frontend/src/views/TaskView.vue`
 现状：
-- 文件过大
-- 混合了承担任务列表、历史记录、运行中提示、弹窗、进度格式化、WebSocket 更新等职责
+- 虽然运行中提示与 active run 相关逻辑已经拆出一部分，但文件整体仍然偏大
+- 仍混合了承担任务列表、历史记录、创建任务、弹窗、WebSocket 更新等职责
 
-建议拆分优先块：
-- `RunningHintModal.vue`
-- active progress 相关 helper / composable
+下一步建议拆分优先块：
 - 历史记录区域
 - 任务列表区域
+- 创建任务区域 / 表单块
+- 页面级 WebSocket / 列表刷新协调逻辑
 
 目标：
-- 降低耦合
-- 减少后续修改时误伤进度链
+- 进一步降低耦合
+- 让 `TaskView.vue` 更接近页面装配层，而不是功能承载层
 
 #### 2. 明确 `progress / stableProgress / preflight` 的字段边界
 现状：
