@@ -34,6 +34,12 @@ func TestParseOneLineProgress_AggregateWithETAOnly(t *testing.T) {
 	if got := int(prog["percentage"].(float64)); got != 37 {
 		t.Fatalf("percentage=%d, want 37", got)
 	}
+	if got := int(prog["bytes"].(float64)); got <= 1024*1024 {
+		t.Fatalf("bytes=%d looks wrong; likely matched timestamp instead of MiB payload", got)
+	}
+	if got := int(prog["totalBytes"].(float64)); got <= 1024*1024 {
+		t.Fatalf("totalBytes=%d looks wrong; likely matched timestamp instead of MiB payload", got)
+	}
 }
 
 func TestParseOneLineProgress_IgnoreFileLevelProgress(t *testing.T) {

@@ -1156,7 +1156,7 @@ func parseETA(s string) int {
 	return sec
 }
 
-var bytesPairRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?`)
+var bytesPairRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B`)
 var speedTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s`)
 var pctTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)%`)
 var etaTokenRe = regexp.MustCompile(`(?i)ETA\s*([0-9hms:.-]+|-)`)
