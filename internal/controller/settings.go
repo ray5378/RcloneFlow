@@ -40,6 +40,7 @@ func defaultsMap() map[string]string {
 		"REFRESH_TOKEN_TTL":              "90d",
 		"LOG_LEVEL":                      "info",
 		"LOG_OUTPUT":                     "stdout",
+		"LOG_RETENTION_DAYS":             "7",
 		"FINAL_SUMMARY_RETENTION_DAYS":   "7",
 		"CLEANUP_INTERVAL_HOURS":         "24",
 		"PRECHECK_MODE":                  "none",
