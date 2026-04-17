@@ -2,7 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
 import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal } from '../components/task'
-import { getActiveProgress as getHintActiveProgress, getActiveProgressText as getHintActiveProgressText, getRunningHintDebug as buildRunningHintDebug } from '../components/task/runningHint'
+import { getActiveProgress as getHintActiveProgress, getActiveProgressText as getHintActiveProgressText } from '../components/task/runningHint'
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
 import { PathItem } from '../components/path'
@@ -353,8 +353,7 @@ function pickFilesFromRun(run:any){
 function showRunDetail(run:any){
   if (run.status === 'running'){
     // 不切主窗口：给出轻量提示小窗，引导去"任务日志"查看实时内容
-    runningHintRun.value = run
-    showRunningHint.value = true
+    runningHint.open(run)
     return
   }
   runDetail.value = run
@@ -786,40 +785,6 @@ function getActiveProgressTextByTaskId(taskId:number){
   let etaStr = ''
   if (Number(p.eta || 0) > 0) etaStr = ` · 预计完成 ${formatEta(Number(p.eta || 0))}`
   return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · 总数量 ${Number(p.totalCount || 0)} ／ 已传输 ${Number(p.completedFiles || 0)}${etaStr}`
-}
-
-function getActiveProgressLineByTaskId(taskId:number){
-  const active = getActiveRunByTaskId(taskId)
-  return active?.progressLine || '-'
-}
-
-function getActiveProgressCheckByTaskId(taskId:number){
-  const active = getActiveRunByTaskId(taskId)
-  return active?.progressCheck || null
-}
-
-function getActiveProgressCheckTextByTaskId(taskId:number){
-  const check:any = getActiveProgressCheckByTaskId(taskId)
-  if (!check) return '-'
-  if (check.ok) return `OK · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
-  const parts:string[] = []
-  if (check.pctMismatch) parts.push('百分比异常')
-  if (check.countMismatch) parts.push('数量异常')
-  if (check.etaMismatch) parts.push('ETA异常')
-  return `${parts.join(' / ') || '异常'} · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
-}
-
-function getActiveProgressJsonByTaskId(taskId:number){
-  const p = getActiveProgressByTaskId(taskId)
-  try { return p ? JSON.stringify(p, null, 2) : '-' } catch { return '-' }
-}
-
-function getRunningHintDebug(taskId:number){
-  return {
-    checkText: getActiveProgressCheckTextByTaskId(taskId),
-    progressLine: getActiveProgressLineByTaskId(taskId),
-    progressJson: getActiveProgressJsonByTaskId(taskId),
-  }
 }
 
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
