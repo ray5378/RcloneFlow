@@ -93,6 +93,57 @@ func TestHandleActiveRuns_UsesProgressAndExposesDebugFields(t *testing.T) {
 	}
 }
 
+func TestHandleActiveRuns_PrefersPreflightTotalsWhenProgressTotalsRegress(t *testing.T) {
+	summary := map[string]any{
+		"progress": map[string]any{
+			"bytes":          float64(100),
+			"totalBytes":     float64(300),
+			"speed":          float64(10),
+			"eta":            float64(20),
+			"percentage":     float64(10),
+			"completedFiles": float64(3),
+			"plannedFiles":   float64(33),
+		},
+		"preflight": map[string]any{
+			"totalBytes": float64(1024),
+			"totalCount": float64(166),
+		},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        3,
+		TaskID:    102,
+		Status:    "running",
+		StartedAt: "2026-04-17T14:30:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/active", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleActiveRuns(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &items); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	it := items[0]
+	prog, _ := it["progress"].(map[string]any)
+	if prog == nil {
+		t.Fatalf("missing progress")
+	}
+	if got := int(prog["totalBytes"].(float64)); got != 1024 {
+		t.Fatalf("totalBytes=%d, want 1024", got)
+	}
+	if got := int(prog["totalCount"].(float64)); got != 166 {
+		t.Fatalf("totalCount=%d, want 166", got)
+	}
+	if got := prog["percentage"].(float64); got < 9.7 || got > 9.8 {
+		t.Fatalf("percentage=%v, want about 9.76", got)
+	}
+}
+
 func TestHandleActiveRuns_FlagsProgressMismatch(t *testing.T) {
 	summary := map[string]any{
 		"progress": map[string]any{

@@ -808,16 +808,22 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		if v, ok := progress["bytes"].(float64); ok {
 			bytes = int64(v)
 		}
-		total := int64(0)
-		if v, ok := progress["totalBytes"].(float64); ok {
-			total = int64(v)
-		}
-		if total == 0 && summary != nil {
+		preflightTotal := int64(0)
+		if summary != nil {
 			if pf, ok := summary["preflight"].(map[string]any); ok {
 				if v, ok2 := pf["totalBytes"].(float64); ok2 {
-					total = int64(v)
+					preflightTotal = int64(v)
 				}
 			}
+		}
+		progressTotal := int64(0)
+		if v, ok := progress["totalBytes"].(float64); ok {
+			progressTotal = int64(v)
+		}
+		total := progressTotal
+		usePreflightTotal := preflightTotal > 0 && (total == 0 || total < preflightTotal)
+		if usePreflightTotal {
+			total = preflightTotal
 		}
 		if total > 0 && bytes > total {
 			bytes = total
@@ -833,8 +839,12 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		}
 
 		pct := 0.0
-		if v, ok := progress["percentage"].(float64); ok {
-			pct = v
+		if !usePreflightTotal {
+			if v, ok := progress["percentage"].(float64); ok {
+				pct = v
+			} else if total > 0 {
+				pct = float64(bytes) / float64(total) * 100
+			}
 		} else if total > 0 {
 			pct = float64(bytes) / float64(total) * 100
 		}
@@ -849,16 +859,20 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		if v, ok := progress["completedFiles"].(float64); ok {
 			completedFiles = v
 		}
+		preflightTotalCount := float64(0)
+		if summary != nil {
+			if pf, ok := summary["preflight"].(map[string]any); ok {
+				if v, ok2 := pf["totalCount"].(float64); ok2 {
+					preflightTotalCount = v
+				}
+			}
+		}
 		totalCount := float64(0)
 		if v, ok := progress["plannedFiles"].(float64); ok {
 			totalCount = v
 		}
-		if totalCount == 0 && summary != nil {
-			if pf, ok := summary["preflight"].(map[string]any); ok {
-				if v, ok2 := pf["totalCount"].(float64); ok2 {
-					totalCount = v
-				}
-			}
+		if preflightTotalCount > 0 && (totalCount == 0 || totalCount < preflightTotalCount) {
+			totalCount = preflightTotalCount
 		}
 		if totalCount > 0 && completedFiles > totalCount {
 			completedFiles = totalCount

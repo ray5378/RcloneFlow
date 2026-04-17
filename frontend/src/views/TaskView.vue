@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
-import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions } from '../components/task'
+import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal } from '../components/task'
+import { getActiveProgress as getHintActiveProgress, getActiveProgressText as getHintActiveProgressText } from '../components/task/runningHint'
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
 import { PathItem } from '../components/path'
@@ -10,6 +11,9 @@ import { handleError, showSuccess, setErrorHandler } from '../composables/useErr
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
 import { getToken } from '../api/auth'
 import { useWebSocket, onWsMessage } from '../composables/useWebSocket'
+import { useActiveRunLookup } from '../composables/useActiveRunLookup'
+import { useRunningHint } from '../composables/useRunningHint'
+import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
 
 // Toast 通知系统
@@ -91,10 +95,6 @@ const historyFilterTaskId = ref<number | null>(null)
 const historyStatusFilter = ref<string>('all') // 'all' | 'finished' | 'failed' | 'skipped' | 'hasTransfer'
 const showDetailModal = ref(false)
 const runDetail = ref<any>({})
-// 运行中提示小窗（不切换主窗口，不弹出完整详情）
-const showRunningHint = ref(false)
-const runningHintRun = ref<any>(null)
-const showRunDebug = ref(false)
 
 let runDetailTimer: any = null
 
@@ -110,9 +110,23 @@ const globalStats = ref<any>({}) // 全局实时数据保留为独立弹窗，�
 // 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度
 
 const activeRuns = ref<any[]>([])
+const activeRunLookup = useActiveRunLookup(activeRuns)
+const {
+  visible: runningHintVisible,
+  run: runningHintRun,
+  debugOpen: runningHintDebugOpen,
+  phaseText: runningHintPhaseText,
+  progressText: runningHintProgressText,
+  debugInfo: runningHintDebugInfo,
+  open: openRunningHint,
+  close: closeRunningHint,
+  toggleDebug: toggleRunningHintDebug,
+  openLog: openRunningHintLog,
+} = useRunningHint(activeRuns, openRunLog)
 // 任务卡片：完成后保留最近稳态进度的观察期（默认 15s）
 const LINGER_MS = 20000
 const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
+const lastNonDecreasingTotalsByTask = ref<Record<number, { totalBytes:number; totalCount:number }>>({})
 // 监控帧是否停滞超过阈值（默认 25s），若是则强制刷新一次
 const STUCK_MS = 25000
 let lastRenderedSignature = ''
@@ -352,8 +366,7 @@ function pickFilesFromRun(run:any){
 function showRunDetail(run:any){
   if (run.status === 'running'){
     // 不切主窗口：给出轻量提示小窗，引导去"任务日志"查看实时内容
-    runningHintRun.value = run
-    showRunningHint.value = true
+    openRunningHint(run)
     return
   }
   runDetail.value = run
@@ -576,9 +589,25 @@ async function loadActiveRuns() {
       raw.eta = Number(raw.eta || 0)
       if (raw.percentage < 0) raw.percentage = 0
       if (raw.percentage > 100) raw.percentage = 100
+      const tid = it.runRecord?.taskId
+      if (tid) {
+        const prevTotals = lastNonDecreasingTotalsByTask.value[tid]
+        if (prevTotals) {
+          if (prevTotals.totalBytes > 0 && raw.totalBytes > 0 && raw.totalBytes < prevTotals.totalBytes) {
+            raw.totalBytes = prevTotals.totalBytes
+          }
+          if (prevTotals.totalCount > 0 && raw.totalCount > 0 && raw.totalCount < prevTotals.totalCount) {
+            raw.totalCount = prevTotals.totalCount
+          }
+        }
+        const nextTotals = {
+          totalBytes: Math.max(prevTotals?.totalBytes || 0, raw.totalBytes || 0),
+          totalCount: Math.max(prevTotals?.totalCount || 0, raw.totalCount || 0),
+        }
+        lastNonDecreasingTotalsByTask.value[tid] = nextTotals
+      }
       it.progress = raw
       if (!it.stableProgress) it.stableProgress = raw
-      const tid = it.runRecord?.taskId
       if (tid) lastStableByTask.value[tid] = { sp: raw, at: now }
       return it
     })
@@ -594,10 +623,7 @@ async function loadActiveRuns() {
 }
 
 function getActiveRunByTaskId(taskId: number) {
-  // 只返回活跃项，不返回最后稳态快照
-  const cur = activeRuns.value.find(item => item.runRecord?.taskId === taskId)
-  if (cur) return cur
-  return undefined as any
+  return activeRunLookup.getActiveRunByTaskId(taskId)
 }
 
 function getDbProgressStable(run:any){
@@ -771,55 +797,6 @@ function getStatusText(status: string) {
   }
 }
 
-function getActiveProgressByTaskId(taskId:number){
-  const active = getActiveRunByTaskId(taskId)
-  return active?.progress || active?.stableProgress || null
-}
-
-function getActiveProgressTextByTaskId(taskId:number){
-  const p:any = getActiveProgressByTaskId(taskId)
-  if (!p) return '-'
-  if (p.phase === 'preparing') {
-    return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
-  }
-  let etaStr = ''
-  if (Number(p.eta || 0) > 0) etaStr = ` · 预计完成 ${formatEta(Number(p.eta || 0))}`
-  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · 总数量 ${Number(p.totalCount || 0)} ／ 已传输 ${Number(p.completedFiles || 0)}${etaStr}`
-}
-
-function getActiveProgressLineByTaskId(taskId:number){
-  const active = getActiveRunByTaskId(taskId)
-  return active?.progressLine || '-'
-}
-
-function getActiveProgressCheckByTaskId(taskId:number){
-  const active = getActiveRunByTaskId(taskId)
-  return active?.progressCheck || null
-}
-
-function getActiveProgressCheckTextByTaskId(taskId:number){
-  const check:any = getActiveProgressCheckByTaskId(taskId)
-  if (!check) return '-'
-  if (check.ok) return `OK · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
-  const parts:string[] = []
-  if (check.pctMismatch) parts.push('百分比异常')
-  if (check.countMismatch) parts.push('数量异常')
-  if (check.etaMismatch) parts.push('ETA异常')
-  return `${parts.join(' / ') || '异常'} · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
-}
-
-function getActiveProgressJsonByTaskId(taskId:number){
-  const p = getActiveProgressByTaskId(taskId)
-  try { return p ? JSON.stringify(p, null, 2) : '-' } catch { return '-' }
-}
-
-function getRunningHintDebug(taskId:number){
-  return {
-    checkText: getActiveProgressCheckTextByTaskId(taskId),
-    progressLine: getActiveProgressLineByTaskId(taskId),
-    progressJson: getActiveProgressJsonByTaskId(taskId),
-  }
-}
 
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
 let refreshLocks: Record<number, boolean> = {}
@@ -1677,37 +1654,19 @@ const targetBreadcrumbs = computed(() => {
   </div>
 
   <!-- 运行中轻量提示小窗（不切主窗口） -->
-  <div v-if="showRunningHint" class="modal-overlay" @click.self="showRunningHint = false; showRunDebug = false">
-    <div class="modal-content" style="max-width:520px">
-      <div class="modal-header">
-        <h3>任务运行中</h3>
-        <button class="close-btn" @click="showRunningHint = false; showRunDebug = false">×</button>
-      </div>
-      <div class="modal-body">
-        <p>该任务仍在传输中，运行详情（历史）仅展示最终信息。</p>
-        <p>实时日志与进度请点击"传输日志"或查看任务卡片上的实时进度。</p>
-        <div class="hint-box">
-          <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
-          <div class="detail-item"><label>阶段：</label><span>{{ getActiveProgressByTaskId(runningHintRun?.taskId)?.phase || '-' }}</span></div>
-          <div class="detail-item"><label>实时：</label><span>{{ getActiveProgressTextByTaskId(runningHintRun?.taskId) }}</span></div>
-          <div class="detail-item full-width">
-            <button class="ghost debug-toggle" @click="showRunDebug = !showRunDebug">
-              {{ showRunDebug ? '收起调试详情' : '展开调试详情' }}
-            </button>
-          </div>
-          <template v-if="showRunDebug">
-            <div class="detail-item"><label>自检：</label><span>{{ getRunningHintDebug(runningHintRun?.taskId).checkText }}</span></div>
-            <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ getRunningHintDebug(runningHintRun?.taskId).progressLine }}</code></div>
-            <div class="detail-item full-width"><label>接口进度：</label><code class="inline-logline">{{ getRunningHintDebug(runningHintRun?.taskId).progressJson }}</code></div>
-          </template>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="primary" @click="() => { openRunLog(runningHintRun); showRunningHint=false; showRunDebug=false }">打开传输日志</button>
-        <button class="ghost" @click="showRunningHint=false; showRunDebug=false">我知道了</button>
-      </div>
-    </div>
-  </div>
+  <RunningHintModal
+    :visible="runningHintVisible"
+    :run="runningHintRun"
+    :phase-text="runningHintPhaseText"
+    :progress-text="runningHintProgressText"
+    :debug-open="runningHintDebugOpen"
+    :debug-check-text="runningHintDebugInfo.checkText"
+    :debug-progress-line="runningHintDebugInfo.progressLine"
+    :debug-progress-json="runningHintDebugInfo.progressJson"
+    @close="closeRunningHint"
+    @toggle-debug="toggleRunningHintDebug"
+    @open-log="openRunningHintLog"
+  />
 
     <div v-if="currentModule === 'add'" class="card">
     <div class="card-header"><div class="title">添加任务</div></div>
