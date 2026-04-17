@@ -614,7 +614,6 @@ async function loadActiveRuns() {
     // 如果本帧没有 active，立即清空，不要维持旧进度
     if (list.length === 0) {
       activeRuns.value = []
-      lastNonDecreasingTotalsByTask.value = {}
       return
     }
     activeRuns.value = list
