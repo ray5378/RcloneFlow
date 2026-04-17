@@ -771,6 +771,11 @@ function getActiveProgressTextByTaskId(taskId:number){
   return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · 总数量 ${Number(p.totalCount || 0)} ／ 已传输 ${Number(p.completedFiles || 0)}${etaStr}`
 }
 
+function getActiveProgressLineByTaskId(taskId:number){
+  const active = getActiveRunByTaskId(taskId)
+  return active?.progressLine || '-'
+}
+
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
 let refreshLocks: Record<number, boolean> = {}
 async function triggerAutoRefresh(taskId: number){
@@ -1640,6 +1645,7 @@ const targetBreadcrumbs = computed(() => {
           <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
           <div class="detail-item"><label>阶段：</label><span>{{ getActiveProgressByTaskId(runningHintRun?.taskId)?.phase || '-' }}</span></div>
           <div class="detail-item"><label>实时：</label><span>{{ getActiveProgressTextByTaskId(runningHintRun?.taskId) }}</span></div>
+          <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ getActiveProgressLineByTaskId(runningHintRun?.taskId) }}</code></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -2087,6 +2093,7 @@ body.light .skipped-message{ background:#fffbeb; color:#78350f; }
 }
 .cmd-textarea{ width:100%; min-height:120px; padding:12px 14px; border-radius:10px; border:1px solid var(--border); background:var(--surface); color:var(--text); font-size:14px; box-sizing:border-box; resize:vertical; }
 body.light .cmd-textarea{ background:var(--surface); border-color:var(--border); color:var(--text) }
+.inline-logline{ display:block; white-space:pre-wrap; word-break:break-all; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:8px 10px; font-size:12px; line-height:1.5; }
 .form-content label.inline-label{ display:flex !important; align-items:center; gap:8px; margin:0 0 6px 0; }
 .form-content label.inline-label input[type="checkbox"]{ width:16px; height:16px; }
 body.light .form-content input,
