@@ -755,6 +755,22 @@ function getStatusText(status: string) {
   }
 }
 
+function getActiveProgressByTaskId(taskId:number){
+  const active = getActiveRunByTaskId(taskId)
+  return active?.progress || active?.stableProgress || null
+}
+
+function getActiveProgressTextByTaskId(taskId:number){
+  const p:any = getActiveProgressByTaskId(taskId)
+  if (!p) return '-'
+  if (p.phase === 'preparing') {
+    return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
+  }
+  let etaStr = ''
+  if (Number(p.eta || 0) > 0) etaStr = ` · 预计完成 ${formatEta(Number(p.eta || 0))}`
+  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · 总数量 ${Number(p.totalCount || 0)} ／ 已传输 ${Number(p.completedFiles || 0)}${etaStr}`
+}
+
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
 let refreshLocks: Record<number, boolean> = {}
 async function triggerAutoRefresh(taskId: number){
@@ -1622,8 +1638,8 @@ const targetBreadcrumbs = computed(() => {
         <p>实时日志与进度请点击"传输日志"或查看任务卡片上的实时进度。</p>
         <div class="hint-box">
           <div class="detail-item"><label>任务：</label><span>{{ runningHintRun?.taskName || `#${runningHintRun?.taskId}` }}</span></div>
-          <div class="detail-item"><label>阶段：</label><span>{{ getActiveRunByTaskId(runningHintRun?.taskId)?.progress?.phase || getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.phase || '-' }}</span></div>
-          <div class="detail-item"><label>进度：</label><span>{{ (((getActiveRunByTaskId(runningHintRun?.taskId)?.progress?.percentage) ?? (getActiveRunByTaskId(runningHintRun?.taskId)?.stableProgress?.percentage) ?? 0)).toFixed(2) }}%</span></div>
+          <div class="detail-item"><label>阶段：</label><span>{{ getActiveProgressByTaskId(runningHintRun?.taskId)?.phase || '-' }}</span></div>
+          <div class="detail-item"><label>实时：</label><span>{{ getActiveProgressTextByTaskId(runningHintRun?.taskId) }}</span></div>
         </div>
       </div>
       <div class="modal-footer">

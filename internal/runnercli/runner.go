@@ -491,31 +491,42 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					rr.Summary["progress"] = sp
 				}
 			}
-			// 钳制 stableProgress 为“完成帧”：当 percentage≈100 或有 totalCount>0 时，将 completedFiles 对齐总数，percentage=100
+			// 结束时基于 progress 生成 completed stable frame，避免运行中/完成态字段语义混淆
 			{
-				sp, _ := rr.Summary["stableProgress"].(map[string]any)
-				if sp == nil { sp = map[string]any{} }
+				base, _ := rr.Summary["progress"].(map[string]any)
+				if base == nil {
+					base, _ = rr.Summary["stableProgress"].(map[string]any)
+				}
+				sp := map[string]any{}
+				for k, v := range base { sp[k] = v }
 				pct := 0.0
 				if v, ok := sp["percentage"].(float64); ok { pct = v }
 				bytes, total := int64(0), int64(0)
 				if v, ok := sp["bytes"].(float64); ok { bytes = int64(v) }
 				if v, ok := sp["totalBytes"].(float64); ok { total = int64(v) }
 				if total > 0 && bytes > total { bytes = total }
-				if total > 0 { pct = float64(bytes) / float64(total) * 100 }
+				if total > 0 {
+					sp["bytes"] = float64(bytes)
+					pct = float64(bytes) / float64(total) * 100
+				}
 				cf := int64(0)
 				if v, ok := sp["completedFiles"].(float64); ok { cf = int64(v) }
 				tc := int64(0)
-				// 从 preflight 取总数（若有）
-				if pf, ok := rr.Summary["preflight"].(map[string]any); ok {
-					if v, ok2 := pf["totalCount"].(float64); ok2 { tc = int64(v) }
+				if v, ok := sp["plannedFiles"].(float64); ok { tc = int64(v) }
+				if tc == 0 {
+					if pf, ok := rr.Summary["preflight"].(map[string]any); ok {
+						if v, ok2 := pf["totalCount"].(float64); ok2 { tc = int64(v) }
+					}
 				}
-				// 落最后帧：若 percentage≈100 或（tc>0 且 cf>=tc-1），统一对齐为 100% + completedFiles=tc（无 tc 则保留 cf）
 				if pct >= 99.999 || (tc > 0 && cf >= tc-1) {
-					if tc > 0 { sp["completedFiles"] = float64(tc) }
+					if tc > 0 {
+						sp["completedFiles"] = float64(tc)
+						sp["totalCount"] = float64(tc)
+					}
 					sp["percentage"] = 100.0
 					sp["phase"] = "completed"
-					rr.Summary["stableProgress"] = sp
 				}
+				rr.Summary["stableProgress"] = sp
 			}
 			// 生成并冻结最终总结 finalSummary（仅在结束时一次性写入）
 			finalSummary := map[string]any{}
