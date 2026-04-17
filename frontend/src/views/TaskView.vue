@@ -144,7 +144,7 @@ onMounted(() => {
   }, 1000)
 })
 onUnmounted(() => { if (stuckTimer) clearInterval(stuckTimer) })
-// 仅用 DB 的 summary.progress；DB 暂无时保留上一帧，不再回退 active
+// 仅用 DB 的 summary.progress 作为运行中 DB fallback；stableProgress 只保留最后兜底
 const lastDbFrameByRunId: Record<number, any> = {}
 // Webhook 配置（POST 地址 + 触发来源/状态勾选）
 const showWebhookModal = ref(false)
@@ -680,7 +680,7 @@ function formatBps(bps:number){
   if (!bps || bps<=0) return '-'
   return formatBytes(bps) + '/s'
 }
-// 从 DB 的 summary.progress 读取运行中实时（不落库也可兼容）
+// 从 DB 的 summary.progress 读取运行中实时（不落库也可兼容）；stableProgress 只作为最后兜底
 function getLiveSummaryFromDB(run:any){
   try{
     const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
@@ -689,22 +689,24 @@ function getLiveSummaryFromDB(run:any){
       const bytes = Number(p.bytes || 0)
       const totalBytes = Number(p.totalBytes || 0)
       const speed = Number(p.speed || 0)
+      const eta = Number(p.eta || 0)
+      const totalCount = Number(p.plannedFiles || 0)
       let percentage = Number(p.percentage || 0)
       if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
-      // 补充实时"已传输数量"：优先 progress.completedFiles，其次 stableProgress.completedFiles
-      const completedFiles = Number(p.completedFiles ?? sum?.stableProgress?.completedFiles ?? 0)
-      return { bytes, totalBytes, speed, percentage, completedFiles }
+      const completedFiles = Number(p.completedFiles || 0)
+      return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles }
     }
-    // 退路：直接从 stableProgress 取（DB-only 流）
     const sp = sum?.stableProgress
     if (sp && typeof sp === 'object'){
       const bytes = Number(sp.bytes || 0)
       const totalBytes = Number(sp.totalBytes || 0)
       const speed = Number(sp.speed || 0)
+      const eta = Number(sp.eta || 0)
+      const totalCount = Number(sp.totalCount || 0)
       let percentage = Number(sp.percentage || 0)
       if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
       const completedFiles = Number(sp.completedFiles || 0)
-      return { bytes, totalBytes, speed, percentage, completedFiles }
+      return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles }
     }
   }catch{}
   return null
