@@ -818,15 +818,23 @@ func (db *DB) UpdateRunStatus(id int64, status, errorMsg string, summary map[str
 	return err
 }
 
-// UpdateRunProgress 更新运行进度（bytes和speed）
+// UpdateRunProgress 更新运行进度（bytes和speed），只有新进度大于旧进度时才更新，防止回退
 func (db *DB) UpdateRunProgress(id int64, bytesTransferred int64, speed string) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	_, err := db.db.Exec(`
-		UPDATE runs SET bytes_transferred = ?, speed = ?, updated_at = ?
-		WHERE id = ?`,
-		bytesTransferred, speed, time.Now(), id)
+	// 先查询当前进度，只有新进度大于旧进度时才更新
+	var currentBytes int64
+	err := db.db.QueryRow("SELECT bytes_transferred FROM runs WHERE id = ?", id).Scan(&currentBytes)
+	if err != nil {
+		return err
+	}
+	if bytesTransferred > currentBytes {
+		_, err = db.db.Exec(`
+			UPDATE runs SET bytes_transferred = ?, speed = ?, updated_at = ?
+			WHERE id = ?`,
+			bytesTransferred, speed, time.Now(), id)
+	}
 	return err
 }
 
