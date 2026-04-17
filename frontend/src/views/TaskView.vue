@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
 import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal } from '../components/task'
+import { getActiveProgress as getHintActiveProgress, getActiveProgressText as getHintActiveProgressText, getRunningHintDebug as buildRunningHintDebug } from '../components/task/runningHint'
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
 import { PathItem } from '../components/path'
