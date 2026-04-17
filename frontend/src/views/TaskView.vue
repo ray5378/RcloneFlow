@@ -792,6 +792,11 @@ function getActiveProgressCheckTextByTaskId(taskId:number){
   return `${parts.join(' / ') || '异常'} · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
 }
 
+function getActiveProgressJsonByTaskId(taskId:number){
+  const p = getActiveProgressByTaskId(taskId)
+  try { return p ? JSON.stringify(p, null, 2) : '-' } catch { return '-' }
+}
+
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
 let refreshLocks: Record<number, boolean> = {}
 async function triggerAutoRefresh(taskId: number){
@@ -1663,6 +1668,7 @@ const targetBreadcrumbs = computed(() => {
           <div class="detail-item"><label>实时：</label><span>{{ getActiveProgressTextByTaskId(runningHintRun?.taskId) }}</span></div>
           <div class="detail-item"><label>自检：</label><span>{{ getActiveProgressCheckTextByTaskId(runningHintRun?.taskId) }}</span></div>
           <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ getActiveProgressLineByTaskId(runningHintRun?.taskId) }}</code></div>
+          <div class="detail-item full-width"><label>接口进度：</label><code class="inline-logline">{{ getActiveProgressJsonByTaskId(runningHintRun?.taskId) }}</code></div>
         </div>
       </div>
       <div class="modal-footer">
