@@ -1151,6 +1151,14 @@ var etaTokenRe = regexp.MustCompile(`(?i)ETA\s*([0-9hms:.-]+|-)`)
 
 func parseOneLineProgress(line string) (map[string]any, bool) {
 	l := strings.TrimSpace(line)
+	// 明确排除文件级进度/文件动作日志，避免把单文件行误当成整体进度
+	if fileLineRe.MatchString(l) || fileCopiedRe.MatchString(l) {
+		return nil, false
+	}
+	// 只接受像整体 one-line 统计那样的行：通常带 ETA 或 xfr#
+	if !strings.Contains(strings.ToLower(l), "eta") && !strings.Contains(strings.ToLower(l), "xfr#") {
+		return nil, false
+	}
 	// 提取 (xfr#a/b) 的已完成数 a 和计划总数 b
 	xfrDone := float64(0)
 	planned := float64(0)
