@@ -1130,15 +1130,27 @@ func parseETA(s string) int {
 			return m*60 + sec
 		}
 	}
-	// h/m/s suffix
 	sec := 0
+	// 显式按包含的后缀组合解析，避免 "1m26s" 被 "%dh%dm%ds" 误读成 1h
+	hasH := strings.Contains(s, "h")
+	hasM := strings.Contains(s, "m")
+	hasS := strings.Contains(s, "s")
 	var h, m, ss int
-	fmt.Sscanf(s, "%dh%dm%ds", &h, &m, &ss)
-	if h == 0 && m == 0 && ss == 0 {
+	switch {
+	case hasH && hasM && hasS:
+		fmt.Sscanf(s, "%dh%dm%ds", &h, &m, &ss)
+	case hasH && hasM:
+		fmt.Sscanf(s, "%dh%dm", &h, &m)
+	case hasH && hasS:
+		fmt.Sscanf(s, "%dh%ds", &h, &ss)
+	case hasM && hasS:
 		fmt.Sscanf(s, "%dm%ds", &m, &ss)
-		if m == 0 && ss == 0 {
-			fmt.Sscanf(s, "%ds", &ss)
-		}
+	case hasH:
+		fmt.Sscanf(s, "%dh", &h)
+	case hasM:
+		fmt.Sscanf(s, "%dm", &m)
+	case hasS:
+		fmt.Sscanf(s, "%ds", &ss)
 	}
 	sec += h*3600 + m*60 + ss
 	return sec
