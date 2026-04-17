@@ -60,7 +60,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}
 	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
 	// 降低默认日志级别：从 -vv 改为 -v，显著减少日志行数和解析/写库开销
-	args := []string{cmdName, src, dst, "-v", "--stats", "5s", "--stats-one-line", "--config", cfg}
+	args := []string{cmdName, src, dst, "-v", "--stats", "1s", "--stats-one-line", "--config", cfg}
 	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
 	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
 		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
@@ -439,41 +439,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					counts["deleted"] = 0
 					counts["total"] = counts["copied"] + counts["failed"] + counts["skipped"]
 				}
-				// Fallback enrichment: lsjson target to fill missing sizeBytes
-				if len(files) > 0 {
-					cr := &adapter.CmdRunner{}
-					if out, _, e2 := cr.Run(context.Background(), []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}...); e2 == nil {
-						var arr []map[string]any
-						if json.Unmarshal([]byte(out), &arr) == nil {
-							m := map[string]int64{}
-							for _, it := range arr {
-								p, _ := it["Path"].(string)
-								if p == "" {
-									p, _ = it["path"].(string)
-								}
-								var sz int64
-								switch vv := it["Size"].(type) {
-								case float64:
-									sz = int64(vv)
-								}
-								if p != "" {
-									p = strings.ReplaceAll(p, "\\", "/")
-									m[p] = sz
-								}
-							}
-							if len(m) > 0 {
-								for i := range files {
-									if szAny, ok := files[i]["sizeBytes"]; !ok || fmt.Sprint(szAny) == "0" {
-										p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
-										if sz, ok2 := m[p]; ok2 && sz > 0 {
-											files[i]["sizeBytes"] = sz
-										}
-									}
-								}
-							}
-						}
-					}
-				}
+				// 异步补全文件大小，不阻塞状态更新
+				r.enrichFilesSizesAsync(run.ID, files, dst, cfg)
 				rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": humanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
 			})
 			// fire webhook for failed run
@@ -524,31 +491,42 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					rr.Summary["progress"] = sp
 				}
 			}
-			// 钳制 stableProgress 为“完成帧”：当 percentage≈100 或有 totalCount>0 时，将 completedFiles 对齐总数，percentage=100
+			// 结束时基于 progress 生成 completed stable frame，避免运行中/完成态字段语义混淆
 			{
-				sp, _ := rr.Summary["stableProgress"].(map[string]any)
-				if sp == nil { sp = map[string]any{} }
+				base, _ := rr.Summary["progress"].(map[string]any)
+				if base == nil {
+					base, _ = rr.Summary["stableProgress"].(map[string]any)
+				}
+				sp := map[string]any{}
+				for k, v := range base { sp[k] = v }
 				pct := 0.0
 				if v, ok := sp["percentage"].(float64); ok { pct = v }
 				bytes, total := int64(0), int64(0)
 				if v, ok := sp["bytes"].(float64); ok { bytes = int64(v) }
 				if v, ok := sp["totalBytes"].(float64); ok { total = int64(v) }
 				if total > 0 && bytes > total { bytes = total }
-				if total > 0 { pct = float64(bytes) / float64(total) * 100 }
+				if total > 0 {
+					sp["bytes"] = float64(bytes)
+					pct = float64(bytes) / float64(total) * 100
+				}
 				cf := int64(0)
 				if v, ok := sp["completedFiles"].(float64); ok { cf = int64(v) }
 				tc := int64(0)
-				// 从 preflight 取总数（若有）
-				if pf, ok := rr.Summary["preflight"].(map[string]any); ok {
-					if v, ok2 := pf["totalCount"].(float64); ok2 { tc = int64(v) }
+				if v, ok := sp["plannedFiles"].(float64); ok { tc = int64(v) }
+				if tc == 0 {
+					if pf, ok := rr.Summary["preflight"].(map[string]any); ok {
+						if v, ok2 := pf["totalCount"].(float64); ok2 { tc = int64(v) }
+					}
 				}
-				// 落最后帧：若 percentage≈100 或（tc>0 且 cf>=tc-1），统一对齐为 100% + completedFiles=tc（无 tc 则保留 cf）
 				if pct >= 99.999 || (tc > 0 && cf >= tc-1) {
-					if tc > 0 { sp["completedFiles"] = float64(tc) }
+					if tc > 0 {
+						sp["completedFiles"] = float64(tc)
+						sp["totalCount"] = float64(tc)
+					}
 					sp["percentage"] = 100.0
 					sp["phase"] = "completed"
-					rr.Summary["stableProgress"] = sp
 				}
+				rr.Summary["stableProgress"] = sp
 			}
 			// 生成并冻结最终总结 finalSummary（仅在结束时一次性写入）
 			finalSummary := map[string]any{}
@@ -697,41 +675,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					}
 				}
 			}
-			// Fallback enrichment: lsjson target to fill missing sizeBytes
-			if len(files) > 0 {
-				cr := &adapter.CmdRunner{}
-				if out, _, e2 := cr.Run(context.Background(), []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}...); e2 == nil {
-					var arr []map[string]any
-					if json.Unmarshal([]byte(out), &arr) == nil {
-						m := map[string]int64{}
-						for _, it := range arr {
-							p, _ := it["Path"].(string)
-							if p == "" {
-								p, _ = it["path"].(string)
-							}
-							var sz int64
-							switch vv := it["Size"].(type) {
-							case float64:
-								sz = int64(vv)
-							}
-							if p != "" {
-								p = strings.ReplaceAll(p, "\\", "/")
-								m[p] = sz
-							}
-						}
-						if len(m) > 0 {
-							for i := range files {
-								if szAny, ok := files[i]["sizeBytes"]; !ok || fmt.Sprint(szAny) == "0" {
-									p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
-									if sz, ok2 := m[p]; ok2 && sz > 0 {
-										files[i]["sizeBytes"] = sz
-									}
-								}
-							}
-						}
-					}
-				}
-			}
+			// 异步补全文件大小，不阻塞状态更新
+			r.enrichFilesSizesAsync(run.ID, files, dst, cfg)
 			finalSummary["counts"] = counts
 			finalSummary["files"] = files
 			rr.Summary["finalSummary"] = finalSummary
@@ -1072,6 +1017,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						rr.Summary = map[string]any{}
 					}
 					rr.Summary["progress"] = prog
+					rr.Summary["progressLine"] = line
 					if b, ok := prog["bytes"].(float64); ok {
 						rr.BytesTransferred = int64(b)
 					}
@@ -1089,6 +1035,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
 					}
+					rr.Summary["progressLine"] = line
 					// preserve non-decreasing completedFiles; fallback to copied list if needed
 					if prev, ok := rr.Summary["progress"].(map[string]any); ok {
 						if pc, ok2 := prev["completedFiles"].(float64); ok2 {
@@ -1107,8 +1054,6 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						}
 					}
 					rr.Summary["progress"] = prog
-					// 同步到 stableProgress，前端统一读取 DB-only 稳态（包含 completedFiles）
-					rr.Summary["stableProgress"] = prog
 					rr.BytesTransferred = int64(prog["bytes"].(float64))
 					rr.Speed = fmt.Sprintf("%d B/s", int64(prog["speed"].(float64)))
 					// 同步部分文件列表快照（最近 100 条）
@@ -1185,27 +1130,48 @@ func parseETA(s string) int {
 			return m*60 + sec
 		}
 	}
-	// h/m/s suffix
 	sec := 0
+	// 显式按包含的后缀组合解析，避免 "1m26s" 被 "%dh%dm%ds" 误读成 1h
+	hasH := strings.Contains(s, "h")
+	hasM := strings.Contains(s, "m")
+	hasS := strings.Contains(s, "s")
 	var h, m, ss int
-	fmt.Sscanf(s, "%dh%dm%ds", &h, &m, &ss)
-	if h == 0 && m == 0 && ss == 0 {
+	switch {
+	case hasH && hasM && hasS:
+		fmt.Sscanf(s, "%dh%dm%ds", &h, &m, &ss)
+	case hasH && hasM:
+		fmt.Sscanf(s, "%dh%dm", &h, &m)
+	case hasH && hasS:
+		fmt.Sscanf(s, "%dh%ds", &h, &ss)
+	case hasM && hasS:
 		fmt.Sscanf(s, "%dm%ds", &m, &ss)
-		if m == 0 && ss == 0 {
-			fmt.Sscanf(s, "%ds", &ss)
-		}
+	case hasH:
+		fmt.Sscanf(s, "%dh", &h)
+	case hasM:
+		fmt.Sscanf(s, "%dm", &m)
+	case hasS:
+		fmt.Sscanf(s, "%ds", &ss)
 	}
 	sec += h*3600 + m*60 + ss
 	return sec
 }
 
-var bytesPairRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?`)
+var bytesPairRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B`)
 var speedTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s`)
 var pctTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)%`)
 var etaTokenRe = regexp.MustCompile(`(?i)ETA\s*([0-9hms:.-]+|-)`)
+var aggregateOneLineRe = regexp.MustCompile(`(?i)^\s*(?:\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+)?(?:INFO|NOTICE)\s*:\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B\s*/\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B\s*,\s*\d+(?:\.\d+)?%\s*,\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B/s\s*,\s*ETA\s*[0-9hms:.-]+(?:\s*\(xfr#\d+(?:/\d+)?\))?\s*$`)
 
 func parseOneLineProgress(line string) (map[string]any, bool) {
 	l := strings.TrimSpace(line)
+	// 明确排除文件级进度/文件动作日志，避免把单文件行误当成整体进度
+	if fileLineRe.MatchString(l) || fileCopiedRe.MatchString(l) {
+		return nil, false
+	}
+	// 只接受整体 one-line 统计的完整形态，避免碎片日志/文件级日志误入
+	if !aggregateOneLineRe.MatchString(l) {
+		return nil, false
+	}
 	// 提取 (xfr#a/b) 的已完成数 a 和计划总数 b
 	xfrDone := float64(0)
 	planned := float64(0)
@@ -1224,12 +1190,12 @@ func parseOneLineProgress(line string) (map[string]any, bool) {
 			}
 		}
 	}
-	// 按多段拼接处理：取最后一个匹配片段作为当前进度
+	// 按多段拼接处理：取第一个匹配片段作为当前进度（整体进度通常在前面）
 	bps := bytesPairRe.FindAllStringSubmatch(l, -1)
 	if len(bps) == 0 {
 		return nil, false
 	}
-	bp := bps[len(bps)-1]
+	bp := bps[0]
 	var cur, tot float64
 	fmt.Sscanf(bp[1], "%f", &cur)
 	fmt.Sscanf(bp[3], "%f", &tot)
@@ -1271,4 +1237,63 @@ func spmValue(m []string, i int) string {
 		return m[i]
 	}
 	return ""
+}
+
+// enrichFilesSizesAsync 异步补全文件大小，不阻塞数据库更新和 webhook
+func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst, cfg string) {
+	go func() {
+		if len(files) == 0 {
+			return
+		}
+		// 限制文件数量，超过 5000 个则跳过
+		if len(files) > 5000 {
+			return
+		}
+		cr := &adapter.CmdRunner{}
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		out, _, e2 := cr.Run(ctx, []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}...)
+		if e2 != nil {
+			return
+		}
+		var arr []map[string]any
+		if json.Unmarshal([]byte(out), &arr) != nil {
+			return
+		}
+		m := map[string]int64{}
+		for _, it := range arr {
+			p, _ := it["Path"].(string)
+			if p == "" {
+				p, _ = it["path"].(string)
+			}
+			var sz int64
+			switch vv := it["Size"].(type) {
+			case float64:
+				sz = int64(vv)
+			}
+			if p != "" {
+				p = strings.ReplaceAll(p, "\\", "/")
+				m[p] = sz
+			}
+		}
+		if len(m) == 0 {
+			return
+		}
+		// 直接在传入的 files 上修改（切片是引用类型，修改会影响原数组）
+		for i := range files {
+			p := strings.ReplaceAll(fmt.Sprint(files[i]["path"]), "\\", "/")
+			if sz, ok := m[p]; ok && sz > 0 {
+				files[i]["sizeBytes"] = sz
+			}
+		}
+		// 补全完成后，更新数据库中的 finalSummary
+		_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+			if rr == nil || rr.Summary == nil {
+				return
+			}
+			if fs, ok := rr.Summary["finalSummary"].(map[string]any); ok {
+				fs["files"] = files
+			}
+		})
+	}()
 }

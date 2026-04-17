@@ -41,6 +41,17 @@ RcloneFlow is a Web UI for rclone with built-in rclone, supporting file sync, st
 - Live percentage, speed, and ETA display
 - Clear progress bar showing transfer status
 
+#### Realtime progress pipeline (developer note)
+- Active task cards and the running hint dialog should prefer `/api/runs/active.progress`
+- `progress` means the latest parsed log frame (live frame)
+- `stableProgress` is kept only for compatibility and completed-state freezing; it should not be the primary source for active-run UI
+- `/api/runs/active` also includes debug fields:
+  - `progressLine`: the last successfully parsed raw one-line log entry
+  - `progressSource`: current progress source (currently `summary.progress`)
+  - `progressMismatch` / `progressCheck`: backend consistency checks
+- Aggregate progress parsing only accepts full aggregate one-line stats rows; file-level progress lines, `Copied (new)`, `Deleted`, etc. must not be treated as total progress
+- Aggregate size-pair parsing requires explicit byte units (for example `MiB/GiB`) to avoid matching timestamp fragments like `2026/04` as `bytes/totalBytes`
+
 ### 📜 History
 - Detailed results for each sync
 - View file lists, success/failure status

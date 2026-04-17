@@ -55,21 +55,56 @@ func (s *LogCleanupService) Start(ctx context.Context) {
 func (s *LogCleanupService) Stop() { close(s.stopCh) }
 
 func (s *LogCleanupService) cleanup() {
-	// 仅删除超出保留期的 run-*.log 文件
-	cutoff := time.Now().Add(-time.Duration(s.retentionDays) * 24 * time.Hour)
-	patterns := []string{"run-*-stdout.log", "run-*-stderr.log"}
+	// 删除超出保留期的日志文件和空目录
+	cutoff := time.Now().AddDate(0, 0, -s.retentionDays)
 	deleted := 0
-	for _, pat := range patterns {
-		matches, _ := filepath.Glob(filepath.Join(s.logsDir, pat))
-		for _, p := range matches {
-			info, err := os.Stat(p)
+
+	entries, err := os.ReadDir(s.logsDir)
+	if err != nil {
+		return
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		subDir := filepath.Join(s.logsDir, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		// 检查目录修改时间是否超过保留期
+		if info.ModTime().Before(cutoff) {
+			if err := os.RemoveAll(subDir); err == nil {
+				deleted++
+				logger.Debug("删除日志目录", zap.String("dir", entry.Name()))
+			}
+			continue
+		}
+		// 目录未过期，清理里面的日志文件
+		subEntries, err := os.ReadDir(subDir)
+		if err != nil {
+			continue
+		}
+		for _, subEntry := range subEntries {
+			if subEntry.IsDir() {
+				continue
+			}
+			subInfo, err := subEntry.Info()
 			if err != nil {
 				continue
 			}
-			if info.ModTime().Before(cutoff) {
-				_ = os.Remove(p)
-				deleted++
+			if subInfo.ModTime().Before(cutoff) {
+				path := filepath.Join(subDir, subEntry.Name())
+				if err := os.Remove(path); err == nil {
+					deleted++
+				}
 			}
+		}
+		// 检查目录是否变空
+		remaining, _ := os.ReadDir(subDir)
+		if len(remaining) == 0 {
+			os.Remove(subDir)
 		}
 	}
 	if deleted > 0 {

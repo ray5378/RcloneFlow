@@ -1,0 +1,142 @@
+package controller
+
+import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"rcloneflow/internal/service"
+)
+
+type mockRunSvcDB struct {
+	runs []service.RunRecord
+}
+
+func (m *mockRunSvcDB) ListRuns(page, pageSize int) ([]service.RunRecord, int, error) {
+	return nil, 0, nil
+}
+func (m *mockRunSvcDB) ListRunsByTask(taskId int64) ([]service.RunRecord, error) {
+	return nil, nil
+}
+func (m *mockRunSvcDB) ListActiveRuns() ([]service.RunRecord, error) {
+	return m.runs, nil
+}
+func (m *mockRunSvcDB) GetActiveRunByTaskID(taskID int64) (service.RunRecord, error) {
+	return service.RunRecord{}, nil
+}
+func (m *mockRunSvcDB) UpdateRun(id int64, updateFn func(*service.RunRecord)) {}
+func (m *mockRunSvcDB) DeleteRun(id int64) error { return nil }
+func (m *mockRunSvcDB) DeleteAllRuns() error { return nil }
+func (m *mockRunSvcDB) DeleteRunsByTask(taskId int64) error { return nil }
+func (m *mockRunSvcDB) CleanOldRuns(days int) (int64, error) { return 0, nil }
+func (m *mockRunSvcDB) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error { return nil }
+
+func TestHandleActiveRuns_UsesProgressAndExposesDebugFields(t *testing.T) {
+	summary := map[string]any{
+		"progress": map[string]any{
+			"bytes":          121.377 * 1024 * 1024,
+			"totalBytes":     335.968 * 1024 * 1024,
+			"speed":          2.474 * 1024 * 1024,
+			"eta":            float64(86),
+			"percentage":     float64(36),
+			"completedFiles": float64(18),
+			"plannedFiles":   float64(53),
+		},
+		"progressLine": `2026/04/17 14:34:08 INFO : 121.377 MiB / 335.968 MiB, 36%, 2.474 MiB/s, ETA 1m26s (xfr#18/53)`,
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        1,
+		TaskID:    100,
+		Status:    "running",
+		StartedAt: "2026-04-17T14:30:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/active", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleActiveRuns(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &items); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("len(items)=%d, want 1", len(items))
+	}
+	it := items[0]
+	prog, _ := it["progress"].(map[string]any)
+	if prog == nil {
+		t.Fatalf("missing progress")
+	}
+	if got := int(prog["completedFiles"].(float64)); got != 18 {
+		t.Fatalf("completedFiles=%d, want 18", got)
+	}
+	if got := int(prog["totalCount"].(float64)); got != 53 {
+		t.Fatalf("totalCount=%d, want 53", got)
+	}
+	if got := it["progressLine"].(string); got == "" {
+		t.Fatalf("missing progressLine")
+	}
+	if got := it["progressSource"].(string); got != "summary.progress" {
+		t.Fatalf("progressSource=%q, want summary.progress", got)
+	}
+	if got := it["progressMismatch"].(bool); got {
+		t.Fatalf("progressMismatch=%v, want false", got)
+	}
+	check, _ := it["progressCheck"].(map[string]any)
+	if check == nil || !check["ok"].(bool) {
+		t.Fatalf("progressCheck.ok want true, got %#v", check)
+	}
+}
+
+func TestHandleActiveRuns_FlagsProgressMismatch(t *testing.T) {
+	summary := map[string]any{
+		"progress": map[string]any{
+			"bytes":          float64(1024),
+			"totalBytes":     float64(2048),
+			"speed":          float64(1),
+			"eta":            float64(60),
+			"percentage":     float64(99),
+			"completedFiles": float64(10),
+			"plannedFiles":   float64(5),
+		},
+		"progressLine": `bad aggregate line`,
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        2,
+		TaskID:    101,
+		Status:    "running",
+		StartedAt: "2026-04-17T14:30:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/active", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleActiveRuns(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &items); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	it := items[0]
+	if got := it["progressMismatch"].(bool); !got {
+		t.Fatalf("progressMismatch=%v, want true", got)
+	}
+	check, _ := it["progressCheck"].(map[string]any)
+	if check == nil {
+		t.Fatalf("missing progressCheck")
+	}
+	if !check["pctMismatch"].(bool) {
+		t.Fatalf("pctMismatch want true")
+	}
+	if !check["etaMismatch"].(bool) {
+		t.Fatalf("etaMismatch want true")
+	}
+}

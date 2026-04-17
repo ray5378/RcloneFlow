@@ -17,7 +17,7 @@ const durationRe = /^\s*\d+\s*(ms|s|m|h|d)\s*$/i
 function validate(){
   errors.value = {}
   // 数字字段 >=0（整数）
-  const intFields = ['FINAL_SUMMARY_RETENTION_DAYS','CLEANUP_INTERVAL_HOURS','WEBHOOK_MAX_FILES']
+  const intFields = ['FINAL_SUMMARY_RETENTION_DAYS','CLEANUP_INTERVAL_HOURS','WEBHOOK_MAX_FILES','LOG_RETENTION_DAYS']
   for (const k of intFields){
     const v = (form.value as any)[k]
     if (v!=='' && (isNaN(Number(v)) || !Number.isFinite(Number(v)) || Number(v) < 0)){
@@ -150,7 +150,9 @@ onMounted(load)
               <option value="warn">警告</option>
               <option value="error">错误</option>
             </select>
-
+            <label title="运行日志文件保留天数">日志文件保留天数 <small class="subkey">LOG_RETENTION_DAYS</small></label>
+            <input v-model="form.LOG_RETENTION_DAYS" type="number" min="1" placeholder="默认7天" />
+            <div class="error" v-if="errors.LOG_RETENTION_DAYS">{{ errors.LOG_RETENTION_DAYS }}</div>
           </div>
         </div>
 

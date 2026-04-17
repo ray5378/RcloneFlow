@@ -37,4 +37,4 @@ Notes:
 ## Frontend Behavior
 - History views render only summary.finalSummary.
 - "Run Detail" shows: start/end, frozen duration, result, average speed, transferred/total, and file details.
-- During an active run, only a lightweight realtime banner is shown (phase/percentage/speed). Nothing is stored to DB.
+- During an active run, the frontend prefers `/api/runs/active.progress` for live UI. Backend log parsing writes live progress into `summary.progress`; `stableProgress` is reserved for compatibility and completed-state freezing.
