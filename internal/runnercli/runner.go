@@ -60,7 +60,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}
 	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
 	// 降低默认日志级别：从 -vv 改为 -v，显著减少日志行数和解析/写库开销
-	args := []string{cmdName, src, dst, "-v", "--stats", "5s", "--stats-one-line", "--config", cfg}
+	args := []string{cmdName, src, dst, "-v", "--stats", "1s", "--stats-one-line", "--config", cfg}
 	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
 	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
 		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
@@ -1158,12 +1158,12 @@ func parseOneLineProgress(line string) (map[string]any, bool) {
 			}
 		}
 	}
-	// 按多段拼接处理：取最后一个匹配片段作为当前进度
+	// 按多段拼接处理：取第一个匹配片段作为当前进度（整体进度通常在前面）
 	bps := bytesPairRe.FindAllStringSubmatch(l, -1)
 	if len(bps) == 0 {
 		return nil, false
 	}
-	bp := bps[len(bps)-1]
+	bp := bps[0]
 	var cur, tot float64
 	fmt.Sscanf(bp[1], "%f", &cur)
 	fmt.Sscanf(bp[3], "%f", &tot)
