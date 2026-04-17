@@ -603,30 +603,6 @@ function getDeNoisedStableByRun(run:any){
   return getDbProgressStable(run)
 }
 
-// 任务卡片的预估完成时间：使用卡片的抗噪稳态（sp.totalBytes/sp.bytes/sp.speed）
-function calcEtaForTaskCard(taskId:number){
-  try{
-    const st = lastStableByTask.value?.[taskId]?.sp || getActiveRunByTaskId(taskId)?.stableProgress
-    if (!st) return null
-    const total = Number(st.totalBytes||0)
-    const bytes = Number(st.bytes||0)
-    if (!total || bytes<=0) return null
-    let speed = Number(st.speed||0)
-    // 仅当可渲染时采信，否则使用最近一次有效速度
-    if (formatBytesPerSec(speed) === '-'){
-      const last = lastNonZeroSpeedByTask[taskId] || 0
-      if (!last || last<=0) return null
-      speed = last
-    } else {
-      lastNonZeroSpeedByTask[taskId] = speed
-    }
-    const remaining = Math.max(0, total - bytes)
-    const eta = Math.floor(remaining / speed)
-    if (eta > 99*3600) return null
-    return eta
-  }catch{ return null }
-}
-
 // 抗噪稳态读取（任务卡片用）：优先 lastStableByTask，再回退当前 active 的 stableProgress
 function getDeNoisedStableByTask(taskId:number){
   // 只返回活跃任务的进度，不返回已完成的数据
