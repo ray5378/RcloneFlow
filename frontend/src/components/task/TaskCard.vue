@@ -7,6 +7,7 @@ interface Progress {
   bytes?: number
   totalBytes?: number
   speed?: number
+  eta?: number  // 后端传来的 ETA（秒）
   completedFiles?: number
   totalCount?: number
   phase?: string
@@ -65,17 +66,12 @@ function getProgressText(): string {
   if (p.phase === 'preparing') {
     return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
   }
-  // 计算预计完成时间
+  // 使用后端传来的 ETA
   let etaStr = ''
-  const speed = p.speed || 0
-  const bytes = p.bytes || 0
-  const totalBytes = p.totalBytes || 0
-  if (speed > 0 && totalBytes > bytes) {
-    const remaining = totalBytes - bytes
-    const etaSeconds = remaining / speed
-    etaStr = ` · 预计完成 ${formatEta(etaSeconds)}`
+  if (p.eta && p.eta > 0) {
+    etaStr = ` · 预计完成 ${formatEta(p.eta)}`
   }
-  return `${getProgressPercent()}% · ${formatBytes(bytes)} / ${formatBytes(totalBytes)} · ${formatBytesPerSec(speed)} · 总数量 ${p.totalCount || 0} ／ 已传输 ${p.completedFiles || 0}${etaStr}`
+  return `${getProgressPercent()}% · ${formatBytes(p.bytes || 0)} / ${formatBytes(p.totalBytes || 0)} · ${formatBytesPerSec(p.speed || 0)} · 总数量 ${p.totalCount || 0} ／ 已传输 ${p.completedFiles || 0}${etaStr}`
 }
 
 function formatSpec(spec: string): string {
