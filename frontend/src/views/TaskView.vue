@@ -13,6 +13,7 @@ import { getToken } from '../api/auth'
 import { useWebSocket, onWsMessage } from '../composables/useWebSocket'
 import { useActiveRunLookup } from '../composables/useActiveRunLookup'
 import { useRunningHint } from '../composables/useRunningHint'
+import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
 
 // Toast 通知系统
