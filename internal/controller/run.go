@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -896,6 +897,22 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			"totalCount":     totalCount,
 		}
 
+		calcPct := 0.0
+		if total > 0 {
+			calcPct = float64(bytes) / float64(total) * 100
+		}
+		pctMismatch := total > 0 && math.Abs(calcPct-pct) > 1.5
+		countMismatch := totalCount > 0 && completedFiles > totalCount
+		etaMismatch := eta > 0 && speed > 0 && total > bytes && math.Abs((float64(total-bytes)/float64(speed))-eta) > 300
+		progressMismatch := pctMismatch || countMismatch || etaMismatch
+		progressCheck := map[string]any{
+			"ok":            !progressMismatch,
+			"pctMismatch":   pctMismatch,
+			"countMismatch": countMismatch,
+			"etaMismatch":   etaMismatch,
+			"calcPct":       calcPct,
+		}
+
 		// 让 activeRuns/stableProgress 直接对齐当前日志解析结果
 		c.runSvc.UpdateRunStatus(run.ID, map[string]any{"stableProgress": stable})
 
@@ -910,10 +927,12 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				"startedAt":        run.StartedAt,
 				"finishedAt":       run.FinishedAt,
 			},
-			"progress":         stable,
-			"stableProgress":   stable,
-			"progressLine":     progressLine,
-			"progressSource":   "summary.progress",
+			"progress":           stable,
+			"stableProgress":     stable,
+			"progressLine":       progressLine,
+			"progressSource":     "summary.progress",
+			"progressMismatch":   progressMismatch,
+			"progressCheck":      progressCheck,
 		}
 		items = append(items, item)
 	}
