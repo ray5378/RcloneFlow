@@ -594,10 +594,7 @@ async function loadActiveRuns() {
 }
 
 function getActiveRunByTaskId(taskId: number) {
-  // 只返回活跃项，不返回最后稳态快照
-  const cur = activeRuns.value.find(item => item.runRecord?.taskId === taskId)
-  if (cur) return cur
-  return undefined as any
+  return activeRunLookup.getActiveRunByTaskId(taskId)
 }
 
 function getDbProgressStable(run:any){
@@ -772,19 +769,11 @@ function getStatusText(status: string) {
 }
 
 function getActiveProgressByTaskId(taskId:number){
-  const active = getActiveRunByTaskId(taskId)
-  return active?.progress || active?.stableProgress || null
+  return activeRunLookup.getActiveProgressByTaskId(taskId)
 }
 
 function getActiveProgressTextByTaskId(taskId:number){
-  const p:any = getActiveProgressByTaskId(taskId)
-  if (!p) return '-'
-  if (p.phase === 'preparing') {
-    return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
-  }
-  let etaStr = ''
-  if (Number(p.eta || 0) > 0) etaStr = ` · 预计完成 ${formatEta(Number(p.eta || 0))}`
-  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · 总数量 ${Number(p.totalCount || 0)} ／ 已传输 ${Number(p.completedFiles || 0)}${etaStr}`
+  return activeRunLookup.getActiveProgressTextByTaskId(taskId)
 }
 
 // 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
