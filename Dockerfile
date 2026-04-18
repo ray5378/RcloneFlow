@@ -1,34 +1,51 @@
+# TEMP TEST-ACCEL VARIANT
+# 说明：这是为了“快速测试、尽量减少联网失败”而加的临时方案。
+# 优先使用仓库内缓存（基础镜像预加载、npm cache、go mod cache、apk cache），
+# 后续开发稳定后应回收/剔除，不作为长期规范默认方案。
+
 # Stage 1: web build (Vite + Vue)
 FROM node:18-alpine AS webbuilder
 WORKDIR /fe
-COPY frontend/ ./
-# Robust npm with mirror + retries; try npm ci then npm install (legacy-peer-deps)
-ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
+COPY frontend/package*.json ./
+COPY third_party/npm-cache /npm-cache
+# TEMP: prefer repo-local npm cache first; fallback to mirror/network when cache misses
+ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com \
+    NPM_CONFIG_CACHE=/npm-cache
 RUN set -eux; \
   npm config set registry "$NPM_CONFIG_REGISTRY"; \
+  npm config set cache "$NPM_CONFIG_CACHE"; \
   npm config set fetch-retries 5; \
   npm config set fetch-retry-factor 2; \
   npm config set fetch-retry-mintimeout 20000; \
   npm config set fetch-retry-maxtimeout 120000; \
-  s=1; for i in 1 2 3; do npm ci --silent --no-progress && s=0 && break || s=$?; echo "npm ci attempt $i failed: $s"; sleep 5; done; \
-  if [ $s -ne 0 ]; then for i in 1 2 3; do npm install --no-audit --no-fund --legacy-peer-deps --no-progress && s=0 && break || s=$?; echo "npm install attempt $i failed: $s"; sleep 5; done; fi; \
+  s=1; for i in 1 2 3; do npm ci --cache "$NPM_CONFIG_CACHE" --prefer-offline --silent --no-progress && s=0 && break || s=$?; echo "npm ci attempt $i failed: $s"; sleep 5; done; \
+  if [ $s -ne 0 ]; then for i in 1 2 3; do npm install --cache "$NPM_CONFIG_CACHE" --prefer-offline --no-audit --no-fund --legacy-peer-deps --no-progress && s=0 && break || s=$?; echo "npm install attempt $i failed: $s"; sleep 5; done; fi; \
   test $s -eq 0
+COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: go build (Alpine)
 FROM golang:1.25-alpine AS gobuilder
-# resilient apk with multi mirrors + retries to avoid TLS/permission glitches
+COPY third_party/apk-cache /apk-cache
+# TEMP: prefer repo-local apk cache first; fallback to network mirrors when cache misses
 RUN set -eux; \
-    echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/main" > /etc/apk/repositories; \
-    echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/community" >> /etc/apk/repositories; \
-    echo "https://mirrors.aliyun.com/alpine/v3.19/main" >> /etc/apk/repositories; \
-    echo "https://mirrors.aliyun.com/alpine/v3.19/community" >> /etc/apk/repositories; \
-    for i in 1 2 3; do apk update && apk add --no-cache build-base git sqlite-dev ca-certificates tzdata wget && break || (echo "apk failed, retry $i" && sleep 5); done
+    if ls /apk-cache/*.apk >/dev/null 2>&1; then \
+      apk add --no-network --allow-untrusted /apk-cache/*.apk || true; \
+    fi; \
+    if ! apk info -e build-base git sqlite-dev ca-certificates tzdata wget >/dev/null 2>&1; then \
+      echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/main" > /etc/apk/repositories; \
+      echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/community" >> /etc/apk/repositories; \
+      echo "https://mirrors.aliyun.com/alpine/v3.19/main" >> /etc/apk/repositories; \
+      echo "https://mirrors.aliyun.com/alpine/v3.19/community" >> /etc/apk/repositories; \
+      for i in 1 2 3; do apk update && apk add --no-cache build-base git sqlite-dev ca-certificates tzdata wget && break || (echo "apk failed, retry $i" && sleep 5); done; \
+    fi
 WORKDIR /app
-# Prefer IPv4-friendly Go proxy, with fallback
-ENV GOPROXY=https://goproxy.cn,direct \
-    GOSUMDB=sum.golang.org
+# TEMP: prefer repo-local Go module cache first; fallback to public proxy when cache misses
+ENV GOPROXY=file:///go-mod-cache/cache/download,https://goproxy.cn,direct \
+    GOSUMDB=off \
+    GOMODCACHE=/go-mod-cache
 COPY go.mod go.sum ./
+COPY third_party/go-mod-cache /go-mod-cache
 RUN go mod download || (go env -w GOPROXY=https://goproxy.io,direct && go mod download) || true
 COPY . .
 ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto
@@ -36,7 +53,12 @@ ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto
 ARG RCLONE_VERSION=v1.73.4
 # Prefer repo-local cached rclone zip first; if absent, download remotely; final fallback to apk rclone
 RUN set -eux; \
-    (apk add --no-cache curl unzip || (apk update && apk add --no-cache curl unzip)); \
+    if ls /apk-cache/*.apk >/dev/null 2>&1; then \
+      apk add --no-network --allow-untrusted /apk-cache/*.apk || true; \
+    fi; \
+    if ! apk info -e curl unzip >/dev/null 2>&1; then \
+      (apk add --no-cache curl unzip || (apk update && apk add --no-cache curl unzip)); \
+    fi; \
     arch="$(apk --print-arch)"; \
     case "$arch" in \
       x86_64) arch=amd64 ;; \

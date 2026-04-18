@@ -104,6 +104,7 @@
 - [ ] 是否只对版本固定、体积大、收益明显的依赖启用该策略
 - [ ] 是否保留了缓存缺失时的远端 fallback
 - [ ] 是否避免把高波动依赖整体塞进仓库（如 npm 全量依赖、Go 全量 vendor、apk 包缓存）
+- [ ] 如果问题出在 Docker 基础镜像拉取（`FROM node:...` / `FROM golang:...`），是否优先使用预加载脚本（如 `scripts/docker/load-base-images.sh`）而不是把基础镜像下载逻辑硬塞进 Dockerfile
 
 ## 5. 提交前检查
 

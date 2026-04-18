@@ -151,7 +151,9 @@
 ### 我想了解构建依赖缓存、本地优先下载策略
 看：
 - `ENGINEERING_RULES.md`
+- `docs/TECH_DEBT.md`（临时测试提速方案与后续剔除原则）
 - `third_party/rclone/README.md`
+- `third_party/docker/README.md`
 
 ### 我想知道这轮拆分做到哪了
 看：

@@ -65,13 +65,51 @@
 - 删除无效的 `queueApi` 包装和残留引用
 - 修复 `frontend/src/styles/global.css` 中缺失的 `}`
 
+## 临时测试提速方案（后续应剔除）
+
+### 当前临时方案目的
+为了在网络不稳定、Docker Hub / 包管理源偶发超时的情况下，快速验证构建流程，仓库当前临时引入了“本地缓存优先”的测试提速方案。
+
+这套方案的目标是：
+- 降低 `docker build` 对外网的依赖
+- 方便快速回归测试
+- 不是长期默认工程方案
+
+### 当前临时缓存目录
+- `third_party/docker/`：基础镜像 tar 缓存
+- `third_party/npm-cache/`：npm cache
+- `third_party/go-mod-cache/`：Go module cache
+- `third_party/apk-cache/`：Alpine apk 包缓存
+
+### 当前临时接线点
+- `Dockerfile`
+  - webbuilder：优先使用 `third_party/npm-cache`
+  - gobuilder：优先使用 `third_party/apk-cache`
+  - gobuilder：优先使用 `third_party/go-mod-cache`
+- `scripts/docker/load-base-images.sh`
+  - 预加载 `node:18-alpine`
+  - 预加载 `golang:1.25-alpine`
+  - 预加载 `alpine:3.19`
+
+### 后续剔除原则
+当以下条件满足时，应优先回收这套临时方案：
+- Docker 基础镜像拉取稳定
+- npm / Go / apk 镜像源稳定
+- 不再需要把大缓存文件长期保留在仓库中
+
+优先剔除顺序建议：
+1. `third_party/npm-cache/`
+2. `third_party/go-mod-cache/`
+3. `third_party/apk-cache/`
+4. `third_party/docker/*.tar`
+5. `Dockerfile` 中对应的临时本地缓存优先逻辑
+
 ## 拆分进度（截至当前主线）
 
 补充说明：
 - 更适合长期持续更新的拆分作战视图，已单独整理到：`docs/TASKVIEW_SPLIT_MAP.md`
 - `TECH_DEBT.md` 继续侧重记录：已拆结果、关键回归、待重构方向
 - `TASKVIEW_SPLIT_MAP.md` 继续侧重记录：已拆/半拆/未拆状态、推荐拆分顺序、每一步重点测试项
-
 
 ### `frontend/src/views/TaskView.vue` 已完成的拆分
 以下内容已经从 `TaskView.vue` 中拆出或收口：
@@ -218,21 +256,6 @@
 #### 9. 把工程规则继续下沉到代码注释 / 契约层
 现状：
 - 当前 `docs/ENGINEERING_RULES.md` 已有较完整的开发规范
-- 但部分关键规则仍主要存在于文档中，尚未完全下沉到接口注释、类型定义、关键函数旁注释
 
 建议：
-- 对关键链路（如 `/api/runs/active`、`progress/stableProgress/preflight`、运行中 ETA）继续增加更贴近代码的注释和契约说明
-- 减少“只在文档里知道，进代码就看不出来”的情况
-
-## 当前不建议乱动的地方
-- 运行中日志解析主链（除非有明确 bug）
-- `progress` 作为 active UI 主源的约定
-- `stableProgress` 的完成态固化逻辑（除非同时检查历史展示）
-- `preflight` 的存在本身（问题不是它存在，而是不该再混入运行中主展示）
-
-## 后续修改建议
-当后续再改运行中展示时，优先按这条链排查：
-
-`日志原文 -> summary.progress -> /api/runs/active.progress -> 任务卡片/运行中提示小窗`
-
-不要直接从 `preflight` 或 `stableProgress` 入手推导运行中 UI，除非明确是在处理回退或完成态。
+- 后续关键链路继续加短注释，避免只靠外部文档记忆
