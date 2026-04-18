@@ -381,7 +381,6 @@
 当前页面层 `TaskView.vue` 仍保留：
 - `createTask()` 极薄入口壳（只负责调用 flow 与 toast）
 - `creatingState`
-- `tempSchedule` UI 临时态
 - 远端列表加载与部分页面级入口编排
 
 本轮已完成并验证的创建任务入口链：

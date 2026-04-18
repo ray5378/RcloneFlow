@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-
-interface ScheduleForm {
-  enableSchedule: boolean
-  scheduleMinute: string
-  scheduleHour: string
-  scheduleDay: string
-  scheduleMonth: string
-  scheduleWeek: string
-}
+import {
+  buildScheduleFormFieldsFromTemp,
+  createEmptyScheduleTempState,
+  parseScheduleFormToTemp,
+  scheduleFieldOptions,
+  toggleAllScheduleTempField,
+  toggleScheduleTempField,
+  weekLabels,
+  type ScheduleField,
+  type ScheduleFormLike as ScheduleForm,
+} from './scheduleOptions'
 
 const props = defineProps<{
   modelValue: ScheduleForm
@@ -18,60 +20,18 @@ const emit = defineEmits<{
   'update:modelValue': [value: ScheduleForm]
 }>()
 
-const temp = ref({
-  minute: [] as string[],
-  hour: [] as string[],
-  day: [] as string[],
-  month: [] as string[],
-  week: [] as string[],
-})
+const temp = ref(createEmptyScheduleTempState())
 
 watch(() => props.modelValue, (val) => {
   if (val) {
-    temp.value = {
-      minute: val.scheduleMinute && val.scheduleMinute !== '*' ? val.scheduleMinute.split(',') : [],
-      hour: val.scheduleHour && val.scheduleHour !== '*' ? val.scheduleHour.split(',') : [],
-      day: val.scheduleDay && val.scheduleDay !== '*' ? val.scheduleDay.split(',') : [],
-      month: val.scheduleMonth && val.scheduleMonth !== '*' ? val.scheduleMonth.split(',') : [],
-      week: val.scheduleWeek && val.scheduleWeek !== '*' ? val.scheduleWeek.split(',') : [],
-    }
+    temp.value = parseScheduleFormToTemp(val)
   }
 }, { immediate: true })
 
-function updateSchedule(field: string, val: string[]) {
-  const parts = {
-    minute: temp.value.minute.join(',') || '*',
-    hour: temp.value.hour.join(',') || '*',
-    day: temp.value.day.join(',') || '*',
-    month: temp.value.month.join(',') || '*',
-    week: temp.value.week.join(',') || '*',
-  }
-  
-  // 如果所有值都被选中，则用 * 代替
-  const allValues: Record<string, string[]> = {
-    month: ['1','2','3','4','5','6','7','8','9','10','11','12'],
-    week: ['0','1','2','3','4','5','6'],
-    day: ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31'],
-    hour: Array.from({length: 24}, (_, i) => String(i).padStart(2,'0')),
-    minute: Array.from({length: 60}, (_, i) => String(i).padStart(2,'0')),
-  }
-  
-  // 检查是否全部选中
-  const fieldVal = val.join(',')
-  const allForField = allValues[field]
-  if (fieldVal === allForField.join(',')) {
-    parts[field as keyof typeof parts] = '*'
-  } else {
-    parts[field as keyof typeof parts] = fieldVal || '*'
-  }
-  
+function updateSchedule() {
   emit('update:modelValue', {
     ...props.modelValue,
-    scheduleMinute: parts.minute,
-    scheduleHour: parts.hour,
-    scheduleDay: parts.day,
-    scheduleMonth: parts.month,
-    scheduleWeek: parts.week,
+    ...buildScheduleFormFieldsFromTemp(temp.value),
   })
 }
 
@@ -82,23 +42,14 @@ function toggleEnable() {
   })
 }
 
-function toggleAll(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
-  const allValues: Record<string, string[]> = {
-    month: ['1','2','3','4','5','6','7','8','9','10','11','12'],
-    week: ['0','1','2','3','4','5','6'],
-    day: ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31'],
-    hour: Array.from({length: 24}, (_, i) => String(i).padStart(2,'0')),
-    minute: Array.from({length: 60}, (_, i) => String(i).padStart(2,'0')),
-  }
-  const all = allValues[field]
-  const current = temp.value[field]
-  // 如果已全选则清空，否则全选
-  if (current.length === all.length) {
-    temp.value[field] = []
-  } else {
-    temp.value[field] = [...all]
-  }
-  updateSchedule(field, temp.value[field])
+function toggleField(field: ScheduleField, value: string) {
+  temp.value = toggleScheduleTempField(temp.value, field, value)
+  updateSchedule()
+}
+
+function toggleAll(field: ScheduleField) {
+  temp.value = toggleAllScheduleTempField(temp.value, field)
+  updateSchedule()
 }
 </script>
 
@@ -115,11 +66,11 @@ function toggleAll(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
       <div class="schedule-row">
         <label>月份</label>
         <div class="chip-select">
-          <button 
-            v-for="m in ['1','2','3','4','5','6','7','8','9','10','11','12']" 
+          <button
+            v-for="m in scheduleFieldOptions.month"
             :key="m"
             :class="['chip-btn', temp.month.includes(m) && 'active']"
-            @click="temp.month.includes(m) ? temp.month = temp.month.filter(x=>x!==m) : temp.month.push(m); updateSchedule('month', temp.month)"
+            @click="toggleField('month', m)"
           >{{ m }}月</button>
           <button class="chip-btn all-btn" @click="toggleAll('month')">全选</button>
         </div>
@@ -128,11 +79,11 @@ function toggleAll(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
       <div class="schedule-row">
         <label>日期</label>
         <div class="chip-select">
-          <button 
-            v-for="d in ['1','2','3','4','5','6','7','8','9','10','11','12','13','14','15','16','17','18','19','20','21','22','23','24','25','26','27','28','29','30','31']" 
+          <button
+            v-for="d in scheduleFieldOptions.day"
             :key="d"
             :class="['chip-btn', temp.day.includes(d) && 'active']"
-            @click="temp.day.includes(d) ? temp.day = temp.day.filter(x=>x!==d) : temp.day.push(d); updateSchedule('day', temp.day)"
+            @click="toggleField('day', d)"
           >{{ d }}</button>
           <button class="chip-btn all-btn" @click="toggleAll('day')">全选</button>
         </div>
@@ -141,11 +92,11 @@ function toggleAll(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
       <div class="schedule-row">
         <label>星期</label>
         <div class="chip-select">
-          <button 
-            v-for="(w, i) in ['周日','周一','周二','周三','周四','周五','周六']" 
+          <button
+            v-for="(w, i) in weekLabels"
             :key="i"
             :class="['chip-btn', temp.week.includes(String(i)) && 'active']"
-            @click="temp.week.includes(String(i)) ? temp.week = temp.week.filter(x=>x!==String(i)) : temp.week.push(String(i)); updateSchedule('week', temp.week)"
+            @click="toggleField('week', String(i))"
           >{{ w }}</button>
           <button class="chip-btn all-btn" @click="toggleAll('week')">全选</button>
         </div>
@@ -154,12 +105,12 @@ function toggleAll(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
       <div class="schedule-row">
         <label>时</label>
         <div class="chip-select">
-          <button 
-            v-for="h in 24" 
-            :key="h-1"
-            :class="['chip-btn', temp.hour.includes(String(h-1).padStart(2,'0')) && 'active']"
-            @click="temp.hour.includes(String(h-1).padStart(2,'0')) ? temp.hour = temp.hour.filter(x=>x!==String(h-1).padStart(2,'0')) : temp.hour.push(String(h-1).padStart(2,'0')); updateSchedule('hour', temp.hour)"
-          >{{ String(h-1).padStart(2,'0') }}时</button>
+          <button
+            v-for="h in scheduleFieldOptions.hour"
+            :key="h"
+            :class="['chip-btn', temp.hour.includes(h) && 'active']"
+            @click="toggleField('hour', h)"
+          >{{ h }}时</button>
           <button class="chip-btn all-btn" @click="toggleAll('hour')">全选</button>
         </div>
       </div>
@@ -167,12 +118,12 @@ function toggleAll(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
       <div class="schedule-row">
         <label>分</label>
         <div class="chip-select minute-chips">
-          <button 
-            v-for="m in 60" 
-            :key="m-1"
-            :class="['chip-btn', temp.minute.includes(String(m-1).padStart(2,'0')) && 'active']"
-            @click="temp.minute.includes(String(m-1).padStart(2,'0')) ? temp.minute = temp.minute.filter(x=>x!==String(m-1).padStart(2,'0')) : temp.minute.push(String(m-1).padStart(2,'0')); updateSchedule('minute', temp.minute)"
-          >{{ String(m-1).padStart(2,'0') }}</button>
+          <button
+            v-for="m in scheduleFieldOptions.minute"
+            :key="m"
+            :class="['chip-btn', temp.minute.includes(m) && 'active']"
+            @click="toggleField('minute', m)"
+          >{{ m }}</button>
           <button class="chip-btn all-btn" @click="toggleAll('minute')">全选</button>
         </div>
       </div>
@@ -257,5 +208,9 @@ function toggleAll(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
 }
 .schedule-preview {
   margin-top: 8px;
+}
+.hint {
+  font-size: 12px;
+  color: #888;
 }
 </style>

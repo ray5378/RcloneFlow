@@ -440,30 +440,6 @@ const {
   listPath: api.listPath,
 })
 
-// 定时选项
-const hourOptions = Array.from({length: 24}, (_, i) => ({ value: String(i).padStart(2,'0'), label: String(i).padStart(2,'0')+'时' }))
-const minuteOptions = Array.from({length: 60}, (_, i) => ({ value: String(i).padStart(2,'0'), label: String(i).padStart(2,'0')+'分' }))
-
-// 临时选择状态
-const tempSchedule = ref({
-  month: [] as string[],
-  week: [] as string[],
-  day: [] as string[],
-  hour: [] as string[],
-  minute: [] as string[],
-})
-
-// 确认选择
-function confirmField(field: 'month' | 'week' | 'day' | 'hour' | 'minute') {
-  const val = tempSchedule.value[field]
-  if (val.length === 0) {
-    // 空表示使用*代表任意
-    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = '*'
-  } else {
-    createForm.value['schedule' + field.charAt(0).toUpperCase() + field.slice(1)] = val.join(',')
-  }
-}
-
 function normalizeTaskOptions(raw: Record<string, any> | undefined | null) {
   const options = { ...(raw || {}) }
   if (typeof options.enableStreaming === 'undefined') {
