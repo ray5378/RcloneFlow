@@ -148,6 +148,11 @@
 看：
 - `DEVELOPMENT_CHECKLIST.md`
 
+### 我想了解构建依赖缓存、本地优先下载策略
+看：
+- `ENGINEERING_RULES.md`
+- `third_party/rclone/README.md`
+
 ### 我想知道这轮拆分做到哪了
 看：
 - `TECH_DEBT.md`

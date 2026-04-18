@@ -34,7 +34,7 @@ COPY . .
 ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64 GOTOOLCHAIN=auto
 # rclone v1.73.4
 ARG RCLONE_VERSION=v1.73.4
-# robust rclone fetch: try GitHub releases first, then official; final fallback to apk rclone
+# Prefer repo-local cached rclone zip first; if absent, download remotely; final fallback to apk rclone
 RUN set -eux; \
     (apk add --no-cache curl unzip || (apk update && apk add --no-cache curl unzip)); \
     arch="$(apk --print-arch)"; \
@@ -45,14 +45,20 @@ RUN set -eux; \
       *) arch=amd64 ;; \
     esac; \
     ver="${RCLONE_VERSION:-v1.73.4}"; \
+    local_zip="/app/third_party/rclone/rclone-${ver}-linux-${arch}.zip"; \
     urls="https://github.com/rclone/rclone/releases/download/${ver}/rclone-${ver}-linux-${arch}.zip https://downloads.rclone.org/${ver}/rclone-${ver}-linux-${arch}.zip"; \
     rm -f /tmp/rclone.zip; \
-    for u in $urls; do \
-      echo "Trying $u"; \
-      if curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors --connect-timeout 5 -o /tmp/rclone.zip "$u"; then \
-        break; \
-      fi; \
-    done; \
+    if [ -s "$local_zip" ]; then \
+      echo "Using local cached rclone zip: $local_zip"; \
+      cp "$local_zip" /tmp/rclone.zip; \
+    else \
+      for u in $urls; do \
+        echo "Trying $u"; \
+        if curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors --connect-timeout 5 -o /tmp/rclone.zip "$u"; then \
+          break; \
+        fi; \
+      done; \
+    fi; \
     rm -rf /tmp/rclone-extract && mkdir -p /tmp/rclone-extract /out; \
     if [ -s /tmp/rclone.zip ]; then \
       unzip -q /tmp/rclone.zip -d /tmp/rclone-extract; \
@@ -60,7 +66,7 @@ RUN set -eux; \
       chmod +x /out/rclone; \
       rm -rf /tmp/rclone.zip /tmp/rclone-extract; \
     else \
-      echo "rclone zip download failed, falling back to apk rclone"; \
+      echo "rclone zip unavailable, falling back to apk rclone"; \
       (apk add --no-cache rclone || (apk update && apk add --no-cache rclone)); \
       cp /usr/bin/rclone /out/rclone; \
       chmod +x /out/rclone; \
