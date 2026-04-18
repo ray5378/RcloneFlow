@@ -67,6 +67,12 @@
 
 ## 拆分进度（截至当前主线）
 
+补充说明：
+- 更适合长期持续更新的拆分作战视图，已单独整理到：`docs/TASKVIEW_SPLIT_MAP.md`
+- `TECH_DEBT.md` 继续侧重记录：已拆结果、关键回归、待重构方向
+- `TASKVIEW_SPLIT_MAP.md` 继续侧重记录：已拆/半拆/未拆状态、推荐拆分顺序、每一步重点测试项
+
+
 ### `frontend/src/views/TaskView.vue` 已完成的拆分
 以下内容已经从 `TaskView.vue` 中拆出或收口：
 
