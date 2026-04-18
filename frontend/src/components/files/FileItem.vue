@@ -28,11 +28,12 @@ defineProps<{
 <style scoped>
 .files-row {
   display: grid;
-  grid-template-columns: 1fr 80px 100px 80px;
-  gap: 8px;
-  padding: 8px 0;
+  grid-template-columns: 1fr 140px 200px 140px;
+  gap: 18px;
+  padding: 10px 16px;
   border-bottom: 1px solid #333;
   font-size: 12px;
+  align-items: center;
 }
 .name {
   overflow: hidden;

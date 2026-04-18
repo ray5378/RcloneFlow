@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
-import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal, TaskHistoryPanel } from '../components/task'
+import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal, TaskHistoryPanel, RunDetailModal } from '../components/task'
 import { getActiveProgress as getHintActiveProgress, getActiveProgressText as getHintActiveProgressText } from '../components/task/runningHint'
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
@@ -1523,138 +1523,38 @@ const targetBreadcrumbs = computed(() => {
     />
 
     <!-- 运行详情弹窗 -->
-    <div v-if="showDetailModal" class="modal-overlay" @click.self="showDetailModal = false">
-      <div class="modal-content detail-modal">
-        <div class="modal-header">
-          <h3>运行详情</h3>
-          <button class="close-btn" @click="showDetailModal = false">×</button>
-        </div>
-        <div class="modal-body">
-          <div class="detail-item">
-            <label>任务名称：</label>
-            <span>{{ runDetail.taskName || '-' }}</span>
-          </div>
-          <div class="detail-item">
-            <label>执行模式：</label>
-            <span>{{ runDetail.taskMode || '-' }}</span>
-          </div>
-          <div class="detail-item">
-            <label>状态：</label>
-            <span :class="['status', getStatusClass(runDetail.status)]">{{ getStatusText(runDetail.status) }}</span>
-          </div>
-          <div class="detail-item">
-            <label>触发方式：</label>
-            <span>{{ runDetail.trigger === 'schedule' ? '定时任务' : (runDetail.trigger === 'webhook' ? 'Webhook 触发' : '手动执行') }}</span>
-          </div>
-          <div class="detail-item full-width">
-            <label>源路径：</label>
-            <span>{{ runDetail.sourceRemote }}:{{ runDetail.sourcePath || '/' }}</span>
-          </div>
-          <div class="detail-item full-width">
-            <label>目标路径：</label>
-            <span>{{ runDetail.targetRemote }}:{{ runDetail.targetPath || '/' }}</span>
-          </div>
-          <!-- 从统计概览中展示开始/结束/耗时/进度/速度（数据库无则省略） -->
-          <!-- 运行总结（友好统计） -->
-          <div class="detail-item full-width">
-            <label>运行总结：</label>
-            <div class="summary-box" v-if="getFinalSummary(runDetail)">
-              <div class="summary-title">统计概览（可筛选）</div>
-              <div class="summary-grid">
-                <div class="summary-cell clickable" @click="setFinalFilter('all')">
-                  <div class="summary-key">总计</div>
-                  <div class="summary-val">{{ finalCountAll }}</div>
-                </div>
-                <div class="summary-cell clickable" @click="setFinalFilter('success')">
-                  <div class="summary-key">{{ runDetail.taskMode==='move' ? '移动' : '成功' }}</div>
-                  <div class="summary-val">{{ finalCountSuccess }}</div>
-                </div>
-                <div class="summary-cell clickable" @click="setFinalFilter('failed')">
-                  <div class="summary-key">失败</div>
-                  <div class="summary-val error-text">{{ finalCountFailed }}</div>
-                </div>
-                <div class="summary-cell clickable" @click="setFinalFilter('other')">
-                  <div class="summary-key">其他</div>
-                  <div class="summary-val">{{ finalCountOther }}</div>
-                </div>
-                <div class="summary-cell" v-if="getPreflight(runDetail)">
-                  <div class="summary-key">总体积</div>
-                  <div class="summary-val est">{{ formatBytes(getPreflight(runDetail).totalBytes || 0) }}</div>
-                </div>
-                <div class="summary-cell">
-                  <div class="summary-key">已传输体积</div>
-                  <div class="summary-val act">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
-                </div>
-                <div class="summary-cell">
-                  <div class="summary-key">开始时间</div>
-                  <div class="summary-val">{{ formatTime(runDetail.startedAt) }}</div>
-                </div>
-                <div class="summary-cell">
-                  <div class="summary-key">结束时间</div>
-                  <div class="summary-val">{{ formatTime(runDetail.finishedAt) }}</div>
-                </div>
-                <div class="summary-cell">
-                  <div class="summary-key">耗时</div>
-                  <div class="summary-val">{{ getFinalSummary(runDetail)?.durationText || '-' }}</div>
-                </div>
-                <div class="summary-cell">
-                  <div class="summary-key">平均速度</div>
-                  <div class="summary-val">{{ formatBps(getFinalSummary(runDetail)?.avgSpeedBps || 0) }}</div>
-                </div>
-                <!-- 运行中进度/运行中速度两项已移除：此处只展示完成态汇总，不含实时项 -->
-
-              </div>
-            </div>
-            <pre v-else class="summary-pre">{{ JSON.stringify({ note: '无总结，可查看传输日志' }, null, 2) }}</pre>
-          </div>
-
-          <!-- 传输明细（可分页、可跳页） -->
-          <div class="detail-item full-width">
-            <label>传输明细：</label>
-            <div>
-              <div class="files-toolbar">
-                <span>共 {{ finalFilesTotal }} 条</span>
-                <div class="pager-inline">
-                  <button class="ghost small" :disabled="finalFilesPage<=1" @click="goPrevFinalFilesPage()">上一页</button>
-                  <span>{{ finalFilesPage }}/{{ totalFinalFilesPages }}</span>
-                  <button class="ghost small" :disabled="finalFilesPage>=totalFinalFilesPages" @click="goNextFinalFilesPage()">下一页</button>
-                  <span>跳转</span>
-                  <input class="page-input" v-model.number="finalFilesJump" type="number" min="1" :max="totalFinalFilesPages" />
-                  <button class="ghost small" @click="jumpFinalFilesPage()">GO</button>
-                </div>
-                <button class="ghost small" @click="reloadRunFiles()">刷新</button>
-              </div>
-              <div class="files-table large">
-                <div class="files-header">
-                  <span class="name">文件</span>
-                  <span class="status">结果</span>
-                  <span class="time">时间</span>
-                  <span class="size">大小</span>
-                </div>
-                <div class="files-body">
-                  <template v-if="finalFiles && finalFiles.length">
-                    <FileItem v-for="it in pagedFinalFiles" :key="(it.path||it.name) + (it.at||'') + (it.status||'')" :item="it" />
-                  </template>
-                  <template v-else>
-                    <FileItem v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" :item="it" />
-                    <div v-if="!pagedRunFiles.length" class="path-empty">无明细（可能日志为空或历史记录较旧）</div>
-                  </template>
-                </div>
-              </div>
-              <div class="files-pager" v-if="!finalFiles || !finalFiles.length">
-                <button class="ghost small" :disabled="runFilesPage<=1" @click="goPrevFilesPage()">上一页</button>
-                <span>{{ runFilesPage }}/{{ totalRunFilesPages }}</span>
-                <button class="ghost small" :disabled="runFilesPage>=totalRunFilesPages" @click="goNextFilesPage()">下一页</button>
-              </div>
-            </div>
-          </div>
-          <div v-if="runDetail.error" class="detail-item full-width">
-            <label>错误信息：</label>
-            <span class="error-text">{{ runDetail.error }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
+    <RunDetailModal
+      :visible="showDetailModal"
+      :run-detail="runDetail"
+      :get-status-class="getStatusClass"
+      :get-status-text="getStatusText"
+      :get-final-summary="getFinalSummary"
+      :get-preflight="getPreflight"
+      :format-bytes="formatBytes"
+      :format-time="formatTime"
+      :format-bps="formatBps"
+      :final-count-all="finalCountAll"
+      :final-count-success="finalCountSuccess"
+      :final-count-failed="finalCountFailed"
+      :final-count-other="finalCountOther"
+      :final-files-total="finalFilesTotal"
+      :final-files-page="finalFilesPage"
+      :total-final-files-pages="totalFinalFilesPages"
+      :final-files-jump="finalFilesJump"
+      :paged-final-files="pagedFinalFiles"
+      :final-files="finalFiles"
+      :paged-run-files="pagedRunFiles"
+      :run-files-page="runFilesPage"
+      :total-run-files-pages="totalRunFilesPages"
+      @close="showDetailModal = false"
+      @set-final-filter="setFinalFilter"
+      @prev-final-files-page="goPrevFinalFilesPage()"
+      @next-final-files-page="goNextFinalFilesPage()"
+      @update-final-files-jump="finalFilesJump = $event"
+      @jump-final-files-page="jumpFinalFilesPage()"
+      @prev-files-page="goPrevFilesPage()"
+      @next-files-page="goNextFilesPage()"
+    />
   </div>
 
   <!-- 运行中轻量提示小窗（不切主窗口） -->

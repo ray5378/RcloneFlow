@@ -182,7 +182,8 @@
 现状：
 - 历史页主区块（页头 / 筛选 / 分页 / 列表）已抽到独立组件 `TaskHistoryPanel.vue`
 - 第一刀当前已验证稳定：进入历史页、筛选、翻页、删除单条、删除所有、删除后刷新均已恢复正常
-- 运行详情弹窗仍留在 `TaskView.vue`
+- 运行详情弹窗模板主块已抽到独立组件 `RunDetailModal.vue`
+- 详情弹窗状态与行为逻辑当前仍主要留在 `TaskView.vue`
 - 历史记录删除后的即时刷新问题本轮已定位并修到直接根因：`useApi.ts` 中删除接口成功返回值语义错误，导致前端误回滚
 - 历史记录区域第二刀曾尝试把状态/删除刷新逻辑继续迁出 `TaskView.vue`，但因一次迁移范围过大、出现新旧双轨接线与模板残片问题，已明确撤回
 
@@ -213,14 +214,22 @@
 
 当前已拆出的历史记录相关文件：
 - `frontend/src/components/task/TaskHistoryPanel.vue`
+- `frontend/src/components/task/RunDetailModal.vue`
 - `frontend/src/composables/useTaskHistoryComputed.ts`
 - `frontend/src/composables/useTaskHistoryLoader.ts`
 - `frontend/src/composables/useTaskHistoryActions.ts`
 
+本轮新增收口：
+- 历史详情弹窗模板主块已从 `TaskView.vue` 抽出到 `RunDetailModal.vue`
+- 当前采取的是“先拆模板、后拆状态/行为”的最小风险路线
+- 详情弹窗相关状态、筛选、分页、明细刷新等逻辑当前仍由页面层持有
+- 本轮拆分中曾出现一次典型回归：父组件 `scoped` 样式未跟随模板迁移，导致总结区网格布局与文件明细表格样式失效；后续已在 `RunDetailModal.vue` 内补齐专属样式并通过用户回归测试
+- `FileItem.vue` 也已同步调整列宽与左右 padding，使明细行与表头对齐
+
 下一步建议：
-- 转向历史详情弹窗区域
-- 优先拆出运行详情弹窗及其内部统计 / 文件明细 / 分页相关逻辑
-- 目标是继续减少 `TaskView.vue` 中历史记录剩余的大块模板和状态承载
+- 在 `RunDetailModal.vue` 已稳定的前提下，再考虑继续下沉详情弹窗内部状态与行为逻辑
+- 优先评估是否把详情筛选 / 明细分页 / 明细派生计算继续抽到 composable
+- 目标是继续减少 `TaskView.vue` 中历史记录剩余的大块状态承载，而不是一次性大迁移
 
 重点测试：
 - 历史列表显示
