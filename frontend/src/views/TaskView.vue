@@ -22,6 +22,7 @@ import { useTaskFormState } from '../composables/useTaskFormState'
 import { useTaskFormSubmit } from '../composables/useTaskFormSubmit'
 import { useTaskFormPrepare } from '../composables/useTaskFormPrepare'
 import { useTaskFormFlow } from '../composables/useTaskFormFlow'
+import { useTaskPathBrowse } from '../composables/useTaskPathBrowse'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
@@ -410,12 +411,33 @@ const {
   scheduleApi,
 })
 
-const sourcePathOptions = ref<any[]>([])
-const targetPathOptions = ref<any[]>([])
-const showSourcePathInput = ref(false)
-const showTargetPathInput = ref(false)
-const sourceCurrentPath = ref('')
-const targetCurrentPath = ref('')
+const {
+  sourcePathOptions,
+  targetPathOptions,
+  showSourcePathInput,
+  showTargetPathInput,
+  sourceCurrentPath,
+  targetCurrentPath,
+  sourceBreadcrumbs,
+  targetBreadcrumbs,
+  setShowSourcePathInput,
+  setShowTargetPathInput,
+  resetTaskPathBrowse,
+  restoreTaskPathBrowse,
+  onSourceRemoteChange,
+  onTargetRemoteChange,
+  onSourceBreadcrumbClick,
+  onTargetBreadcrumbClick,
+  loadSourcePath,
+  loadTargetPath,
+  onSourceClick,
+  onSourceArrow,
+  onTargetClick,
+  onTargetArrow,
+} = useTaskPathBrowse({
+  createForm,
+  listPath: api.listPath,
+})
 
 // 定时选项
 const hourOptions = Array.from({length: 24}, (_, i) => ({ value: String(i).padStart(2,'0'), label: String(i).padStart(2,'0')+'时' }))
@@ -895,6 +917,7 @@ async function goToAddTask() {
   const remoteData = await remoteApi.list()
   remotes.value = remoteData?.remotes || []
   resetTaskFormForCreate()
+  resetTaskPathBrowse()
   openTaskFormModule()
 }
 
@@ -916,18 +939,7 @@ function editTask(task: Task) {
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
   }
 
-  // 加载源路径选项 - 直接加载配置的路径
-  if (task.sourceRemote) {
-    const sourcePath = task.sourcePath || ''
-    sourceCurrentPath.value = sourcePath
-    loadSourcePath(task.sourceRemote, sourcePath)
-  }
-  // 加载目标路径选项 - 直接加载配置的路径
-  if (task.targetRemote) {
-    const targetPath = task.targetPath || ''
-    targetCurrentPath.value = targetPath
-    loadTargetPath(task.targetRemote, targetPath)
-  }
+  restoreTaskPathBrowse(task)
   openTaskFormModule()
 }
 
@@ -1043,149 +1055,6 @@ function clearAllRunsWithConfirm() {
   })
 }
 
-function onSourceRemoteChange() {
-  sourceCurrentPath.value = ''
-  if (createForm.value.sourceRemote) {
-    loadSourcePath(createForm.value.sourceRemote, '')
-  } else {
-    sourcePathOptions.value = []
-  }
-  createForm.value.sourcePath = ''
-}
-
-function onTargetRemoteChange() {
-  targetCurrentPath.value = ''
-  if (createForm.value.targetRemote) {
-    loadTargetPath(createForm.value.targetRemote, '')
-  } else {
-    targetPathOptions.value = []
-  }
-  createForm.value.targetPath = ''
-}
-
-async function loadSourcePath(remote: string, path: string) {
-  try {
-    const data = await api.listPath(remote, path)
-    sourcePathOptions.value = data.items || []
-    sourceCurrentPath.value = path
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-async function loadTargetPath(remote: string, path: string) {
-  try {
-    const data = await api.listPath(remote, path)
-    targetPathOptions.value = data.items || []
-    targetCurrentPath.value = path
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-function openSourceDir(item: any) {
-  if (item.IsDir) {
-    loadSourcePath(createForm.value.sourceRemote, item.Path)
-  }
-}
-
-function openAndSetSource(item: any) {
-  // 箭头点击：打开并设置为源路径
-  if (item.IsDir) {
-    createForm.value.sourcePath = item.Path
-    loadSourcePath(createForm.value.sourceRemote, item.Path)
-  }
-}
-
-function onSourceClick(item: any) {
-  // 单击行：直接设置源路径
-  createForm.value.sourcePath = item.Path
-  showSourcePathInput.value = false
-}
-
-function onSourceArrow(item: any) {
-  // 箭头点击：打开并设置为源路径
-  createForm.value.sourcePath = item.Path
-  loadSourcePath(createForm.value.sourceRemote, item.Path)
-}
-
-function openTargetDir(item: any) {
-  if (item.IsDir) {
-    loadTargetPath(createForm.value.targetRemote, item.Path)
-  }
-}
-
-function openAndSetTarget(item: any) {
-  // 箭头点击：打开并设置为目标路径
-  if (item.IsDir) {
-    createForm.value.targetPath = item.Path
-    loadTargetPath(createForm.value.targetRemote, item.Path)
-  }
-}
-
-function onTargetClick(item: any) {
-  // 单击行：直接设置目标路径
-  createForm.value.targetPath = item.Path
-  showTargetPathInput.value = false
-}
-
-function onTargetArrow(item: any) {
-  // 箭头点击：打开并设置目标路径
-  createForm.value.targetPath = item.Path
-  loadTargetPath(createForm.value.targetRemote, item.Path)
-}
-
-function selectSourceDir(item: any) {
-  // 单击选中文件夹（填充路径但不进入）
-  createForm.value.sourcePath = item.Path
-  showSourcePathInput.value = false
-}
-
-function selectTargetDir(item: any) {
-  // 单击选中文件夹（填充路径但不进入）
-  createForm.value.targetPath = item.Path
-  showTargetPathInput.value = false
-}
-
-function selectSourceFile(item: any) {
-  if (!item.IsDir) {
-    createForm.value.sourcePath = item.Path
-    showSourcePathInput.value = false
-  }
-}
-
-function selectTargetFile(item: any) {
-  if (!item.IsDir) {
-    createForm.value.targetPath = item.Path
-    showTargetPathInput.value = false
-  }
-}
-
-// 源路径面包屑
-const sourceBreadcrumbs = computed(() => {
-  if (!createForm.value.sourceRemote) return []
-  const parts = (sourceCurrentPath.value || '').split('/').filter(Boolean)
-  const crumbs = [{ name: createForm.value.sourceRemote + ':', path: '' }]
-  let current = ''
-  for (const p of parts) {
-    current += '/' + p
-    crumbs.push({ name: p, path: current })
-  }
-  return crumbs
-})
-
-// 目标路径面包屑
-const targetBreadcrumbs = computed(() => {
-  if (!createForm.value.targetRemote) return []
-  const parts = (targetCurrentPath.value || '').split('/').filter(Boolean)
-  const crumbs = [{ name: createForm.value.targetRemote + ':', path: '' }]
-  let current = ''
-  for (const p of parts) {
-    current += '/' + p
-    crumbs.push({ name: p, path: current })
-  }
-  return crumbs
-})
 </script>
 
 
@@ -1414,13 +1283,13 @@ const targetBreadcrumbs = computed(() => {
       :editing-task="editingTask"
       @update:command-mode="commandMode = $event"
       @update:command-text="commandText = $event"
-      @update:show-source-path-input="showSourcePathInput = $event"
-      @update:show-target-path-input="showTargetPathInput = $event"
+      @update:show-source-path-input="setShowSourcePathInput($event)"
+      @update:show-target-path-input="setShowTargetPathInput($event)"
       @update:show-advanced-options="showAdvancedOptions = $event"
       @source-remote-change="onSourceRemoteChange"
       @target-remote-change="onTargetRemoteChange"
-      @load-source-path="loadSourcePath"
-      @load-target-path="loadTargetPath"
+      @source-breadcrumb-click="onSourceBreadcrumbClick"
+      @target-breadcrumb-click="onTargetBreadcrumbClick"
       @source-arrow="onSourceArrow"
       @source-click="onSourceClick"
       @target-arrow="onTargetArrow"

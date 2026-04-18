@@ -105,7 +105,7 @@ const showAdvancedOptionsModel = computed({
                 <button
                   class="crumb"
                   :class="{ current: i === sourceBreadcrumbs.length - 1 }"
-                  @click="crumb.path !== sourceCurrentPath && $emit('load-source-path', createForm.sourceRemote, crumb.path)"
+                  @click="crumb.path !== sourceCurrentPath && $emit('source-breadcrumb-click', crumb.path)"
                 >
                   {{ crumb.name }}
                 </button>
@@ -143,7 +143,7 @@ const showAdvancedOptionsModel = computed({
                 <button
                   class="crumb"
                   :class="{ current: i === targetBreadcrumbs.length - 1 }"
-                  @click="crumb.path !== targetCurrentPath && $emit('load-target-path', createForm.targetRemote, crumb.path)"
+                  @click="crumb.path !== targetCurrentPath && $emit('target-breadcrumb-click', crumb.path)"
                 >
                   {{ crumb.name }}
                 </button>
