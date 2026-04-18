@@ -20,6 +20,9 @@ import { useRunDetailState } from '../composables/useRunDetailState'
 import { useRunDetailEntry } from '../composables/useRunDetailEntry'
 import { useTaskFormState } from '../composables/useTaskFormState'
 import { useTaskFormSubmit } from '../composables/useTaskFormSubmit'
+import { useTaskFormPrepare } from '../composables/useTaskFormPrepare'
+import { useTaskFormFlow } from '../composables/useTaskFormFlow'
+import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
 
@@ -387,21 +390,25 @@ const {
   fillTaskFormForEdit,
 } = useTaskFormState()
 
-const {
-  validateTaskForm,
-  submitTaskForm,
-} = useTaskFormSubmit({
-  createForm,
-  editingTask,
-  normalizeTaskOptions,
-  getScheduleByTaskId,
-  taskApi,
-  scheduleApi,
-})
-
 const openMenuId = ref<number | null>(null)
 const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
 const runningTaskId = ref<number | null>(null)
+
+const {
+  handleTaskFormDoneClick,
+  validateTaskForm,
+  executeTaskFormSubmit,
+} = useTaskFormSubmit({
+  createForm,
+  editingTask,
+  creatingState,
+  currentModule,
+  normalizeTaskOptions,
+  getScheduleByTaskId,
+  loadData,
+  taskApi,
+  scheduleApi,
+})
 
 const sourcePathOptions = ref<any[]>([])
 const targetPathOptions = ref<any[]>([])
@@ -757,102 +764,27 @@ async function triggerAutoRefresh(taskId: number){
   return ''
 }
 
-function prepareTaskFormSubmit() {
-  if (!commandMode.value) return ''
-  try {
-    const parsed = parseRcloneCommand(commandText.value)
-    createForm.value.mode = parsed.mode
-    createForm.value.sourceRemote = parsed.src.remote
-    createForm.value.sourcePath = parsed.src.path
-    createForm.value.targetRemote = parsed.dst.remote
-    createForm.value.targetPath = parsed.dst.path
-    createForm.value.options = { ...normalizeTaskOptions(createForm.value.options), ...parsed.options }
-    return ''
-  } catch (e) {
-    return '命令解析失败：' + (e as Error).message
-  }
-}
+const { validateTaskFormBeforeSubmit } = useTaskFormPrepare({
+  createForm,
+  commandMode,
+  commandText,
+  normalizeTaskOptions,
+  parseRcloneCommand,
+  validateTaskForm,
+})
 
-async function finishTaskFormSubmit() {
-  editingTask.value = null
-  await loadData()
-  currentModule.value = 'add'
-  creatingState.value = 'done'
-}
+const { runTaskFormFlow } = useTaskFormFlow({
+  handleTaskFormDoneClick,
+  validateTaskFormBeforeSubmit,
+  executeTaskFormSubmit,
+})
 
 async function createTask() {
-  // 如果已完成，点击返回任务列表
-  if (creatingState.value === 'done') {
-    creatingState.value = 'idle'
-    currentModule.value = 'tasks'
-    return
-  }
-
-  const prepareError = prepareTaskFormSubmit()
-  if (prepareError) {
-    showToast(prepareError, 'error')
-    return
-  }
-
-  const validationError = validateTaskForm()
-  if (validationError) {
-    showToast(validationError, 'error')
-    return
-  }
-
-  creatingState.value = 'loading'
-  try {
-    await submitTaskForm()
-    await finishTaskFormSubmit()
-  } catch (e) {
-    creatingState.value = 'idle'
-    showToast((e as Error).message, 'error')
+  const error = await runTaskFormFlow()
+  if (error) {
+    showToast(error, 'error')
   }
 }
-
-function parseRcloneCommand(cmd: string) {
-  if (!cmd) throw new Error('命令为空')
-  // 简单分词（支持引号包裹）
-  const tokens = cmd.match(/(?:"[^"]*"|'[^']*'|\S)+/g) || []
-  if (tokens.length < 3) throw new Error('缺少源/目标')
-  // 查找子命令
-  const sub = tokens[1]
-  const mode = sub === 'sync' ? 'sync' : sub === 'move' ? 'move' : 'copy'
-  // 源/目标
-  const src = parseRemotePath(tokens[2])
-  const dst = parseRemotePath(tokens[3])
-  // 解析 flags
-  const options: Record<string, any> = {}
-  for (let i = 4; i < tokens.length; i++) {
-    const t = tokens[i]
-    if (t.startsWith('--')) {
-      const key = t.replace(/^--/, '')
-      const next = tokens[i + 1]
-      switch (key) {
-        case 'bwlimit': options.bwLimit = stripQuotes(next); i++; break
-        case 'transfers': options.transfers = Number(next); i++; break
-        case 'use-server-modtime': options.useServerModtime = true; break
-        case 'size-only': options.sizeOnly = true; break
-        case 'verbose': /* ignore */ break
-        default:
-          // 其他 boolean 开关
-          if (!next || next.startsWith('--')) {
-            options[toCamel(key)] = true
-          } else {
-            options[toCamel(key)] = stripQuotes(next); i++
-          }
-      }
-    }
-  }
-  return { mode, src, dst, options }
-}
-function parseRemotePath(s: string){
-  const m = s.split(':')
-  if (m.length < 2) throw new Error('路径格式错误：'+s)
-  return { remote: m[0], path: m.slice(1).join(':') || '' }
-}
-function stripQuotes(s?: string){ return s ? s.replace(/^['\"]|['\"]$/g, '') : s }
-function toCamel(s: string){ return s.replace(/-([a-z])/g, (_,c)=>c.toUpperCase()) }
 
 const {
   runFilesPage,

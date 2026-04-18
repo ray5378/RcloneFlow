@@ -4,8 +4,11 @@ import type { Task } from '../types'
 interface UseTaskFormSubmitOptions {
   createForm: Ref<any>
   editingTask: Ref<Task | null>
+  creatingState: Ref<'idle' | 'loading' | 'done'>
+  currentModule: Ref<'history' | 'add' | 'tasks'>
   normalizeTaskOptions: (raw: Record<string, any> | undefined | null) => Record<string, any>
   getScheduleByTaskId: (taskId: number) => any
+  loadData: () => Promise<any>
   taskApi: {
     create: (task: any) => Promise<any>
     update: (id: number, task: any) => Promise<any>
@@ -17,6 +20,13 @@ interface UseTaskFormSubmitOptions {
 }
 
 export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
+  function handleTaskFormDoneClick() {
+    if (options.creatingState.value !== 'done') return false
+    options.creatingState.value = 'idle'
+    options.currentModule.value = 'tasks'
+    return true
+  }
+
   function validateTaskForm() {
     if (!options.createForm.value.name) {
       return '请输入任务名称'
@@ -76,10 +86,37 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
     return { kind: 'create' as const, task }
   }
 
+  async function completeTaskFormSubmit() {
+    options.editingTask.value = null
+    await options.loadData()
+    options.currentModule.value = 'add'
+    options.creatingState.value = 'done'
+  }
+
+  function resetTaskFormSubmitState() {
+    options.creatingState.value = 'idle'
+  }
+
+  async function executeTaskFormSubmit() {
+    options.creatingState.value = 'loading'
+    try {
+      await submitTaskForm()
+      await completeTaskFormSubmit()
+      return ''
+    } catch (e) {
+      resetTaskFormSubmitState()
+      return (e as Error).message
+    }
+  }
+
   return {
+    handleTaskFormDoneClick,
     validateTaskForm,
     buildTaskPayload,
     buildScheduleSpec,
     submitTaskForm,
+    completeTaskFormSubmit,
+    resetTaskFormSubmitState,
+    executeTaskFormSubmit,
   }
 }

@@ -335,12 +335,30 @@
   - `showAdvancedOptions`
   - `resetTaskFormForCreate()`
   - `fillTaskFormForEdit(task, scheduleSpec?)`
+- `useTaskFormPrepare.ts`
+  - `prepareTaskFormSubmit()`
+  - `validateTaskFormBeforeSubmit()`
+- `useTaskCommandParse.ts`
+  - `parseRcloneCommand()`
+  - `parseRemotePath()`
+  - `stripQuotes()`
+  - `toCamel()`
+- `useTaskFormSubmit.ts`
+  - `handleTaskFormDoneClick()`
+  - `validateTaskForm()`
+  - `buildTaskPayload()`
+  - `buildScheduleSpec()`
+  - `submitTaskForm()`
+  - `completeTaskFormSubmit()`
+  - `resetTaskFormSubmitState()`
+  - `executeTaskFormSubmit()`
+- `useTaskFormFlow.ts`
+  - `runTaskFormFlow()`
 
 当前页面层 `TaskView.vue` 仍保留：
-- `createTask()` 提交链
+- `createTask()` 极薄入口壳（只负责调用 flow 与 toast）
 - `creatingState`
 - `tempSchedule` UI 临时态
-- `parseRcloneCommand()` 命令解析链
 - 源/目标路径浏览深链
 - 远端列表加载与部分页面级入口编排
 
