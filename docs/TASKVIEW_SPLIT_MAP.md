@@ -315,23 +315,60 @@
 ---
 
 ### C. 创建任务区域 / 表单块
-状态：**未拆**
+状态：**半拆**
 优先级：**高**
 
-原因：
-- 表单项多、状态多、容易继续堆积复杂度
-- 与页面其他区域职责不同，适合拆块
+当前已拆出的创建任务相关文件：
+- `frontend/src/components/task/AddTaskForm.vue`
+- `frontend/src/composables/useTaskFormState.ts`
 
-拆后目标：
-- 抽成独立表单组件或表单模块
-- 减少主页面持有的表单细节
+当前已下沉职责：
+- `AddTaskForm.vue`
+  - 创建任务表单主模板
+  - 复用 `ScheduleOptions.vue`
+  - 复用 `AdvancedOptions.vue`
+- `useTaskFormState.ts`
+  - `createForm`
+  - `commandMode`
+  - `commandText`
+  - `editingTask`
+  - `showAdvancedOptions`
+  - `resetTaskFormForCreate()`
+  - `fillTaskFormForEdit(task, scheduleSpec?)`
+
+当前页面层 `TaskView.vue` 仍保留：
+- `createTask()` 提交链
+- `creatingState`
+- `tempSchedule` UI 临时态
+- `parseRcloneCommand()` 命令解析链
+- 源/目标路径浏览深链
+- 远端列表加载与部分页面级入口编排
+
+本轮已完成并验证的创建任务入口链：
+- 进入“添加任务”
+- 进入“编辑任务”
+- 创建/编辑切换时表单基础状态重置与回填
+- 高级选项区样式回归修复
+- 任务卡片进入编辑时的入口报错修复
+
+本轮创建任务拆分的关键经验：
+- `TaskView.vue` 在新增表单相关 composable 后，同样容易出现“页面已调用但 import 未补齐”的真实回归
+- 这类回归会直接表现为：页面空白、任务列表空白、编辑入口失效、`xxx is not defined`
+- 表单模板抽成组件后，原样式不会自动跟随；对子组件内部布局（尤其 `AdvancedOptions.vue`）必须显式迁移样式，否则会出现布局严重错位
+
+建议下一步拆分顺序：
+1. 继续拆提交链（`createTask()`）
+2. 再看命令行解析链（`parseRcloneCommand()`）
+3. 最后评估路径浏览深链是否值得继续下沉
 
 重点测试：
-- 表单输入
-- 校验
-- 提交
-- 编辑/新建切换
-- 命令行模式相关输入
+- 新建任务
+- 编辑任务
+- 新建/编辑切换
+- 命令行模式
+- 定时任务选项
+- 高级选项
+- 路径浏览与路径回填
 
 ---
 

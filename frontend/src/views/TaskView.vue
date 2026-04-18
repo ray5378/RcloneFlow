@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
-import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal, TaskHistoryPanel, RunDetailModal } from '../components/task'
+import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal, TaskHistoryPanel, RunDetailModal, AddTaskForm } from '../components/task'
 import { getActiveProgress as getHintActiveProgress, getActiveProgressText as getHintActiveProgressText } from '../components/task/runningHint'
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
-import { PathItem } from '../components/path'
 import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { handleError, showSuccess, setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
@@ -19,6 +18,7 @@ import { useRunDetailComputed } from '../composables/useRunDetailComputed'
 import { useRunDetailFiles } from '../composables/useRunDetailFiles'
 import { useRunDetailState } from '../composables/useRunDetailState'
 import { useRunDetailEntry } from '../composables/useRunDetailEntry'
+import { useTaskFormState } from '../composables/useTaskFormState'
 import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
 
@@ -102,7 +102,6 @@ const historyStatusFilter = ref<string>('all') // 'all' | 'finished' | 'failed' 
 const { showDetailModal, runDetail, openRunDetailModal, closeRunDetailModal } = useRunDetailState()
 
 const showCreateModal = ref(false)
-const showAdvancedOptions = ref(false)
 const showGlobalStatsModal = ref(false)
 const globalStats = ref<any>({}) // 全局实时数据保留为独立弹窗，与历史态无关
 // 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度
@@ -377,28 +376,17 @@ const confirmModal = ref<{ show: boolean; title: string; message: string; onConf
   onConfirm: () => {}
 })
 
-const createForm = ref({
-  name: '',
-  mode: 'copy',
-  sourceRemote: '',
-  sourcePath: '',
-  targetRemote: '',
-  targetPath: '',
-  enableSchedule: false,
-  scheduleMonth: '*',     // * = 每月, 或 "1,3,5"
-  scheduleWeek: '',      // 空 = 不设置, 或 "1,3,5" (周一三五)
-  scheduleDay: '',       // 空 = 不设置, 或 "1,15,28"
-  scheduleHour: '00',   // "00,12,18"
-  scheduleMinute: '00', // "00,30,59"
-  options: { enableStreaming: true } as Record<string, any>,
-})
-
-// 命令行模式
-const commandMode = ref(false)
-const commandText = ref('')
+const {
+  createForm,
+  commandMode,
+  commandText,
+  editingTask,
+  showAdvancedOptions,
+  resetTaskFormForCreate,
+  fillTaskFormForEdit,
+} = useTaskFormState()
 
 const openMenuId = ref<number | null>(null)
-const editingTask = ref<Task | null>(null)
 const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
 const runningTaskId = ref<number | null>(null)
 
@@ -993,38 +981,25 @@ async function runTask(taskId: number) {
   return result
 }
 
-async function goToAddTask() {
-  // Reload remotes before switching to add mode
-  const remoteData = await remoteApi.list()
-  remotes.value = remoteData?.remotes || []
+function openTaskFormModule() {
   currentModule.value = 'add'
   openMenuId.value = null
 }
 
-function editTask(task: Task) {
-  editingTask.value = task
+async function goToAddTask() {
+  // Reload remotes before switching to add mode
+  const remoteData = await remoteApi.list()
+  remotes.value = remoteData?.remotes || []
+  resetTaskFormForCreate()
+  openTaskFormModule()
+}
 
+function editTask(task: Task) {
   // 查找该任务的定时规则
   const schedule = getScheduleByTaskId(task.id)
+  const parts = fillTaskFormForEdit(task, schedule?.spec)
 
-  if (schedule) {
-    // 解析 spec: minute|hour|day|month|week
-    const parts = schedule.spec.split('|')
-    createForm.value = {
-      name: task.name,
-      mode: task.mode,
-      sourceRemote: task.sourceRemote,
-      sourcePath: task.sourcePath || '',
-      targetRemote: task.targetRemote,
-      targetPath: task.targetPath || '',
-      enableSchedule: true,
-      scheduleMinute: parts[0] || '00',
-      scheduleHour: parts[1] || '*',
-      scheduleDay: parts[2] || '*',
-      scheduleMonth: parts[3] || '*',
-      scheduleWeek: parts[4] || '*',
-      options: task.options || {},
-    }
+  if (parts) {
     // 更新临时选择状态
     tempSchedule.value = {
       minute: parts[0] && parts[0] !== '*' ? parts[0].split(',') : [],
@@ -1034,21 +1009,6 @@ function editTask(task: Task) {
       week: parts[4] && parts[4] !== '*' ? parts[4].split(',') : [],
     }
   } else {
-    createForm.value = {
-      name: task.name,
-      mode: task.mode,
-      sourceRemote: task.sourceRemote,
-      sourcePath: task.sourcePath || '',
-      targetRemote: task.targetRemote,
-      targetPath: task.targetPath || '',
-      enableSchedule: false,
-      scheduleMonth: '*',
-      scheduleWeek: '',
-      scheduleDay: '',
-      scheduleHour: '00',
-      scheduleMinute: '00',
-      options: normalizeTaskOptions(task.options as Record<string, any>),
-    }
     tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
   }
 
@@ -1064,8 +1024,7 @@ function editTask(task: Task) {
     targetCurrentPath.value = targetPath
     loadTargetPath(task.targetRemote, targetPath)
   }
-  currentModule.value = 'add'
-  openMenuId.value = null
+  openTaskFormModule()
 }
 
 function showConfirm(title: string, message: string, onConfirm: () => void) {
@@ -1532,299 +1491,38 @@ const targetBreadcrumbs = computed(() => {
     @open-log="openRunningHintLog"
   />
 
-    <div v-if="currentModule === 'add'" class="card">
-    <div class="card-header"><div class="title">添加任务</div></div>
-    <div class="form-content">
-      <div class="field-item">
-        <label class="inline-label">
-          <input type="checkbox" v-model="commandMode" />
-          <span style="margin-left:8px">命令行模式（可粘贴 rclone 命令）</span>
-        </label>
-        <textarea v-if="commandMode" v-model="commandText" class="cmd-textarea" rows="4" placeholder='例如: rclone copy FNOS:/HDD/media openlist:/影音媒体/天翼5050 --bwlimit "07:30,2M;17:40,2M;23:00,2M" --use-server-modtime --size-only --verbose --transfers 2'></textarea>
-        <p v-if="commandMode" class="hint">保存时将自动解析命令，填充"模式/源/目标/选项"。任务名称仍需手动填写。</p>
-      </div>
-      <div class="field-item">
-        <label>任务名称 <span style="color: #dc2626">*</span></label>
-        <input v-model="createForm.name" type="text" placeholder="输入任务名称" />
-      </div>
-      <div class="field-item">
-        <label>模式</label>
-        <select v-model="createForm.mode">
-          <option value="copy">复制 (copy)</option>
-          <option value="sync">同步 (sync)</option>
-          <option value="move">移动 (move)</option>
-        </select>
-      </div>
-      <div class="field-item">
-        <label>源存储 <span style="color: #dc2626">*</span></label>
-        <select v-model="createForm.sourceRemote" @change="onSourceRemoteChange">
-          <option value="">选择源存储</option>
-          <option v-for="r in remotes" :key="r" :value="r">{{ r }}</option>
-        </select>
-      </div>
-      <div class="field-item">
-        <label>源路径</label>
-        <div class="path-selector">
-          <div class="path-browse">
-            <div class="pathbar">
-              <template v-for="(crumb, i) in sourceBreadcrumbs" :key="crumb.path">
-                <span v-if="i > 0" class="sep">/</span>
-                <button
-                  class="crumb"
-                  :class="{ current: i === sourceBreadcrumbs.length - 1 }"
-                  @click="crumb.path !== sourceCurrentPath && loadSourcePath(createForm.sourceRemote, crumb.path)"
-                >
-                  {{ crumb.name }}
-                </button>
-              </template>
-            </div>
-            <div class="path-list">
-              <PathItem 
-                v-for="item in sourcePathOptions" 
-                :key="item.Path" 
-                :item="item"
-                @enter="onSourceArrow(item)"
-                @click="onSourceClick(item)"
-              />
-              <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
-            </div>
-          </div>
-          <button type="button" class="ghost small" @click="showSourcePathInput = !showSourcePathInput">手动输入</button>
-        </div>
-        <input v-if="showSourcePathInput" v-model="createForm.sourcePath" type="text" placeholder="手动输入路径" style="margin-top: 8px" />
-      </div>
-      <div class="field-item">
-        <label>目标存储 <span style="color: #dc2626">*</span></label>
-        <select v-model="createForm.targetRemote" @change="onTargetRemoteChange">
-          <option value="">选择目标存储</option>
-          <option v-for="r in remotes" :key="r" :value="r">{{ r }}</option>
-        </select>
-      </div>
-      <div class="field-item">
-        <label>目标路径</label>
-        <div class="path-selector">
-          <div class="path-browse">
-            <div class="pathbar">
-              <template v-for="(crumb, i) in targetBreadcrumbs" :key="crumb.path">
-                <span v-if="i > 0" class="sep">/</span>
-                <button
-                  class="crumb"
-                  :class="{ current: i === targetBreadcrumbs.length - 1 }"
-                  @click="crumb.path !== targetCurrentPath && loadTargetPath(createForm.targetRemote, crumb.path)"
-                >
-                  {{ crumb.name }}
-                </button>
-              </template>
-            </div>
-            <div class="path-list">
-              <PathItem 
-                v-for="item in targetPathOptions" 
-                :key="item.Path" 
-                :item="item"
-                @enter="onTargetArrow(item)"
-                @click="onTargetClick(item)"
-              />
-              <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
-            </div>
-          </div>
-          <button type="button" class="ghost small" @click="showTargetPathInput = !showTargetPathInput">手动输入</button>
-        </div>
-        <input v-if="showTargetPathInput" v-model="createForm.targetPath" type="text" placeholder="手动输入路径" style="margin-top: 8px" />
-      </div>
-
-      <!-- 定时任务设置 -->
-      <ScheduleOptions v-model="createForm" />
-
-      <!-- 高级选项 -->
-      <button type="button" class="ghost small" @click="showAdvancedOptions = !showAdvancedOptions">
-        {{ showAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}
-      </button>
-      <div v-if="showAdvancedOptions" class="advanced-section">
-        <div class="advanced-group">
-          <div class="advanced-group-title">传输策略</div>
-          <div class="advanced-row inline">
-            <label>开启流式传输（推荐）</label>
-            <input type="checkbox" v-model="createForm.options.enableStreaming" />
-          </div>
-        </div>
-
-        <div class="advanced-group">
-          <div class="advanced-group-title">过滤参数</div>
-          <div class="advanced-row">
-            <label>排除 (exclude)</label>
-            <textarea v-model="createForm.options.exclude" placeholder="每行一个规则, 如: *.txt&#10;备份/**" rows="3"></textarea>
-          </div>
-          <div class="advanced-row">
-            <label>包含 (include)</label>
-            <textarea v-model="createForm.options.include" placeholder="每行一个规则, 如: *.pdf&#10;文档/**" rows="3"></textarea>
-          </div>
-          <div class="advanced-row">
-            <label>过滤规则 (filter)</label>
-            <textarea v-model="createForm.options.filter" placeholder="每行一个规则, 如: - *.tmp&#10;+ *.bak" rows="3"></textarea>
-          </div>
-          <div class="advanced-row inline">
-            <label>忽略大小写</label>
-            <input type="checkbox" v-model="createForm.options.ignoreCase" />
-          </div>
-          <div class="advanced-row inline">
-            <label>忽略已存在的文件</label>
-            <input type="checkbox" v-model="createForm.options.ignoreExisting" />
-          </div>
-          <div class="advanced-row inline">
-            <label>删除被排除的文件</label>
-            <input type="checkbox" v-model="createForm.options.deleteExcluded" />
-          </div>
-        </div>
-
-        <div class="advanced-group">
-          <div class="advanced-group-title">比较策略</div>
-          <div class="advanced-row inline">
-            <label>校验和比较</label>
-            <input type="checkbox" v-model="createForm.options.checksum" />
-          </div>
-          <div class="advanced-row inline">
-            <label>仅按大小</label>
-            <input type="checkbox" v-model="createForm.options.sizeOnly" />
-          </div>
-          <div class="advanced-row inline">
-            <label>忽略大小</label>
-            <input type="checkbox" v-model="createForm.options.ignoreSize" />
-          </div>
-          <div class="advanced-row inline">
-            <label>忽略时间</label>
-            <input type="checkbox" v-model="createForm.options.ignoreTimes" />
-          </div>
-          <div class="advanced-row inline">
-            <label>更新较新的</label>
-            <input type="checkbox" v-model="createForm.options.update" />
-          </div>
-          <div class="advanced-row">
-            <label>时间窗口</label>
-            <input type="text" v-model="createForm.options.modifyWindow" placeholder="如: 1h2s" />
-          </div>
-        </div>
-
-        <div class="advanced-group">
-          <div class="advanced-group-title">路径策略</div>
-          <div class="advanced-row inline">
-            <label>不遍历</label>
-            <input type="checkbox" v-model="createForm.options.noTraverse" />
-          </div>
-          <div class="advanced-row inline">
-            <label>不检查目标</label>
-            <input type="checkbox" v-model="createForm.options.noCheckDest" />
-          </div>
-          <div class="advanced-row">
-            <label>比较目录</label>
-            <input type="text" v-model="createForm.options.compareDest" placeholder="remote:path" />
-          </div>
-          <div class="advanced-row">
-            <label>复制目录</label>
-            <input type="text" v-model="createForm.options.copyDest" placeholder="remote:path" />
-          </div>
-        </div>
-
-        <div class="advanced-group">
-          <div class="advanced-group-title">传输控制</div>
-          <div class="advanced-row">
-            <label>并发传输数</label>
-            <input type="number" v-model="createForm.options.transfers" min="1" max="100" />
-          </div>
-          <div class="advanced-row">
-            <label>带宽限制</label>
-            <input type="text" v-model="createForm.options.bwLimit" placeholder="如: 10M" />
-          </div>
-          <div class="advanced-row inline">
-            <label>多线程传输</label>
-            <input type="checkbox" v-model="createForm.options.multiThreadStreams" />
-          </div>
-          <div class="advanced-row">
-            <label>最大传输</label>
-            <input type="number" v-model="createForm.options.maxTransfer" min="0" placeholder="字节数, 0表示无限制" />
-          </div>
-          <div class="advanced-row">
-            <label>最大时长</label>
-            <input type="number" v-model="createForm.options.maxDuration" min="0" placeholder="秒, 0表示无限制" />
-          </div>
-        </div>
-
-        <div class="advanced-group">
-          <div class="advanced-group-title">同步选项</div>
-          <div class="advanced-row">
-            <label>删除时机</label>
-            <select v-model="createForm.options.cutoffMode">
-              <option value="">默认</option>
-              <option value="before">删除前</option>
-              <option value="during">删除中</option>
-              <option value="after">删除后</option>
-            </select>
-          </div>
-          <div class="advanced-row">
-            <label>最大删除数</label>
-            <input type="number" v-model="createForm.options.maxDelete" min="0" />
-          </div>
-          <div class="advanced-row inline">
-            <label>跟踪重命名</label>
-            <input type="checkbox" v-model="createForm.options.trackRenames" />
-          </div>
-          <div class="advanced-row inline">
-            <label>忽略错误</label>
-            <input type="checkbox" v-model="createForm.options.ignoreErrors" />
-          </div>
-        </div>
-
-        <div class="advanced-group">
-          <div class="advanced-group-title">其他选项</div>
-          <div class="advanced-row inline">
-            <label>模拟运行 (dry-run)</label>
-            <input type="checkbox" v-model="createForm.options.dryRun" />
-          </div>
-          <div class="advanced-row inline">
-            <label>交互模式</label>
-            <input type="checkbox" v-model="createForm.options.interactive" />
-          </div>
-          <div class="advanced-row inline">
-            <label>检查前先检查</label>
-            <input type="checkbox" v-model="createForm.options.checkFirst" />
-          </div>
-          <div class="advanced-row inline">
-            <label>服务器端跨配置</label>
-            <input type="checkbox" v-model="createForm.options.serverSideAcrossConfigs" />
-          </div>
-          <div class="advanced-row">
-            <label>检查器数</label>
-            <input type="number" v-model="createForm.options.checkers" min="1" max="100" />
-          </div>
-          <div class="advanced-row">
-            <label>重试次数</label>
-            <input type="number" v-model="createForm.options.retries" min="0" />
-          </div>
-          <div class="advanced-row">
-            <label>备份目录</label>
-            <input type="text" v-model="createForm.options.backupDir" placeholder="remote:path" />
-          </div>
-          <div class="advanced-row">
-            <label>日志文件</label>
-            <input type="text" v-model="createForm.options.logFile" placeholder="/path/to/log" />
-          </div>
-        </div>
-      </div>
-
-      <div class="form-actions">
-        <button
-          class="primary"
-          :class="{ 'btn-success': creatingState === 'done' }"
-          :disabled="creatingState === 'loading'"
-          @click="createTask"
-        >
-          <template v-if="creatingState === 'loading'">创建中...</template>
-          <template v-else-if="creatingState === 'done'">完成（点击返回任务列表）</template>
-          <template v-else-if="editingTask">保存修改</template>
-          <template v-else>创建任务</template>
-        </button>
-      </div>
-    </div>
-  </div>
+    <AddTaskForm
+      v-if="currentModule === 'add'"
+      :command-mode="commandMode"
+      :command-text="commandText"
+      :create-form="createForm"
+      :remotes="remotes"
+      :show-source-path-input="showSourcePathInput"
+      :show-target-path-input="showTargetPathInput"
+      :source-breadcrumbs="sourceBreadcrumbs"
+      :source-current-path="sourceCurrentPath"
+      :source-path-options="sourcePathOptions"
+      :target-breadcrumbs="targetBreadcrumbs"
+      :target-current-path="targetCurrentPath"
+      :target-path-options="targetPathOptions"
+      :show-advanced-options="showAdvancedOptions"
+      :creating-state="creatingState"
+      :editing-task="editingTask"
+      @update:command-mode="commandMode = $event"
+      @update:command-text="commandText = $event"
+      @update:show-source-path-input="showSourcePathInput = $event"
+      @update:show-target-path-input="showTargetPathInput = $event"
+      @update:show-advanced-options="showAdvancedOptions = $event"
+      @source-remote-change="onSourceRemoteChange"
+      @target-remote-change="onTargetRemoteChange"
+      @load-source-path="loadSourcePath"
+      @load-target-path="loadTargetPath"
+      @source-arrow="onSourceArrow"
+      @source-click="onSourceClick"
+      @target-arrow="onTargetArrow"
+      @target-click="onTargetClick"
+      @submit="createTask"
+    />
 
   <!-- 全局实时数据弹窗 -->
   <div v-if="showGlobalStatsModal" class="modal-overlay" @click.self="showGlobalStatsModal = false">
