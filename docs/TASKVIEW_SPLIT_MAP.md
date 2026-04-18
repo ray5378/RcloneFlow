@@ -218,6 +218,55 @@
 - `frontend/src/composables/useTaskHistoryComputed.ts`
 - `frontend/src/composables/useTaskHistoryLoader.ts`
 - `frontend/src/composables/useTaskHistoryActions.ts`
+- `frontend/src/composables/useRunDetailComputed.ts`
+- `frontend/src/composables/useRunDetailFiles.ts`
+- `frontend/src/composables/useRunDetailState.ts`
+- `frontend/src/composables/useRunDetailEntry.ts`
+
+本轮新增的拆分经验（必须保留）：
+- `TaskView.vue` 属于高脆弱文件；当新增 composable 并把页面逻辑切到新 composable 时，最容易出现的真实回归不是“逻辑写错”，而是“接线没落完整”
+- 这类回归的典型表现包括：`xxx is not defined`、任务列表空白、点击详情无反应、详情打不开
+- 因此后续每次新增 composable 后，必须立刻逐项核对：
+  - `import` 是否补齐
+  - 页面解构是否已接回
+  - 页面旧状态是否删干净
+  - 调用点是否都已切到新来源
+- 上述核对不通过前，不应把该步视为已稳定完成，也不应继续往下一刀扩改
+
+本轮运行详情链新增收口：
+- `frontend/src/composables/useRunDetailComputed.ts` 当前已承接：
+  - `getFinalSummary`
+  - `getPreflight`
+  - `finalFiles`
+  - `finalCountAll`
+  - `finalCountSuccess`
+  - `finalCountFailed`
+  - `finalCountOther`
+  - `setFinalFilter`
+  - `finalFilesTotal`
+  - `totalFinalFilesPages`
+  - `pagedFinalFiles`
+  - `finalFilesJump`
+  - `goPrevFinalFilesPage()`
+  - `goNextFinalFilesPage()`
+  - `jumpFinalFilesPage()`
+- `frontend/src/composables/useRunDetailFiles.ts` 当前已承接：
+  - `runFilesPage`
+  - `openRunDetailFiles(run)`
+  - `pagedRunFiles`
+  - `totalRunFilesPages`
+  - `goPrevFilesPage()`
+  - `goNextFilesPage()`
+  - 以及已下沉但页面当前不再直接使用的底层状态：`runFiles` / `runFilesTotal` / `runFilesPageSize` / `reloadRunFiles()`
+- `frontend/src/composables/useRunDetailState.ts` 当前已承接：
+  - `showDetailModal`
+  - `runDetail`
+  - `openRunDetailModal(run)`
+  - `closeRunDetailModal()`
+- 当前页面层 `TaskView.vue` 对历史详情弹窗的职责已进一步收敛为：
+  - `showRunDetail(run)`：只做入口判断（`running` -> `openRunningHint`，非 running -> 进入历史详情）
+  - `closeRunDetail()`：只保留关闭入口
+  - 模板装配与事件转发
 
 本轮新增收口：
 - 历史详情弹窗模板主块已从 `TaskView.vue` 抽出到 `RunDetailModal.vue`
@@ -392,5 +441,8 @@
 - 页面装配层
 - 数据入口层
 - 少量状态协调层
+
+而不是继续作为一个超大功能承载文件。
+
 
 而不是继续作为一个超大功能承载文件。

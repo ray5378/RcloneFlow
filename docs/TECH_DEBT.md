@@ -70,6 +70,12 @@
 ### 当前临时方案目的
 为了在网络不稳定、Docker Hub / 包管理源偶发超时的情况下，快速验证构建流程，仓库当前临时引入了“本地缓存优先”的测试提速方案。
 
+补充当前测试工作流约定：
+- 每次真正到达用户测试点时，先执行 `docker build --no-cache -t ray5378/rcloneflow:latest .`
+- 由于构建缓存已提前准备好，当前预期一般应在 4 分钟内完成
+- 如果构建失败，Agent 需要主动重试 2 次
+- Agent 需要先自己检查构建是否完成，再通知用户开始测试；如果 2 次重试后仍失败，再把失败情况告知用户
+
 这套方案的目标是：
 - 降低 `docker build` 对外网的依赖
 - 方便快速回归测试
@@ -113,6 +119,15 @@
 
 ### `frontend/src/views/TaskView.vue` 已完成的拆分
 以下内容已经从 `TaskView.vue` 中拆出或收口：
+
+补充到当前阶段：
+- 历史详情弹窗相关主干已进一步拆为四条链：
+  - `frontend/src/composables/useRunDetailComputed.ts`
+  - `frontend/src/composables/useRunDetailFiles.ts`
+  - `frontend/src/composables/useRunDetailState.ts`
+  - `frontend/src/composables/useRunDetailEntry.ts`
+- 当前 `TaskView.vue` 在历史详情弹窗这一块已更接近装配层；页面层主要保留模板装配、事件转发和少量页面级连接线
+- 本轮拆分反复验证出一条必须长期保留的经验：新增 composable 后，必须立即核对 `import`、页面解构、旧状态/旧函数清理、调用点是否都切到新来源，否则极易出现 `xxx is not defined`、页面空白、详情打不开等真实运行时回归
 
 #### 1. 运行中提示小窗 UI
 - 已拆出：`frontend/src/components/task/RunningHintModal.vue`

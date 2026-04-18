@@ -15,6 +15,10 @@ import { useActiveRunLookup } from '../composables/useActiveRunLookup'
 import { useRunningHint } from '../composables/useRunningHint'
 import { useTaskHistoryComputed } from '../composables/useTaskHistoryComputed'
 import { useTaskHistoryLoader } from '../composables/useTaskHistoryLoader'
+import { useRunDetailComputed } from '../composables/useRunDetailComputed'
+import { useRunDetailFiles } from '../composables/useRunDetailFiles'
+import { useRunDetailState } from '../composables/useRunDetailState'
+import { useRunDetailEntry } from '../composables/useRunDetailEntry'
 import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
 
@@ -95,16 +99,8 @@ const remotes = ref<string[]>([])
 const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
 const historyFilterTaskId = ref<number | null>(null)
 const historyStatusFilter = ref<string>('all') // 'all' | 'finished' | 'failed' | 'skipped' | 'hasTransfer'
-const showDetailModal = ref(false)
-const runDetail = ref<any>({})
+const { showDetailModal, runDetail, openRunDetailModal, closeRunDetailModal } = useRunDetailState()
 
-let runDetailTimer: any = null
-
-// 运行详情 - 文件列表分页
-const runFiles = ref<any[]>([])
-const runFilesTotal = ref(0)
-const runFilesPage = ref(1)
-const runFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 380) / 32)))
 const showCreateModal = ref(false)
 const showAdvancedOptions = ref(false)
 const showGlobalStatsModal = ref(false)
@@ -347,89 +343,33 @@ async function openRunLog(run:any){
 
 // （重复定义已移除）
 
-async function reloadRunFiles(){
-  try{
-    if (!runDetail.value?.id) return
-    const pageOffset = (runFilesPage.value-1) * runFilesPageSize.value
-    const res = await runApi.getFiles(runDetail.value.id, pageOffset, runFilesPageSize.value)
-    runFiles.value = res.items || []
-    runFilesTotal.value = res.total || 0
-  }catch(e){ console.error(e) }
-}
-
-function pickFilesFromRun(run:any){
-  try{
-    const sum = typeof run.summary === 'string' ? JSON.parse(run.summary) : run.summary
-    if (sum?.finalSummary?.files && Array.isArray(sum.finalSummary.files)) return sum.finalSummary.files
-  }catch{}
-  return []
-}
-
 function showRunDetail(run:any){
   if (run.status === 'running'){
-    // 不切主窗口：给出轻量提示小窗，引导去"任务日志"查看实时内容
+    // 运行中的记录不进入历史详情弹窗，而是走轻量提示小窗
     openRunningHint(run)
     return
   }
-  runDetail.value = run
-  showDetailModal.value = true
-  runFilesPage.value = 1
-  runFiles.value = []
-  runFilesTotal.value = 0
-  reloadRunFiles()
+
+  // 历史详情入口：页面层只负责入口判断，详情状态与文件链已分别下沉
+  openRunDetailModal(run)
+  openRunDetailFiles(run)
 }
 
 function closeRunDetail(){
-  showDetailModal.value = false
-  if (runDetailTimer) { clearInterval(runDetailTimer); runDetailTimer = null }
+  // 历史详情出口：页面层只保留关闭入口，具体状态由 useRunDetailState 管理
+  closeRunDetailModal()
 }
 
 onUnmounted(()=>{
-  if (runDetailTimer) { clearInterval(runDetailTimer); runDetailTimer = null }
   if (stuckTimer) { clearInterval(stuckTimer); stuckTimer = null }
 })
 
-const pagedRunFiles = computed(()=> runFiles.value)
-const totalRunFilesPages = computed(()=> Math.max(1, Math.ceil((runFilesTotal.value||0)/runFilesPageSize.value)))
-function goPrevFilesPage(){ if (runFilesPage.value>1) { runFilesPage.value--; reloadRunFiles() } }
-function goNextFilesPage(){ if (runFilesPage.value<totalRunFilesPages.value) { runFilesPage.value++; reloadRunFiles() } }
-// finalSummary.files 分页（内存分页）
-const finalFiles = computed(()=> (getFinalSummary(runDetail.value)?.files || []) as any[])
-// 统计计数
-const finalCountAll = computed(()=> finalFiles.value.length)
-const finalCountSuccess = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='success').length)
-const finalCountFailed = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='failed').length)
-const finalCountOther = computed(()=> finalFiles.value.filter(it=> (it.status||'')==='skipped').length)
+// finalSummary.files 与统计计数已下沉到 useRunDetailComputed.ts
 // move 模式时，成功数量代表 Moved 条数；已在后端合并 Copied+Deleted 为 Moved
-// 预估总数（preflight），用于"需完成多少"
-function getPreflight(run:any){
-  try{
-    const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
-    return sum?.preflight || null
-  }catch{ return null }
-}
-// 可筛选标签：all|success|failed|other
-const currentFinalFilter = ref<'all'|'success'|'failed'|'other'>('all')
-function setFinalFilter(k:'all'|'success'|'failed'|'other') { currentFinalFilter.value = k; finalFilesPage.value = 1 }
-const finalFilteredFiles = computed(()=> {
-  if (currentFinalFilter.value==='success') return finalFiles.value.filter(it=> (it.status||'')==='success')
-  if (currentFinalFilter.value==='failed') return finalFiles.value.filter(it=> (it.status||'')==='failed')
-  if (currentFinalFilter.value==='other') return finalFiles.value.filter(it=> (it.status||'')==='skipped')
-  return finalFiles.value
-})
+// 筛选状态与 finalFilteredFiles 已下沉到 useRunDetailComputed.ts
 // 分页（按筛选后的集）
 const finalFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 420) / 34)))
 const finalFilesPage = ref(1)
-const finalFilesTotal = computed(()=> finalFilteredFiles.value.length)
-const totalFinalFilesPages = computed(()=> Math.max(1, Math.ceil((finalFilesTotal.value||0)/finalFilesPageSize.value)))
-const pagedFinalFiles = computed(()=> {
-  const start = (finalFilesPage.value-1) * finalFilesPageSize.value
-  return finalFilteredFiles.value.slice(start, start + finalFilesPageSize.value)
-})
-const finalFilesJump = ref<number | null>(null)
-function goPrevFinalFilesPage(){ if (finalFilesPage.value>1) finalFilesPage.value-- }
-function goNextFinalFilesPage(){ if (finalFilesPage.value<totalFinalFilesPages.value) finalFilesPage.value++ }
-function jumpFinalFilesPage(){ if (!finalFilesJump.value) return; const p = Math.min(Math.max(1, finalFilesJump.value), totalFinalFilesPages.value); finalFilesPage.value = p }
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
   title: '',
@@ -709,15 +649,8 @@ function formatDuration(startTime: string | undefined, endTime: string | undefin
   return `${seconds}s`
 }
 
-function getFinalSummary(run: any){
-  try{
-    const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
-    if (sum && typeof sum === 'object' && sum.finalSummary) return sum.finalSummary
-  }catch{}
-  return null
-}
 function getRunDurationText(run:any){
-  const fs = getFinalSummary(run)
+  const fs = getFinalSummaryFromComposable(run)
   if (fs && fs.durationText) return fs.durationText
   // fallback to local compute for running
   return formatDuration(run.startedAt, run.finishedAt)
@@ -962,6 +895,33 @@ function stripQuotes(s?: string){ return s ? s.replace(/^['\"]|['\"]$/g, '') : s
 function toCamel(s: string){ return s.replace(/-([a-z])/g, (_,c)=>c.toUpperCase()) }
 
 const {
+  runFilesPage,
+  openRunDetailFiles,
+  pagedRunFiles,
+  totalRunFilesPages,
+  goPrevFilesPage,
+  goNextFilesPage,
+} = useRunDetailFiles({ runDetail, runApi })
+
+const {
+  getFinalSummary: getFinalSummaryFromComposable,
+  getPreflight: getPreflightFromComposable,
+  finalFiles,
+  finalCountAll,
+  finalCountSuccess,
+  finalCountFailed,
+  finalCountOther,
+  setFinalFilter,
+  finalFilesTotal,
+  totalFinalFilesPages,
+  pagedFinalFiles,
+  finalFilesJump,
+  goPrevFinalFilesPage,
+  goNextFinalFilesPage,
+  jumpFinalFilesPage,
+} = useRunDetailComputed({ runDetail, finalFilesPage, finalFilesPageSize })
+
+const {
   filteredRuns,
   filteredRunsTotal,
   currentTotal,
@@ -974,7 +934,7 @@ const {
   historyStatusFilter,
   runsPage,
   runsPageSize,
-  getFinalSummary,
+  getFinalSummary: getFinalSummaryFromComposable,
 })
 
 const {
@@ -1509,7 +1469,7 @@ const targetBreadcrumbs = computed(() => {
       :history-status-filter="historyStatusFilter"
       :filtered-runs="filteredRuns"
       :get-db-progress-stable="getDbProgressStable"
-      :get-final-summary="getFinalSummary"
+      :get-final-summary="getFinalSummaryFromComposable"
       @back="currentModule = 'tasks'"
       @set-status-filter="historyStatusFilter = $event"
       @prev-page="runsPage--; loadData()"
@@ -1528,8 +1488,8 @@ const targetBreadcrumbs = computed(() => {
       :run-detail="runDetail"
       :get-status-class="getStatusClass"
       :get-status-text="getStatusText"
-      :get-final-summary="getFinalSummary"
-      :get-preflight="getPreflight"
+      :get-final-summary="getFinalSummaryFromComposable"
+      :get-preflight="getPreflightFromComposable"
       :format-bytes="formatBytes"
       :format-time="formatTime"
       :format-bps="formatBps"
@@ -1546,7 +1506,7 @@ const targetBreadcrumbs = computed(() => {
       :paged-run-files="pagedRunFiles"
       :run-files-page="runFilesPage"
       :total-run-files-pages="totalRunFilesPages"
-      @close="showDetailModal = false"
+      @close="closeRunDetail()"
       @set-final-filter="setFinalFilter"
       @prev-final-files-page="goPrevFinalFilesPage()"
       @next-final-files-page="goNextFinalFilesPage()"
