@@ -14,6 +14,9 @@ import { useActiveRunLookup } from '../composables/useActiveRunLookup'
 import { useRunningHint } from '../composables/useRunningHint'
 import { useTaskHistoryComputed } from '../composables/useTaskHistoryComputed'
 import { useTaskHistoryLoader } from '../composables/useTaskHistoryLoader'
+import { useTaskHistoryActions } from '../composables/useTaskHistoryActions'
+import { useTaskListActions } from '../composables/useTaskListActions'
+import { useTaskRunActions } from '../composables/useTaskRunActions'
 import { useRunDetailComputed } from '../composables/useRunDetailComputed'
 import { useRunDetailFiles } from '../composables/useRunDetailFiles'
 import { useRunDetailState } from '../composables/useRunDetailState'
@@ -24,6 +27,8 @@ import { useTaskFormPrepare } from '../composables/useTaskFormPrepare'
 import { useTaskFormFlow } from '../composables/useTaskFormFlow'
 import { useTaskPathBrowse } from '../composables/useTaskPathBrowse'
 import { useTaskFormEntry } from '../composables/useTaskFormEntry'
+import { useTaskListView } from '../composables/useTaskListView'
+import { useTaskViewUi } from '../composables/useTaskViewUi'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
@@ -67,39 +72,17 @@ function jumpToPage() {
   loadData()
 }
 
-// 任务分页
-const tasksPage = ref(1)
-const tasksPageSize = 20
-const tasksJumpPage = ref(1)
-const tasksTotal = computed(() => filteredTasksRaw.value.length)
-const currentTasksPages = computed(() => Math.max(1, Math.ceil(tasksTotal.value / tasksPageSize)))
-
-function jumpToTasksPage() {
-  const page = Math.min(Math.max(1, tasksJumpPage.value || 1), currentTasksPages.value)
-  tasksPage.value = page
-  tasksJumpPage.value = page
-}
-
-const taskSearch = ref('')
-
-// 过滤后的任务列表（原始）
-const filteredTasksRaw = computed(() => {
-  if (!taskSearch.value) return tasks.value
-  const q = taskSearch.value.toLowerCase()
-  return tasks.value.filter(t =>
-    t.name.toLowerCase().includes(q) ||
-    t.sourceRemote.toLowerCase().includes(q) ||
-    t.targetRemote.toLowerCase().includes(q) ||
-    t.mode.toLowerCase().includes(q)
-  )
-})
-
-// 过滤后的任务列表（分页后）
-const filteredTasks = computed(() => {
-  const start = (tasksPage.value - 1) * tasksPageSize
-  const end = start + tasksPageSize
-  return filteredTasksRaw.value.slice(start, end)
-})
+const {
+  tasksPage,
+  tasksPageSize,
+  tasksJumpPage,
+  taskSearch,
+  tasksTotal,
+  currentTasksPages,
+  filteredTasksRaw,
+  filteredTasks,
+  jumpToTasksPage,
+} = useTaskListView(tasks)
 
 const remotes = ref<string[]>([])
 const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
@@ -375,12 +358,15 @@ onUnmounted(()=>{
 // 分页（按筛选后的集）
 const finalFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 420) / 34)))
 const finalFilesPage = ref(1)
-const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
-  show: false,
-  title: '',
-  message: '',
-  onConfirm: () => {}
-})
+const {
+  openMenuId,
+  confirmModal,
+  toggleMenu,
+  closeMenus,
+  showConfirm,
+  closeConfirm,
+  confirmAndClose,
+} = useTaskViewUi()
 
 const {
   createForm,
@@ -392,9 +378,11 @@ const {
   fillTaskFormForEdit,
 } = useTaskFormState()
 
-const openMenuId = ref<number | null>(null)
 const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
-const runningTaskId = ref<number | null>(null)
+
+function getScheduleByTaskId(taskId: number) {
+  return schedules.value.find(s => s.taskId === taskId)
+}
 
 const {
   handleTaskFormDoneClick,
@@ -840,49 +828,49 @@ const {
   runApi,
 })
 
-const stoppedTaskId = ref<number|null>(null)
-async function stopTaskAny(taskId: number) {
-  try {
-    // 直接按任务 ID kill（后端会定位最近 run 并发信号）
-    await taskApi.kill(taskId)
-    // 兼容 RC：如仍有 rcJobId，则再尝试停止
-    const active = await jobApi.list()
-    const cur:any = Array.isArray(active) ? active.find(x => x?.runRecord?.taskId === taskId && x?.runRecord?.rcJobId) : null
-    if (cur?.runRecord?.rcJobId) {
-      await jobApi.stop(cur.runRecord.rcJobId)
-    }
-    // 按钮状态反馈：红色"已经停止"，10秒后恢复
-    stoppedTaskId.value = taskId
-    setTimeout(()=>{ if (stoppedTaskId.value===taskId) stoppedTaskId.value=null }, 10000)
-    // 轻量刷新列表
-    await loadData()
-  } catch (e) {
-    stoppedTaskId.value = null
-    showToast((e as Error).message, 'error')
-  }
-}
+const {
+  clearRun,
+  clearAllRuns,
+} = useTaskHistoryActions({
+  runs,
+  taskRuns,
+  historyFilterTaskId,
+  runsPage,
+  jumpPage,
+  filteredRuns,
+  loadData,
+  refreshTaskHistoryRuns,
+  runApi,
+})
 
+const {
+  deleteTask,
+  toggleSchedule,
+  deleteSchedule,
+  clearAllRunsWithConfirm,
+} = useTaskListActions({
+  openMenuId,
+  historyFilterTaskId,
+  schedules,
+  loadData,
+  showConfirm,
+  showToast,
+  clearAllRuns,
+  taskApi,
+  scheduleApi,
+})
 
-async function runTask(taskId: number) {
-  if (runningTaskId.value !== null) {
-    showToast('单例模式：已有任务正在运行，跳过本次执行', 'error')
-    return
-  }
-  runningTaskId.value = taskId
-  const result = await taskApi.run(taskId)
-  if (!result) {
-    // handleError already showed a toast, just reset state
-    runningTaskId.value = null
-    return
-  }
-  // 5秒后恢复
-  setTimeout(() => {
-    if (runningTaskId.value === taskId) {
-      runningTaskId.value = null
-    }
-  }, 5000)
-  return result
-}
+const {
+  runningTaskId,
+  stoppedTaskId,
+  stopTaskAny,
+  runTask,
+} = useTaskRunActions({
+  loadData,
+  showToast,
+  taskApi,
+  jobApi,
+})
 
 const {
   goToAddTask,
@@ -899,31 +887,6 @@ const {
   restoreTaskPathBrowse,
 })
 
-function showConfirm(title: string, message: string, onConfirm: () => void) {
-  confirmModal.value = { show: true, title, message, onConfirm }
-}
-
-async function deleteTask(id: number) {
-  showConfirm('删除任务', '确定删除此任务？此操作不可恢复！', async () => {
-    const success = await taskApi.delete(id)
-    if (success) {
-      openMenuId.value = null
-      await loadData()
-    }
-  })
-}
-
-function getScheduleByTaskId(taskId: number) {
-  return schedules.value.find(s => s.taskId === taskId)
-}
-
-async function toggleSchedule(taskId: number) {
-  const schedule = getScheduleByTaskId(taskId)
-  if (!schedule) return
-  await scheduleApi.update(schedule.id, !schedule.enabled)
-  await loadData()
-}
-
 function formatScheduleSpec(spec: string): string {
   if (!spec) return ''
   const parts = spec.split('|')
@@ -935,80 +898,6 @@ function formatScheduleSpec(spec: string): string {
 
   // 显示为标准cron格式
   return `${minute} ${hour} ${day} ${month} ${week}`
-}
-
-function toggleMenu(id: number) {
-  openMenuId.value = openMenuId.value === id ? null : id
-}
-
-function closeMenus() {
-  openMenuId.value = null
-}
-
-async function deleteSchedule(id: number) {
-  if (!confirm('确定删除此定时任务？')) return
-  await scheduleApi.delete(id)
-  await loadData()
-}
-
-async function clearRun(id: number) {
-  const prevRuns = runs.value
-  const prevTaskRuns = taskRuns.value
-
-  runs.value = runs.value.filter(r => r.id !== id)
-  taskRuns.value = taskRuns.value.filter(r => r.id !== id)
-  if (historyFilterTaskId.value !== null && runsPage.value > 1 && filteredRuns.value.length === 0) {
-    runsPage.value -= 1
-    jumpPage.value = runsPage.value
-  }
-
-  const ok = await runApi.delete(id)
-  if (!ok) {
-    runs.value = prevRuns
-    taskRuns.value = prevTaskRuns
-    return
-  }
-
-  await loadData()
-  if (historyFilterTaskId.value !== null) {
-    await refreshTaskHistoryRuns()
-  }
-}
-
-async function clearAllRuns() {
-  if (historyFilterTaskId.value === null) {
-    showToast('请先选择任务', 'error')
-    return
-  }
-
-  const prevRuns = runs.value
-  const prevTaskRuns = taskRuns.value
-  const taskId = historyFilterTaskId.value
-
-  taskRuns.value = []
-  runs.value = runs.value.filter(r => r.taskId !== taskId)
-  runsPage.value = 1
-  jumpPage.value = 1
-
-  const ok = await runApi.deleteByTask(taskId)
-  if (!ok) {
-    runs.value = prevRuns
-    taskRuns.value = prevTaskRuns
-    return
-  }
-
-  await loadData()
-  await refreshTaskHistoryRuns()
-}
-
-function clearAllRunsWithConfirm() {
-  if (historyFilterTaskId.value === null) {
-    showToast('请先选择任务', 'error')
-    return
-  }
-  showConfirm('删除所有历史', '确定删除该任务所有历史记录？此操作不可恢复！', async () => {
-    await clearAllRuns()
-  })
 }
 
 </script>
@@ -1296,18 +1185,18 @@ function clearAllRunsWithConfirm() {
 
 
   <!-- 确认删除弹窗 -->
-  <div v-if="confirmModal.show" class="modal-overlay" @click.self="confirmModal.show = false">
+  <div v-if="confirmModal.show" class="modal-overlay" @click.self="closeConfirm()">
     <div class="modal-content confirm-modal">
       <div class="modal-header">
         <h3>{{ confirmModal.title }}</h3>
-        <button class="close-btn" @click="confirmModal.show = false">×</button>
+        <button class="close-btn" @click="closeConfirm()">×</button>
       </div>
       <div class="modal-body">
         <p>{{ confirmModal.message }}</p>
       </div>
       <div class="modal-footer">
-        <button class="ghost" @click="confirmModal.show = false">取消</button>
-        <button class="primary danger" @click="confirmModal.show = false; confirmModal.onConfirm()">确认</button>
+        <button class="ghost" @click="closeConfirm()">取消</button>
+        <button class="primary danger" @click="confirmAndClose()">确认</button>
       </div>
     </div>
   </div>

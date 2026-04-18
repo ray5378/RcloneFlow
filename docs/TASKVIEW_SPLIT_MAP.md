@@ -381,7 +381,7 @@
 当前页面层 `TaskView.vue` 仍保留：
 - `createTask()` 极薄入口壳（只负责调用 flow 与 toast）
 - `creatingState`
-- 远端列表加载与部分页面级入口编排
+- 更外层的页面级数据加载 / WebSocket / 刷新协调
 
 本轮已完成并验证的创建任务入口链：
 - 进入“添加任务”
@@ -395,10 +395,19 @@
 - 这类回归会直接表现为：页面空白、任务列表空白、编辑入口失效、`xxx is not defined`
 - 表单模板抽成组件后，原样式不会自动跟随；对子组件内部布局（尤其 `AdvancedOptions.vue`）必须显式迁移样式，否则会出现布局严重错位
 
+本轮新增完成并验证的任务列表外层装配链：
+- `useTaskListView.ts` 已承接任务列表搜索 / 分页 / 跳页 / 派生列表链
+- `useTaskViewUi.ts` 已承接菜单开关态、确认弹窗状态、确认打开/关闭/确认动作
+- `useTaskHistoryActions.ts` 已真实接入页面主链，承接 `clearRun()` / `clearAllRuns()`
+- `useTaskListActions.ts` 已承接 `deleteTask()` / `toggleSchedule()` / `deleteSchedule()` / `clearAllRunsWithConfirm()` 等行为入口壳
+- `useTaskRunActions.ts` 已承接 `runTask()` / `stopTaskAny()` / `runningTaskId` / `stoppedTaskId`
+- 用户已确认：任务列表显示、删除任务、删除定时任务、清空历史、运行任务、停止任务均正常
+- 同时已修复并验证一整组拆分回归：`getScheduleByTaskId is not defined`、`useTaskRunActions is not defined`、`confirmAndClose is not a function`、`Cannot access ... before initialization`
+
 建议下一步拆分顺序：
-1. 先收口本轮创建任务表单区 + 路径浏览深链 + 入口编排链拆分成果
-2. 再看 `tempSchedule` UI 临时态是否需要单独治理
-3. 最后再评估更深的页面级装配/入口编排是否值得继续下沉
+1. 先收口本轮创建任务表单区 + 路径浏览深链 + 入口编排链 + 定时规则治理 + 任务列表外层装配链成果
+2. 再评估更深的页面级数据加载 / WebSocket / 刷新协调是否值得继续下沉
+3. 最后再决定是否触碰更深的任务列表行为细节或页面总装配层
 
 重点测试：
 - 新建任务
