@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as api from '../api'
-import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal } from '../components/task'
+import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal, TaskHistoryPanel } from '../components/task'
 import { getActiveProgress as getHintActiveProgress, getActiveProgressText as getHintActiveProgressText } from '../components/task/runningHint'
 import { ToastItem } from '../components/toast'
 import { FileItem } from '../components/files'
@@ -13,6 +13,8 @@ import { getToken } from '../api/auth'
 import { useWebSocket, onWsMessage } from '../composables/useWebSocket'
 import { useActiveRunLookup } from '../composables/useActiveRunLookup'
 import { useRunningHint } from '../composables/useRunningHint'
+import { useTaskHistoryComputed } from '../composables/useTaskHistoryComputed'
+import { useTaskHistoryLoader } from '../composables/useTaskHistoryLoader'
 import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
 
@@ -959,59 +961,33 @@ function parseRemotePath(s: string){
 function stripQuotes(s?: string){ return s ? s.replace(/^['\"]|['\"]$/g, '') : s }
 function toCamel(s: string){ return s.replace(/-([a-z])/g, (_,c)=>c.toUpperCase()) }
 
-// 过滤后的历史记录
-const filteredRuns = computed(() => {
-  // 全局视图用 runs.value，任务视图用 taskRuns.value
-  let source = historyFilterTaskId.value === null ? runs.value : taskRuns.value
-  let result = [...source]
-  if (historyStatusFilter.value === 'hasTransfer') {
-    result = result.filter(r => {
-      const sum = getFinalSummary(r)
-      return sum && (sum.totalCount > 1 || sum.transferredBytes > 0)
-    })
-  } else if (historyStatusFilter.value !== 'all') {
-    result = result.filter(r => r.status === historyStatusFilter.value)
-  }
-  // 客户端分页
-  const start = (runsPage.value - 1) * runsPageSize
-  const end = start + runsPageSize
-  return result.slice(start, end)
+const {
+  filteredRuns,
+  filteredRunsTotal,
+  currentTotal,
+  currentTotalPages,
+} = useTaskHistoryComputed({
+  runs,
+  runsTotal,
+  taskRuns,
+  historyFilterTaskId,
+  historyStatusFilter,
+  runsPage,
+  runsPageSize,
+  getFinalSummary,
 })
 
-// 筛选后的总数（用于分页）
-const filteredRunsTotal = computed(() => {
-  let source = historyFilterTaskId.value === null ? runs.value : taskRuns.value
-  let result = [...source]
-  if (historyStatusFilter.value === 'hasTransfer') {
-    result = result.filter(r => {
-      const sum = getFinalSummary(r)
-      return sum && (sum.totalCount > 1 || sum.transferredBytes > 0)
-    })
-  } else if (historyStatusFilter.value !== 'all') {
-    result = result.filter(r => r.status === historyStatusFilter.value)
-  }
-  return result.length
+const {
+  refreshTaskHistoryRuns,
+  viewTaskHistory,
+} = useTaskHistoryLoader({
+  taskRuns,
+  historyFilterTaskId,
+  runsPage,
+  jumpPage,
+  currentModule,
+  runApi,
 })
-
-// 当前分页的总数（全局视图用 runsTotal，特定任务视图用 filteredRunsTotal）
-const currentTotal = computed(() => {
-  return historyFilterTaskId.value === null ? (runsTotal.value || 0) : filteredRunsTotal.value
-})
-
-// 当前总页数
-const currentTotalPages = computed(() => Math.max(1, Math.ceil(currentTotal.value / runsPageSize)))
-
-function viewTaskHistory(taskId: number) {
-  runsPage.value = 1
-  historyFilterTaskId.value = taskId
-  currentModule.value = 'history'
-  // 获取该任务的历史记录
-  runApi.getRunsByTask(taskId).then(data => {
-    if (data && Array.isArray(data)) {
-      taskRuns.value = data
-    }
-  })
-}
 
 const stoppedTaskId = ref<number|null>(null)
 async function stopTaskAny(taskId: number) {
@@ -1185,8 +1161,27 @@ async function deleteSchedule(id: number) {
 }
 
 async function clearRun(id: number) {
-  await runApi.delete(id)
+  const prevRuns = runs.value
+  const prevTaskRuns = taskRuns.value
+
+  runs.value = runs.value.filter(r => r.id !== id)
+  taskRuns.value = taskRuns.value.filter(r => r.id !== id)
+  if (historyFilterTaskId.value !== null && runsPage.value > 1 && filteredRuns.value.length === 0) {
+    runsPage.value -= 1
+    jumpPage.value = runsPage.value
+  }
+
+  const ok = await runApi.delete(id)
+  if (!ok) {
+    runs.value = prevRuns
+    taskRuns.value = prevTaskRuns
+    return
+  }
+
   await loadData()
+  if (historyFilterTaskId.value !== null) {
+    await refreshTaskHistoryRuns()
+  }
 }
 
 async function clearAllRuns() {
@@ -1195,8 +1190,24 @@ async function clearAllRuns() {
     return
   }
   showConfirm('删除所有历史', '确定删除该任务所有历史记录？此操作不可恢复！', async () => {
-    await runApi.deleteByTask(historyFilterTaskId.value)
+    const prevRuns = runs.value
+    const prevTaskRuns = taskRuns.value
+    const taskId = historyFilterTaskId.value
+
+    taskRuns.value = []
+    runs.value = runs.value.filter(r => r.taskId !== taskId)
+    runsPage.value = 1
+    jumpPage.value = 1
+
+    const ok = await runApi.deleteByTask(taskId)
+    if (!ok) {
+      runs.value = prevRuns
+      taskRuns.value = prevTaskRuns
+      return
+    }
+
     await loadData()
+    await refreshTaskHistoryRuns()
   })
 }
 
@@ -1478,45 +1489,29 @@ const targetBreadcrumbs = computed(() => {
     </div>
   </div>
 
-  <div v-if="currentModule === 'history'" class="card">
-    <div class="card-header">
-      <div class="title clickable" @click.stop="currentModule = 'tasks'">任务历史记录 ←</div>
-      <div class="history-filters" @click.stop>
-        <button :class="['filter-btn', historyStatusFilter==='all' && 'active']" @click.stop="historyStatusFilter='all'">全部</button>
-        <button :class="['filter-btn', historyStatusFilter==='finished' && 'active']" @click.stop="historyStatusFilter='finished'">成功</button>
-        <button :class="['filter-btn', historyStatusFilter==='failed' && 'active']" @click.stop="historyStatusFilter='failed'">失败</button>
-        <button :class="['filter-btn', historyStatusFilter==='skipped' && 'active']" @click.stop="historyStatusFilter='skipped'">跳过</button>
-        <button :class="['filter-btn', historyStatusFilter==='hasTransfer' && 'active']" @click.stop="historyStatusFilter='hasTransfer'">有传输</button>
-      </div>
-      <!-- 历史记录分页 -->
-      <div class="pagination" v-if="currentTotal > runsPageSize" @click.stop>
-        <span class="page-current">第 {{ runsPage }} / {{ currentTotalPages }} 页</span>
-        <button class="page-btn" :disabled="runsPage <= 1" @click.stop="runsPage--; loadData()">上一页</button>
-        <button class="page-btn" :disabled="runsPage >= currentTotalPages" @click.stop="runsPage++; loadData()">下一页</button>
-        <input type="number" class="page-input" v-model.number="jumpPage" :min="1" :max="currentTotalPages" @keyup.enter.stop="jumpToPage" />
-        <button class="page-btn" @click.stop="jumpToPage">跳转</button>
-      </div>
-      <div class="header-actions" @click.stop>
-        <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click.stop="clearAllRuns">删除所有</button>
-        <button v-if="historyFilterTaskId !== null" class="ghost small" @click.stop="currentModule = 'tasks'">
-          ← 返回
-        </button>
-      </div>
-    </div>
-    <div class="list">
-      <RunItem
-        v-for="run in filteredRuns"
-        :key="run.id"
-        :run="run"
-        :progress="run.status === 'running' ? getDbProgressStable(run) : undefined"
-        :summary="getFinalSummary(run)"
-        @click="showRunDetail(run)"
-        @view-detail="showRunDetail(run)"
-        @view-log="openRunLog(run)"
-        @clear="clearRun(run.id)"
-      />
-      <div v-if="!filteredRuns.length" class="empty">暂无历史记录</div>
-    </div>
+  <div v-if="currentModule === 'history'">
+    <TaskHistoryPanel
+      :current-total="currentTotal"
+      :runs-page="runsPage"
+      :runs-page-size="runsPageSize"
+      :current-total-pages="currentTotalPages"
+      :jump-page="jumpPage"
+      :history-filter-task-id="historyFilterTaskId"
+      :history-status-filter="historyStatusFilter"
+      :filtered-runs="filteredRuns"
+      :get-db-progress-stable="getDbProgressStable"
+      :get-final-summary="getFinalSummary"
+      @back="currentModule = 'tasks'"
+      @set-status-filter="historyStatusFilter = $event"
+      @prev-page="runsPage--; loadData()"
+      @next-page="runsPage++; loadData()"
+      @update-jump-page="jumpPage = $event"
+      @jump-page="jumpToPage"
+      @clear-all="clearAllRuns"
+      @view-detail="showRunDetail"
+      @view-log="openRunLog"
+      @clear-run="clearRun"
+    />
 
     <!-- 运行详情弹窗 -->
     <div v-if="showDetailModal" class="modal-overlay" @click.self="showDetailModal = false">

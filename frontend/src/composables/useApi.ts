@@ -170,7 +170,8 @@ export const runApi = {
 
   async delete(id: number) {
     try {
-      return await api.clearRun(id)
+      await api.clearRun(id)
+      return true
     } catch (err) {
       handleError(err, { module: 'Run', operation: '删除历史记录' })
       return false
@@ -179,7 +180,8 @@ export const runApi = {
 
   async deleteAll() {
     try {
-      return await api.clearAllRuns()
+      await api.clearAllRuns()
+      return true
     } catch (err) {
       handleError(err, { module: 'Run', operation: '清空历史记录' })
       return false
