@@ -32,20 +32,27 @@ function onJumpPageInput(event: Event) {
   const target = event.target as HTMLInputElement
   emit('update-jump-page', Number(target.value || 1))
 }
+
+function onHeaderClick(event: MouseEvent) {
+  const target = event.target as HTMLElement | null
+  if (!target) return
+  if (target.closest('[data-no-back]')) return
+  emit('back')
+}
 </script>
 
 <template>
   <div class="card">
-    <div class="card-header">
+    <div class="card-header history-header" @click="onHeaderClick">
       <div class="title clickable" @click.stop="emit('back')">任务历史记录 ←</div>
-      <div class="history-filters" @click.stop>
+      <div class="history-filters" data-no-back @click.stop>
         <button :class="['filter-btn', historyStatusFilter === 'all' && 'active']" @click.stop="emit('set-status-filter', 'all')">全部</button>
         <button :class="['filter-btn', historyStatusFilter === 'finished' && 'active']" @click.stop="emit('set-status-filter', 'finished')">成功</button>
         <button :class="['filter-btn', historyStatusFilter === 'failed' && 'active']" @click.stop="emit('set-status-filter', 'failed')">失败</button>
         <button :class="['filter-btn', historyStatusFilter === 'skipped' && 'active']" @click.stop="emit('set-status-filter', 'skipped')">跳过</button>
         <button :class="['filter-btn', historyStatusFilter === 'hasTransfer' && 'active']" @click.stop="emit('set-status-filter', 'hasTransfer')">有传输</button>
       </div>
-      <div class="pagination" v-if="currentTotal > runsPageSize" @click.stop>
+      <div class="pagination" v-if="currentTotal > runsPageSize" data-no-back @click.stop>
         <span class="page-current">第 {{ runsPage }} / {{ currentTotalPages }} 页</span>
         <button class="page-btn" :disabled="runsPage <= 1" @click.stop="emit('prev-page')">上一页</button>
         <button class="page-btn" :disabled="runsPage >= currentTotalPages" @click.stop="emit('next-page')">下一页</button>
@@ -60,7 +67,7 @@ function onJumpPageInput(event: Event) {
         />
         <button class="page-btn" @click.stop="emit('jump-page')">跳转</button>
       </div>
-      <div class="header-actions" @click.stop>
+      <div class="header-actions" data-no-back @click.stop>
         <button
           v-if="historyFilterTaskId !== null && filteredRuns.length > 0"
           class="ghost small danger-text"
@@ -91,6 +98,12 @@ function onJumpPageInput(event: Event) {
 </template>
 
 <style scoped>
+.history-header{
+  cursor:pointer;
+}
+.history-header > *{
+  cursor:auto;
+}
 .history-filters{
   display:flex;
   align-items:center;
