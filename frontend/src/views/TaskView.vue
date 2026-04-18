@@ -23,6 +23,7 @@ import { useTaskFormSubmit } from '../composables/useTaskFormSubmit'
 import { useTaskFormPrepare } from '../composables/useTaskFormPrepare'
 import { useTaskFormFlow } from '../composables/useTaskFormFlow'
 import { useTaskPathBrowse } from '../composables/useTaskPathBrowse'
+import { useTaskFormEntry } from '../composables/useTaskFormEntry'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
@@ -907,41 +908,20 @@ async function runTask(taskId: number) {
   return result
 }
 
-function openTaskFormModule() {
-  currentModule.value = 'add'
-  openMenuId.value = null
-}
-
-async function goToAddTask() {
-  // Reload remotes before switching to add mode
-  const remoteData = await remoteApi.list()
-  remotes.value = remoteData?.remotes || []
-  resetTaskFormForCreate()
-  resetTaskPathBrowse()
-  openTaskFormModule()
-}
-
-function editTask(task: Task) {
-  // 查找该任务的定时规则
-  const schedule = getScheduleByTaskId(task.id)
-  const parts = fillTaskFormForEdit(task, schedule?.spec)
-
-  if (parts) {
-    // 更新临时选择状态
-    tempSchedule.value = {
-      minute: parts[0] && parts[0] !== '*' ? parts[0].split(',') : [],
-      hour: parts[1] && parts[1] !== '*' ? parts[1].split(',') : [],
-      day: parts[2] && parts[2] !== '*' ? parts[2].split(',') : [],
-      month: parts[3] && parts[3] !== '*' ? parts[3].split(',') : [],
-      week: parts[4] && parts[4] !== '*' ? parts[4].split(',') : [],
-    }
-  } else {
-    tempSchedule.value = { month: [], week: [], day: [], hour: [], minute: [] }
-  }
-
-  restoreTaskPathBrowse(task)
-  openTaskFormModule()
-}
+const {
+  goToAddTask,
+  editTask,
+} = useTaskFormEntry({
+  currentModule,
+  openMenuId,
+  remotes,
+  remoteApi,
+  resetTaskFormForCreate,
+  resetTaskPathBrowse,
+  getScheduleByTaskId,
+  fillTaskFormForEdit,
+  restoreTaskPathBrowse,
+})
 
 function showConfirm(title: string, message: string, onConfirm: () => void) {
   confirmModal.value = { show: true, title, message, onConfirm }

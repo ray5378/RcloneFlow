@@ -72,7 +72,7 @@
 
 补充当前测试工作流约定：
 - 每次真正到达用户测试点时，先执行 `docker build --no-cache -t ray5378/rcloneflow:latest .`
-- 由于构建缓存已提前准备好，当前预期一般应在 4 分钟内完成
+- 当前规则改为：默认先等待约 5 分钟主动检查；如果 5 分钟后仍未完成，则立刻停止当前构建，并直接重新发起一次新的 no-cache 构建
 - 如果构建失败，Agent 需要主动重试 2 次
 - Agent 需要先自己检查构建是否完成，再通知用户开始测试；如果 2 次重试后仍失败，再把失败情况告知用户
 
@@ -127,7 +127,7 @@
   - `frontend/src/composables/useRunDetailState.ts`
   - `frontend/src/composables/useRunDetailEntry.ts`
 - 当前 `TaskView.vue` 在历史详情弹窗这一块已更接近装配层；页面层主要保留模板装配、事件转发和少量页面级连接线
-- 创建任务表单区当前也已进入更完整的半拆阶段：`AddTaskForm.vue` 已承接表单主模板，`useTaskFormState.ts` 已承接基础表单状态与新建/编辑入口回填链，`useTaskFormPrepare.ts` 已承接命令行模式提交前准备与统一前置校验，`useTaskCommandParse.ts` 已承接命令解析链，`useTaskFormSubmit.ts` 已承接提交编排主干与成功/失败收尾，`useTaskFormFlow.ts` 已承接 `createTask()` 最后一层入口编排，`useTaskPathBrowse.ts` 已承接路径浏览状态、breadcrumb、加载、重置与编辑态恢复
+- 创建任务表单区当前也已进入更完整的半拆阶段：`AddTaskForm.vue` 已承接表单主模板，`useTaskFormState.ts` 已承接基础表单状态与新建/编辑入口回填链，`useTaskFormPrepare.ts` 已承接命令行模式提交前准备与统一前置校验，`useTaskCommandParse.ts` 已承接命令解析链，`useTaskFormSubmit.ts` 已承接提交编排主干与成功/失败收尾，`useTaskFormFlow.ts` 已承接 `createTask()` 最后一层入口编排，`useTaskPathBrowse.ts` 已承接路径浏览状态、breadcrumb、加载、重置与编辑态恢复，`useTaskFormEntry.ts` 已承接新建/编辑任务入口编排
 - 本轮拆分反复验证出一条必须长期保留的经验：新增 composable 后，必须立即核对 `import`、页面解构、旧状态/旧函数清理、调用点是否都切到新来源，否则极易出现 `xxx is not defined`、页面空白、详情打不开等真实运行时回归
 - 另一条本轮新增经验：页面模板拆成子组件后，原样式不会自动跟随；对于 `AdvancedOptions.vue` 这类内部布局复杂的子组件，必须显式迁移内部样式，否则会出现勾选框错位、标签与输入框布局颠倒、输入项宽度异常等明显 UI 回归
 
