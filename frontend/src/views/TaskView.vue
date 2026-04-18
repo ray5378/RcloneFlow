@@ -1189,25 +1189,34 @@ async function clearAllRuns() {
     showToast('请先选择任务', 'error')
     return
   }
+
+  const prevRuns = runs.value
+  const prevTaskRuns = taskRuns.value
+  const taskId = historyFilterTaskId.value
+
+  taskRuns.value = []
+  runs.value = runs.value.filter(r => r.taskId !== taskId)
+  runsPage.value = 1
+  jumpPage.value = 1
+
+  const ok = await runApi.deleteByTask(taskId)
+  if (!ok) {
+    runs.value = prevRuns
+    taskRuns.value = prevTaskRuns
+    return
+  }
+
+  await loadData()
+  await refreshTaskHistoryRuns()
+}
+
+function clearAllRunsWithConfirm() {
+  if (historyFilterTaskId.value === null) {
+    showToast('请先选择任务', 'error')
+    return
+  }
   showConfirm('删除所有历史', '确定删除该任务所有历史记录？此操作不可恢复！', async () => {
-    const prevRuns = runs.value
-    const prevTaskRuns = taskRuns.value
-    const taskId = historyFilterTaskId.value
-
-    taskRuns.value = []
-    runs.value = runs.value.filter(r => r.taskId !== taskId)
-    runsPage.value = 1
-    jumpPage.value = 1
-
-    const ok = await runApi.deleteByTask(taskId)
-    if (!ok) {
-      runs.value = prevRuns
-      taskRuns.value = prevTaskRuns
-      return
-    }
-
-    await loadData()
-    await refreshTaskHistoryRuns()
+    await clearAllRuns()
   })
 }
 
@@ -1507,7 +1516,7 @@ const targetBreadcrumbs = computed(() => {
       @next-page="runsPage++; loadData()"
       @update-jump-page="jumpPage = $event"
       @jump-page="jumpToPage"
-      @clear-all="clearAllRuns"
+      @clear-all="clearAllRunsWithConfirm"
       @view-detail="showRunDetail"
       @view-log="openRunLog"
       @clear-run="clearRun"

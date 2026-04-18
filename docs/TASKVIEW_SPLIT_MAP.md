@@ -208,22 +208,19 @@
 
 当前收口结论：
 - 第一刀保留并成立：`TaskHistoryPanel.vue`
-- 第二刀已撤回，不再沿用当时那版“整坨搬迁”的做法
-- 后续重做第二刀时，必须拆成更小颗粒度，而不是再次一次性搬状态、行为、模板事件接线
+- 第二刀已按 A / B / C 三小步重做并全部通过验证
+- 历史记录主区当前已完成阶段性收口：UI / computed / loader / actions 已拆出
 
-下一步重做顺序：
-- 第二刀-A：只迁移历史记录纯计算逻辑
-  - `filteredRuns`
-  - `filteredRunsTotal`
-  - `currentTotal`
-  - `currentTotalPages`
-- 第二刀-B：只迁移历史记录读取逻辑
-  - `refreshTaskHistoryRuns()`
-  - `viewTaskHistory()`
-- 第二刀-C：最后才迁移删除/刷新逻辑
-  - `clearRun()`
-  - `clearAllRuns()`
-  - 删除后的即时更新 / 失败回滚 / 同步刷新
+当前已拆出的历史记录相关文件：
+- `frontend/src/components/task/TaskHistoryPanel.vue`
+- `frontend/src/composables/useTaskHistoryComputed.ts`
+- `frontend/src/composables/useTaskHistoryLoader.ts`
+- `frontend/src/composables/useTaskHistoryActions.ts`
+
+下一步建议：
+- 转向历史详情弹窗区域
+- 优先拆出运行详情弹窗及其内部统计 / 文件明细 / 分页相关逻辑
+- 目标是继续减少 `TaskView.vue` 中历史记录剩余的大块模板和状态承载
 
 重点测试：
 - 历史列表显示
@@ -376,6 +373,12 @@
 `运行中提示已拆出 -> 历史记录 -> 创建任务表单 -> 任务列表 -> 页面级 WebSocket/刷新协调`
 
 这条路线的目标，是让 `TaskView.vue` 最终收敛为：
+- 页面装配层
+- 数据入口层
+- 少量状态协调层
+
+而不是继续作为一个超大功能承载文件。
+是让 `TaskView.vue` 最终收敛为：
 - 页面装配层
 - 数据入口层
 - 少量状态协调层
