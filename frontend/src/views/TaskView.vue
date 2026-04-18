@@ -19,6 +19,7 @@ import { useRunDetailFiles } from '../composables/useRunDetailFiles'
 import { useRunDetailState } from '../composables/useRunDetailState'
 import { useRunDetailEntry } from '../composables/useRunDetailEntry'
 import { useTaskFormState } from '../composables/useTaskFormState'
+import { useTaskFormSubmit } from '../composables/useTaskFormSubmit'
 import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
 import type { Task, Schedule, Run } from '../types'
 
@@ -386,6 +387,18 @@ const {
   fillTaskFormForEdit,
 } = useTaskFormState()
 
+const {
+  validateTaskForm,
+  submitTaskForm,
+} = useTaskFormSubmit({
+  createForm,
+  editingTask,
+  normalizeTaskOptions,
+  getScheduleByTaskId,
+  taskApi,
+  scheduleApi,
+})
+
 const openMenuId = ref<number | null>(null)
 const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
 const runningTaskId = ref<number | null>(null)
@@ -744,6 +757,29 @@ async function triggerAutoRefresh(taskId: number){
   return ''
 }
 
+function prepareTaskFormSubmit() {
+  if (!commandMode.value) return ''
+  try {
+    const parsed = parseRcloneCommand(commandText.value)
+    createForm.value.mode = parsed.mode
+    createForm.value.sourceRemote = parsed.src.remote
+    createForm.value.sourcePath = parsed.src.path
+    createForm.value.targetRemote = parsed.dst.remote
+    createForm.value.targetPath = parsed.dst.path
+    createForm.value.options = { ...normalizeTaskOptions(createForm.value.options), ...parsed.options }
+    return ''
+  } catch (e) {
+    return '命令解析失败：' + (e as Error).message
+  }
+}
+
+async function finishTaskFormSubmit() {
+  editingTask.value = null
+  await loadData()
+  currentModule.value = 'add'
+  creatingState.value = 'done'
+}
+
 async function createTask() {
   // 如果已完成，点击返回任务列表
   if (creatingState.value === 'done') {
@@ -752,86 +788,22 @@ async function createTask() {
     return
   }
 
-  if (!createForm.value.name) {
-    showToast('请输入任务名称', 'error')
+  const prepareError = prepareTaskFormSubmit()
+  if (prepareError) {
+    showToast(prepareError, 'error')
     return
   }
 
-  // 命令行模式：解析 rclone 命令
-  if (commandMode.value) {
-    try {
-      const parsed = parseRcloneCommand(commandText.value)
-      createForm.value.mode = parsed.mode
-      createForm.value.sourceRemote = parsed.src.remote
-      createForm.value.sourcePath = parsed.src.path
-      createForm.value.targetRemote = parsed.dst.remote
-      createForm.value.targetPath = parsed.dst.path
-      createForm.value.options = { ...normalizeTaskOptions(createForm.value.options), ...parsed.options }
-    } catch (e) {
-      showToast('命令解析失败：' + (e as Error).message, 'error')
-      return
-    }
-  }
-
-  if (!createForm.value.sourceRemote || !createForm.value.targetRemote) {
-    showToast('请选择源和目标存储', 'error')
+  const validationError = validateTaskForm()
+  if (validationError) {
+    showToast(validationError, 'error')
     return
   }
 
   creatingState.value = 'loading'
   try {
-    // 构建任务数据
-    const taskData = {
-      name: createForm.value.name,
-      mode: createForm.value.mode,
-      sourceRemote: createForm.value.sourceRemote,
-      sourcePath: createForm.value.sourcePath,
-      targetRemote: createForm.value.targetRemote,
-      targetPath: createForm.value.targetPath,
-      options: normalizeTaskOptions(createForm.value.options),
-    }
-
-    if (editingTask.value) {
-      // 更新任务
-      await taskApi.update(editingTask.value.id, taskData)
-      // 更新定时规则：先删除旧的在创建新的
-      const oldSchedule = getScheduleByTaskId(editingTask.value.id)
-      if (createForm.value.enableSchedule) {
-        const spec = [
-          createForm.value.scheduleMinute || '00',
-          createForm.value.scheduleHour || '*',
-          createForm.value.scheduleDay || '*',
-          createForm.value.scheduleMonth || '*',
-          createForm.value.scheduleWeek || '*',
-        ].join('|')
-        if (oldSchedule) {
-          await scheduleApi.update(oldSchedule.id, true, spec)
-        } else {
-          await scheduleApi.create({ taskId: editingTask.value.id, spec, enabled: true })
-        }
-      } else if (oldSchedule) {
-        // 关闭并保留记录
-        await scheduleApi.update(oldSchedule.id, false)
-      }
-      editingTask.value = null
-    } else {
-      // 新建任务
-      const task = await taskApi.create(taskData)
-      // 如果启用了定时任务，创建定时规则
-      if (createForm.value.enableSchedule) {
-        const spec = [
-          createForm.value.scheduleMinute || '00',
-          createForm.value.scheduleHour || '*',
-          createForm.value.scheduleDay || '*',
-          createForm.value.scheduleMonth || '*',
-          createForm.value.scheduleWeek || '*',
-        ].join('|')
-        await scheduleApi.create({ taskId: task.id, spec, enabled: true })
-      }
-    }
-    await loadData()
-    currentModule.value = 'add'
-    creatingState.value = 'done'
+    await submitTaskForm()
+    await finishTaskFormSubmit()
   } catch (e) {
     creatingState.value = 'idle'
     showToast((e as Error).message, 'error')
