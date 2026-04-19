@@ -1,6 +1,10 @@
 <script setup lang="ts">
-import { RunningHintModal, GlobalStatsModal, RunLogModal, SingletonConfigModal, WebhookConfigModal, ConfirmModal, TaskListSection, TaskHistorySection, AddTaskForm } from '../components/task'
-import { ToastItem } from '../components/toast'
+import GlobalStatsModal from '../components/task/GlobalStatsModal.vue'
+import ConfirmModal from '../components/task/ConfirmModal.vue'
+import TaskListViewShell from '../components/task/TaskListViewShell.vue'
+import TaskHistoryViewShell from '../components/task/TaskHistoryViewShell.vue'
+import TaskEditorViewShell from '../components/task/TaskEditorViewShell.vue'
+import ToastCenter from '../components/toast/ToastCenter.vue'
 import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatEta } from '../utils/format'

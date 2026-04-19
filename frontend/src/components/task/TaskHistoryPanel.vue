@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RunItem } from './index'
+import RunItem from './RunItem.vue'
 import type { Run } from '../../types'
 
 const props = defineProps<{
