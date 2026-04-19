@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { ScheduleOptions, AdvancedOptions } from './'
+import ScheduleOptions from './ScheduleOptions.vue'
+import AdvancedOptions from './AdvancedOptions.vue'
 import { PathItem } from '../path'
 
 const props = defineProps<{
