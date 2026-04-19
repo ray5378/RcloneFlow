@@ -51,16 +51,6 @@ export const taskApi = {
     }
   },
 
-  async stop(id: number) {
-    try {
-      await api.stopTaskTransfer(id)
-      return true
-    } catch (err) {
-      handleError(err, { module: 'Task', operation: '停止任务' })
-      return false
-    }
-  },
-
   async kill(id: number) {
     try {
       await api.killTask(id)
@@ -209,24 +199,15 @@ export const runApi = {
 }
 
 /**
- * Job APIs with error handling
+ * Active run APIs with error handling
  */
 export const jobApi = {
   async list() {
     try {
       return await api.getActiveRuns()
     } catch (err) {
-      handleError(err, { module: 'Job', operation: '获取任务列表' })
+      handleError(err, { module: 'ActiveRun', operation: '获取运行中任务' })
       return []
-    }
-  },
-
-  async stop(id: number) {
-    try {
-      return await api.stopJob(id)
-    } catch (err) {
-      handleError(err, { module: 'Job', operation: '停止任务' })
-      return false
     }
   }
 }

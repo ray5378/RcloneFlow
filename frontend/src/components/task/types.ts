@@ -21,7 +21,6 @@ export interface Task {
 export interface RunRecord {
   id: number
   taskId: number
-  rcJobId: number
   status: 'running' | 'finished' | 'failed' | 'skipped'
   trigger: 'manual' | 'schedule' | 'webhook'
   summary?: string

@@ -3,7 +3,6 @@
  * 对应后端 TaskService
  */
 import { get, post, put, del, patch } from './client'
-import { getActiveRuns, getRuns, getJobStatus, stopJob } from './run'
 import type { Task } from '../types'
 
 /** 强制终止任务的当前传输（按最近 run 定位 PID） */
@@ -40,15 +39,3 @@ export async function runTask(taskId: number): Promise<{ jobId: number }> {
 export async function deleteTask(taskId: number): Promise<void> {
   return del(`/api/tasks/${taskId}`)
 }
-
-/** 停止指定任务当前传输 */
-export async function stopTaskTransfer(taskId: number): Promise<void> {
-  const activeRuns = await getActiveRuns()
-  const active = activeRuns.find(item => item.runRecord?.taskId === taskId && item.runRecord?.rcJobId)
-  if (!active?.runRecord?.rcJobId) {
-    throw new Error('当前任务没有正在运行的传输')
-  }
-  await stopJob(active.runRecord.rcJobId)
-}
-
-// 已废弃：历史态改为读取 finalSummary，运行中由 /api/runs/active 提供轻量数据

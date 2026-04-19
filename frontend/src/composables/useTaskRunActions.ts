@@ -2,14 +2,11 @@ import { ref } from 'vue'
 
 interface UseTaskRunActionsOptions {
   loadData: () => Promise<void>
+  loadActiveRuns?: () => Promise<void>
   showToast: (message: string, type?: 'info' | 'success' | 'error') => void
   taskApi: {
     run: (taskId: number) => Promise<any>
     kill: (taskId: number) => Promise<void>
-  }
-  jobApi: {
-    list: () => Promise<any[]>
-    stop: (jobId: number | string) => Promise<void>
   }
 }
 
@@ -20,20 +17,16 @@ export function useTaskRunActions(options: UseTaskRunActionsOptions) {
   async function stopTaskAny(taskId: number) {
     try {
       await options.taskApi.kill(taskId)
-      const active = await options.jobApi.list()
-      const current = Array.isArray(active)
-        ? active.find(x => x?.runRecord?.taskId === taskId && x?.runRecord?.rcJobId)
-        : null
-      if (current?.runRecord?.rcJobId) {
-        await options.jobApi.stop(current.runRecord.rcJobId)
-      }
       stoppedTaskId.value = taskId
       setTimeout(() => {
         if (stoppedTaskId.value === taskId) {
           stoppedTaskId.value = null
         }
       }, 10000)
-      await options.loadData()
+      await Promise.all([
+        options.loadData(),
+        options.loadActiveRuns?.() ?? Promise.resolve(),
+      ])
     } catch (e) {
       stoppedTaskId.value = null
       options.showToast((e as Error).message, 'error')
@@ -50,6 +43,14 @@ export function useTaskRunActions(options: UseTaskRunActionsOptions) {
     if (!result) {
       runningTaskId.value = null
       return
+    }
+    try {
+      await options.loadData()
+      await options.loadActiveRuns?.()
+      setTimeout(() => { options.loadActiveRuns?.().catch(console.error) }, 300)
+      setTimeout(() => { options.loadActiveRuns?.().catch(console.error) }, 1200)
+    } catch (e) {
+      console.error(e)
     }
     setTimeout(() => {
       if (runningTaskId.value === taskId) {

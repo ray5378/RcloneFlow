@@ -1,17 +1,39 @@
-import { onMounted, onUnmounted, type Ref } from 'vue'
+import { onMounted, onUnmounted, watch, type Ref } from 'vue'
 
 export function useTaskViewRefreshLifecycle(options: {
   tasks: Ref<any[]>
+  currentModule?: Ref<'history' | 'add' | 'tasks'>
   getDeNoisedStableByTask: (taskId: number) => any
   loadData: () => Promise<void> | void
   loadActiveRuns: () => Promise<void>
+  setupRealtimeSync?: () => void
   stuckMs: number
 }) {
   let lastRenderedSignature = ''
   let stuckTimer: number | null = null
   let activePollTimer: number | null = null
 
+  if (options.currentModule) {
+    watch(options.currentModule, (next) => {
+      if (next === 'tasks') {
+        Promise.all([
+          Promise.resolve(options.loadData()).catch(console.error),
+          options.loadActiveRuns().catch(console.error),
+        ]).catch(console.error)
+        setTimeout(() => {
+          options.loadActiveRuns().catch(console.error)
+        }, 300)
+      }
+    })
+  }
+
   onMounted(() => {
+    Promise.all([
+      Promise.resolve(options.loadData()).catch(console.error),
+      options.loadActiveRuns().catch(console.error),
+    ]).catch(console.error)
+    options.setupRealtimeSync?.()
+
     stuckTimer = window.setInterval(() => {
       try {
         const sigParts: string[] = []

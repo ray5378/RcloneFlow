@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { formatBytes, formatBytesPerSec } from '../../utils/format'
+import { formatBytes } from '../../utils/format'
+import { getUnifiedProgressText } from './progressText'
 
 interface Progress {
   percentage?: number
@@ -84,28 +85,11 @@ function getTriggerText(trigger: string) {
   return map[trigger] || trigger
 }
 
-// 计算进度百分比
-function getProgressPercent(run: RunRecord): string {
-  if (run.status === 'running' && props.progress?.percentage) {
-    return props.progress.percentage.toFixed(2) + '%'
+function getProgressText(run: RunRecord): string {
+  if (run.status === 'running') {
+    return getUnifiedProgressText(props.progress)
   }
   return '-'
-}
-
-// 获取速度
-function getSpeed(run: RunRecord): string {
-  if (run.status === 'running' && props.progress?.speed) {
-    return formatBytesPerSec(props.progress.speed)
-  }
-  return run.speed || '-'
-}
-
-// 获取已传输
-function getTransferred(run: RunRecord): string {
-  if (run.status === 'running' && props.progress?.bytes) {
-    return formatBytes(props.progress.bytes)
-  }
-  return formatBytes(run.bytesTransferred || 0)
 }
 </script>
 
@@ -129,9 +113,7 @@ function getTransferred(run: RunRecord): string {
     
     <!-- 运行时进度 -->
     <div class="summary-mini" v-if="run.status === 'running'">
-      <span class="chip">进度 {{ getProgressPercent(run) }}</span>
-      <span class="chip meta">速度 {{ getSpeed(run) }}</span>
-      <span class="chip meta">已传输 {{ getTransferred(run) }}</span>
+      <span class="chip meta">{{ getProgressText(run) }}</span>
     </div>
     
     <!-- 完成状态摘要 -->

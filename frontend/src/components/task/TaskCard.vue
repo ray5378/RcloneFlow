@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { formatBytes, formatBytesPerSec, formatEta } from '../../utils/format'
+import { getUnifiedProgressText } from './progressText'
 
 interface Progress {
   percentage?: number
@@ -16,12 +16,6 @@ interface Progress {
 interface Schedule {
   enabled?: boolean
   spec?: string
-}
-
-interface ActiveRun {
-  progress?: Progress
-  stableProgress?: Progress
-  runRecord?: { status?: string }
 }
 
 interface Task {
@@ -58,7 +52,7 @@ const emit = defineEmits<{
 }>()
 
 function getLiveProgress(): Progress | null {
-  return props.progress || props.activeRun?.progress || props.activeRun?.stableProgress || null
+  return props.progress || null
 }
 
 function getProgressPercent(): string {
@@ -68,17 +62,7 @@ function getProgressPercent(): string {
 }
 
 function getProgressText(): string {
-  const p = getLiveProgress()
-  if (!p) return '-'
-  if (p.phase === 'preparing') {
-    return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
-  }
-  // 使用后端传来的 ETA
-  let etaStr = ''
-  if (p.eta && p.eta > 0) {
-    etaStr = ` · 预计完成 ${formatEta(p.eta)}`
-  }
-  return `${getProgressPercent()}% · ${formatBytes(p.bytes || 0)} / ${formatBytes(p.totalBytes || 0)} · ${formatBytesPerSec(p.speed || 0)} · 总数量 ${p.totalCount || 0} ／ 已传输 ${p.completedFiles || 0}${etaStr}`
+  return getUnifiedProgressText(getLiveProgress())
 }
 
 function formatSpec(spec: string): string {
@@ -102,7 +86,7 @@ function isStopped(): boolean {
 </script>
 
 <template>
-  <div class="task-card" :class="{ active: activeRun }" @click="emit('viewHistory', task.id!)">
+  <div class="task-card" :class="{ active: !!progress }" @click="emit('viewHistory', task.id!)">
     <div class="task-main">
       <div class="name">
         <strong>{{ task.name }}</strong>

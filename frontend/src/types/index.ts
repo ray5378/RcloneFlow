@@ -141,7 +141,6 @@ export interface Schedule {
 export interface Run {
   id: number
   taskId: number
-  rcJobId: number
   status: string
   trigger: string
   startedAt: string

@@ -1,6 +1,7 @@
 import type { Ref } from 'vue'
 
 export function useTaskProgressSync(options: {
+  runs: Ref<any[]>
   activeRuns: Ref<any[]>
   activeRunLookup: { getActiveRunByTaskId: (taskId: number) => any }
   lastStableByTask: Ref<Record<number, { sp: any; at: number }>>
@@ -23,10 +24,10 @@ export function useTaskProgressSync(options: {
     return db || null
   }
 
-  function getDeNoisedStableByRun(run: any) {
+  function getRealtimeProgressByRun(run: any) {
     try {
-      const tid = run?.taskId as number
-      if (tid) {
+      const tid = Number(run?.taskId ?? run?.taskID ?? run?.task_id ?? run?.runRecord?.taskId)
+      if (tid > 0) {
         const active = options.activeRunLookup.getActiveRunByTaskId(tid)
         if (active?.progress) return active.progress
         if (active?.stableProgress) return active.stableProgress
@@ -35,9 +36,24 @@ export function useTaskProgressSync(options: {
     return getDbProgressStable(run)
   }
 
-  function getDeNoisedStableByTask(taskId: number) {
+  function getDeNoisedStableByRun(run: any) {
+    return getRealtimeProgressByRun(run)
+  }
+
+  function getTaskCardProgressByTask(taskId: number) {
     const active = options.activeRunLookup.getActiveRunByTaskId(taskId)
-    const raw = active?.progress || active?.stableProgress || options.lastStableByTask.value?.[taskId]?.sp
+    if (active?.progress) return active.progress
+    if (active?.stableProgress) return active.stableProgress
+    const run = (options.runs.value || []).find((item: any) => {
+      const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
+      return candidateTaskId > 0 && candidateTaskId === Number(taskId) && item?.status === 'running'
+    })
+    if (!run) return null
+    return getDbProgressStable(run)
+  }
+
+  function getDeNoisedStableByTask(taskId: number) {
+    const raw = getTaskCardProgressByTask(taskId)
     if (!raw) return null
     const st: any = { ...raw }
     st.bytes = Number(st.bytes || 0)
@@ -132,7 +148,9 @@ export function useTaskProgressSync(options: {
 
   return {
     getDbProgressStable,
+    getRealtimeProgressByRun,
     getDeNoisedStableByRun,
+    getTaskCardProgressByTask,
     getDeNoisedStableByTask,
     formatBps,
     calcEtaFromAvg,

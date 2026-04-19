@@ -25,6 +25,7 @@ interface UseTaskViewDataSyncOptions {
 
 export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   let loadSeq = 0
+  let activeRunsReloadTimer: number | null = null
 
   async function loadData() {
     const seq = ++loadSeq
@@ -121,15 +122,23 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     loadGlobalStats()
   }
 
+  function scheduleActiveRunsReload(delay = 150) {
+    if (activeRunsReloadTimer) return
+    activeRunsReloadTimer = window.setTimeout(() => {
+      activeRunsReloadTimer = null
+      loadActiveRuns().catch(console.error)
+    }, delay)
+  }
+
   function setupRealtimeSync() {
-    useWebSocket({
+    const wsClient = useWebSocket({
       onMessage: (msg) => {
         if (msg.type === 'run_status' && msg.data) {
           const idx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
           if (idx !== -1) {
             options.runs.value[idx] = { ...options.runs.value[idx], status: msg.data.status }
           }
-          loadActiveRuns().catch(console.error)
+          scheduleActiveRunsReload(0)
         } else if (msg.type === 'run_progress' && msg.data) {
           const idx = options.activeRuns.value.findIndex(r => r.runRecord?.id === msg.data.run_id)
           if (idx !== -1) {
@@ -141,19 +150,53 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
               totalBytes: Number(msg.data.total || prev.totalBytes || 0),
               speed: Number(msg.data.speed || 0),
               percentage: Number(msg.data.percent || prev.percentage || 0),
+              completedFiles: Number(msg.data.completedFiles || prev.completedFiles || 0),
+              totalCount: Number(msg.data.totalCount || msg.data.plannedFiles || prev.totalCount || 0),
+              eta: Number(msg.data.eta || prev.eta || 0),
             }
             options.activeRuns.value[idx] = {
               ...cur,
               progress: nextProgress,
               stableProgress: cur.stableProgress || nextProgress,
             }
+            if (!nextProgress.completedFiles || !nextProgress.totalCount) {
+              scheduleActiveRunsReload()
+            }
+          } else {
+            scheduleActiveRunsReload(0)
+          }
+          const runIdx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
+          if (runIdx !== -1) {
+            const curRun = options.runs.value[runIdx] || {}
+            const sum = typeof curRun.summary === 'string'
+              ? (() => { try { return JSON.parse(curRun.summary) } catch { return {} } })()
+              : (curRun.summary || {})
+            const prevProgress = sum.progress || {}
+            sum.progress = {
+              ...prevProgress,
+              bytes: Number(msg.data.bytes || 0),
+              totalBytes: Number(msg.data.total || prevProgress.totalBytes || 0),
+              speed: Number(msg.data.speed || 0),
+              percentage: Number(msg.data.percent || prevProgress.percentage || 0),
+              completedFiles: Number(msg.data.completedFiles || prevProgress.completedFiles || 0),
+              plannedFiles: Number(msg.data.totalCount || msg.data.plannedFiles || prevProgress.plannedFiles || 0),
+              eta: Number(msg.data.eta || prevProgress.eta || 0),
+            }
+            options.runs.value[runIdx] = {
+              ...curRun,
+              summary: sum,
+            }
           }
         }
       }
     })
+    wsClient.connect()
 
     onWsMessage('run_status', () => {
-      loadData().catch(console.error)
+      Promise.all([
+        loadActiveRuns().catch(console.error),
+        loadData().catch(console.error),
+      ]).catch(console.error)
     })
   }
 

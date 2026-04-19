@@ -24,6 +24,7 @@ import (
 	"rcloneflow/internal/config"
 	"rcloneflow/internal/logger"
 	"rcloneflow/internal/store"
+	"rcloneflow/internal/websocket"
 )
 
 // Runner manages CLI transfers with progress/logs and stop control.
@@ -444,6 +445,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				r.enrichFilesSizesAsync(run.ID, files, dst, cfg)
 				rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": humanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
 			})
+			websocket.Broadcast("run_status", map[string]any{
+				"run_id": run.ID,
+				"status": "failed",
+			})
 			// fire webhook for failed run
 			go r.postWebhookIfNeeded(run.ID)
 			r.mu.Lock()
@@ -681,6 +686,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			finalSummary["counts"] = counts
 			finalSummary["files"] = files
 			rr.Summary["finalSummary"] = finalSummary
+		})
+		websocket.Broadcast("run_status", map[string]any{
+			"run_id": run.ID,
+			"status": "finished",
 		})
 		// fire webhook for successful run
 		go r.postWebhookIfNeeded(run.ID)
@@ -985,7 +994,7 @@ func (fp *fileProgress) copiedList() []string {
 }
 
 // statsRe matches rclone progress lines like "2026/04/17 14:33:38 INFO : 46.593 MiB / 335.968 MiB, 14%, 2.234 MiB/s, ETA 2m9s"
-var statsRe = regexp.MustCompile(`INFO\s*:\s*([\d.]+[KMGTP]?i?B?)\s*/\s*([\d.]+[KMGTP]?i?B?),\s*([\d.]+)%,\s*([\d.]+[KMGTP]?i?B?)/s`)
+var statsRe = regexp.MustCompile(`INFO\s*:\s*([\d.]+\s*[KMGTP]?i?B?)\s*/\s*([\d.]+\s*[KMGTP]?i?B?),\s*([\d.]+)%,\s*([\d.]+\s*[KMGTP]?i?B?)/s`)
 var fileLineRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B,\s*(\d+(?:\.\d+)?)%?,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B/s`)
 var fileCopiedRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*Copied\s*\(new\)`)
 
@@ -1043,6 +1052,17 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				"percentage": pct,
 				"speed":      spd,
 			}
+			if parsed, ok := parseOneLineProgress(line); ok {
+				if v, ok2 := parsed["completedFiles"]; ok2 {
+					prog["completedFiles"] = v
+				}
+				if v, ok2 := parsed["plannedFiles"]; ok2 {
+					prog["plannedFiles"] = v
+				}
+				if v, ok2 := parsed["eta"]; ok2 {
+					prog["eta"] = v
+				}
+			}
 			_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 				if rr.Summary == nil {
 					rr.Summary = map[string]any{}
@@ -1051,6 +1071,16 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				rr.Summary["progressLine"] = line
 				rr.BytesTransferred = int64(cur)
 				rr.Speed = fmt.Sprintf("%d B/s", int64(spd))
+			})
+			websocket.Broadcast("run_progress", map[string]any{
+				"run_id":         runID,
+				"bytes":          prog["bytes"],
+				"total":          prog["totalBytes"],
+				"speed":          prog["speed"],
+				"percent":        prog["percentage"],
+				"completedFiles": prog["completedFiles"],
+				"plannedFiles":   prog["plannedFiles"],
+				"eta":            prog["eta"],
 			})
 			continue
 		}
@@ -1086,6 +1116,16 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					if fp != nil {
 						rr.Summary["files"] = fp.snapshot(100)
 					}
+				})
+				websocket.Broadcast("run_progress", map[string]any{
+					"run_id":         runID,
+					"bytes":          prog["bytes"],
+					"total":          prog["totalBytes"],
+					"speed":          prog["speed"],
+					"percent":        prog["percentage"],
+					"completedFiles": prog["completedFiles"],
+					"plannedFiles":   prog["plannedFiles"],
+					"eta":            prog["eta"],
 				})
 			}
 			// 解析文件级进度（INFO: name: cur/total, pct, speed）
