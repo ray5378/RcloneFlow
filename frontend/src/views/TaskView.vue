@@ -64,8 +64,10 @@ const {
 const {
   showDetailModal,
   runDetail,
+  openRunDetailModal,
   closeRunDetailModal,
   runFilesPage,
+  openRunDetailFiles,
   pagedRunFiles,
   totalRunFilesPages,
   goPrevFilesPage,
@@ -95,10 +97,21 @@ const {
   runningHintPhaseText,
   runningHintProgressText,
   runningHintDebugInfo,
+  openRunningHint,
   closeRunningHint,
   toggleRunningHintDebug,
   openRunningHintLog,
 } = useRunningHintRuntime(activeRuns, openRunLog)
+
+const {
+  showRunDetail,
+  closeRunDetail,
+} = useRunDetailEntry({
+  openRunningHint,
+  openRunDetailModal,
+  openRunDetailFiles,
+  closeRunDetailModal,
+})
 const {
   loadData,
   loadActiveRuns,
