@@ -395,9 +395,9 @@ const {
     @prev-final-files-page="goPrevFinalFilesPage()"
     @next-final-files-page="goNextFinalFilesPage()"
     @update-final-files-jump="setFinalFilesJumpValue"
-    @jump-final-files-page="jumpFinalFilesPage()"
-    @prev-files-page="goPrevFilesPage()"
-    @next-files-page="goNextFilesPage()"
+    @jump-final-files-page="jumpFinalFilesPage"
+    @prev-files-page="goPrevFilesPage"
+    @next-files-page="goNextFilesPage"
   />
 
   <!-- 运行中轻量提示小窗（不切主窗口） -->
@@ -455,7 +455,7 @@ const {
     :format-bytes="formatBytes"
     :format-bytes-per-sec="formatBytesPerSec"
     :format-eta="formatEta"
-    @close="showGlobalStatsModal = false"
+    @close="closeGlobalStatsModal"
   />
 
   <!-- 确认删除弹窗 -->
