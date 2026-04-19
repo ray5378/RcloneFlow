@@ -390,7 +390,7 @@ const {
     @view-detail="showRunDetail"
     @view-log="openRunLog"
     @clear-run="clearRun"
-    @close-detail="closeRunDetail()"
+    @close-detail="closeRunDetail"
     @set-final-filter="setFinalFilter"
     @prev-final-files-page="goPrevFinalFilesPage"
     @next-final-files-page="goNextFinalFilesPage"
