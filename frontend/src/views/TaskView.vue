@@ -296,52 +296,29 @@ const {
     @jump-page="jumpToTasksPage"
   />
 
-  <!-- Webhook 配置弹窗（POST 地址 + 触发来源） -->
-  <div v-if="showWebhookModal" class="modal-overlay" @click.self="showWebhookModal=false">
-    <div class="modal-content" style="max-width:560px">
-      <div class="modal-header">
-        <h3>Webhook 通知</h3>
-        <button class="close-btn" @click="showWebhookModal=false">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="detail-item full-width">
-          <label>Webhook 接收（触发ID）：</label>
-          <input v-model="webhookForm.triggerId" type="text" placeholder="留空=使用任务ID（示例：/webhook/<任务ID> 或 /webhook/<你的ID>）" />
-        </div>
-        <div class="detail-item full-width">
-          <label>对外 POST 地址：</label>
-          <input v-model="webhookForm.postUrl" type="text" placeholder="https://example.com/hooks/endpoint" />
-          <p class="hint">任务完成或失败后，将以 POST 通知该地址。</p>
-        </div>
-        <div class="detail-item full-width">
-          <label>企业微信地址：</label>
-          <input v-model="(webhookForm as any).wecomUrl" type="text" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." />
-          <p class="hint">若填写，将同时向企业微信机器人发送 Markdown 通知。</p>
-        </div>
-        <div class="detail-item">
-          <label>触发来源：</label>
-          <div class="trigger-row">
-            <label class="trigger-opt"><input type="checkbox" v-model="webhookForm.notify.manual" /><span>手动</span></label>
-            <label class="trigger-opt"><input type="checkbox" v-model="webhookForm.notify.schedule" /><span>定时</span></label>
-            <label class="trigger-opt"><input type="checkbox" v-model="webhookForm.notify.webhook" /><span>Webhook</span></label>
-          </div>
-        </div>
-        <div class="detail-item">
-          <label>状态过滤：</label>
-          <div class="trigger-row">
-            <label class="trigger-opt"><input type="checkbox" v-model="(webhookForm as any).status.success" /><span>成功</span></label>
-            <label class="trigger-opt"><input type="checkbox" v-model="(webhookForm as any).status.failed" /><span>失败</span></label>
-          </div>
-          <p class="hint">仅当匹配状态时发送通知；默认两个都勾选。</p>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="primary" @click="saveWebhook">保存</button>
-        <button class="ghost" @click="testWebhook" :disabled="!webhookForm.postUrl && !(webhookForm as any).wecomUrl">发送测试</button>
-        <button class="ghost" @click="showWebhookModal=false">取消</button>
-      </div>
-    </div>
-  </div>
+  <WebhookConfigModal
+    :visible="showWebhookModal"
+    :trigger-id="webhookForm.triggerId"
+    :post-url="webhookForm.postUrl"
+    :wecom-url="(webhookForm as any).wecomUrl"
+    :notify-manual="webhookForm.notify.manual"
+    :notify-schedule="webhookForm.notify.schedule"
+    :notify-webhook="webhookForm.notify.webhook"
+    :status-success="(webhookForm as any).status.success"
+    :status-failed="(webhookForm as any).status.failed"
+    :can-test="!!webhookForm.postUrl || !!(webhookForm as any).wecomUrl"
+    @update:trigger-id="webhookForm.triggerId = $event"
+    @update:post-url="webhookForm.postUrl = $event"
+    @update:wecom-url="(webhookForm as any).wecomUrl = $event"
+    @update:notify-manual="webhookForm.notify.manual = $event"
+    @update:notify-schedule="webhookForm.notify.schedule = $event"
+    @update:notify-webhook="webhookForm.notify.webhook = $event"
+    @update:status-success="(webhookForm as any).status.success = $event"
+    @update:status-failed="(webhookForm as any).status.failed = $event"
+    @save="saveWebhook"
+    @test="testWebhook"
+    @close="showWebhookModal = false"
+  />
 
   <!-- 单例模式配置弹窗 -->
   <SingletonConfigModal
