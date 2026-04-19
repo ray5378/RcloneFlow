@@ -25,6 +25,28 @@ setErrorHandler((message, type) => {
   showToast(message, type as 'info' | 'success' | 'error')
 })
 
+const closeWebhookModal = () => { showWebhookModal.value = false }
+const closeSingletonModal = () => { showSingletonModal.value = false }
+const closeLogModal = () => { showLogModal.value = false }
+const closeGlobalStatsModal = () => { showGlobalStatsModal.value = false }
+const setTaskSearch = (value: string) => { taskSearch.value = value }
+const setTasksJumpPageValue = (value: number | null) => { tasksJumpPage.value = value }
+const setHistoryStatusFilter = (value: string) => { historyStatusFilter.value = value }
+const setJumpPageValue = (value: number) => { jumpPage.value = value }
+const setFinalFilesJumpValue = (value: number | null) => { finalFilesJump.value = value }
+const setWebhookTriggerId = (value: string) => { webhookForm.triggerId = value }
+const setWebhookPostUrl = (value: string) => { webhookForm.postUrl = value }
+const setWebhookWecomUrl = (value: string) => { ;(webhookForm as any).wecomUrl = value }
+const setWebhookNotifyManual = (value: boolean) => { webhookForm.notify.manual = value }
+const setWebhookNotifySchedule = (value: boolean) => { webhookForm.notify.schedule = value }
+const setWebhookNotifyWebhook = (value: boolean) => { webhookForm.notify.webhook = value }
+const setWebhookStatusSuccess = (value: boolean) => { ;(webhookForm as any).status.success = value }
+const setWebhookStatusFailed = (value: boolean) => { ;(webhookForm as any).status.failed = value }
+const setSingletonEnabled = (value: boolean) => { singletonForm.singletonEnabled = value }
+const setCommandMode = (value: boolean) => { commandMode.value = value }
+const setCommandText = (value: string) => { commandText.value = value }
+const setShowAdvancedOptions = (value: boolean) => { showAdvancedOptions.value = value }
+
 const {
   tasks,
   schedules,
