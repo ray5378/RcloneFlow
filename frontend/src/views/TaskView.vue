@@ -328,7 +328,7 @@ const {
     @update:status-failed="(webhookForm as any).status.failed = $event"
     @save="saveWebhook"
     @test="testWebhook"
-    @close="showWebhookModal = false"
+    @close="closeWebhookModal"
   />
 
   <!-- 单例模式配置弹窗 -->
@@ -433,11 +433,11 @@ const {
     :show-advanced-options="showAdvancedOptions"
     :creating-state="creatingState"
     :editing-task="editingTask"
-    @update:command-mode="commandMode = $event"
-    @update:command-text="commandText = $event"
+    @update:command-mode="setCommandMode"
+    @update:command-text="setCommandText"
     @update:show-source-path-input="setShowSourcePathInput"
     @update:show-target-path-input="setShowTargetPathInput"
-    @update:show-advanced-options="showAdvancedOptions = $event"
+    @update:show-advanced-options="setShowAdvancedOptions"
     @source-remote-change="onSourceRemoteChange"
     @target-remote-change="onTargetRemoteChange"
     @source-breadcrumb-click="onSourceBreadcrumbClick"
