@@ -18,6 +18,7 @@ import { useTaskHistoryActions } from '../composables/useTaskHistoryActions'
 import { useTaskListActions } from '../composables/useTaskListActions'
 import { useTaskRunActions } from '../composables/useTaskRunActions'
 import { useTaskViewDataSync } from '../composables/useTaskViewDataSync'
+import { useTaskProgressSync } from '../composables/useTaskProgressSync'
 import { useRunDetailComputed } from '../composables/useRunDetailComputed'
 import { useRunDetailFiles } from '../composables/useRunDetailFiles'
 import { useRunDetailState } from '../composables/useRunDetailState'
@@ -181,8 +182,22 @@ onUnmounted(() => {
   if (stuckTimer) clearInterval(stuckTimer)
   if (activePollTimer) clearInterval(activePollTimer)
 })
-// 仅用 DB 的 summary.progress 作为运行中 DB fallback；stableProgress 只保留最后兜底
-const lastDbFrameByRunId: Record<number, any> = {}
+const {
+  getDbProgressStable,
+  getDeNoisedStableByRun,
+  getDeNoisedStableByTask,
+  formatBps,
+  calcEtaFromAvg,
+  triggerAutoRefresh,
+} = useTaskProgressSync({
+  activeRuns,
+  activeRunLookup,
+  lastStableByTask,
+  loadData,
+  loadActiveRuns,
+  lingerMs: LINGER_MS,
+})
+
 // Webhook 配置（POST 地址 + 触发来源/状态勾选）
 const showWebhookModal = ref(false)
 const webhookForm = ref<{taskId:number|null, postUrl:string, triggerId:string, notify:{manual:boolean,schedule:boolean,webhook:boolean}, status:{success:boolean,failed:boolean}}>({ taskId: null, postUrl: '', triggerId:'', notify:{manual:false,schedule:false,webhook:false}, status:{success:true,failed:true} })
@@ -472,46 +487,6 @@ function getActiveRunByTaskId(taskId: number) {
   return activeRunLookup.getActiveRunByTaskId(taskId)
 }
 
-function getDbProgressStable(run:any){
-  const db = getLiveSummaryFromDB(run)
-  const id = run?.id
-  if (db && id){ lastDbFrameByRunId[id] = db; return db }
-  if (id && lastDbFrameByRunId[id]) return lastDbFrameByRunId[id]
-  return db || null
-}
-
-// 历史"运行中"卡片直接使用当前 activeRuns 的 progress；无 active 时再回退 DB
-function getDeNoisedStableByRun(run:any){
-  try{
-    const tid = run?.taskId as number
-    if (tid){
-      const active = getActiveRunByTaskId(tid)
-      if (active?.progress) return active.progress
-      if (active?.stableProgress) return active.stableProgress
-    }
-  }catch{}
-  return getDbProgressStable(run)
-}
-
-// 任务卡片直接使用后端 activeRuns 的 progress，不在前端做去噪拼接/完成态强行钳制
-function getDeNoisedStableByTask(taskId:number){
-  const active = getActiveRunByTaskId(taskId)
-  const raw = active?.progress || active?.stableProgress
-  if (!raw) return null
-  const st:any = { ...raw }
-  st.bytes = Number(st.bytes || 0)
-  st.totalBytes = Number(st.totalBytes || 0)
-  st.speed = Number(st.speed || 0)
-  st.percentage = Number(st.percentage || 0)
-  st.completedFiles = Number(st.completedFiles || 0)
-  st.totalCount = Number(st.totalCount || 0)
-  st.eta = Number(st.eta || 0)
-  if (st.percentage < 0) st.percentage = 0
-  if (st.percentage > 100) st.percentage = 100
-  return st
-}
-
-
 function formatTime(time: string | undefined) {
   if (!time) return '-'
   try {
@@ -543,63 +518,6 @@ function getRunDurationText(run:any){
   // fallback to local compute for running
   return formatDuration(run.startedAt, run.finishedAt)
 }
-function formatBps(bps:number){
-  if (!bps || bps<=0) return '-'
-  return formatBytes(bps) + '/s'
-}
-// 从 DB 的 summary.progress 读取运行中实时（不落库也可兼容）；stableProgress 只作为最后兜底
-function getLiveSummaryFromDB(run:any){
-  try{
-    const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
-    const p = sum?.progress
-    if (p && typeof p === 'object'){
-      const bytes = Number(p.bytes || 0)
-      const totalBytes = Number(p.totalBytes || 0)
-      const speed = Number(p.speed || 0)
-      const eta = Number(p.eta || 0)
-      const totalCount = Number(p.plannedFiles || 0)
-      let percentage = Number(p.percentage || 0)
-      if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
-      const completedFiles = Number(p.completedFiles || 0)
-      return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles }
-    }
-    const sp = sum?.stableProgress
-    if (sp && typeof sp === 'object'){
-      const bytes = Number(sp.bytes || 0)
-      const totalBytes = Number(sp.totalBytes || 0)
-      const speed = Number(sp.speed || 0)
-      const eta = Number(sp.eta || 0)
-      const totalCount = Number(sp.totalCount || 0)
-      let percentage = Number(sp.percentage || 0)
-      if ((!percentage || Number.isNaN(percentage)) && totalBytes>0) percentage = (bytes/totalBytes)*100
-      const completedFiles = Number(sp.completedFiles || 0)
-      return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles }
-    }
-  }catch{}
-  return null
-}
-// 以当前 live 帧为准估算 ETA（剩余时间，秒）；运行中不再回退 preflight
-const lastNonZeroSpeedByTask: Record<number, number> = {}
-function calcEtaFromAvg(run:any, live:any){
-  try{
-    if (!run?.startedAt || !live) return null
-    const tid = (run.taskId || run.taskID || run.task_id || run.runRecord?.taskId) as number
-    const total = Number(live.totalBytes || 0)
-    if (!total) return null
-    const bytes = Number(live.bytes || 0)
-    if (bytes <= 0) return null
-    const remaining = Math.max(0, total - bytes)
-    let speed = Number(live.speed || 0)
-    if (formatBytesPerSec(speed) === '-') return null
-    if (tid && speed > 0) lastNonZeroSpeedByTask[tid] = speed
-    const sp = tid ? (lastNonZeroSpeedByTask[tid] || 0) : speed
-    if (!sp || sp <= 0) return null
-    const etaSec = Math.floor(remaining / sp)
-    if (etaSec > 99*3600) return null
-    return etaSec
-  }catch{ return null }
-}
-
 function getStatusClass(status: string) {
   switch (status) {
     case 'running': return 'running'
@@ -620,29 +538,6 @@ function getStatusText(status: string) {
   }
 }
 
-
-// 当某任务的稳定进度达 100% 附近时，触发一次"延迟刷新"，拉取最终状态
-let refreshLocks: Record<number, boolean> = {}
-async function triggerAutoRefresh(taskId: number){
-  if (refreshLocks[taskId]) return ''
-  refreshLocks[taskId] = true
-  try{
-    // 达到 100% 后等待 20 秒再刷新，给用户留出"完成"可视停留时间
-    await new Promise(r=>setTimeout(r, 20000))
-    await Promise.all([loadActiveRuns(), loadData()])
-    // 兜底：再延迟 1s 后再拉一次，避免偶发落库延迟卡一帧
-    await new Promise(r=>setTimeout(r, 1000))
-    await Promise.all([loadActiveRuns(), loadData()])
-    // 再兜底：若依然停留，移除该任务的 lastStable，以强制下一帧不再使用占位
-    const st = lastStableByTask.value?.[taskId]
-    if (st && Date.now() - st.at > LINGER_MS) {
-      delete lastStableByTask.value[taskId]
-    }
-  } finally {
-    setTimeout(()=>{ delete refreshLocks[taskId] }, 5000)
-  }
-  return ''
-}
 
 const { validateTaskFormBeforeSubmit } = useTaskFormPrepare({
   createForm,

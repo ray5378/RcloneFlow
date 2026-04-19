@@ -431,12 +431,18 @@
   - `loadGlobalStats()`
   - `openGlobalStats()`
   - `setupRealtimeSync()`
+- `frontend/src/composables/useTaskProgressSync.ts`
+  - `getDbProgressStable()`
+  - `getDeNoisedStableByRun()`
+  - `getDeNoisedStableByTask()`
+  - `formatBps()`
+  - `calcEtaFromAvg()`
+  - `triggerAutoRefresh()`
 
 当前页面层仍保留：
-- `triggerAutoRefresh()`
-- `refreshLocks`
 - stuck 检测 / 轮询兜底定时器
-- 活跃进度稳态/去噪/ETA 估算的剩余逻辑
+- 页面级生命周期挂接壳
+- 活跃进度稳态/去噪/ETA 估算的剩余 timer / signature 协调逻辑
 
 拆后目标：
 - 让页面层只负责挂接刷新能力
