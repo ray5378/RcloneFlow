@@ -464,8 +464,8 @@ const {
     :visible="confirmModal.show"
     :title="confirmModal.title"
     :message="confirmModal.message"
-    @close="closeConfirm()"
-    @confirm="confirmAndClose()"
+    @close="closeConfirm"
+    @confirm="confirmAndClose"
   />
 </template>
 
