@@ -435,8 +435,8 @@ const {
     :editing-task="editingTask"
     @update:command-mode="commandMode = $event"
     @update:command-text="commandText = $event"
-    @update:show-source-path-input="setShowSourcePathInput($event)"
-    @update:show-target-path-input="setShowTargetPathInput($event)"
+    @update:show-source-path-input="setShowSourcePathInput"
+    @update:show-target-path-input="setShowTargetPathInput"
     @update:show-advanced-options="showAdvancedOptions = $event"
     @source-remote-change="onSourceRemoteChange"
     @target-remote-change="onTargetRemoteChange"
@@ -561,27 +561,28 @@ body.light .summary-val{color:#111827}
 .summary-cell.clickable:hover{background:#1f2937;border-color:#475569;box-shadow:0 0 0 1px #334155 inset}
 body.light .summary-cell.clickable:hover{background:#f0f4f8;border-color:#cbd5e1;box-shadow:0 0 0 1px #cbd5e1 inset}
 
-.files-table{margin-top:14px;border:1px solid #333;border-radius:10px;}
+.files-table{margin-top:14px;border:1px solid #333;border-radius:10px;overflow:hidden}
 .files-table.large{max-width:1200px}
 .files-header,.files-row{display:grid;grid-template-columns:1fr 140px 200px 140px;gap:18px;align-items:center}
 .files-header{padding:12px 16px;background:#252525;color:#cbd5e1;font-size:13px}
 .files-body{max-height:540px;overflow:auto}
-.files-row{padding:12px 16px;border-top:1px solid #333}
-.files-row .name,.files-row .status,.files-row .time,.files-row .size { color:#e5e7eb }
-.files-row .name{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis }
-body.light .files-header{ background:#f5f5f5; color:#4b5563 }
-body.light .files-row .name,body.light .files-row .status,body.light .files-row .time,body.light .files-row .size { color:#1f2937 }
-.files-table .status { width:auto; padding:0; background:transparent; border-radius:0; font-weight:600 }
-.files-table .status.success{ color:#34d399 }
-.files-table .status.failed{ color:#f87171 }
-.files-table .status.skipped{ color:#fbbf24 }
-.pager-inline{display:flex;align-items:center;gap:8px}
-.page-input{width:64px;padding:6px 8px;border:1px solid #333;border-radius:8px;background:#252525;color:#e0e0e0}
-body.light .page-input{ background:#fff; color:#111827; border-color:#ddd }
-.chip .est{ color:#ef4444 }
-.chip .act{ color:#16a34a }
-.summary-val.est{ color:#ef4444 }
-.summary-val.act{ color:#16a34a }
+body.light .files-table{border-color:#e5e7eb}
+body.light .files-header{background:#f5f5f5;color:#4b5563}
+.files-table .status{width:auto;padding:0;background:transparent;border-radius:0;font-weight:600}
+.files-table .status.success{color:#34d399}
+.files-table .status.failed{color:#f87171}
+.files-table .status.skipped{color:#fbbf24}
+.pager-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.files-pager{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
+.pager-inline button,
+.files-pager button,
+.pager-inline span,
+.files-pager span{white-space:nowrap}
+.jump-input{width:72px;min-width:72px;padding:4px 8px}
+@media (max-width: 1100px){
+  .summary-grid{grid-template-columns:repeat(2,1fr)}
+  .files-toolbar{flex-direction:column;align-items:flex-start}
+}
 @media (max-width: 768px) {
   .task-main {
     flex-direction: column;
