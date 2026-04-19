@@ -345,7 +345,7 @@ const {
     :visible="showLogModal"
     :title="logModalTitle"
     :content="logContent"
-    @close="showLogModal = false"
+    @close="closeLogModal"
   />
 
   <TaskHistorySection
