@@ -185,6 +185,49 @@ func (db *DB) migrate() error {
 				CREATE INDEX IF NOT EXISTS idx_schedules_task_id ON schedules(task_id);
 			`,
 		},
+		{
+			version: 2,
+			sql: `
+				CREATE TABLE IF NOT EXISTS runs_new (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					task_id INTEGER NOT NULL,
+					status TEXT NOT NULL,
+					trigger TEXT NOT NULL,
+					summary TEXT DEFAULT '{}',
+					error TEXT DEFAULT '',
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+					finished_at DATETIME,
+					task_name TEXT,
+					task_mode TEXT,
+					source_remote TEXT,
+					source_path TEXT,
+					target_remote TEXT,
+					target_path TEXT,
+					bytes_transferred INTEGER DEFAULT 0,
+					speed TEXT,
+					FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+				);
+
+				INSERT INTO runs_new (
+					id, task_id, status, trigger, summary, error, created_at, updated_at,
+					finished_at, task_name, task_mode, source_remote, source_path,
+					target_remote, target_path, bytes_transferred, speed
+				)
+				SELECT
+					id, task_id, status, trigger, summary, error, created_at, updated_at,
+					finished_at, task_name, task_mode, source_remote, source_path,
+					target_remote, target_path, bytes_transferred, speed
+				FROM runs;
+
+				DROP TABLE runs;
+				ALTER TABLE runs_new RENAME TO runs;
+
+				CREATE INDEX IF NOT EXISTS idx_runs_task_id ON runs(task_id);
+				CREATE INDEX IF NOT EXISTS idx_runs_created_at ON runs(created_at);
+				CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
+			`,
+		},
 	}
 
 	// 获取当前版本
