@@ -19,6 +19,7 @@ import { useTaskListActions } from '../composables/useTaskListActions'
 import { useTaskRunActions } from '../composables/useTaskRunActions'
 import { useTaskViewDataSync } from '../composables/useTaskViewDataSync'
 import { useTaskProgressSync } from '../composables/useTaskProgressSync'
+import { useTaskViewRefreshLifecycle } from '../composables/useTaskViewRefreshLifecycle'
 import { useRunDetailComputed } from '../composables/useRunDetailComputed'
 import { useRunDetailFiles } from '../composables/useRunDetailFiles'
 import { useRunDetailState } from '../composables/useRunDetailState'
@@ -389,9 +390,6 @@ function closeRunDetail(){
   closeRunDetailModal()
 }
 
-onUnmounted(()=>{
-  if (stuckTimer) { clearInterval(stuckTimer); stuckTimer = null }
-})
 
 // finalSummary.files 与统计计数已下沉到 useRunDetailComputed.ts
 // move 模式时，成功数量代表 Moved 条数；已在后端合并 Copied+Deleted 为 Moved

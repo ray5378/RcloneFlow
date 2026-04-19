@@ -439,10 +439,16 @@
   - `calcEtaFromAvg()`
   - `triggerAutoRefresh()`
 
+当前已继续拆出：
+- `frontend/src/composables/useTaskViewRefreshLifecycle.ts`
+  - stuck 检测定时器
+  - activeRuns 兜底轮询定时器
+  - 对应的 `onMounted` / `onUnmounted` 生命周期挂接与清理
+
 当前页面层仍保留：
-- stuck 检测 / 轮询兜底定时器
-- 页面级生命周期挂接壳
-- 活跃进度稳态/去噪/ETA 估算的剩余 timer / signature 协调逻辑
+- 少量页面级 glue code
+- 活跃进度稳态/去噪相关的剩余 signature 协调语义
+- 其他尚未继续下沉的零散装配连接线
 
 拆后目标：
 - 让页面层只负责挂接刷新能力
