@@ -298,10 +298,7 @@ const {
 
 
 <template>
-  <!-- Toast 通知容器 -->
-  <div class="toast-container">
-    <ToastItem v-for="toast in toasts" :key="toast.id" :toast="toast" />
-  </div>
+  <ToastCenter :toasts="toasts" />
 
   <TaskListViewShell
     v-if="currentModule === 'tasks'"
