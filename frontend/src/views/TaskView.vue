@@ -179,7 +179,6 @@ const {
   commandText,
   editingTask,
   showAdvancedOptions,
-  resetTaskFormForCreate,
   fillTaskFormForEdit,
   getScheduleByTaskId,
   creatingState,
