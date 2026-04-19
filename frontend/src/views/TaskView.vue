@@ -424,21 +424,19 @@ const {
     :jump-final-files-page="jumpFinalFilesPage"
     :go-prev-files-page="goPrevFilesPage"
     :go-next-files-page="goNextFilesPage"
-  />
-
-  <!-- 运行中轻量提示小窗（不切主窗口） -->
-  <RunningHintModal
-    :visible="runningHintVisible"
-    :run="runningHintRun"
-    :phase-text="runningHintPhaseText"
-    :progress-text="runningHintProgressText"
-    :debug-open="runningHintDebugOpen"
-    :debug-check-text="runningHintDebugInfo.checkText"
-    :debug-progress-line="runningHintDebugInfo.progressLine"
-    :debug-progress-json="runningHintDebugInfo.progressJson"
-    @close="closeRunningHint"
-    @toggle-debug="toggleRunningHintDebug"
-    @open-log="openRunningHintLog"
+    :show-log-modal="showLogModal"
+    :log-modal-title="logModalTitle"
+    :log-content="logContent"
+    :close-log-modal="closeLogModal"
+    :running-hint-visible="runningHintVisible"
+    :running-hint-run="runningHintRun"
+    :running-hint-debug-open="runningHintDebugOpen"
+    :running-hint-phase-text="runningHintPhaseText"
+    :running-hint-progress-text="runningHintProgressText"
+    :running-hint-debug-info="runningHintDebugInfo"
+    :close-running-hint="closeRunningHint"
+    :toggle-running-hint-debug="toggleRunningHintDebug"
+    :open-running-hint-log="openRunningHintLog"
   />
 
   <TaskEditorViewShell

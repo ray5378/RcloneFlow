@@ -93,24 +93,28 @@
 
 ---
 
-### C. modal 层当前仍保留在 `TaskView.vue`
+### C. modal 层已进入“按归属部分下沉”阶段
 
-当前仍由 `TaskView.vue` 直接装配的 modal：
-- `RunningHintModal.vue`
+当前 modal 层已经不再全部留在 `TaskView.vue``。
+
+#### 已下沉到 `TaskListViewShell.vue`
 - `WebhookConfigModal.vue`
 - `SingletonConfigModal.vue`
+
+#### 已下沉到 `TaskHistoryViewShell.vue`
 - `RunLogModal.vue`
+- `RunningHintModal.vue`
+
+#### 当前仍保留在 `TaskView.vue`
 - `GlobalStatsModal.vue`
 - `ConfirmModal.vue`
 
-这是一种有意的最小扰动选择：
-- 先把三大主界面骨架拆出去
-- modal 保持当前挂载层级稳定
-- 避免在拆骨架时同时引入弹层层级变化风险
+当前边界判断：
+- 任务列表操作强相关弹层，归到列表壳
+- 运行/历史链强相关弹层，归到历史壳
+- 全局性/跨模块弹层，继续留在页面总装配层
 
-当前判断：
-- modal 层可以继续留在 `TaskView.vue`
-- 是否继续下沉，应视收益与风险再决定，不是当前必做项
+这是当前阶段更合理的最小扰动结构，不必为了“全下沉”继续强推进。
 
 ---
 

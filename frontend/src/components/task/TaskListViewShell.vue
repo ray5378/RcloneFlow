@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TaskListSection } from './'
+import { TaskListSection, WebhookConfigModal, SingletonConfigModal } from './'
 
 defineProps<{
   taskSearch: string
@@ -27,6 +27,24 @@ defineProps<{
   nextTasksPage: () => void
   setTasksJumpPageValue: (value: number | null) => void
   jumpToTasksPage: () => void
+  showWebhookModal: boolean
+  webhookForm: any
+  setWebhookTriggerId: (value: string) => void
+  setWebhookPostUrl: (value: string) => void
+  setWebhookWecomUrl: (value: string) => void
+  setWebhookNotifyManual: (value: boolean) => void
+  setWebhookNotifySchedule: (value: boolean) => void
+  setWebhookNotifyWebhook: (value: boolean) => void
+  setWebhookStatusSuccess: (value: boolean) => void
+  setWebhookStatusFailed: (value: boolean) => void
+  saveWebhook: () => void
+  testWebhook: () => void
+  closeWebhookModal: () => void
+  showSingletonModal: boolean
+  singletonForm: any
+  setSingletonEnabled: (value: boolean) => void
+  saveSingleton: () => void
+  closeSingletonModal: () => void
 }>()
 </script>
 
@@ -57,5 +75,37 @@ defineProps<{
     @next-page="nextTasksPage"
     @update:jump-page="setTasksJumpPageValue"
     @jump-page="jumpToTasksPage"
+  />
+
+  <WebhookConfigModal
+    :visible="showWebhookModal"
+    :trigger-id="webhookForm.triggerId"
+    :post-url="webhookForm.postUrl"
+    :wecom-url="(webhookForm as any).wecomUrl"
+    :notify-manual="webhookForm.notify.manual"
+    :notify-schedule="webhookForm.notify.schedule"
+    :notify-webhook="webhookForm.notify.webhook"
+    :status-success="(webhookForm as any).status.success"
+    :status-failed="(webhookForm as any).status.failed"
+    :can-test="!!webhookForm.postUrl || !!(webhookForm as any).wecomUrl"
+    @update:trigger-id="setWebhookTriggerId"
+    @update:post-url="setWebhookPostUrl"
+    @update:wecom-url="setWebhookWecomUrl"
+    @update:notify-manual="setWebhookNotifyManual"
+    @update:notify-schedule="setWebhookNotifySchedule"
+    @update:notify-webhook="setWebhookNotifyWebhook"
+    @update:status-success="setWebhookStatusSuccess"
+    @update:status-failed="setWebhookStatusFailed"
+    @save="saveWebhook"
+    @test="testWebhook"
+    @close="closeWebhookModal"
+  />
+
+  <SingletonConfigModal
+    :visible="showSingletonModal"
+    :singleton-enabled="singletonForm.singletonEnabled"
+    @update:singleton-enabled="setSingletonEnabled"
+    @save="saveSingleton"
+    @close="closeSingletonModal"
   />
 </template>

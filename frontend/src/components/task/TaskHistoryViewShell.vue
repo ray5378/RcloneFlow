@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TaskHistorySection } from './'
+import { TaskHistorySection, RunLogModal, RunningHintModal } from './'
 
 defineProps<{
   currentTotal: number
@@ -51,6 +51,19 @@ defineProps<{
   jumpFinalFilesPage: () => void
   goPrevFilesPage: () => void
   goNextFilesPage: () => void
+  showLogModal: boolean
+  logModalTitle: string
+  logContent: string
+  closeLogModal: () => void
+  runningHintVisible: boolean
+  runningHintRun: any
+  runningHintDebugOpen: boolean
+  runningHintPhaseText: string
+  runningHintProgressText: string
+  runningHintDebugInfo: any
+  closeRunningHint: () => void
+  toggleRunningHintDebug: () => void
+  openRunningHintLog: () => void
 }>()
 </script>
 
@@ -105,5 +118,26 @@ defineProps<{
     @jump-final-files-page="jumpFinalFilesPage"
     @prev-files-page="goPrevFilesPage"
     @next-files-page="goNextFilesPage"
+  />
+
+  <RunLogModal
+    :visible="showLogModal"
+    :title="logModalTitle"
+    :content="logContent"
+    @close="closeLogModal"
+  />
+
+  <RunningHintModal
+    :visible="runningHintVisible"
+    :run="runningHintRun"
+    :phase-text="runningHintPhaseText"
+    :progress-text="runningHintProgressText"
+    :debug-open="runningHintDebugOpen"
+    :debug-check-text="runningHintDebugInfo.checkText"
+    :debug-progress-line="runningHintDebugInfo.progressLine"
+    :debug-progress-json="runningHintDebugInfo.progressJson"
+    @close="closeRunningHint"
+    @toggle-debug="toggleRunningHintDebug"
+    @open-log="openRunningHintLog"
   />
 </template>
