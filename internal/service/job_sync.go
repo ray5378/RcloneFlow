@@ -82,55 +82,13 @@ func (s *JobSyncService) syncRunningJobs() {
 
 	logger.Debug("发现运行中的任务", zap.Int("count", len(runs)))
 
-	// 获取全局统计信息（包含当前传输进度）
-	stats, err := s.rc.CoreStats(context.Background())
-	if err != nil {
-		logger.Debug("获取rclone统计信息失败", zap.Error(err))
-	}
-
-	// 解析全局统计
-	var totalBytes, bytes int64
-	var speed string
-	if stats != nil {
-		if b, ok := stats["bytes"].(float64); ok {
-			bytes = int64(b)
-		}
-		if tb, ok := stats["totalBytes"].(float64); ok {
-			totalBytes = int64(tb)
-		}
-		if sp, ok := stats["speed"].(float64); ok {
-			speed = formatSpeed(int64(sp))
-		}
-	}
-
 	for _, run := range runs {
 		if run.RcJobID <= 0 {
 			continue
 		}
 
-		// 更新传输进度（即使任务状态没变）
-		if bytes > 0 || totalBytes > 0 {
-			if err := s.db.UpdateRunProgress(run.ID, bytes, speed); err != nil {
-				logger.Debug("更新任务进度失败",
-					zap.Int64("run_id", run.ID),
-					zap.Error(err))
-			} else {
-				// 广播进度更新（限流，避免太频繁）
-				var pct float64
-				if totalBytes > 0 {
-					pct = float64(bytes) / float64(totalBytes) * 100
-				}
-				websocket.Broadcast("run_progress", map[string]interface{}{
-					"run_id":   run.ID,
-					"bytes":    bytes,
-					"total":    totalBytes,
-					"speed":    speed,
-					"percent":  pct,
-				})
-			}
-		}
-
 		// 调用 rclone job API 获取任务状态
+		// 注意：进度数据来自日志解析（consume 函数），不通过 RC 获取
 		status, err := s.rc.JobStatus(context.Background(), run.RcJobID)
 		if err != nil {
 			// 如果job不存在于rclone中(可能已清理)，标记为finished
