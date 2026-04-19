@@ -150,6 +150,7 @@ const {
   confirmAndClose,
   formatTime,
   formatDuration,
+  getStatusClass,
   getStatusText,
 } = useTaskViewAuxRuntime({
   loadData,
