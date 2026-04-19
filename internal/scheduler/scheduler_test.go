@@ -1,81 +1,71 @@
 package scheduler
 
-import (
-	"testing"
-	"time"
-)
+import "testing"
 
-func TestParseSpec(t *testing.T) {
+func TestParseSpecToCron(t *testing.T) {
 	tests := []struct {
-		name    string
-		spec    string
-		wantOK  bool
-		wantDur time.Duration
+		name     string
+		spec     string
+		wantOK   bool
+		wantCron string
 	}{
 		{
-			name:    "valid 5m",
-			spec:    "@every 5m",
-			wantOK:  true,
-			wantDur: 5 * time.Minute,
+			name:     "valid wildcard spec",
+			spec:     "*|*|*|*|*",
+			wantOK:   true,
+			wantCron: "0 * * * * *",
 		},
 		{
-			name:    "valid 1h",
-			spec:    "@every 1h",
-			wantOK:  true,
-			wantDur: 1 * time.Hour,
+			name:     "valid minute hour spec",
+			spec:     "04,03,06|17,19|*|*|*",
+			wantOK:   true,
+			wantCron: "0 04,03,06 17,19 * * *",
 		},
 		{
-			name:    "valid 30s",
-			spec:    "30s",
-			wantOK:  true,
-			wantDur: 30 * time.Second,
+			name:   "invalid empty",
+			spec:   "",
+			wantOK: false,
 		},
 		{
-			name:    "valid 2h30m",
-			spec:    "2h30m",
-			wantOK:  true,
-			wantDur: 2*time.Hour + 30*time.Minute,
+			name:   "invalid parts length",
+			spec:   "*|*|*",
+			wantOK: false,
 		},
 		{
-			name:    "invalid empty",
-			spec:    "",
-			wantOK:  false,
-			wantDur: 0,
+			name:   "invalid minute",
+			spec:   "61|*|*|*|*",
+			wantOK: false,
 		},
 		{
-			name:    "invalid negative",
-			spec:    "-5m",
-			wantOK:  false,
-			wantDur: 0,
+			name:   "invalid hour",
+			spec:   "*|24|*|*|*",
+			wantOK: false,
 		},
 		{
-			name:    "invalid zero",
-			spec:    "0m",
-			wantOK:  false,
-			wantDur: 0,
+			name:   "invalid day",
+			spec:   "*|*|0|*|*",
+			wantOK: false,
 		},
 		{
-			name:    "invalid random",
-			spec:    "abc",
-			wantOK:  false,
-			wantDur: 0,
+			name:   "invalid month",
+			spec:   "*|*|*|13|*",
+			wantOK: false,
 		},
 		{
-			name:    "with spaces",
-			spec:    "  @every 10m  ",
-			wantOK:  true,
-			wantDur: 10 * time.Minute,
+			name:   "invalid week",
+			spec:   "*|*|*|*|7",
+			wantOK: false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dur, ok := parseSpec(tt.spec)
+			cronExpr, ok := ParseSpecToCron(tt.spec)
 			if ok != tt.wantOK {
-				t.Errorf("parseSpec(%q) ok = %v, want %v", tt.spec, ok, tt.wantOK)
+				t.Errorf("ParseSpecToCron(%q) ok = %v, want %v", tt.spec, ok, tt.wantOK)
 			}
-			if ok && dur != tt.wantDur {
-				t.Errorf("parseSpec(%q) = %v, want %v", tt.spec, dur, tt.wantDur)
+			if ok && cronExpr != tt.wantCron {
+				t.Errorf("ParseSpecToCron(%q) = %q, want %q", tt.spec, cronExpr, tt.wantCron)
 			}
 		})
 	}
