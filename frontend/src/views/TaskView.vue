@@ -18,6 +18,7 @@ import { useToastCenter } from '../composables/useToastCenter'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 
 const { toasts, showToast } = useToastCenter()
+const { normalizeTaskOptions } = useTaskFormNormalize()
 
 // Set up global error handler for composables
 setErrorHandler((message, type) => {
