@@ -441,7 +441,7 @@ const {
     @open-log="openRunningHintLog"
   />
 
-  <AddTaskForm
+  <TaskEditorViewShell
     v-if="currentModule === 'add'"
     :command-mode="commandMode"
     :command-text="commandText"
@@ -458,20 +458,20 @@ const {
     :show-advanced-options="showAdvancedOptions"
     :creating-state="creatingState"
     :editing-task="editingTask"
-    @update:command-mode="setCommandMode"
-    @update:command-text="setCommandText"
-    @update:show-source-path-input="setShowSourcePathInput"
-    @update:show-target-path-input="setShowTargetPathInput"
-    @update:show-advanced-options="setShowAdvancedOptions"
-    @source-remote-change="onSourceRemoteChange"
-    @target-remote-change="onTargetRemoteChange"
-    @source-breadcrumb-click="onSourceBreadcrumbClick"
-    @target-breadcrumb-click="onTargetBreadcrumbClick"
-    @source-arrow="onSourceArrow"
-    @source-click="onSourceClick"
-    @target-arrow="onTargetArrow"
-    @target-click="onTargetClick"
-    @submit="createTask"
+    :set-command-mode="setCommandMode"
+    :set-command-text="setCommandText"
+    :set-show-source-path-input="setShowSourcePathInput"
+    :set-show-target-path-input="setShowTargetPathInput"
+    :set-show-advanced-options="setShowAdvancedOptions"
+    :on-source-remote-change="onSourceRemoteChange"
+    :on-target-remote-change="onTargetRemoteChange"
+    :on-source-breadcrumb-click="onSourceBreadcrumbClick"
+    :on-target-breadcrumb-click="onTargetBreadcrumbClick"
+    :on-source-arrow="onSourceArrow"
+    :on-source-click="onSourceClick"
+    :on-target-arrow="onTargetArrow"
+    :on-target-click="onTargetClick"
+    :create-task="createTask"
   />
 
   <!-- 全局实时数据弹窗 -->

@@ -1,0 +1,106 @@
+<script setup lang="ts">
+defineProps<{
+  currentTotal: number
+  runsPage: number
+  runsPageSize: number
+  currentTotalPages: number
+  jumpPage: number
+  historyFilterTaskId: number | null
+  historyStatusFilter: string
+  filteredRuns: any[]
+  getRealtimeProgressByRun: (run: any) => any
+  getFinalSummaryFromComposable: (run: any) => any
+  showDetailModal: boolean
+  runDetail: any
+  getStatusClass: (status: string) => string
+  getStatusText: (status: string) => string
+  getPreflightFromComposable: (run: any) => any
+  formatBytes: (value: number) => string
+  formatTime: (value: any) => string
+  formatBps: (value: number) => string
+  finalCountAll: number
+  finalCountSuccess: number
+  finalCountFailed: number
+  finalCountOther: number
+  finalFilesTotal: number
+  finalFilesPage: number
+  totalFinalFilesPages: number
+  finalFilesJump: number | null
+  pagedFinalFiles: any[]
+  finalFiles: any[]
+  pagedRunFiles: any[]
+  runFilesPage: number
+  totalRunFilesPages: number
+  currentModule: string
+  loadData: () => Promise<void>
+  setHistoryStatusFilter: (value: string) => void
+  setJumpPageValue: (value: number) => void
+  jumpToPage: () => void
+  clearAllRunsWithConfirm: () => void
+  showRunDetail: (run: any) => void
+  openRunLog: (run: any) => void
+  clearRun: (run: any) => void
+  closeRunDetail: () => void
+  setFinalFilter: (filter: string) => void
+  goPrevFinalFilesPage: () => void
+  goNextFinalFilesPage: () => void
+  setFinalFilesJumpValue: (value: number | null) => void
+  jumpFinalFilesPage: () => void
+  goPrevFilesPage: () => void
+  goNextFilesPage: () => void
+}>()
+</script>
+
+<template>
+  <TaskHistorySection
+    :current-total="currentTotal"
+    :runs-page="runsPage"
+    :runs-page-size="runsPageSize"
+    :current-total-pages="currentTotalPages"
+    :jump-page="jumpPage"
+    :history-filter-task-id="historyFilterTaskId"
+    :history-status-filter="historyStatusFilter"
+    :filtered-runs="filteredRuns"
+    :get-db-progress-stable="getRealtimeProgressByRun"
+    :get-final-summary="getFinalSummaryFromComposable"
+    :show-detail-modal="showDetailModal"
+    :run-detail="runDetail"
+    :get-status-class="getStatusClass"
+    :get-status-text="getStatusText"
+    :get-preflight="getPreflightFromComposable"
+    :format-bytes="formatBytes"
+    :format-time="formatTime"
+    :format-bps="formatBps"
+    :final-count-all="finalCountAll"
+    :final-count-success="finalCountSuccess"
+    :final-count-failed="finalCountFailed"
+    :final-count-other="finalCountOther"
+    :final-files-total="finalFilesTotal"
+    :final-files-page="finalFilesPage"
+    :total-final-files-pages="totalFinalFilesPages"
+    :final-files-jump="finalFilesJump"
+    :paged-final-files="pagedFinalFiles"
+    :final-files="finalFiles"
+    :paged-run-files="pagedRunFiles"
+    :run-files-page="runFilesPage"
+    :total-run-files-pages="totalRunFilesPages"
+    @back="currentModule = 'tasks'"
+    @set-status-filter="setHistoryStatusFilter"
+    @prev-page="runsPage--; loadData()"
+    @next-page="runsPage++; loadData()"
+    @update-jump-page="setJumpPageValue"
+    @jump-page="jumpToPage"
+    @clear-all="clearAllRunsWithConfirm"
+    @view-detail="showRunDetail"
+    @view-log="openRunLog"
+    @clear-run="clearRun"
+    @close-detail="closeRunDetail"
+    @set-final-filter="setFinalFilter"
+    @prev-final-files-page="goPrevFinalFilesPage"
+    @next-final-files-page="goNextFinalFilesPage"
+    @update-final-files-jump="setFinalFilesJumpValue"
+    @jump-final-files-page="jumpFinalFilesPage"
+    @prev-files-page="goPrevFilesPage"
+    @next-files-page="goNextFilesPage"
+  />
+</template>
