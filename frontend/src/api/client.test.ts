@@ -3,7 +3,7 @@ import { get, post, put, del, patch, api, addResponseInterceptor } from './clien
 
 // Mock fetch
 const mockFetch = vi.fn()
-global.fetch = mockFetch
+globalThis.fetch = mockFetch as any
 
 describe('client.ts', () => {
   beforeEach(() => {

@@ -3,11 +3,9 @@ import {
   getRuns,
   getRun,
   clearRun,
-  getJobStatus,
   getActiveRuns,
 } from './run'
 
-// Mock the client module
 vi.mock('./client', () => ({
   get: vi.fn(),
   del: vi.fn(),
@@ -57,22 +55,6 @@ describe('run API', () => {
     })
   })
 
-  describe('getJobStatus', () => {
-    it('should call get with job id', async () => {
-      const mockStatus = {
-        id: 123,
-        status: 'in progress',
-        percentage: 50,
-      }
-      ;(get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockStatus)
-
-      const result = await getJobStatus(123)
-
-      expect(get).toHaveBeenCalledWith('/api/jobs/123/status')
-      expect(result).toEqual(mockStatus)
-    })
-  })
-
   describe('getActiveRuns', () => {
     it('should call get with active runs path', async () => {
       const mockActiveRuns = [
@@ -90,13 +72,12 @@ describe('run API', () => {
     })
   })
 
-  describe('ActiveRun type', () => {
-    it('should have correct structure', () => {
+  describe('ActiveRun shape', () => {
+    it('should match current frontend expectation without rcJobId', () => {
       const activeRun = {
         runRecord: {
           id: 1,
           taskId: 1,
-          rcJobId: 123,
           status: 'running',
           trigger: 'manual',
           startedAt: '2024-01-01T00:00:00Z',

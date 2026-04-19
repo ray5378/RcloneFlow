@@ -1,4 +1,4 @@
-import { computed, type Ref } from 'vue'
+import { type Ref } from 'vue'
 import { getActiveProgress, getActiveProgressText } from '../components/task/runningHint'
 
 export function useActiveRunLookup(activeRuns: Ref<any[]>) {

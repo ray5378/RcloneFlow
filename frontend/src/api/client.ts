@@ -9,7 +9,7 @@ import { getToken as getStoredToken, getRefreshToken, setTokens, logout } from '
 const BASE_URL = ''
 
 // 响应拦截器
-type ResponseInterceptor = (response: Response) => Response | Promise<Response>
+export type ResponseInterceptor = (response: Response) => Response | Promise<Response>
 
 // 响应拦截器列表
 const responseInterceptors: ResponseInterceptor[] = []
@@ -75,7 +75,7 @@ async function apiRequest<T>(
     if (response.status === 401 && !path.includes('/api/auth/')) {
       try { await tryRefreshToken() } catch { handleUnauthorizedRedirect(); throw new Error('未授权') }
       // 重试一次
-      const retryHeaders: HeadersInit = { ...defaultHeaders, ...options.headers }
+      const retryHeaders: Record<string, string> = { ...defaultHeaders, ...(options.headers as Record<string, string> | undefined) }
       const retryToken = getStoredToken()
       if (retryToken) retryHeaders['Authorization'] = `Bearer ${retryToken}`
       response = await fetch(url, { ...options, headers: retryHeaders })

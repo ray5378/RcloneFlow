@@ -63,16 +63,6 @@ export async function getGlobalStats(): Promise<GlobalStats> {
   return get<GlobalStats>('/api/stats/global')
 }
 
-/** 获取任务 Job 状态 */
-export async function getJobStatus(jobId: number): Promise<JobStatus> {
-  return get<JobStatus>(`/api/jobs/${jobId}/status`)
-}
-
-/** 停止任务 Job */
-export async function stopJob(jobId: number): Promise<void> {
-  return get<void>(`/api/jobs/${jobId}/stop`)
-}
-
 /** 全局实时统计 */
 export interface GlobalStats {
   bytes: number        // 已传输字节
@@ -83,24 +73,11 @@ export interface GlobalStats {
   percentage: number  // 进度百分比 (0-100)
 }
 
-/** Job 状态 */
-export interface JobStatus {
-  id: number
-  startTime: string
-  stopTime?: string
-  finished: boolean
-  success: boolean
-  error?: string
-  duration?: string
-  progress?: string  // 人类可读的进度字符串
-}
-
 /** 运行中任务的实时状态 */
 export interface ActiveRun {
   runRecord: {
     id: number
     taskId: number
-    rcJobId: number
     status: string
     trigger: string
     startedAt: string
