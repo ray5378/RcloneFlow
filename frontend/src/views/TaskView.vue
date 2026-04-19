@@ -394,7 +394,7 @@ const {
     @set-final-filter="setFinalFilter"
     @prev-final-files-page="goPrevFinalFilesPage()"
     @next-final-files-page="goNextFinalFilesPage()"
-    @update-final-files-jump="finalFilesJump = $event"
+    @update-final-files-jump="setFinalFilesJumpValue"
     @jump-final-files-page="jumpFinalFilesPage()"
     @prev-files-page="goPrevFilesPage()"
     @next-files-page="goNextFilesPage()"
