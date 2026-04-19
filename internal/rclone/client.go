@@ -182,19 +182,6 @@ func (c *Client) StartJob(ctx context.Context, mode, srcFs, dstFs string, opts *
 	return c.cli.StartJob(ctx, mode, srcFs, dstFs, opts)
 }
 
-// JobStatus 获取任务状态
-func (c *Client) JobStatus(ctx context.Context, jobID int64) (map[string]any, error) {
-	status, err := c.cli.JobStatus(ctx, jobID)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]any{
-		"finished": status.Finished,
-		"success":  status.Success,
-		"error":    status.Error,
-	}, nil
-}
-
 // HasActiveJobs 检查是否有正在运行的 rclone 任务
 func (c *Client) HasActiveJobs(ctx context.Context) (bool, error) {
 	resp, err := c.cli.ListJobs(ctx)
