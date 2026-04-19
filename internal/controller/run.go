@@ -978,14 +978,7 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 
 // HandleGlobalStats 处理获取全局实时统计信息
 func (c *RunController) HandleGlobalStats(w http.ResponseWriter, r *http.Request) {
-	// 先尝试从 RC 获取
-	stats, err := c.rc.CoreStats(r.Context())
-	if err == nil {
-		// 如果 RC 可用直接返回
-		WriteJSON(w, 200, stats)
-		return
-	}
-	// 回退：聚合本地 CLI Runner 的活动任务进度
+	// 聚合本地 CLI Runner 的活动任务进度（RC 仅用于浏览/管理存储，不涉及进度）
 	runs, e2 := c.runSvc.ListActiveRuns()
 	if e2 != nil {
 		WriteJSON(w, 500, map[string]any{"error": e2.Error()})

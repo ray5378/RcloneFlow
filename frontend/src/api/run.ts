@@ -107,18 +107,4 @@ export interface ActiveRun {
     summary: string
     error: string
   }
-  realtimeStatus?: {
-    id: number
-    status: string
-    success?: boolean
-    error?: string
-    finished?: boolean
-    // 进度信息
-    bytes?: number
-    size?: number
-    speed?: number
-    speedAvg?: number
-    eta?: number
-    percentage?: number
-  }
 }
