@@ -927,7 +927,6 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				"id":               run.ID,
 				"taskId":           run.TaskID,
 				"status":           run.Status,
-				"rcJobId":          0,
 				"bytesTransferred": run.BytesTransferred,
 				"error":            run.Error,
 				"startedAt":        run.StartedAt,

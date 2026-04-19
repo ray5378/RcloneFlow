@@ -6,7 +6,6 @@ import "encoding/json"
 type RunRecord struct {
 	ID               int64  `json:"id"`
 	TaskID           int64  `json:"taskId"`
-	RcJobID          int64  `json:"rcJobId"`
 	Status           string `json:"status"`
 	Trigger          string `json:"trigger"`
 	StartedAt        string `json:"startedAt"`

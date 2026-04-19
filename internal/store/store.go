@@ -44,7 +44,6 @@ type Schedule struct {
 type Run struct {
 	ID        int64          `json:"id"`
 	TaskID    int64          `json:"taskId"`
-	RcJobID   int64          `json:"rcJobId"`
 	Status    string         `json:"status"`
 	Trigger   string         `json:"trigger"`
 	Summary   map[string]any `json:"summary,omitempty"`
@@ -458,7 +457,7 @@ func (db *DB) ListRuns(page, pageSize int) ([]Run, int, error) {
 	// 分页查询
 	offset := (page - 1) * pageSize
 	rows, err := db.db.Query(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
 		FROM runs ORDER BY id DESC LIMIT ? OFFSET ?`, pageSize, offset)
 	if err != nil {
@@ -541,10 +540,10 @@ func (db *DB) TryAcquireRun(run *Run) (*Run, bool, error) {
 
 	// 插入新记录
 	_, err = tx.Exec(`
-		INSERT INTO runs (task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		INSERT INTO runs (task_id, status, trigger, summary, error, created_at, updated_at,
 		                 task_name, task_mode, source_remote, source_path, target_remote, target_path, bytes_transferred, speed)
-		VALUES (?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?, ?, ?, ?, ?, 0, '')`,
-		run.TaskID, run.RcJobID, run.Status, run.Trigger, string(summaryJSON), run.Error,
+		VALUES (?, ?, ?, ?, ?, datetime('now'), datetime('now'), ?, ?, ?, ?, ?, ?, 0, '')`,
+		run.TaskID, run.Status, run.Trigger, string(summaryJSON), run.Error,
 		run.TaskName, run.TaskMode, run.SourceRemote, run.SourcePath, run.TargetRemote, run.TargetPath)
 	if err != nil {
 		return nil, false, err
@@ -577,11 +576,11 @@ func (db *DB) GetActiveRunByTaskID(taskID int64) (Run, error) {
 	var taskName, taskMode, sourceRemote, sourcePath, targetRemote, targetPath sql.NullString
 	var bytesTransferred sql.NullInt64
 	err := db.db.QueryRow(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
-		FROM runs WHERE task_id = ? AND status = 'running' AND rc_job_id > 0
+		FROM runs WHERE task_id = ? AND status = 'running'
 		ORDER BY created_at DESC LIMIT 1`, taskID).Scan(
-		&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
+		&r.ID, &r.TaskID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
 		&taskName, &taskMode, &sourceRemote, &sourcePath, &targetRemote, &targetPath,
 		&finishedAt, &bytesTransferred, &speed)
 	if err != nil {
@@ -637,7 +636,7 @@ func (db *DB) scanRuns(rows *sql.Rows) ([]Run, error) {
 		var speed sql.NullString
 		var taskName, taskMode, sourceRemote, sourcePath, targetRemote, targetPath sql.NullString
 		var bytesTransferred sql.NullInt64
-		err := rows.Scan(&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
+		err := rows.Scan(&r.ID, &r.TaskID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
 			&taskName, &taskMode, &sourceRemote, &sourcePath, &targetRemote, &targetPath,
 			&finishedAt, &bytesTransferred, &speed)
 		if err != nil {
@@ -696,9 +695,9 @@ func (db *DB) AddRun(r Run) (Run, error) {
 	}
 
 	result, err := db.db.Exec(`
-		INSERT INTO runs (task_id, rc_job_id, status, trigger, summary, error, task_name, task_mode, source_remote, source_path, target_remote, target_path) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.TaskID, r.RcJobID, r.Status, r.Trigger, string(summaryJSON), r.Error,
+		INSERT INTO runs (task_id, status, trigger, summary, error, task_name, task_mode, source_remote, source_path, target_remote, target_path) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.TaskID, r.Status, r.Trigger, string(summaryJSON), r.Error,
 		r.TaskName, r.TaskMode, r.SourceRemote, r.SourcePath, r.TargetRemote, r.TargetPath)
 	if err != nil {
 		return Run{}, err
@@ -723,9 +722,9 @@ func (db *DB) UpdateRun(id int64, fn func(*Run)) error {
 	var r Run
 	var summaryJSON string
 	err := db.db.QueryRow(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at 
 		FROM runs WHERE id = ?`, id).Scan(
-		&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt)
+		&r.ID, &r.TaskID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return err
 	}
@@ -752,9 +751,9 @@ func (db *DB) GetRun(id int64) (Run, error) {
 	var r Run
 	var summaryJSON string
 	err := db.db.QueryRow(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at 
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at 
 		FROM runs WHERE id = ?`, id).Scan(
-		&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt)
+		&r.ID, &r.TaskID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt)
 	if err != nil {
 		return Run{}, err
 	}
@@ -764,46 +763,7 @@ func (db *DB) GetRun(id int64) (Run, error) {
 	return r, nil
 }
 
-// ListRunningRuns 获取所有运行中的任务（供JobSyncService使用）
-func (db *DB) ListRunningRuns() ([]JobStatus, error) {
-	db.mu.RLock()
-	defer db.mu.RUnlock()
-
-	rows, err := db.db.Query(`
-		SELECT id, rc_job_id, status, summary, error 
-		FROM runs 
-		WHERE status = 'running' AND rc_job_id > 0
-		ORDER BY created_at ASC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var runs []JobStatus
-	for rows.Next() {
-		var r JobStatus
-		var summaryJSON string
-		if err := rows.Scan(&r.ID, &r.RcJobID, &r.Status, &summaryJSON, &r.Error); err != nil {
-			continue
-		}
-		if summaryJSON != "" && summaryJSON != "{}" {
-			json.Unmarshal([]byte(summaryJSON), &r.Summary)
-		}
-		runs = append(runs, r)
-	}
-	return runs, nil
-}
-
-// JobStatus 运行记录结构（用于JobSyncService）
-type JobStatus struct {
-	ID      int64
-	RcJobID int64
-	Status  string
-	Summary map[string]any
-	Error   string
-}
-
-// UpdateRunStatus 更新运行状态（供JobSyncService使用）
+// UpdateRunStatus 更新运行状态
 func (db *DB) UpdateRunStatus(id int64, status, errorMsg string, summary map[string]any) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
@@ -930,3 +890,4 @@ func (db *DB) ListUsers() ([]User, error) {
 	}
 	return users, nil
 }
+

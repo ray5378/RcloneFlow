@@ -171,7 +171,7 @@
   - 文件浏览：如 `/api/browser/list` → `operations/list`
   - 文件操作：如 `/api/fs/copy` / `/api/fs/move` / `/api/fs/delete` / `/api/fs/purge` / `/api/fs/mkdir`
   - 添加存储：remote / config 相关 RC API
-- 运行态 RC 旧链继续下沉清理后，`internal/rclone/client.go` 中旧 `JobStatus` / `JobStop` 包装与 `internal/store/store.go` 中 `UpdateRunStatusByJobId` 也已删除；当前剩余残留主要收缩到 `RcJobID` 持久化字段、DAO/store 读写列以及 `internal/adapter/rclone.go` 的底层 RC job 能力（未再接入运行态主链）。后续若继续清理，应把 `RcJobID` 当成单独一层结构/存储债处理，而不是再把运行态 API 兼容面拉回来。
+- 运行态 RC 旧链继续下沉清理后，`internal/rclone/client.go` 中旧 `JobStatus` / `JobStop` 包装与 `internal/store/store.go` 中 `UpdateRunStatusByJobId` 也已删除；当前主链已进一步把 `RcJobID` 从运行记录业务结构与大部分 store/dao 读写路径中拔掉：`internal/service/run.go` 的 `RunRecord`、`internal/service/run_adapter.go`、`internal/controller/run.go` active run 返回、`internal/scheduler/scheduler.go` 的旧默认 taskRunner、`internal/dao/run.go` 以及 `internal/store/store.go` 的主要运行记录查询/写入逻辑均已改为不再读写 `rc_job_id`。数据库列当前允许物理留存，但业务主链已不再依赖。剩余若继续清理，重点已从运行态 API 兼容面转为 schema/测试/低层未接线能力收尾。
 - 到当前阶段，`TaskView.vue` 的脚本装配层已非常接近文档目标：主页面脚本已基本由 `useTaskViewState.ts`、`useTaskViewRuntimeState.ts`、`useTaskViewRuntime.ts`、`useTaskViewAuxRuntime.ts`、`useTaskListRuntime.ts`、`useTaskFormRuntime.ts`、`useTaskHistoryRuntime.ts`、`useRunDetailRuntime.ts`、`useRunningHintRuntime.ts` 这些入口构成；后续继续推进时，重点将逐步从“继续大量拆脚本装配”转向“清少量残留 glue / 评估模板主骨架是否还有低风险拆分点”
 - 本轮继续清掉了一批 `TaskView.vue` 顶层页面未直接使用的解构残留：包括部分 runtime/helper 暴露但页面模板未消费的名字、旧本地变量与无效动作入口，进一步降低脚本层噪音与认知负担
 - 本轮又继续完成一波纯删除型去噪：清理了页面顶部未使用的 Vue/WS/错误处理/类型 import、旧 helper import，以及多组 runtime 解构中页面未直接消费的名字；这一阶段的收益已明显从“结构性拆分”转向“减少脚本层噪音、让主骨架更清晰”

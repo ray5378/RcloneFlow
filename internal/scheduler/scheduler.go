@@ -87,7 +87,7 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 		}
 	}
 
-	jobID, err := r.rc.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger, opts)
+	_, err := r.rc.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger, opts)
 	if err != nil {
 		r.db.AddRun(store.Run{
 			TaskID:       taskID,
@@ -105,7 +105,6 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 
 	_, err = r.db.AddRun(store.Run{
 		TaskID:       taskID,
-		RcJobID:      jobID,
 		Status:       "running",
 		Trigger:      trigger,
 		TaskName:     t.Name,

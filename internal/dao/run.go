@@ -22,9 +22,9 @@ func NewRunDAO(db *sql.DB) *RunDAO {
 // Create 创建运行记录
 func (d *RunDAO) Create(run store.Run) (store.Run, error) {
 	result, err := d.db.Exec(`
-		INSERT INTO runs (task_id, rc_job_id, status, trigger, task_name, task_mode, source_remote, source_path, target_remote, target_path)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		run.TaskID, run.RcJobID, run.Status, run.Trigger,
+		INSERT INTO runs (task_id, status, trigger, task_name, task_mode, source_remote, source_path, target_remote, target_path)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		run.TaskID, run.Status, run.Trigger,
 		run.TaskName, run.TaskMode, run.SourceRemote, run.SourcePath, run.TargetRemote, run.TargetPath)
 	if err != nil {
 		return store.Run{}, err
@@ -44,10 +44,10 @@ func (d *RunDAO) GetByID(id int64) (store.Run, error) {
 	var summaryJSON string
 	var finishedAt sql.NullTime
 	err := d.db.QueryRow(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
 		FROM runs WHERE id = ?`, id).Scan(
-		&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
+		&r.ID, &r.TaskID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
 		&r.TaskName, &r.TaskMode, &r.SourceRemote, &r.SourcePath, &r.TargetRemote, &r.TargetPath,
 		&finishedAt, &r.BytesTransferred, &r.Speed)
 	if err != nil {
@@ -65,7 +65,7 @@ func (d *RunDAO) GetByID(id int64) (store.Run, error) {
 // GetAll 获取所有运行记录
 func (d *RunDAO) GetAll() ([]store.Run, error) {
 	rows, err := d.db.Query(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
 		FROM runs ORDER BY created_at DESC`)
 	if err != nil {
@@ -78,7 +78,7 @@ func (d *RunDAO) GetAll() ([]store.Run, error) {
 		var r store.Run
 		var summaryJSON string
 		var finishedAt sql.NullTime
-		if err := rows.Scan(&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
+		if err := rows.Scan(&r.ID, &r.TaskID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
 			&r.TaskName, &r.TaskMode, &r.SourceRemote, &r.SourcePath, &r.TargetRemote, &r.TargetPath,
 			&finishedAt, &r.BytesTransferred, &r.Speed); err != nil {
 			continue
@@ -97,7 +97,7 @@ func (d *RunDAO) GetAll() ([]store.Run, error) {
 // GetByTaskID 根据任务ID获取运行记录
 func (d *RunDAO) GetByTaskID(taskID int64) ([]store.Run, error) {
 	rows, err := d.db.Query(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
 		FROM runs WHERE task_id = ? ORDER BY created_at DESC`, taskID)
 	if err != nil {
@@ -110,7 +110,7 @@ func (d *RunDAO) GetByTaskID(taskID int64) ([]store.Run, error) {
 		var r store.Run
 		var summaryJSON string
 		var finishedAt sql.NullTime
-		if err := rows.Scan(&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
+		if err := rows.Scan(&r.ID, &r.TaskID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
 			&r.TaskName, &r.TaskMode, &r.SourceRemote, &r.SourcePath, &r.TargetRemote, &r.TargetPath,
 			&finishedAt, &r.BytesTransferred, &r.Speed); err != nil {
 			continue
@@ -132,11 +132,11 @@ func (d *RunDAO) GetActiveRunByTaskID(taskID int64) (store.Run, error) {
 	var summaryJSON string
 	var finishedAt sql.NullTime
 	err := d.db.QueryRow(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
-		FROM runs WHERE task_id = ? AND status = 'running' AND rc_job_id > 0
+		FROM runs WHERE task_id = ? AND status = 'running'
 		ORDER BY created_at DESC LIMIT 1`, taskID).Scan(
-		&r.ID, &r.TaskID, &r.RcJobID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
+		&r.ID, &r.TaskID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
 		&r.TaskName, &r.TaskMode, &r.SourceRemote, &r.SourcePath, &r.TargetRemote, &r.TargetPath,
 		&finishedAt, &r.BytesTransferred, &r.Speed)
 	if err != nil {
@@ -149,33 +149,6 @@ func (d *RunDAO) GetActiveRunByTaskID(taskID int64) (store.Run, error) {
 		r.FinishedAt = &finishedAt.Time
 	}
 	return r, nil
-}
-
-// GetRunning 获取运行中的任务
-func (d *RunDAO) GetRunning() ([]store.JobStatus, error) {
-	rows, err := d.db.Query(`
-		SELECT id, rc_job_id, status, summary, error 
-		FROM runs 
-		WHERE status = 'running' AND rc_job_id > 0
-		ORDER BY created_at ASC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var runs []store.JobStatus
-	for rows.Next() {
-		var r store.JobStatus
-		var summaryJSON string
-		if err := rows.Scan(&r.ID, &r.RcJobID, &r.Status, &summaryJSON, &r.Error); err != nil {
-			continue
-		}
-		if summaryJSON != "" && summaryJSON != "{}" {
-			json.Unmarshal([]byte(summaryJSON), &r.Summary)
-		}
-		runs = append(runs, r)
-	}
-	return runs, nil
 }
 
 // Update 更新运行记录
@@ -205,7 +178,6 @@ func (d *RunDAO) UpdateStatus(id int64, status, errorMsg string, summary map[str
 		finishedAt = time.Now()
 	}
 
-	// 解析 summary 中的传输统计
 	var bytesTransferred int64
 	var speed string
 	if summary != nil {

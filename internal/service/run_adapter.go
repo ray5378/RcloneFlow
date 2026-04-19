@@ -41,7 +41,6 @@ func toRunRecord(r store.Run) RunRecord {
 	return RunRecord{
 		ID:               r.ID,
 		TaskID:           r.TaskID,
-		RcJobID:          r.RcJobID,
 		Status:           r.Status,
 		Trigger:          r.Trigger,
 		StartedAt:        formatTime(r.CreatedAt),
