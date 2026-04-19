@@ -188,8 +188,6 @@ const {
   onTargetRemoteChange,
   onSourceBreadcrumbClick,
   onTargetBreadcrumbClick,
-  loadSourcePath,
-  loadTargetPath,
   onSourceClick,
   onSourceArrow,
   onTargetClick,
