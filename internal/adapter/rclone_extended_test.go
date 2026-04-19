@@ -278,7 +278,7 @@ func TestStartJob(t *testing.T) {
 	cfg := &RcloneConfig{BaseURL: server.URL}
 	client := NewRcloneClient(cfg)
 
-	jobID, err := client.StartJob(context.Background(), "copy", "local:/src", "local:/dst")
+	jobID, err := client.StartJob(context.Background(), "copy", "local:/src", "local:/dst", nil)
 	if err != nil {
 		t.Fatalf("StartJob() error = %v", err)
 	}
