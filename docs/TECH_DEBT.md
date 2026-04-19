@@ -251,20 +251,20 @@
 
 ### 高优先级
 
-#### 1. 继续拆分 `frontend/src/views/TaskView.vue`
+#### 1. `frontend/src/views/TaskView.vue` 拆分进入阶段性完成，后续转为收尾优化
 现状：
-- 虽然运行中提示与 active run 相关逻辑已经拆出一部分，但文件整体仍然偏大
-- 仍混合了承担任务列表、历史记录、创建任务、弹窗、WebSocket 更新等职责
+- `TaskView.vue` 当前约 **718 行**，已明显低于早前 900~1000+ 行阶段
+- 页面主链已基本收敛为装配层，核心入口已集中到：`useTaskViewState`、`useTaskViewRuntimeState`、`useTaskViewRuntime`、`useTaskViewAuxRuntime`、`useTaskListRuntime`、`useTaskFormRuntime`、`useTaskHistoryRuntime`、`useRunDetailRuntime`、`useRunningHintRuntime`
+- 历史记录区域、任务列表区域、创建任务区域、运行详情链、辅助 UI 系统、页面级 WebSocket / 刷新协调逻辑都已完成 runtime / section 化收口，不再属于“大块未拆”状态
 
-下一步建议拆分优先块：
-- 历史记录区域
-- 任务列表区域
-- 创建任务区域 / 表单块
-- 页面级 WebSocket / 列表刷新协调逻辑
+新的优化方向：
+- 把 `TaskView.vue` 后续工作从“继续大拆分”调整为“少量 glue code 收尾 + 模板骨架按需微调”
+- 优先清理页面顶层仍残留的少量装配噪音、重复透传、可再内聚的轻量 helper，而不是继续强行切更多 composable
+- 若继续瘦身，优先做低风险模板骨架优化与一致性整理，不再轻易触碰已稳定的主链边界
 
 目标：
-- 进一步降低耦合
-- 让 `TaskView.vue` 更接近页面装配层，而不是功能承载层
+- 保持 `TaskView.vue` 作为页面装配层稳定落地
+- 后续优化以可读性、一致性、低风险去噪为主，而不是继续做高扰动结构性拆分
 
 #### 2. 明确 `progress / stableProgress / preflight` 的字段边界
 现状：
