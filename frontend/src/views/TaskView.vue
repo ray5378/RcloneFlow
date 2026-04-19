@@ -143,46 +143,6 @@ const {
 })
 // 监控帧是否停滞超过阈值（默认 25s），若是则强制刷新一次
 const STUCK_MS = 25000
-let lastRenderedSignature = ''
-let stuckTimer: number | null = null
-let activePollTimer: number | null = null
-onMounted(() => {
-  stuckTimer = window.setInterval(() => {
-    try{
-      // 用任务卡片可见的核心字段拼接签名：任务数、每个任务的 id+pct+completedFiles
-      const sigParts: string[] = []
-      for (const t of tasks.value||[]){
-        const sp = getDeNoisedStableByTask((t as any).id) as any
-        const pct = sp ? Number(sp.percentage||0).toFixed(3) : 'na'
-        const c = sp ? Number(sp.completedFiles||0) : -1
-        sigParts.push(`${(t as any).id}:${pct}:${c}`)
-      }
-      const sig = `${tasks.value?.length||0}|${sigParts.join(',')}`
-      if (sig === lastRenderedSignature){
-        // 帧未变化：触发一次性刷新
-        const now = Date.now()
-        const last = (window as any).__last_stuck_refresh || 0
-        if (now - last > STUCK_MS){
-          (window as any).__last_stuck_refresh = now
-          // 轻量拉新
-          loadData()
-        }
-      } else {
-        lastRenderedSignature = sig
-      }
-    }catch{}
-  }, 1000)
-  // 兜底轮询：即使 ws 没推到，也每 3 秒刷新一次 activeRuns
-  activePollTimer = window.setInterval(() => {
-    if (document.visibilityState === 'visible') {
-      loadActiveRuns().catch(console.error)
-    }
-  }, 3000)
-})
-onUnmounted(() => {
-  if (stuckTimer) clearInterval(stuckTimer)
-  if (activePollTimer) clearInterval(activePollTimer)
-})
 const {
   getDbProgressStable,
   getDeNoisedStableByRun,
@@ -710,6 +670,7 @@ function formatScheduleSpec(spec: string): string {
         :task="task"
         :schedule="getScheduleByTaskId(task.id)"
         :active-run="getActiveRunByTaskId(task.id)"
+        :progress="getDeNoisedStableByTask(task.id)"
         :running-task-id="runningTaskId"
         :stopped-task-id="stoppedTaskId"
         @run="runTask(task.id)"

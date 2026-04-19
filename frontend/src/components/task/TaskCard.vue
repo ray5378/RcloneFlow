@@ -41,6 +41,7 @@ const props = defineProps<{
   task: Task
   schedule?: Schedule | null
   activeRun?: ActiveRun | null
+  progress?: Progress | null
   runningTaskId?: number | null
   stoppedTaskId?: number | null
 }>()
@@ -57,7 +58,7 @@ const emit = defineEmits<{
 }>()
 
 function getLiveProgress(): Progress | null {
-  return props.activeRun?.progress || props.activeRun?.stableProgress || null
+  return props.progress || props.activeRun?.progress || props.activeRun?.stableProgress || null
 }
 
 function getProgressPercent(): string {

@@ -3,7 +3,11 @@ import { getActiveProgress, getActiveProgressText } from '../components/task/run
 
 export function useActiveRunLookup(activeRuns: Ref<any[]>) {
   function getActiveRunByTaskId(taskId: number) {
-    const cur = (activeRuns.value || []).find((item: any) => item?.runRecord?.taskId === taskId)
+    const targetId = Number(taskId)
+    const cur = (activeRuns.value || []).find((item: any) => {
+      const candidateId = Number(item?.runRecord?.taskId ?? item?.taskId ?? item?.taskID ?? item?.task_id)
+      return candidateId > 0 && candidateId === targetId
+    })
     if (cur) return cur
     return undefined as any
   }

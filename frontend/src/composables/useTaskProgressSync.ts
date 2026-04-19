@@ -37,7 +37,7 @@ export function useTaskProgressSync(options: {
 
   function getDeNoisedStableByTask(taskId: number) {
     const active = options.activeRunLookup.getActiveRunByTaskId(taskId)
-    const raw = active?.progress || active?.stableProgress
+    const raw = active?.progress || active?.stableProgress || options.lastStableByTask.value?.[taskId]?.sp
     if (!raw) return null
     const st: any = { ...raw }
     st.bytes = Number(st.bytes || 0)

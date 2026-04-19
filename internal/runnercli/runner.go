@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -983,6 +984,8 @@ func (fp *fileProgress) copiedList() []string {
 	return out
 }
 
+// statsRe matches rclone progress lines like "2026/04/17 14:33:38 INFO : 46.593 MiB / 335.968 MiB, 14%, 2.234 MiB/s, ETA 2m9s"
+var statsRe = regexp.MustCompile(`INFO\s*:\s*([\d.]+[KMGTP]?i?B?)\s*/\s*([\d.]+[KMGTP]?i?B?),\s*([\d.]+)%,\s*([\d.]+[KMGTP]?i?B?)/s`)
 var fileLineRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B,\s*(\d+(?:\.\d+)?)%?,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B/s`)
 var fileCopiedRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*Copied\s*\(new\)`)
 
@@ -1028,7 +1031,30 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				continue
 			}
 		}
-		// 2) 文本 one-line 解析（仅在需要时）
+		// 2) statsRe 文本解析（优先于 parseOneLineProgress）
+		if m := statsRe.FindStringSubmatch(line); len(m) > 0 {
+			cur := parseUnit(m[1])
+			tot := parseUnit(m[2])
+			pct, _ := strconv.ParseFloat(m[3], 64)
+			spd := parseUnit(m[4])
+			prog := map[string]any{
+				"bytes":      cur,
+				"totalBytes": tot,
+				"percentage": pct,
+				"speed":      spd,
+			}
+			_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+				if rr.Summary == nil {
+					rr.Summary = map[string]any{}
+				}
+				rr.Summary["progress"] = prog
+				rr.Summary["progressLine"] = line
+				rr.BytesTransferred = int64(cur)
+				rr.Speed = fmt.Sprintf("%d B/s", int64(spd))
+			})
+			continue
+		}
+		// 3) parseOneLineProgress 兜底（仅在需要时）
 		if wantParse {
 			if prog, ok := parseOneLineProgress(line); ok {
 				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
@@ -1109,6 +1135,37 @@ func unitToMul(u string) float64 {
 	default:
 		return 1
 	}
+}
+
+// parseUnit parses a string like "3.055 MiB" or "508 KiB" into bytes
+func parseUnit(s string) float64 {
+	s = strings.TrimSpace(s)
+	// regex to extract number and unit
+	var num float64
+	var unit string
+	// handle formats: "3.055MiB", "3.055 MiB", "508KiB", "508 KiB"
+	re := regexp.MustCompile(`([\d.]+)\s*([KMGTP]?i?B?)`)
+	m := re.FindStringSubmatch(s)
+	if len(m) < 3 {
+		// try just parsing as float
+		fmt.Sscanf(s, "%f", &num)
+		return num
+	}
+	fmt.Sscanf(m[1], "%f", &num)
+	unit = strings.ToUpper(m[2])
+	// normalize unit: "MIB" -> "MI", "MB" -> "M"
+	unit = strings.TrimSuffix(unit, "B")
+	if !strings.HasSuffix(unit, "I") && len(unit) > 0 && unit[len(unit)-1] == 'I' {
+		// already has I suffix
+	} else if strings.HasSuffix(unit, "I") {
+		// keep as is
+	} else {
+		// no I suffix, add it for KiB, MiB etc
+		if unit == "K" || unit == "M" || unit == "G" || unit == "T" || unit == "P" {
+			unit = unit + "I"
+		}
+	}
+	return num * unitToMul(unit)
 }
 
 func parseETA(s string) int {
