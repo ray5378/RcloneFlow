@@ -17,6 +17,7 @@ import { useTaskHistoryLoader } from '../composables/useTaskHistoryLoader'
 import { useTaskHistoryActions } from '../composables/useTaskHistoryActions'
 import { useTaskListActions } from '../composables/useTaskListActions'
 import { useTaskRunActions } from '../composables/useTaskRunActions'
+import { useTaskViewDataSync } from '../composables/useTaskViewDataSync'
 import { useRunDetailComputed } from '../composables/useRunDetailComputed'
 import { useRunDetailFiles } from '../composables/useRunDetailFiles'
 import { useRunDetailState } from '../composables/useRunDetailState'
@@ -113,6 +114,31 @@ const {
 const LINGER_MS = 20000
 const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
 const lastNonDecreasingTotalsByTask = ref<Record<number, { totalBytes:number; totalCount:number }>>({})
+const {
+  loadData,
+  loadActiveRuns,
+  loadGlobalStats,
+  openGlobalStats,
+  setupRealtimeSync,
+} = useTaskViewDataSync({
+  tasks,
+  remotes,
+  schedules,
+  runs,
+  runsTotal,
+  runsPage,
+  runsPageSize,
+  activeRuns,
+  globalStats,
+  showGlobalStatsModal,
+  lastStableByTask,
+  lastNonDecreasingTotalsByTask,
+  taskApi,
+  remoteApi,
+  scheduleApi,
+  runApi,
+  jobApi,
+})
 // 监控帧是否停滞超过阈值（默认 25s），若是则强制刷新一次
 const STUCK_MS = 25000
 let lastRenderedSignature = ''
@@ -439,125 +465,8 @@ function normalizeTaskOptions(raw: Record<string, any> | undefined | null) {
 onMounted(async () => {
   await loadData()
   await loadActiveRuns()
-
-  // WebSocket 实时推送（替代轮询）
-  useWebSocket({
-    onMessage: (msg) => {
-      if (msg.type === 'run_status' && msg.data) {
-        // 更新对应 run 的状态
-        const idx = runs.value.findIndex(r => r.id === msg.data.run_id)
-        if (idx !== -1) {
-          runs.value[idx] = { ...runs.value[idx], status: msg.data.status }
-        }
-        // 刷新活跃传输和历史记录
-        loadActiveRuns().catch(console.error)
-      } else if (msg.type === 'run_progress' && msg.data) {
-        // 更新进度（用于实时显示传输进度）
-        const idx = activeRuns.value.findIndex(r => r.runRecord?.id === msg.data.run_id)
-        if (idx !== -1) {
-          const cur = activeRuns.value[idx] || {}
-          const prev = cur.progress || cur.stableProgress || {}
-          const nextProgress = {
-            ...prev,
-            bytes: Number(msg.data.bytes || 0),
-            totalBytes: Number(msg.data.total || prev.totalBytes || 0),
-            speed: Number(msg.data.speed || 0),
-            percentage: Number(msg.data.percent || prev.percentage || 0),
-          }
-          activeRuns.value[idx] = {
-            ...cur,
-            progress: nextProgress,
-            stableProgress: cur.stableProgress || nextProgress,
-          }
-        }
-      }
-    }
-  })
-
-  // 监听状态变化时刷新数据
-  onWsMessage('run_status', () => {
-    loadData().catch(console.error)
-  })
+  setupRealtimeSync()
 })
-
-let loadSeq = 0
-async function loadData() {
-  const seq = ++loadSeq
-  try {
-    const [taskData, remoteData, scheduleData, runResult] = await Promise.all([
-      taskApi.list(),
-      remoteApi.list(),
-      scheduleApi.list(),
-      runApi.list(runsPage.value, runsPageSize),
-    ])
-    if (seq !== loadSeq) return
-    if (Array.isArray(taskData)) tasks.value = taskData
-    if (Array.isArray(remoteData?.remotes) && remoteData.remotes.length > 0) remotes.value = remoteData.remotes
-    if (Array.isArray(scheduleData) && scheduleData.length > 0) schedules.value = scheduleData
-    if (runResult?.runs) {
-      runs.value = runResult.runs
-      runsTotal.value = typeof runResult.total === 'number' ? runResult.total : (runResult.runs?.length || 0)
-    }
-    try { localStorage.setItem('lastTasksSnapshot', JSON.stringify(tasks.value||[])) } catch {}
-  } catch (e:any) {
-    console.error(e)
-    if (!tasks.value || tasks.value.length===0) {
-      try { const snap = JSON.parse(localStorage.getItem('lastTasksSnapshot')||'[]'); if (Array.isArray(snap)) tasks.value = snap } catch {}
-    }
-  }
-}
-
-async function loadActiveRuns() {
-  try {
-    const data = await jobApi.list()
-    const now = Date.now()
-    const list:any[] = (data || []).map((it:any) => {
-      const raw:any = (it && typeof it.progress === 'object' && it.progress)
-        ? { ...it.progress }
-        : ((it && typeof it.stableProgress === 'object' && it.stableProgress) ? { ...it.stableProgress } : null)
-      if (!raw) return it
-      // 任务卡片运行中信息优先使用后端返回的 progress；stableProgress 仅保留兼容
-      raw.bytes = Number(raw.bytes || 0)
-      raw.totalBytes = Number(raw.totalBytes || 0)
-      raw.speed = Number(raw.speed || 0)
-      raw.percentage = Number(raw.percentage || 0)
-      raw.completedFiles = Number(raw.completedFiles || 0)
-      raw.totalCount = Number(raw.totalCount || 0)
-      raw.eta = Number(raw.eta || 0)
-      if (raw.percentage < 0) raw.percentage = 0
-      if (raw.percentage > 100) raw.percentage = 100
-      const tid = it.runRecord?.taskId
-      if (tid) {
-        const prevTotals = lastNonDecreasingTotalsByTask.value[tid]
-        if (prevTotals) {
-          if (prevTotals.totalBytes > 0 && raw.totalBytes > 0 && raw.totalBytes < prevTotals.totalBytes) {
-            raw.totalBytes = prevTotals.totalBytes
-          }
-          if (prevTotals.totalCount > 0 && raw.totalCount > 0 && raw.totalCount < prevTotals.totalCount) {
-            raw.totalCount = prevTotals.totalCount
-          }
-        }
-        const nextTotals = {
-          totalBytes: Math.max(prevTotals?.totalBytes || 0, raw.totalBytes || 0),
-          totalCount: Math.max(prevTotals?.totalCount || 0, raw.totalCount || 0),
-        }
-        lastNonDecreasingTotalsByTask.value[tid] = nextTotals
-      }
-      it.progress = raw
-      if (!it.stableProgress) it.stableProgress = raw
-      if (tid) lastStableByTask.value[tid] = { sp: raw, at: now }
-      return it
-    })
-    // 如果本帧没有 active，立即清空，不要维持旧进度
-    if (list.length === 0) {
-      activeRuns.value = []
-      return
-    }
-    activeRuns.value = list
-  } catch (e) {
-    console.error(e)
-  }
-}
 
 function getActiveRunByTaskId(taskId: number) {
   return activeRunLookup.getActiveRunByTaskId(taskId)
@@ -602,22 +511,6 @@ function getDeNoisedStableByTask(taskId:number){
   return st
 }
 
-
-// 加载全局实时统计
-async function loadGlobalStats() {
-  try {
-    const stats = await api.getGlobalStats()
-    globalStats.value = stats || {}
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-// 打开全局实时数据弹窗
-function openGlobalStats() {
-  showGlobalStatsModal.value = true
-  loadGlobalStats()
-}
 
 function formatTime(time: string | undefined) {
   if (!time) return '-'

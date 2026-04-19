@@ -421,16 +421,26 @@
 ---
 
 ### D. 页面级 WebSocket / 列表刷新协调逻辑
-状态：**未拆**
-优先级：**高，但应放在前三块之后**
+状态：**已开始半拆**
+优先级：**高，继续拆时仍需谨慎**
 
-原因：
-- 这是高风险逻辑层
-- 一旦先动，容易把 UI 拆分过程一起搅乱
+当前已拆出：
+- `frontend/src/composables/useTaskViewDataSync.ts`
+  - `loadData()`
+  - `loadActiveRuns()`
+  - `loadGlobalStats()`
+  - `openGlobalStats()`
+  - `setupRealtimeSync()`
+
+当前页面层仍保留：
+- `triggerAutoRefresh()`
+- `refreshLocks`
+- stuck 检测 / 轮询兜底定时器
+- 活跃进度稳态/去噪/ETA 估算的剩余逻辑
 
 拆后目标：
 - 让页面层只负责挂接刷新能力
-- 将刷新协调与消息处理收口到更清晰的 composable / service 风格逻辑中
+- 将刷新协调与消息处理继续收口到更清晰的 composable / service 风格逻辑中
 
 重点测试：
 - 任务卡片自动刷新
