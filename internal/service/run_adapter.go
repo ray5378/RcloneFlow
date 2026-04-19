@@ -128,6 +128,3 @@ func (a *storeRunAdapter) CleanOldRuns(days int) (int64, error) {
 	return a.db.CleanOldRuns(days)
 }
 
-func (a *storeRunAdapter) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error {
-	return a.db.UpdateRunStatusByJobId(jobId, status, errorMsg)
-}

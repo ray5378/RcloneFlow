@@ -284,14 +284,6 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		if run.ID != id {
 			continue
 		}
-		if run.Status == "running" && run.RcJobID > 0 {
-			st, err := c.rc.JobStatus(r.Context(), run.RcJobID)
-			if err == nil {
-				c.runSvc.UpdateRunStatus(run.ID, st)
-				WriteJSON(w, 200, st)
-				return
-			}
-		}
 		// attach duration* & passthrough finalSummary
 		b, _ := json.Marshal(run)
 		var obj map[string]any
@@ -1029,39 +1021,3 @@ func (c *RunController) HandleGlobalStats(w http.ResponseWriter, r *http.Request
 	})
 }
 
-// HandleJobStatus 处理获取指定 Job 的状态
-func (c *RunController) HandleJobStatus(w http.ResponseWriter, r *http.Request) {
-	jobIdStr := r.PathValue("jobId")
-	jobId, err := strconv.ParseInt(jobIdStr, 10, 64)
-	if err != nil {
-		WriteJSON(w, 400, map[string]any{"error": "invalid job id"})
-		return
-	}
-
-	status, err := c.rc.JobStatus(r.Context(), jobId)
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
-		return
-	}
-	WriteJSON(w, 200, status)
-}
-
-// HandleJobStop 处理停止指定的 Job
-func (c *RunController) HandleJobStop(w http.ResponseWriter, r *http.Request) {
-	jobIdStr := r.PathValue("jobId")
-	jobId, err := strconv.ParseInt(jobIdStr, 10, 64)
-	if err != nil {
-		WriteJSON(w, 400, map[string]any{"error": "invalid job id"})
-		return
-	}
-
-	if err := c.rc.JobStop(r.Context(), jobId); err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
-		return
-	}
-
-	// 更新数据库中该任务的状态为 stopped
-	c.runSvc.UpdateRunStatusByJobId(jobId, "stopped", "用户手动停止")
-
-	WriteJSON(w, 200, map[string]any{"success": true})
-}

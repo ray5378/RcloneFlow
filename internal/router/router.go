@@ -126,8 +126,6 @@ func (r *Router) Setup(mux *http.ServeMux) {
 		}
 		r.runCtrl.HandleRunStatus(w, req)
 	})
-	apiMux.HandleFunc("/api/jobs/{jobId}/status", r.runCtrl.HandleJobStatus)
-	apiMux.HandleFunc("/api/jobs/{jobId}/stop", r.runCtrl.HandleJobStop)
 	apiMux.HandleFunc("/api/runs/task/", r.runCtrl.HandleRunsByTask)
 
 	// 应用JWT中间件保护API路由

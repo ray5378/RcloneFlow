@@ -87,11 +87,8 @@ func Run(cfg *config.Config) error {
 		}
 	}
 
-	// 启动任务状态同步服务
-	jobSync := service.NewJobSyncService(db, rc, cfg.GetPoolInterval())
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go jobSync.Start(ctx)
 
 	// 启动历史记录清理服务
 	// 清理服务（单实例），供设置保存后重排
