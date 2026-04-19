@@ -158,6 +158,7 @@ const {
   logContent,
   openRunLog,
   openMenuId,
+  showConfirm,
   confirmModal,
   closeConfirm,
   confirmAndClose,

@@ -2,596 +2,272 @@
 
 `frontend/src/views/TaskView.vue` 拆分地图。
 
-这份文档的目标，不是重复记录所有技术债，而是把 `TaskView.vue` 的拆分工作整理成一张可以持续维护的“作战地图”，让后续每拆一步都能明确知道：
-- 已经拆了什么
-- 还剩什么没拆
-- 哪一块处于半拆状态
-- 下一刀最适合先砍哪里
-- 每一刀会影响哪些功能、要重点测什么
+这份文档不再记录早期“大拆分想象图”，而是对齐当前真实代码状态，明确：
+- 哪些 runtime / section / modal 已经接回主链
+- `TaskView.vue` 现在还承担什么
+- 后续只建议做哪些低风险页面壳收尾
+- 哪些高扰动方向当前不建议再推进
 
 ---
 
 ## 1. 当前阶段判断
 
-当前拆分进度还处于：
-- **已完成第一批关键逻辑抽离**
-- **但尚未进入页面主体的大块拆分完成阶段**
+当前结论已经明确：
 
-更准确地说：
-- 运行中提示相关逻辑已经拆出
-- active run 读取与部分抗噪逻辑已经拆出
-- 但 `TaskView.vue` 仍然承担了页面主体的大量职责
+> `frontend/src/views/TaskView.vue` 的拆分已经进入**阶段性完成**，后续重点不再是继续大拆，而是做**页面壳级低风险收尾优化**。
 
-当前整体状态应理解为：
-> 已经打开拆分局面，并进入“页面装配层持续收平”的中后段；但主页面仍未真正瘦身完成。
+当前真实状态：
+- `frontend/src/views/TaskView.vue` 当前约 **632 行**
+- 相比更早的 900+ 行阶段，页面已经明显从“功能承载层”收敛到“页面装配层”
+- 主要 runtime、section、modal 已经下沉并重新接回主链
+- 当前主要矛盾不再是“缺少结构拆分”，而是“顶层页面壳还有少量 glue code / 模板桥接 / 导入噪音待收尾”
 
-补充到当前进度：
-- `frontend/src/views/TaskView.vue` 当前约 **945 行**
-- 相比早前 1000+ 行阶段，脚本层已继续从“功能承载层”向“页面装配层”收口
-- 当前主要矛盾已不再是“关键主链完全没拆”，而是“页面顶层仍聚合了较多模块 wiring 与模板主骨架”
+当前不建议再把目标表述成：
+- “继续大拆 `TaskView.vue`”
+- “继续切更多 composable”
+- “继续做结构性迁移”
 
----
-
-## 2. 已拆出的模块
-
-### A. 运行中提示小窗 UI
-状态：**已拆完**
-
-已拆文件：
-- `frontend/src/components/task/RunningHintModal.vue`
-
-当前职责：
-- 小窗模板
-- 小窗按钮
-- 调试展开区
-
-影响范围：
-- 运行中提示弹窗
-- 小窗中的调试信息显示
-
-重点测试：
-- 小窗是否正常打开/关闭
-- 小窗内容是否随当前 run 正常切换
-- 调试展开区是否显示正确
+更准确的表述应该是：
+- **保持主链稳定**
+- **持续压薄页面壳**
+- **把顶层模板和 script 中剩余的低价值桥接继续清掉**
+- **文档与真实代码保持同步**
 
 ---
 
-### B. 运行中提示 helper
-状态：**已拆完**
+## 2. 当前已经完成的拆分/收口
 
-已拆文件：
-- `frontend/src/components/task/runningHint.ts`
+### A. 页面级 state / runtime 已接入
 
-当前职责：
-- active progress 读取
-- progress 文本拼装
-- progress line / check / debug JSON 组装
+当前 `TaskView.vue` 已接入的页面级状态与 runtime：
+- `useTaskViewState`
+- `useTaskViewRuntimeState`
+- `useTaskViewRuntime`
+- `useTaskViewAuxRuntime`
+- `useTaskListView`
+- `useTaskListRuntime`
+- `useTaskFormNormalize`
+- `useTaskFormRuntime`
+- `useTaskHistoryRuntime`
+- `useRunDetailRuntime`
+- `useRunDetailEntry`
+- `useRunningHintRuntime`
+- `useToastCenter`
 
-影响范围：
-- 运行中提示文本
-- 调试详情格式化结果
+当前页面层职责已经收敛为：
+- 组合页面级状态与 runtime
+- 把 props / events 接到各个 section / modal
+- 保留极少量页面壳 setter / close handler / 轻量 glue code
 
-重点测试：
-- 进度文本是否与 active run 一致
-- progress line / check 是否不为空
-- 调试信息字段是否完整
-
----
-
-### C. 运行中提示状态管理
-状态：**已拆完**
-
-已拆文件：
-- `frontend/src/composables/useRunningHint.ts`
-
-当前职责：
-- 小窗开关状态
-- 当前 run 绑定
-- debug 开关状态
-- phase / progress / debugInfo 组装
-- 打开日志动作
-
-影响范围：
-- 小窗与当前运行中任务的绑定
-- debug 状态切换
-
-重点测试：
-- 点击运行中提示入口后是否打开正确 run
-- 日志按钮是否可用
-- debug 状态切换是否稳定
+这和早期“大量逻辑直接堆在 `TaskView.vue`”已经不是一个阶段。
 
 ---
 
-### D. active run 基础读取
-状态：**已拆完**
+### B. 独立 modal 壳已经完成回收
 
-已拆文件：
-- `frontend/src/composables/useActiveRunLookup.ts`
+当前已接回组件链的 modal：
+- `RunningHintModal.vue`
+- `RunDetailModal.vue`
+- `GlobalStatsModal.vue`
+- `RunLogModal.vue`
+- `SingletonConfigModal.vue`
+- `WebhookConfigModal.vue`
+- `ConfirmModal.vue`
 
-当前职责：
-- `getActiveRunByTaskId()`
-- `getActiveProgressByTaskId()`
-- `getActiveProgressTextByTaskId()`
+当前页面层对这些 modal 的职责主要是：
+- 传 `visible`
+- 传业务数据 / 展示 props
+- 传 `close` / `save` / `confirm` / `test` 等事件
 
-影响范围：
-- 任务卡片读取 active run
-- running hint 读取 active run
-
-重点测试：
-- taskId 到 active run 的映射是否正确
-- 运行中任务卡片是否能正确显示 active progress
-
----
-
-### E. active run fallback / 数值归一化
-状态：**已拆完**
-
-已拆文件：
-- `frontend/src/composables/activeRunProgress.ts`
-
-当前职责：
-- `getDeNoisedStableByRun()`
-- `getDeNoisedStableByTask()`
-
-影响范围：
-- active run 相关的抗噪读取
-- 完成态 / 兼容态数值归一
-
-重点测试：
-- 数值显示是否稳定
-- 不同 run 状态下是否没有明显倒退或错乱
+也就是说，这一层已经基本符合“页面装配壳”定位。
 
 ---
 
-## 3. 当前半拆状态区域
+### C. 轻量 section / 页面骨架已经完成接线
 
-### A. 页面级 active run 接线
-状态：**半拆**
-
-现状：
-- 底层读取 helper / composable 已经有了
-- 但页面仍然承担大量接线与组合逻辑
-
-剩余问题：
-- 页面层仍知道太多 active run 细节
-- 页面仍可能继续堆出新的双轨读取逻辑
-
-后续方向：
-- 继续把页面层保留为装配入口
-- 尽量让具体读取和拼装继续下沉
-
----
-
-### B. 运行中相关展示联动
-状态：**半拆**
-
-现状：
-- 小窗已经拆出
-- 但任务卡片、页面状态、WebSocket 刷新联动仍部分留在主页面
-
-剩余问题：
-- 运行中展示更新链路仍较长
-- 页面中仍存在较多联动点
-
-后续方向：
-- 后续拆任务列表块时，把运行中展示联动进一步收口
-
-### C. 页面独立弹窗壳
-状态：**开始进入模板骨架低风险拆分**
-
-现状：
-- `frontend/src/components/task/GlobalStatsModal.vue` 已从 `TaskView.vue` 拆出并接回主链
-- 该弹窗属于纯展示型 modal，输入输出边界清晰，已验证可作为模板骨架低风险拆分的第一刀
-
-当前已拆出的独立弹窗壳：
-- `frontend/src/components/task/RunningHintModal.vue`
-- `frontend/src/components/task/RunDetailModal.vue`
-- `frontend/src/components/task/GlobalStatsModal.vue`
-- `frontend/src/components/task/RunLogModal.vue`
-- `frontend/src/components/task/SingletonConfigModal.vue`
-- `frontend/src/components/task/WebhookConfigModal.vue`
-- `frontend/src/components/task/ConfirmModal.vue`
-
-拆分经验：
-- 对这类 modal 壳，优先把模板和局部样式一起迁走，页面只保留 `visible` / 数据 props / `close` 事件接线
-- 这类块的风险明显低于任务列表主循环与表单主模板，适合作为从“脚本层收尾”过渡到“模板骨架拆分”的第一批目标
-
-### D. 轻量页面骨架壳
-状态：**持续推进中**
-
-现状：
-- 在独立 modal 壳基本收口后，已开始把更轻的页面骨架壳从 `TaskView.vue` 下沉
-- 当前已拆出 `frontend/src/components/task/TaskListHeader.vue`，承接“任务列表标题 + 搜索输入 + 添加按钮”这一层外壳
-- 当前已拆出 `frontend/src/components/task/TaskListPagination.vue`，承接任务列表分页区，但仍不触碰 `TaskCard v-for` 主循环
-- 当前已拆出 `frontend/src/components/task/TaskListSection.vue`，按“纯装配壳”方式承接 tasks 区的 header / list / empty / pagination
-- 当前已拆出 `frontend/src/components/task/TaskHistorySection.vue`，按“纯装配壳”方式承接 history 区的 `TaskHistoryPanel` + `RunDetailModal` 接线关系
-
-边界策略：
-- 先拆 header / toolbar / section 这类输入输出单纯、以页面装配为主的外壳
-- 暂不直接拆任务列表主循环、分页主块业务边界或 `AddTaskForm.vue` 模板
-
-当前进展补充：
-- `TaskCard v-for` 主循环行为边界保持不变，任务运行/编辑/删除/历史/webhook/singleton 等动作仍由页面外层原有逻辑提供，只做事件透传
-- history 区过滤、分页、日志、详情分页等业务链也保持原样，只把页面到面板 / 详情弹窗的连接层收进 section 壳
-- 页面内最后两块仍内联的辅助弹窗（webhook 配置 / 全局实时数据）也已重新切回 `WebhookConfigModal.vue` / `GlobalStatsModal.vue` 组件链，进一步减少了 `TaskView.vue` 模板内联块
-
----
-
-## 4. 仍未拆的主块
-
-### A. 历史记录区域
-状态：**半拆**
-优先级：**高**
-
-现状：
-- 历史页主区块（页头 / 筛选 / 分页 / 列表）已抽到独立组件 `TaskHistoryPanel.vue`
-- 第一刀当前已验证稳定：进入历史页、筛选、翻页、删除单条、删除所有、删除后刷新均已恢复正常
-- 运行详情弹窗模板主块已抽到独立组件 `RunDetailModal.vue`
-- 详情弹窗状态与行为逻辑当前仍主要留在 `TaskView.vue`
-- 历史记录删除后的即时刷新问题本轮已定位并修到直接根因：`useApi.ts` 中删除接口成功返回值语义错误，导致前端误回滚
-- 历史记录区域第二刀曾尝试把状态/删除刷新逻辑继续迁出 `TaskView.vue`，但因一次迁移范围过大、出现新旧双轨接线与模板残片问题，已明确撤回
-
-原因：
-- UI 区块相对独立
-- 与运行中主链耦合较低
-- 拆分收益高、风险相对可控
-
-已暴露的结构性风险：
-- 当前历史页仍存在 `runs` 与 `taskRuns` 双轨状态
-- 如果当前显示源与删除/刷新命中的更新源不是同一份状态，就会出现：
-  - 后端已经删除成功
-  - 但前端当前视图没有立即变化
-- 这与此前“任务卡片进度不更新”属于同类问题：
-  - 页面显示依赖 A
-  - 更新动作只命中 B
-  - A 没同步，UI 就卡住
-
-拆后目标：
-- 抽成独立组件
-- 页面仅负责传入数据、回调和少量状态
-- 后续继续收敛历史页显示源与更新源，减少双轨状态导致的刷新错位
-
-当前收口结论：
-- 第一刀保留并成立：`TaskHistoryPanel.vue`
-- 第二刀已按 A / B / C 三小步重做并全部通过验证
-- 历史记录主区当前已完成阶段性收口：UI / computed / loader / actions 已拆出
-
-当前已拆出的历史记录相关文件：
-- `frontend/src/components/task/TaskHistoryPanel.vue`
-- `frontend/src/components/task/RunDetailModal.vue`
-- `frontend/src/composables/useTaskHistoryComputed.ts`
-- `frontend/src/composables/useTaskHistoryLoader.ts`
-- `frontend/src/composables/useTaskHistoryActions.ts`
-- `frontend/src/composables/useTaskHistoryRuntime.ts`
-- `frontend/src/composables/useRunDetailComputed.ts`
-- `frontend/src/composables/useRunDetailFiles.ts`
-- `frontend/src/composables/useRunDetailState.ts`
-- `frontend/src/composables/useRunDetailEntry.ts`
-
-本轮新增的拆分经验（必须保留）：
-- `TaskView.vue` 属于高脆弱文件；当新增 composable 并把页面逻辑切到新 composable 时，最容易出现的真实回归不是“逻辑写错”，而是“接线没落完整”
-- 这类回归的典型表现包括：`xxx is not defined`、任务列表空白、点击详情无反应、详情打不开
-- 因此后续每次新增 composable 后，必须立刻逐项核对：
-  - `import` 是否补齐
-  - 页面解构是否已接回
-  - 页面旧状态是否删干净
-  - 调用点是否都已切到新来源
-- 上述核对不通过前，不应把该步视为已稳定完成，也不应继续往下一刀扩改
-
-本轮运行详情链新增收口：
-- `frontend/src/composables/useRunDetailComputed.ts` 当前已承接：
-  - `getFinalSummary`
-  - `getPreflight`
-  - `finalFiles`
-  - `finalCountAll`
-  - `finalCountSuccess`
-  - `finalCountFailed`
-  - `finalCountOther`
-  - `setFinalFilter`
-  - `finalFilesTotal`
-  - `totalFinalFilesPages`
-  - `pagedFinalFiles`
-  - `finalFilesJump`
-  - `goPrevFinalFilesPage()`
-  - `goNextFinalFilesPage()`
-  - `jumpFinalFilesPage()`
-- `frontend/src/composables/useRunDetailFiles.ts` 当前已承接：
-  - `runFilesPage`
-  - `openRunDetailFiles(run)`
-  - `pagedRunFiles`
-  - `totalRunFilesPages`
-  - `goPrevFilesPage()`
-  - `goNextFilesPage()`
-  - 以及已下沉但页面当前不再直接使用的底层状态：`runFiles` / `runFilesTotal` / `runFilesPageSize` / `reloadRunFiles()`
-- `frontend/src/composables/useRunDetailState.ts` 当前已承接：
-  - `showDetailModal`
-  - `runDetail`
-  - `openRunDetailModal(run)`
-  - `closeRunDetailModal()`
-- 当前页面层 `TaskView.vue` 对历史详情弹窗的职责已进一步收敛为：
-  - `showRunDetail(run)`：只做入口判断（`running` -> `openRunningHint`，非 running -> 进入历史详情）
-  - `closeRunDetail()`：只保留关闭入口
-  - 模板装配与事件转发
-
-本轮新增收口：
-- 历史详情弹窗模板主块已从 `TaskView.vue` 抽出到 `RunDetailModal.vue`
-- 当前采取的是“先拆模板、后拆状态/行为”的最小风险路线
-- 详情弹窗相关状态、筛选、分页、明细刷新等逻辑当前仍由页面层持有
-- 本轮拆分中曾出现一次典型回归：父组件 `scoped` 样式未跟随模板迁移，导致总结区网格布局与文件明细表格样式失效；后续已在 `RunDetailModal.vue` 内补齐专属样式并通过用户回归测试
-- `FileItem.vue` 也已同步调整列宽与左右 padding，使明细行与表头对齐
-- 历史页标题栏“空白处返回任务卡片”交互也已在 `TaskHistoryPanel.vue` 内修复：空白区域可返回，但筛选 / 分页 / header actions 等交互区不会误触返回
-
-下一步建议：
-- 在 `RunDetailModal.vue` 已稳定的前提下，再考虑继续下沉详情弹窗内部状态与行为逻辑
-- 优先评估是否把详情筛选 / 明细分页 / 明细派生计算继续抽到 composable
-- 目标是继续减少 `TaskView.vue` 中历史记录剩余的大块状态承载，而不是一次性大迁移
-
-重点测试：
-- 历史列表显示
-- 展开/收起
-- 状态文案
-- 与运行中任务切换时是否互不干扰
-- 删除单条后是否立即从当前列表消失
-- 删除全部后是否立即清空当前历史视图
-- 分页页码在删除后是否仍正确
-
----
-
-### B. 任务列表区域
-状态：**未拆**
-优先级：**高**
-
-原因：
-- 这是页面主区块之一
-- 同时承载运行中状态、按钮动作、卡片交互
-- 后续大部分结构治理都绕不过它
-
-拆后目标：
-- 把任务卡片渲染和卡片交互从页面层分离
-- 页面层更多只负责列表组织与数据提供
-
-重点测试：
-- 任务卡片渲染
-- 运行中状态显示
-- hover/选中态
-- 各按钮动作
-- 与 WebSocket 刷新后的状态一致性
-
----
-
-### C. 创建任务区域 / 表单块
-状态：**半拆**
-优先级：**高**
-
-当前已拆出的创建任务相关文件：
-- `frontend/src/components/task/AddTaskForm.vue`
-- `frontend/src/composables/useTaskFormState.ts`
-
-当前已下沉职责：
+当前已下沉并接回的页面骨架组件：
+- `TaskListSection.vue`
+- `TaskHistorySection.vue`
 - `AddTaskForm.vue`
-  - 创建任务表单主模板
-  - 复用 `ScheduleOptions.vue`
-  - 复用 `AdvancedOptions.vue`
-- `useTaskFormState.ts`
-  - `createForm`
-  - `commandMode`
-  - `commandText`
-  - `editingTask`
-  - `showAdvancedOptions`
-  - `resetTaskFormForCreate()`
-  - `fillTaskFormForEdit(task, scheduleSpec?)`
-- `useTaskFormPrepare.ts`
-  - `prepareTaskFormSubmit()`
-  - `validateTaskFormBeforeSubmit()`
-- `useTaskCommandParse.ts`
-  - `parseRcloneCommand()`
-  - `parseRemotePath()`
-  - `stripQuotes()`
-  - `toCamel()`
-- `useTaskFormSubmit.ts`
-  - `handleTaskFormDoneClick()`
-  - `validateTaskForm()`
-  - `buildTaskPayload()`
-  - `buildScheduleSpec()`
-  - `submitTaskForm()`
-  - `completeTaskFormSubmit()`
-  - `resetTaskFormSubmitState()`
-  - `executeTaskFormSubmit()`
-- `useTaskFormFlow.ts`
-  - `runTaskFormFlow()`
-- `useTaskPathBrowse.ts`
-  - `sourcePathOptions`
-  - `targetPathOptions`
-  - `showSourcePathInput`
-  - `showTargetPathInput`
-  - `sourceCurrentPath`
-  - `targetCurrentPath`
-  - `sourceBreadcrumbs`
-  - `targetBreadcrumbs`
-  - `setShowSourcePathInput()`
-  - `setShowTargetPathInput()`
-  - `resetTaskPathBrowse()`
-  - `restoreTaskPathBrowse(task)`
-  - `onSourceRemoteChange()`
-  - `onTargetRemoteChange()`
-  - `onSourceBreadcrumbClick()`
-  - `onTargetBreadcrumbClick()`
-  - `loadSourcePath()`
-  - `loadTargetPath()`
-  - `onSourceClick()`
-  - `onSourceArrow()`
-  - `onTargetClick()`
-  - `onTargetArrow()`
+- `TaskListHeader.vue`
+- `TaskListPagination.vue`
 
-当前页面层 `TaskView.vue` 仍保留：
-- `createTask()` 极薄入口壳（只负责调用 flow 与 toast）
-- `creatingState`
-- 更外层的页面级数据加载 / WebSocket / 刷新协调
+当前边界：
+- `TaskView.vue` 负责页面级数据装配
+- section 负责各自区域模板骨架
+- 业务行为入口仍由已有 runtime / action composable 提供
 
-本轮已完成并验证的创建任务入口链：
-- 进入“添加任务”
-- 进入“编辑任务”
-- 创建/编辑切换时表单基础状态重置与回填
-- 高级选项区样式回归修复
-- 任务卡片进入编辑时的入口报错修复
-
-本轮创建任务拆分的关键经验：
-- `TaskView.vue` 在新增表单相关 composable 后，同样容易出现“页面已调用但 import 未补齐”的真实回归
-- 这类回归会直接表现为：页面空白、任务列表空白、编辑入口失效、`xxx is not defined`
-- 表单模板抽成组件后，原样式不会自动跟随；对子组件内部布局（尤其 `AdvancedOptions.vue`）必须显式迁移样式，否则会出现布局严重错位
-
-本轮新增完成并验证的任务列表外层装配链：
-- `useTaskListView.ts` 已承接任务列表搜索 / 分页 / 跳页 / 派生列表链
-- `useTaskViewUi.ts` 已承接菜单开关态、确认弹窗状态、确认打开/关闭/确认动作
-- `useTaskHistoryActions.ts` 已真实接入页面主链，承接 `clearRun()` / `clearAllRuns()`
-- `useTaskListActions.ts` 已承接 `deleteTask()` / `toggleSchedule()` / `deleteSchedule()` / `clearAllRunsWithConfirm()` 等行为入口壳
-- `useTaskRunActions.ts` 已承接 `runTask()` / `stopTaskAny()` / `runningTaskId` / `stoppedTaskId`
-- 用户已确认：任务列表显示、删除任务、删除定时任务、清空历史、运行任务、停止任务均正常
-- 同时已修复并验证一整组拆分回归：`getScheduleByTaskId is not defined`、`useTaskRunActions is not defined`、`confirmAndClose is not a function`、`Cannot access ... before initialization`
-
-建议下一步拆分顺序：
-1. 先收口本轮创建任务表单区 + 路径浏览深链 + 入口编排链 + 定时规则治理 + 任务列表外层装配链成果
-2. 再评估更深的页面级数据加载 / WebSocket / 刷新协调是否值得继续下沉
-3. 最后再决定是否触碰更深的任务列表行为细节或页面总装配层
-
-重点测试：
-- 新建任务
-- 编辑任务
-- 新建/编辑切换
-- 命令行模式
-- 定时任务选项
-- 高级选项
-- 路径浏览与路径回填
+这意味着当前主要工作已经从“拆 section”转成“清理 section 与页面壳之间的冗余桥接”。
 
 ---
 
-### D. 页面级 WebSocket / 列表刷新协调逻辑
-状态：**已开始半拆**
-优先级：**高，继续拆时仍需谨慎**
+### D. 运行详情链已经完成阶段性收口
 
-当前已拆出：
-- `frontend/src/composables/useTaskViewDataSync.ts`
-  - `loadData()`
-  - `loadActiveRuns()`
-  - `loadGlobalStats()`
-  - `openGlobalStats()`
-  - `setupRealtimeSync()`
-- `frontend/src/composables/useTaskProgressSync.ts`
-  - `getDbProgressStable()`
-  - `getDeNoisedStableByRun()`
-  - `getDeNoisedStableByTask()`
-  - `formatBps()`
-  - `calcEtaFromAvg()`
-  - `triggerAutoRefresh()`
+当前运行详情相关已接线能力包括：
+- `openRunDetailModal`
+- `closeRunDetailModal`
+- `openRunDetailFiles`
+- `showRunDetail`
+- `closeRunDetail`
+- `getFinalSummary`
+- `getPreflight`
+- `setFinalFilter`
+- `goPrevFinalFilesPage`
+- `goNextFinalFilesPage`
+- `jumpFinalFilesPage`
+- `goPrevFilesPage`
+- `goNextFilesPage`
 
-当前已继续拆出：
-- `frontend/src/composables/useTaskViewRefreshLifecycle.ts`
-  - stuck 检测定时器
-  - activeRuns 兜底轮询定时器
-  - 对应的 `onMounted` / `onUnmounted` 生命周期挂接与清理
+当前页面层在详情链中的职责主要是：
+- 入口判断
+- 详情弹窗装配
+- 少量分页/过滤事件接线
 
-当前页面层仍保留：
-- 少量页面级 glue code
-- 活跃进度稳态/去噪相关的剩余 signature 协调语义
-- 其他尚未继续下沉的零散装配连接线
-
-拆后目标：
-- 让页面层只负责挂接刷新能力
-- 将刷新协调与消息处理继续收口到更清晰的 composable / service 风格逻辑中
-
-重点测试：
-- 任务卡片自动刷新
-- 历史记录刷新
-- run_progress 更新接线
-- 页面不空白
-- 无重复轮询或失控刷新
+说明这块也已经不适合再用“未拆主块”来描述。
 
 ---
 
-## 5. 推荐拆分顺序
+## 3. 当前仍属于页面壳收尾的内容
 
-### 第 1 刀：历史记录区域
-原因：
-- 相对独立
-- 风险低于任务列表主区
-- 适合作为继续拆分的热身刀
+后续允许继续推进的，应该只剩这些**低风险页面壳收尾项**。
 
-### 第 2 刀：创建任务区域 / 表单块
-原因：
-- 功能边界清楚
-- 适合和任务列表、历史区块分开
+### A. 模板透明 wrapper / 内联赋值桥接
 
-### 第 3 刀：任务列表区域
-原因：
-- 收益最大
-- 但接线更多，适合在前两刀稳定后再进
+典型例子：
+- `@foo="bar($event)"` → `@foo="bar"`
+- `@close="xxx = false"` → `@close="closeXxxModal"`
+- `@update:xxx="state.xxx = $event"` → 命名明确的轻量 setter
 
-### 第 4 刀：页面级 WebSocket / 刷新协调逻辑
-原因：
-- 风险最高
-- 应放在主要 UI 区块拆稳以后再收口
+目标：
+- 继续减少模板里的即时表达式
+- 让页面壳更多体现“装配”，少体现“局部逻辑书写”
+
+这是当前最合适、最稳定的推进方向。
 
 ---
 
-## 6. 每次拆分后都要更新的内容
+### B. 顶层导入 / 解构 / 接线反弹问题
 
-以后每完成一步拆分，应同步更新本文件以下内容：
-- 对应区块状态：未拆 / 半拆 / 已拆完
-- 已拆出的文件名
-- 当前职责变化
-- 影响范围
-- 重点测试项
-- 下一步推荐顺序是否变化
+这一类属于高频反弹项：
+- 旧导入又回来了，但页面没在用
+- 页面模板已切到新函数，script 里没补导入/解构
+- composable 新增返回项后，页面没接回来
 
-如果某一步拆分过程中出现回归，也应补到这里，避免重复踩坑。
+过去多轮已经反复遇到的典型对象包括：
+- `handleError`
+- `showSuccess`
+- `formatDuration`
+- `showConfirm`
+- `useTaskFormNormalize`
+
+后续规则：
+- 每次改动页面壳后，都要顺手检查 import / 解构 / 模板绑定是否一致
+- 这类问题优先级高于继续“拆结构”
 
 ---
 
-## 7. 当前不建议直接先动的地方
+### C. style 尾部脏片反弹
 
-在没有明确目标时，不建议优先从这些地方下手：
-- 运行中进度主链本身
-- `progress / stableProgress / preflight` 主语义
-- 旧回退逻辑的深层清理
-- 页面级 WebSocket 主链（除非这轮目标就是它）
+这是 `TaskView.vue` 当前最典型的高频脆弱点之一。
+
+已知表现：
+- build 报 `Invalid end tag.`
+- 文件尾部反弹出多份 `</style>`
+- 或残留被截断的 CSS 片段
+
+固定处理策略：
+1. 先检查：
+   - `grep -n "<style scoped>\|</style>" frontend/src/views/TaskView.vue`
+2. 如出现异常，不做猜测式补丁
+3. 直接从 `<style scoped>` 到文件尾整段重写为：
+   - 单份 `<style scoped>`
+   - 单份 `</style>`
+   - 干净、完整、可构建版本
+
+这条规则已经被多轮验证为最稳定的修法。
+
+---
+
+## 4. 当前不建议继续推进的方向
+
+### A. 不再为了“继续拆”而继续切更多 composable
+
+当前阶段不建议：
+- 把稳定主链再强行切成更多小块
+- 为了文件更短而继续迁移已稳定逻辑
+- 在没有明确收益时重排 runtime 边界
 
 原因：
-- 这些区域风险更高
-- 更适合作为“后续收口”，而不是下一刀的第一选择
+- 当前收益已经明显下降
+- 风险却在上升
+- 更容易打破现有稳定接线
 
 ---
 
-## 9. 当前一句话路线图
+### B. 不碰稳定业务主链
 
-当前拆分路线建议保持为：
+当前不建议主动触碰：
+- 运行主链
+- 历史详情真实业务语义
+- 任务执行/停止主行为
+- 页面级刷新主语义
+- 已经稳定的 runtime 边界
 
-`运行中提示已拆出 -> 历史记录 -> 创建任务表单 -> 任务列表 -> 页面级 WebSocket/刷新协调`
+当前目标不是“重新设计页面”，而是“把页面壳收干净”。
 
-这条路线的目标，是让 `TaskView.vue` 最终收敛为：
+---
+
+## 5. 后续推荐动作顺序
+
+如果继续推进，推荐顺序应该是：
+
+1. **继续扫描 `TaskView.vue` 当前真实文件状态**
+   - 不依赖旧快照
+   - 只改当前仍真实存在的问题
+
+2. **继续压模板透明 wrapper / 内联赋值桥接**
+   - 优先改成直接传函数引用
+   - modal close 统一收成轻量 close handler
+
+3. **继续清理顶层导入 / 解构 / 透传噪音**
+   - 删除未使用导入
+   - 补回真实缺失接线
+   - 保持 composable 返回项与页面装配一致
+
+4. **持续盯住 style 尾部脏片反弹**
+   - 一旦反弹，直接按固定规则整段修复
+
+5. **文档持续同步，不拖到最后**
+   - `docs/TASKVIEW_SPLIT_MAP.md`
+   - `docs/TECH_DEBT.md`
+
+---
+
+## 6. 每轮改动后的固定验证
+
+每轮 `TaskView.vue` 页面壳收尾后，固定执行：
+
+- `cd /root/.openclaw/workspace/rcloneflow/frontend && npx tsc --noEmit -p tsconfig.json`
+- `cd /root/.openclaw/workspace/rcloneflow/frontend && npm run build`
+
+若前端源码改动触发构建产物变更，还要同步提交：
+- `web/index.html`
+- `web/assets/*`
+
+提交后必须再次确认：
+- `git status --short` 最终为空
+
+---
+
+## 7. 当前一句话路线图
+
+当前正确路线图已经不是“继续大拆”，而是：
+
+`runtime / section / modal 已接回主链 -> TaskView.vue 进入阶段性完成 -> 后续只做页面壳低风险收尾优化`
+
+目标是让 `TaskView.vue` 最终稳定停留在：
 - 页面装配层
 - 数据入口层
-- 少量状态协调层
+- 少量轻量 setter / close handler / glue code
 
-而不是继续作为一个超大功能承载文件。
-合作为“后续收口”，而不是下一刀的第一选择
-
----
-
-## 8. 当前一句话路线图
-
-当前拆分路线建议保持为：
-
-`运行中提示已拆出 -> 历史记录 -> 创建任务表单 -> 任务列表 -> 页面级 WebSocket/刷新协调`
-
-这条路线的目标，是让 `TaskView.vue` 最终收敛为：
-- 页面装配层
-- 数据入口层
-- 少量状态协调层
-
-而不是继续作为一个超大功能承载文件。
-是让 `TaskView.vue` 最终收敛为：
-- 页面装配层
-- 数据入口层
-- 少量状态协调层
-
-而不是继续作为一个超大功能承载文件。
+而不是再回到“大体量功能承载文件”或继续做高扰动结构改造。
