@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { AddTaskForm } from './'
+import AddTaskForm from './AddTaskForm.vue'
 
 defineProps<{
   commandMode: boolean

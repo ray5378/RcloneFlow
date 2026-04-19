@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { TaskHistorySection, RunLogModal, RunningHintModal } from './'
+import TaskHistorySection from './TaskHistorySection.vue'
+import RunLogModal from './RunLogModal.vue'
+import RunningHintModal from './RunningHintModal.vue'
 
 defineProps<{
   currentTotal: number

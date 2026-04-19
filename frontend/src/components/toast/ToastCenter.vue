@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ToastItem } from './'
+import ToastItem from './ToastItem.vue'
 
 defineProps<{
   toasts: Array<{ id: string | number; [key: string]: any }>

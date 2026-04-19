@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { TaskListSection, WebhookConfigModal, SingletonConfigModal } from './'
+import TaskListSection from './TaskListSection.vue'
+import WebhookConfigModal from './WebhookConfigModal.vue'
+import SingletonConfigModal from './SingletonConfigModal.vue'
 
 defineProps<{
   taskSearch: string
