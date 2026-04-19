@@ -224,9 +224,3 @@ func (c *Client) CoreStatsGroup(ctx context.Context, group string) (map[string]a
 	return resp, err
 }
 
-// JobStop 停止指定的 Job
-func (c *Client) JobStop(ctx context.Context, jobID int64) error {
-	params := map[string]any{"jobid": jobID}
-	var resp map[string]any
-	return c.cli.Call(ctx, "job/stop", params, &resp)
-}

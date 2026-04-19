@@ -838,18 +838,6 @@ func (db *DB) UpdateRunProgress(id int64, bytesTransferred int64, speed string) 
 	return err
 }
 
-// UpdateRunStatusByJobId 根据 JobID 更新运行状态
-func (db *DB) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error {
-	db.mu.Lock()
-	defer db.mu.Unlock()
-
-	_, err := db.db.Exec(`
-		UPDATE runs SET status = ?, error = ?, finished_at = ?, updated_at = ?
-		WHERE rc_job_id = ?`,
-		status, errorMsg, time.Now(), time.Now(), jobId)
-	return err
-}
-
 // ===== 用户相关操作 =====
 
 // CreateUser 创建用户

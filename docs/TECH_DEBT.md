@@ -171,7 +171,7 @@
   - 文件浏览：如 `/api/browser/list` → `operations/list`
   - 文件操作：如 `/api/fs/copy` / `/api/fs/move` / `/api/fs/delete` / `/api/fs/purge` / `/api/fs/mkdir`
   - 添加存储：remote / config 相关 RC API
-- `RcJobID` / store 层字段与底层 RC job 能力目前仍有残留，但已不再作为运行态主链或后端 jobs API 暴露面；后续若继续清理，可再专门收最后一层持久化字段与低层未接线能力
+- 运行态 RC 旧链继续下沉清理后，`internal/rclone/client.go` 中旧 `JobStatus` / `JobStop` 包装与 `internal/store/store.go` 中 `UpdateRunStatusByJobId` 也已删除；当前剩余残留主要收缩到 `RcJobID` 持久化字段、DAO/store 读写列以及 `internal/adapter/rclone.go` 的底层 RC job 能力（未再接入运行态主链）。后续若继续清理，应把 `RcJobID` 当成单独一层结构/存储债处理，而不是再把运行态 API 兼容面拉回来。
 - 到当前阶段，`TaskView.vue` 的脚本装配层已非常接近文档目标：主页面脚本已基本由 `useTaskViewState.ts`、`useTaskViewRuntimeState.ts`、`useTaskViewRuntime.ts`、`useTaskViewAuxRuntime.ts`、`useTaskListRuntime.ts`、`useTaskFormRuntime.ts`、`useTaskHistoryRuntime.ts`、`useRunDetailRuntime.ts`、`useRunningHintRuntime.ts` 这些入口构成；后续继续推进时，重点将逐步从“继续大量拆脚本装配”转向“清少量残留 glue / 评估模板主骨架是否还有低风险拆分点”
 - 本轮继续清掉了一批 `TaskView.vue` 顶层页面未直接使用的解构残留：包括部分 runtime/helper 暴露但页面模板未消费的名字、旧本地变量与无效动作入口，进一步降低脚本层噪音与认知负担
 - 本轮又继续完成一波纯删除型去噪：清理了页面顶部未使用的 Vue/WS/错误处理/类型 import、旧 helper import，以及多组 runtime 解构中页面未直接消费的名字；这一阶段的收益已明显从“结构性拆分”转向“减少脚本层噪音、让主骨架更清晰”
