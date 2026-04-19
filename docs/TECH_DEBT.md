@@ -162,13 +162,14 @@
 - 当前后端旧任务停止链的真实依赖图已进一步明确：
   - `internal/scheduler/scheduler.go` / `internal/service/run.go` / `internal/service/run_adapter.go` / `internal/store/store.go` 仍会落库并传递 `RcJobID`
   - `internal/service/job_sync.go` 通过 `ListRunningRuns()` 取出 `store.JobStatus.RcJobID`，再调用 `s.rc.JobStatus(...)` 轮询运行中任务状态
-  - `internal/controller/run.go` 的 `HandleRunStatus` 仍会在 `run.RcJobID > 0` 时直接调用 `c.rc.JobStatus(...)`
+  - `internal/controller/run.go` 的 `HandleRunStatus` 过去会在 `run.RcJobID > 0` 时直接调用 `c.rc.JobStatus(...)`
   - `internal/controller/run.go` 的 `HandleJobStop` 仍通过 `c.rc.JobStop(...)` + `UpdateRunStatusByJobId(...)` 处理旧 `/api/jobs/{jobId}/stop` 兼容接口
   - `internal/router/router.go` 仍暴露 `/api/jobs/{jobId}/status` 与 `/api/jobs/{jobId}/stop`
 - 因此，后端这条链目前不是“仅剩兼容壳”，而是**运行态同步 + 状态查询 + 停止兼容接口**三者共用的 JobID 主链。下一步如果继续推进，正确顺序应是：
   1. 先决定运行中任务状态同步是否继续依赖 RC `job/status`
   2. 再决定 `HandleRunStatus` 是否改为不再直读 `RcJobID`
   3. 最后才评估 `/api/jobs/{jobId}` 兼容接口与 `UpdateRunStatusByJobId` 是否可退场
+- 已按最小风险步骤落第一刀：`internal/controller/run.go` 中的 `HandleRunStatus` 现在只会在 `run.Status == "running" && run.RcJobID > 0` 时才查询 RC `job/status`；对非 running 记录，直接走 DB / summary / finalSummary 返回路径，不再额外依赖 `RcJobID`。这一改动前端 build 与 `internal/controller` 相关测试均未显示回归；整组 `go test ./internal/...` 仍存在仓库既有测试债（如 `internal/store` / `internal/service` 的旧签名不匹配与重复测试名），但不是本次改动新引入
 - 到当前阶段，`TaskView.vue` 的脚本装配层已非常接近文档目标：主页面脚本已基本由 `useTaskViewState.ts`、`useTaskViewRuntimeState.ts`、`useTaskViewRuntime.ts`、`useTaskViewAuxRuntime.ts`、`useTaskListRuntime.ts`、`useTaskFormRuntime.ts`、`useTaskHistoryRuntime.ts`、`useRunDetailRuntime.ts`、`useRunningHintRuntime.ts` 这些入口构成；后续继续推进时，重点将逐步从“继续大量拆脚本装配”转向“清少量残留 glue / 评估模板主骨架是否还有低风险拆分点”
 - 本轮继续清掉了一批 `TaskView.vue` 顶层页面未直接使用的解构残留：包括部分 runtime/helper 暴露但页面模板未消费的名字、旧本地变量与无效动作入口，进一步降低脚本层噪音与认知负担
 - 本轮又继续完成一波纯删除型去噪：清理了页面顶部未使用的 Vue/WS/错误处理/类型 import、旧 helper import，以及多组 runtime 解构中页面未直接消费的名字；这一阶段的收益已明显从“结构性拆分”转向“减少脚本层噪音、让主骨架更清晰”

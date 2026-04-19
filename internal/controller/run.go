@@ -284,7 +284,7 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		if run.ID != id {
 			continue
 		}
-		if run.RcJobID > 0 {
+		if run.Status == "running" && run.RcJobID > 0 {
 			st, err := c.rc.JobStatus(r.Context(), run.RcJobID)
 			if err == nil {
 				c.runSvc.UpdateRunStatus(run.ID, st)
