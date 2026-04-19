@@ -117,7 +117,6 @@ const {
   loadActiveRuns,
   getRealtimeProgressByRun,
   getTaskCardProgressByTask,
-  getDeNoisedStableByTask,
   formatBps,
 } = useTaskViewRuntime({
   tasks,
