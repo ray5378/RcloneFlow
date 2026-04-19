@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { TaskListSection } from './'
+
 defineProps<{
   taskSearch: string
   filteredTasks: any[]
@@ -21,6 +23,8 @@ defineProps<{
   stopTaskAny: (task: any) => void
   setWebhook: (task: any) => void
   setSingletonMode: (task: any) => void
+  prevTasksPage: () => void
+  nextTasksPage: () => void
   setTasksJumpPageValue: (value: number | null) => void
   jumpToTasksPage: () => void
 }>()
@@ -49,8 +53,8 @@ defineProps<{
     @stop="stopTaskAny"
     @set-webhook="setWebhook"
     @set-singleton="setSingletonMode"
-    @prev-page="tasksPage--"
-    @next-page="tasksPage++"
+    @prev-page="prevTasksPage"
+    @next-page="nextTasksPage"
     @update:jump-page="setTasksJumpPageValue"
     @jump-page="jumpToTasksPage"
   />

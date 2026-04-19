@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { AddTaskForm } from './'
+
 defineProps<{
   commandMode: boolean
   commandText: string

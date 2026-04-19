@@ -303,9 +303,9 @@ const {
     <ToastItem v-for="toast in toasts" :key="toast.id" :toast="toast" />
   </div>
 
-  <TaskListSection
+  <TaskListViewShell
     v-if="currentModule === 'tasks'"
-    :search="taskSearch"
+    :task-search="taskSearch"
     :filtered-tasks="filteredTasks"
     :get-schedule-by-task-id="getScheduleByTaskId"
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
@@ -316,20 +316,20 @@ const {
     :tasks-page="tasksPage"
     :current-tasks-pages="currentTasksPages"
     :tasks-jump-page="tasksJumpPage"
-    @update:search="setTaskSearch"
-    @add="goToAddTask"
-    @run="runTask"
-    @edit="editTask"
-    @delete="deleteTask"
-    @toggle-schedule="toggleSchedule"
-    @view-history="viewTaskHistory"
-    @stop="stopTaskAny"
-    @set-webhook="setWebhook"
-    @set-singleton="setSingletonMode"
-    @prev-page="tasksPage--"
-    @next-page="tasksPage++"
-    @update:jump-page="setTasksJumpPageValue"
-    @jump-page="jumpToTasksPage"
+    :set-task-search="setTaskSearch"
+    :go-to-add-task="goToAddTask"
+    :run-task="runTask"
+    :edit-task="editTask"
+    :delete-task="deleteTask"
+    :toggle-schedule="toggleSchedule"
+    :view-task-history="viewTaskHistory"
+    :stop-task-any="stopTaskAny"
+    :set-webhook="setWebhook"
+    :set-singleton-mode="setSingletonMode"
+    :prev-tasks-page="() => { tasksPage-- }"
+    :next-tasks-page="() => { tasksPage++ }"
+    :set-tasks-jump-page-value="setTasksJumpPageValue"
+    :jump-to-tasks-page="jumpToTasksPage"
   />
 
   <WebhookConfigModal

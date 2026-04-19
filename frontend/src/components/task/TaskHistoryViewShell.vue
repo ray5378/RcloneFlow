@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { TaskHistorySection } from './'
+
 defineProps<{
   currentTotal: number
   runsPage: number
@@ -31,8 +33,9 @@ defineProps<{
   pagedRunFiles: any[]
   runFilesPage: number
   totalRunFilesPages: number
-  currentModule: string
-  loadData: () => Promise<void>
+  backToTasks: () => void
+  prevRunsPage: () => void
+  nextRunsPage: () => void
   setHistoryStatusFilter: (value: string) => void
   setJumpPageValue: (value: number) => void
   jumpToPage: () => void
@@ -84,10 +87,10 @@ defineProps<{
     :paged-run-files="pagedRunFiles"
     :run-files-page="runFilesPage"
     :total-run-files-pages="totalRunFilesPages"
-    @back="currentModule = 'tasks'"
+    @back="backToTasks"
     @set-status-filter="setHistoryStatusFilter"
-    @prev-page="runsPage--; loadData()"
-    @next-page="runsPage++; loadData()"
+    @prev-page="prevRunsPage"
+    @next-page="nextRunsPage"
     @update-jump-page="setJumpPageValue"
     @jump-page="jumpToPage"
     @clear-all="clearAllRunsWithConfirm"
