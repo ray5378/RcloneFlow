@@ -157,25 +157,30 @@
 - 按后续评估结论继续推进后，`frontend/src/components/task/TaskHistorySection.vue` 已作为纯装配壳落地：统一承接 history 区的 `TaskHistoryPanel` + `RunDetailModal` 接线，但不改历史过滤、分页、详情、日志等业务边界；这一刀 build 通过，说明 `TaskView.vue` 在 tasks 区之外，history 区也已具备 section 化收口条件
 - 本轮继续进入 `TaskView.vue` 的阶段性收尾：再清掉一批顶部只剩 import 本身的旧残留（旧 API/WS/runningHint/type/辅助 UI import，以及 `filteredTasksRaw` 等未消费解构），build 在按固定规则清尾后继续通过；说明当前页面已基本进入“少量旧接线/旧 import 去噪 + 尾残结构维护”的收尾区间
 - 本轮继续把页面里最后两块仍内联的辅助弹窗重新切回已有组件链：`WebhookConfigModal.vue` 与 `GlobalStatsModal.vue` 已重新接回 `TaskView.vue` 主模板；这一步让页面模板进一步收平，也说明当前阶段更适合做“切正旧内联块 + 清顶部残留”的收尾，而不是再开新拆分面
-- 方向 B 已开始推进并完成第一刀：`frontend/src/composables/useApi.test.ts` 已重写为与当前 `useApi.ts` 一致的最小测试集，`npx tsc --noEmit -p tsconfig.json` 已恢复通过；随后继续完成一刀前端 RC 旧链清理：删除 `frontend/src/api/run.ts` 中仅服务于旧任务停止链的 `getJobStatus` / `stopJob` / `JobStatus`，并同步清掉 `frontend/src/api/run.test.ts` 中对应断言与 `rcJobId` 历史示例。该步严格限定在“任务停止旧链”范围，未触碰文件浏览 / 文件操作 / 添加存储这几条现役 RC API 链，且 `tsc + build` 均通过
-- 继续排查后确认：前端侧 `rcJobId / job/status / job/stop` 旧链已基本收缩完成；剩余命中已主要集中在后端运行态同步与兼容接口层（如 `internal/controller/run.go`、`internal/router/router.go`、`internal/rclone/client.go`、`internal/adapter/rclone.go`、`internal/service/job_sync.go`、`internal/store/store.go` 等）。这些残留与运行中任务状态同步、按 JobID 回写状态、旧 `/api/jobs/{jobId}` 接口兼容直接相关，当前不能按前端那种方式直接删除；下一步若继续清理，需要单独评估后端运行态同步链与 API 兼容面，而不是继续做前端直删
-- 根据最新决策，运行态 RC 旧链已进入直接退场阶段：除文件浏览 / 文件操作 / 添加存储外，其余已有 CLI 主链的 RC 运行态逻辑不再保留兼容壳。
-- 本轮已直接清理运行状态 / 停止 / jobs 路由这条 RC 旧链：
-  - `internal/controller/run.go` 的 `HandleRunStatus` 不再查询 RC `job/status`，统一直接走 DB / `summary` / `finalSummary`
-  - 删除 `internal/controller/run.go` 中旧 `HandleJobStatus` / `HandleJobStop`
-  - 删除 `internal/router/router.go` 中 `/api/jobs/{jobId}/status` 与 `/api/jobs/{jobId}/stop` 路由注册
-  - `internal/app/app.go` 不再启动 `job_sync` 轮询作为运行态同步主链
-  - `internal/service/run.go` / `internal/service/run_adapter.go` 删除 `UpdateRunStatusByJobId` 这层运行态服务接口
-  - `internal/service/job_sync.go` 已退役为 no-op 占位，明确不再承担 RC `job/status` 同步职责
-- 当前保留 RC 的边界不变：
-  - 文件浏览：如 `/api/browser/list` → `operations/list`
-  - 文件操作：如 `/api/fs/copy` / `/api/fs/move` / `/api/fs/delete` / `/api/fs/purge` / `/api/fs/mkdir`
-  - 添加存储：remote / config 相关 RC API
-- 运行态 RC 旧链继续下沉清理后，`internal/rclone/client.go` 中旧 `JobStatus` / `JobStop` 包装与 `internal/store/store.go` 中 `UpdateRunStatusByJobId` 也已删除；当前主链已进一步把 `RcJobID` 从运行记录业务结构与大部分 store/dao 读写路径中拔掉：`internal/service/run.go` 的 `RunRecord`、`internal/service/run_adapter.go`、`internal/controller/run.go` active run 返回、`internal/scheduler/scheduler.go` 的旧默认 taskRunner、`internal/dao/run.go` 以及 `internal/store/store.go` 的主要运行记录查询/写入逻辑均已改为不再读写 `rc_job_id`。随后又通过 `internal/store/store.go` 的内联 migration v2 完成 `runs.rc_job_id` 的 schema 物理退场：新库初始建表已不再带该列，旧库会在迁移时重建 `runs` 表并复制现有数据后删除 `rc_job_id`。在此基础上，又进一步清掉了 `internal/adapter/runner.go` / `internal/rclone/client.go` / `internal/adapter/rclone.go` 中未接线的公开 RC job 能力面：`HasActiveJobs`、`ListJobs`、`StopJob` 与公开 `JobStatus` 方法已退场；仅保留文件复制/移动异步收尾所需的内部 `waitForJob()` + 私有 `jobStatus()` 轮询能力，以避免误伤仍保留的 RC 文件操作链。随后继续清掉 `internal/rclone/client.go` 中那组明确标注为 `Deprecated: not wired to API routes` 的 RC FS/public-link/job wrapper（如 `Mkdir` / `DeleteFile` / `Purge` / `MoveFile` / `CopyFile` / `CopyDir` / `MoveDir` / `PublicLink` / `StartJob`）；当前主链已统一通过 CLI FS 控制器与适配器直连，不再保留这层未接线转发壳。当前这条运行态旧链已从业务主链、测试面、schema 面和低层未接线能力面基本全部退场；后续若继续清理，重点只剩文档收敛。
-- 测试收口已开始并完成第一轮：不再给旧 RC job 测试壳打补丁，而是按当前主链语义重写/缩减最小测试集。`internal/dao/dao_test.go` 已重写为与当前 `TaskDAO` / `ScheduleDAO` / `RunDAO` 实现一致的最小测试集；`internal/store/store_test.go` 已删掉 `ListRunningRuns` 旧测试并将 run 相关测试改成当前 `ListRuns(page, pageSize)` / `UpdateRunStatus` 语义。当前 `go test ./internal/dao ./internal/store` 已通过。
-- 测试收口第二轮已完成：`internal/service/full_test.go` 已从旧 `store.JobStatus` / `RcJobID` / 旧 runDAO mock 语义收敛为当前 CLI 主链下的最小 service 测试集，并通过重命名避免与 `internal/service/task_test.go` 的历史重复测试名冲突。当前 `go test ./internal/service` 已通过。
-- 测试收口第三轮已完成：`internal/adapter` 测试已按当前边界收平。一方面补齐了 `runner.RunTask(...)` / `client.StartJob(...)` 的当前签名；另一方面把会进入 `waitForJob()` 的 `CopyFile` / `MoveFile` / `CopyDir` / `MoveDir` 测试改成可终止的双路径 mock（首次返回 `jobid`，后续 `/job/status` 返回 `finished=true`），并把 `runner_test.go` 的路径断言更新为当前实际行为（leading slash 会被规范为 `remote:path` 而不是保留为 `remote:/path`）。当前 `go test ./internal/adapter` 已通过。
-- 测试收口第四轮已完成：`internal/scheduler/scheduler_test.go` 已从依赖旧私有函数 `parseSpec` 的历史测试壳收敛为针对当前公开入口 `ParseSpecToCron` 的最小测试集。至此，`go test ./...` 已全量通过。
+- 运行态 RC 旧链清理已完成最终收口，当前边界固定如下：
+  - 保留 RC：文件浏览（如 `/api/browser/list` → `operations/list`）、文件操作（如 `/api/fs/copy` / `/api/fs/move` / `/api/fs/delete` / `/api/fs/purge` / `/api/fs/mkdir`）、添加存储（remote / config 相关 RC API）
+  - 其余凡是已有 CLI 主链的运行态 RC 旧链，一律直接删除，不再保留兼容壳
+- 已退场的运行态 RC 旧链包括：
+  - `internal/controller/run.go` 不再通过 RC `job/status` 提供运行状态，旧 `HandleJobStatus` / `HandleJobStop` 已删除
+  - `internal/router/router.go` 中 `/api/jobs/{jobId}/status` 与 `/api/jobs/{jobId}/stop` 已删除
+  - `internal/app/app.go` 不再启动 `job_sync` 作为运行态同步主链
+  - `internal/service/run.go` / `internal/service/run_adapter.go` 中 `UpdateRunStatusByJobId` 已删除
+  - `internal/service/job_sync.go` 已退役为 no-op 占位，不再承担 RC `job/status` 同步职责
+- `RcJobID` / `rc_job_id` 已从业务与 schema 全面退场：
+  - `internal/service/run.go`、`internal/service/run_adapter.go`、`internal/controller/run.go`、`internal/scheduler/scheduler.go`、`internal/dao/run.go`、`internal/store/store.go` 的主业务链已不再读写该字段
+  - `internal/store/store.go` 已通过内联 migration v2 完成 `runs.rc_job_id` 的物理迁移删除；新库初始建表也不再创建该列
+- 低层未接线 RC job / wrapper 能力也已完成收口：
+  - `internal/adapter/runner.go`、`internal/adapter/rclone.go`、`internal/rclone/client.go` 中的 `HasActiveJobs`、`ListJobs`、`StopJob`、公开 `JobStatus` 及一组 `Deprecated: not wired to API routes` 的 RC wrapper 均已删除
+  - 仅保留文件复制/移动异步收尾所需的内部 `waitForJob()` + 私有 `jobStatus()`，以避免误伤仍保留的 RC 文件操作链
+- 相关测试已按当前主链语义完成收口：
+  - `internal/dao/dao_test.go`、`internal/store/store_test.go` 已去掉旧 `RcJobID` / `ListRunningRuns` 语义
+  - `internal/service/full_test.go` 已去掉旧 `store.JobStatus` / `RcJobID` / 历史 runDAO mock 语义
+  - `internal/adapter` 测试已对齐当前签名，并将 `waitForJob()` 场景改成可终止的双路径 mock
+  - `internal/scheduler/scheduler_test.go` 已从旧私有 `parseSpec` 测试壳收敛为当前 `ParseSpecToCron` 入口
+- 当前验证状态：
+  - `go test ./...` 已通过
+  - `frontend && npm run build` 已通过
+  - 因此，这条运行态 RC 旧链已从业务主链、测试面、schema 面和低层未接线能力面全部完成收口
 - 到当前阶段，`TaskView.vue` 的脚本装配层已非常接近文档目标：主页面脚本已基本由 `useTaskViewState.ts`、`useTaskViewRuntimeState.ts`、`useTaskViewRuntime.ts`、`useTaskViewAuxRuntime.ts`、`useTaskListRuntime.ts`、`useTaskFormRuntime.ts`、`useTaskHistoryRuntime.ts`、`useRunDetailRuntime.ts`、`useRunningHintRuntime.ts` 这些入口构成；后续继续推进时，重点将逐步从“继续大量拆脚本装配”转向“清少量残留 glue / 评估模板主骨架是否还有低风险拆分点”
 - 本轮继续清掉了一批 `TaskView.vue` 顶层页面未直接使用的解构残留：包括部分 runtime/helper 暴露但页面模板未消费的名字、旧本地变量与无效动作入口，进一步降低脚本层噪音与认知负担
 - 本轮又继续完成一波纯删除型去噪：清理了页面顶部未使用的 Vue/WS/错误处理/类型 import、旧 helper import，以及多组 runtime 解构中页面未直接消费的名字；这一阶段的收益已明显从“结构性拆分”转向“减少脚本层噪音、让主骨架更清晰”
