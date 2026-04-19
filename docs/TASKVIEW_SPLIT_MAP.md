@@ -17,7 +17,7 @@
 > `frontend/src/views/TaskView.vue` 已从“单文件页面骨架 + 运行时装配”进一步收敛为“**页面总装配层 + 3 个页面子壳**”。
 
 当前真实状态：
-- `frontend/src/views/TaskView.vue` 当前约 **654 行**
+- `frontend/src/views/TaskView.vue` 当前约 **495 行**（样式已外移到 `frontend/src/views/TaskView.css`）
 - 三大主界面已经拆成 3 个页面子壳，并已接入 `TaskView.vue` 主装配链
 - `TaskView.vue` 不再直接装配 `TaskListSection` / `TaskHistorySection` / `AddTaskForm`
 - 当前主要矛盾已经从“继续拆骨架”转为：
@@ -273,6 +273,10 @@
 
 也就是说，当前结构目标已经从：
 - “把所有东西塞回一个 view 里做清理”
+
+转成：
+- “让总装配层、页面子壳、modal 层各自停在稳定边界上”
+塞回一个 view 里做清理”
 
 转成：
 - “让总装配层、页面子壳、modal 层各自停在稳定边界上”
