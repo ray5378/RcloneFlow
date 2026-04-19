@@ -81,15 +81,15 @@ defineProps<{
 
   <WebhookConfigModal
     :visible="showWebhookModal"
-    :trigger-id="webhookForm.triggerId"
-    :post-url="webhookForm.postUrl"
-    :wecom-url="(webhookForm as any).wecomUrl"
-    :notify-manual="webhookForm.notify.manual"
-    :notify-schedule="webhookForm.notify.schedule"
-    :notify-webhook="webhookForm.notify.webhook"
-    :status-success="(webhookForm as any).status.success"
-    :status-failed="(webhookForm as any).status.failed"
-    :can-test="!!webhookForm.postUrl || !!(webhookForm as any).wecomUrl"
+    :trigger-id="webhookForm?.triggerId ?? ''"
+    :post-url="webhookForm?.postUrl ?? ''"
+    :wecom-url="(webhookForm as any)?.wecomUrl ?? ''"
+    :notify-manual="webhookForm?.notify?.manual ?? false"
+    :notify-schedule="webhookForm?.notify?.schedule ?? false"
+    :notify-webhook="webhookForm?.notify?.webhook ?? false"
+    :status-success="(webhookForm as any)?.status?.success ?? false"
+    :status-failed="(webhookForm as any)?.status?.failed ?? false"
+    :can-test="!!(webhookForm?.postUrl) || !!((webhookForm as any)?.wecomUrl)"
     @update:trigger-id="setWebhookTriggerId"
     @update:post-url="setWebhookPostUrl"
     @update:wecom-url="setWebhookWecomUrl"
@@ -105,7 +105,7 @@ defineProps<{
 
   <SingletonConfigModal
     :visible="showSingletonModal"
-    :singleton-enabled="singletonForm.singletonEnabled"
+    :singleton-enabled="singletonForm?.singletonEnabled ?? false"
     @update:singleton-enabled="setSingletonEnabled"
     @save="saveSingleton"
     @close="closeSingletonModal"
