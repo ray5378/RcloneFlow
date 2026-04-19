@@ -118,6 +118,8 @@ const {
   jumpFinalFilesPage,
 } = useRunDetailRuntime({ runApi })
 
+const openRunLogFromHint = (run: any) => openRunLog(run)
+
 // 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度
 const {
   runningHintVisible,
@@ -130,7 +132,7 @@ const {
   closeRunningHint,
   toggleRunningHintDebug,
   openRunningHintLog,
-} = useRunningHintRuntime(activeRuns, openRunLog)
+} = useRunningHintRuntime(activeRuns, openRunLogFromHint)
 
 const {
   showRunDetail,
