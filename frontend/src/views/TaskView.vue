@@ -335,9 +335,9 @@ const {
   <SingletonConfigModal
     :visible="showSingletonModal"
     :singleton-enabled="singletonForm.singletonEnabled"
-    @update:singleton-enabled="singletonForm.singletonEnabled = $event"
+    @update:singleton-enabled="setSingletonEnabled"
     @save="saveSingleton"
-    @close="showSingletonModal = false"
+    @close="closeSingletonModal"
   />
 
   <!-- 传输日志弹窗 -->
@@ -537,7 +537,6 @@ body.light .tile-menu { background: #fff; border-color: #ddd; }
 .tile-menu button { width: 100%; text-align: left; padding: 8px 12px; }
 .tile-menu button:hover { background: #444; }
 body.light .tile-menu button:hover { background: #f0f0f0; }
-
 .error-text { color: #ff6b6b; white-space: pre-wrap; }
 .danger-hint { color: #ff6b6b; font-size: 13px; line-height: 1.5; }
 .modal-content.log-modal{width:92vw !important; max-width:1200px !important; max-height:80vh; display:flex; flex-direction:column;}
@@ -545,7 +544,6 @@ body.light .tile-menu button:hover { background: #f0f0f0; }
 .log-box{width:100%; display:flex; justify-content:center;}
 .log-pre{background:#0b1220;color:#e5e7eb;padding:12px;border-radius:8px;height:100%;overflow:auto;white-space:pre-wrap;width:calc(100% - 64px);max-width:1100px;box-sizing:border-box;margin:0;border:1px solid #334155}
 .detail-modal{ width: 135% !important; max-width: 1200px !important; }
-
 .summary-box{background:#111827;border:1px solid #333;border-radius:10px;padding:12px 14px;margin-top:6px;max-width:1200px}
 .summary-title{font-weight:600;color:#e0e0e0;margin-bottom:8px}
 .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
@@ -560,7 +558,6 @@ body.light .summary-val{color:#111827}
 .summary-cell.clickable{cursor:pointer;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
 .summary-cell.clickable:hover{background:#1f2937;border-color:#475569;box-shadow:0 0 0 1px #334155 inset}
 body.light .summary-cell.clickable:hover{background:#f0f4f8;border-color:#cbd5e1;box-shadow:0 0 0 1px #cbd5e1 inset}
-
 .files-table{margin-top:14px;border:1px solid #333;border-radius:10px;overflow:hidden}
 .files-table.large{max-width:1200px}
 .files-header,.files-row{display:grid;grid-template-columns:1fr 140px 200px 140px;gap:18px;align-items:center}
@@ -598,7 +595,6 @@ body.light .files-header{background:#f5f5f5;color:#4b5563}
     min-width: 0;
   }
 }
-
 .toast-container {
   position: fixed;
   top: 20px;
