@@ -221,46 +221,6 @@ func TestSyncMove(t *testing.T) {
 	}
 }
 
-func TestJobStop(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/job/stop" {
-			t.Fatalf("expected /job/stop, got %s", r.URL.Path)
-		}
-		var req StopJobRequest
-		_ = json.NewDecoder(r.Body).Decode(&req)
-		if req.JobID != 123 {
-			t.Fatalf("expected JobID 123, got %d", req.JobID)
-		}
-		w.WriteHeader(200)
-	}))
-	defer server.Close()
-
-	client := NewRcloneClient(&RcloneConfig{BaseURL: server.URL})
-	if err := client.StopJob(context.Background(), 123); err != nil {
-		t.Fatalf("StopJob() error = %v", err)
-	}
-}
-
-func TestJobList(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/job/list" {
-			t.Fatalf("expected /job/list, got %s", r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"jobids": []int64{1, 2, 3}, "running_ids": []int64{1}, "finished_ids": []int64{2, 3}})
-	}))
-	defer server.Close()
-
-	client := NewRcloneClient(&RcloneConfig{BaseURL: server.URL})
-	jobs, err := client.ListJobs(context.Background())
-	if err != nil {
-		t.Fatalf("ListJobs() error = %v", err)
-	}
-	if len(jobs.RunningIDs) != 1 || len(jobs.FinishedIDs) != 2 {
-		t.Fatalf("unexpected jobs: %+v", jobs)
-	}
-}
-
 func TestVersion(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/core/version" {

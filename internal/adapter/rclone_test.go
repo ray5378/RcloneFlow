@@ -110,31 +110,6 @@ func TestPathInfo(t *testing.T) {
 	}
 }
 
-func TestJobStatusResponse(t *testing.T) {
-	resp := &JobStatusResponse{
-		ID:        1,
-		ExecuteID: "abc-123",
-		StartTime: "2024-01-01T12:00:00Z",
-		EndTime:   "2024-01-01T12:01:00Z",
-		Duration:  60.0,
-		Success:   true,
-		Finished:  true,
-		Error:     "",
-	}
-
-	if !resp.Finished {
-		t.Error("expected Finished true")
-	}
-
-	if !resp.Success {
-		t.Error("expected Success true")
-	}
-
-	if resp.Error != "" {
-		t.Errorf("expected empty Error, got %s", resp.Error)
-	}
-}
-
 func TestCreateRemoteRequest(t *testing.T) {
 	req := &CreateRemoteRequest{
 		Name: "myremote",

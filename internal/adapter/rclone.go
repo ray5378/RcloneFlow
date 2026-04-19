@@ -610,8 +610,8 @@ func (c *RcloneClient) StartJob(ctx context.Context, mode, srcFs, dstFs string, 
 	return resp.JobID, nil
 }
 
-// JobStatusResponse 任务状态响应
-type JobStatusResponse struct {
+// jobStatusResponse 任务状态响应（仅供内部异步文件操作轮询使用）
+type jobStatusResponse struct {
 	ID        int64          `json:"id"`
 	ExecuteID string         `json:"executeId"`
 	StartTime string         `json:"startTime"`
@@ -624,9 +624,8 @@ type JobStatusResponse struct {
 	Progress  map[string]any `json:"progress,omitempty"`
 }
 
-// JobStatus 获取任务状态
-func (c *RcloneClient) JobStatus(ctx context.Context, jobID int64) (*JobStatusResponse, error) {
-	var resp JobStatusResponse
+func (c *RcloneClient) jobStatus(ctx context.Context, jobID int64) (*jobStatusResponse, error) {
+	var resp jobStatusResponse
 	if err := c.Call(ctx, "job/status", &JobIDRequest{JobID: jobID}, &resp); err != nil {
 		return nil, err
 	}
@@ -641,7 +640,7 @@ type JobIDRequest struct {
 // waitForJob 等待异步任务完成
 func (c *RcloneClient) waitForJob(ctx context.Context, jobID int64) error {
 	for {
-		status, err := c.JobStatus(ctx, jobID)
+		status, err := c.jobStatus(ctx, jobID)
 		if err != nil {
 			return err
 		}
@@ -651,47 +650,10 @@ func (c *RcloneClient) waitForJob(ctx context.Context, jobID int64) error {
 			}
 			return nil
 		}
-		// 等待1秒
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-time.After(time.Second):
 		}
 	}
-}
-
-// JobListResponse 任务列表响应
-type JobListResponse struct {
-	ExecuteID   string  `json:"executeId"`
-	JobIDs      []int64 `json:"jobids"`
-	RunningIDs  []int64 `json:"running_ids"`
-	FinishedIDs []int64 `json:"finished_ids"`
-}
-
-// ListJobs 列出所有任务
-func (c *RcloneClient) ListJobs(ctx context.Context) (*JobListResponse, error) {
-	var resp JobListResponse
-	if err := c.Call(ctx, "job/list", nil, &resp); err != nil {
-		return nil, err
-	}
-	return &resp, nil
-}
-
-// HasActiveJobs 检查是否有正在运行的任务
-func (c *RcloneClient) HasActiveJobs(ctx context.Context) (bool, error) {
-	resp, err := c.ListJobs(ctx)
-	if err != nil {
-		return false, err
-	}
-	return len(resp.RunningIDs) > 0, nil
-}
-
-// StopJobRequest 停止任务请求
-type StopJobRequest struct {
-	JobID int64 `json:"jobid"`
-}
-
-// StopJob 停止任务
-func (c *RcloneClient) StopJob(ctx context.Context, jobID int64) error {
-	return c.Call(ctx, "job/stop", &StopJobRequest{JobID: jobID}, nil)
 }

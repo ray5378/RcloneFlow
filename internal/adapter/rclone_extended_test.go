@@ -226,43 +226,6 @@ func TestDeleteFile(t *testing.T) {
 	}
 }
 
-func TestJobStatus(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/job/status" {
-			t.Errorf("expected /job/status, got %s", r.URL.Path)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"id":       123,
-			"finished": true,
-			"success":  true,
-			"duration": 1.5,
-		})
-	}))
-	defer server.Close()
-
-	cfg := &RcloneConfig{BaseURL: server.URL}
-	client := NewRcloneClient(cfg)
-
-	status, err := client.JobStatus(context.Background(), 123)
-	if err != nil {
-		t.Fatalf("JobStatus() error = %v", err)
-	}
-
-	if !status.Finished {
-		t.Error("expected finished to be true")
-	}
-
-	if !status.Success {
-		t.Error("expected success to be true")
-	}
-
-	if status.Duration != 1.5 {
-		t.Errorf("expected duration 1.5, got %f", status.Duration)
-	}
-}
-
 func TestStartJob(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		expectedPath := "/sync/copy"
