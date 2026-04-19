@@ -134,55 +134,6 @@ func (c *Client) GetFsInfo(ctx context.Context, fs string) (map[string]any, erro
 	return result, nil
 }
 
-// Deprecated: The following RC-based FS helpers are retained only for diagnostics/fallback.
-// Production FS operations are CLI-only in internal/controller/fs_cli.go and are not routed here.
-
-// Mkdir 创建目录（Deprecated: not wired to API routes）
-func (c *Client) Mkdir(ctx context.Context, fs, remote string) error {
-	return c.cli.Mkdir(ctx, fs, remote)
-}
-
-// DeleteFile 删除文件（Deprecated: not wired to API routes）
-func (c *Client) DeleteFile(ctx context.Context, fs, remote string) error {
-	return c.cli.DeleteFile(ctx, fs, remote)
-}
-
-// Purge 删除目录（Deprecated: not wired to API routes）
-func (c *Client) Purge(ctx context.Context, fs, remote string) error {
-	return c.cli.Purge(ctx, fs, remote)
-}
-
-// MoveFile 移动文件（Deprecated: not wired to API routes）
-func (c *Client) MoveFile(ctx context.Context, srcFs, srcRemote, dstFs, dstRemote string) error {
-	return c.cli.MoveFile(ctx, srcFs, srcRemote, dstFs, dstRemote)
-}
-
-// CopyFile 复制文件（Deprecated: not wired to API routes）
-func (c *Client) CopyFile(ctx context.Context, srcFs, srcRemote, dstFs, dstRemote string) error {
-	return c.cli.CopyFile(ctx, srcFs, srcRemote, dstFs, dstRemote)
-}
-
-// CopyDir 复制目录（Deprecated: not wired to API routes）
-func (c *Client) CopyDir(ctx context.Context, srcFs, dstFs string) error {
-	return c.cli.CopyDir(ctx, srcFs, dstFs)
-}
-
-// MoveDir 移动目录（Deprecated: not wired to API routes）
-func (c *Client) MoveDir(ctx context.Context, srcFs, dstFs string) error {
-	return c.cli.MoveDir(ctx, srcFs, dstFs)
-}
-
-// PublicLink 生成分享链接（Deprecated: not wired to API routes）
-func (c *Client) PublicLink(ctx context.Context, fs, remote string) (string, error) {
-	return c.cli.PublicLink(ctx, fs, remote)
-}
-
-// StartJob 启动任务
-func (c *Client) StartJob(ctx context.Context, mode, srcFs, dstFs string, opts *adapter.TaskOptions) (int64, error) {
-	return c.cli.StartJob(ctx, mode, srcFs, dstFs, opts)
-}
-
-
 // RunTask 运行任务
 func (c *Client) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string, opts *adapter.TaskOptions) (int64, error) {
 	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")

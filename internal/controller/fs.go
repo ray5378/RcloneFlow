@@ -7,4 +7,4 @@ package controller
 // - Directory listing (browser) stays on RC in browser.go
 // - Storage management (add/edit/delete remotes, config import/export, usage/fsinfo) stays on RC
 // - Do NOT add /api/fs/* routes here; all FS ops must go through fs_cli.go (rclone CLI)
-// - RC-based FS helpers in internal/rclone/client.go are kept only for diagnostics/future fallback and are not wired to routes
+// - Legacy RC helper wrappers in internal/rclone/client.go have been removed; active FS routes are CLI-only in fs_cli.go
