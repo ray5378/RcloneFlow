@@ -1,79 +1,54 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import * as api from '../api'
-import { TaskCard, RunItem, ScheduleOptions, AdvancedOptions, RunningHintModal, TaskHistoryPanel, RunDetailModal, AddTaskForm } from '../components/task'
-import { getActiveProgress as getHintActiveProgress, getActiveProgressText as getHintActiveProgressText } from '../components/task/runningHint'
+import { RunningHintModal, GlobalStatsModal, RunLogModal, SingletonConfigModal, WebhookConfigModal, ConfirmModal, TaskListSection, TaskHistorySection, AddTaskForm } from '../components/task'
 import { ToastItem } from '../components/toast'
-import { FileItem } from '../components/files'
 import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { handleError, showSuccess, setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from '../utils/format'
-import { getToken } from '../api/auth'
-import { useWebSocket, onWsMessage } from '../composables/useWebSocket'
-import { useActiveRunLookup } from '../composables/useActiveRunLookup'
-import { useRunningHint } from '../composables/useRunningHint'
-import { useTaskHistoryComputed } from '../composables/useTaskHistoryComputed'
-import { useTaskHistoryLoader } from '../composables/useTaskHistoryLoader'
-import { useTaskHistoryActions } from '../composables/useTaskHistoryActions'
-import { useTaskListActions } from '../composables/useTaskListActions'
-import { useTaskRunActions } from '../composables/useTaskRunActions'
-import { useTaskViewDataSync } from '../composables/useTaskViewDataSync'
-import { useTaskProgressSync } from '../composables/useTaskProgressSync'
-import { useTaskViewRefreshLifecycle } from '../composables/useTaskViewRefreshLifecycle'
-import { useRunDetailComputed } from '../composables/useRunDetailComputed'
-import { useRunDetailFiles } from '../composables/useRunDetailFiles'
-import { useRunDetailState } from '../composables/useRunDetailState'
+import { useRunningHintRuntime } from '../composables/useRunningHintRuntime'
+import { useTaskHistoryRuntime } from '../composables/useTaskHistoryRuntime'
+import { useTaskViewRuntime } from '../composables/useTaskViewRuntime'
+import { useTaskViewState } from '../composables/useTaskViewState'
+import { useTaskViewRuntimeState } from '../composables/useTaskViewRuntimeState'
+import { useRunDetailRuntime } from '../composables/useRunDetailRuntime'
 import { useRunDetailEntry } from '../composables/useRunDetailEntry'
-import { useTaskFormState } from '../composables/useTaskFormState'
-import { useTaskFormSubmit } from '../composables/useTaskFormSubmit'
-import { useTaskFormPrepare } from '../composables/useTaskFormPrepare'
-import { useTaskFormFlow } from '../composables/useTaskFormFlow'
-import { useTaskPathBrowse } from '../composables/useTaskPathBrowse'
-import { useTaskFormEntry } from '../composables/useTaskFormEntry'
+import { useTaskFormRuntime } from '../composables/useTaskFormRuntime'
+import { useTaskListRuntime } from '../composables/useTaskListRuntime'
 import { useTaskListView } from '../composables/useTaskListView'
-import { useTaskViewUi } from '../composables/useTaskViewUi'
+import { useToastCenter } from '../composables/useToastCenter'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
-import { getDeNoisedStableByRun as buildDeNoisedStableByRun, getDeNoisedStableByTask as buildDeNoisedStableByTask } from '../composables/activeRunProgress'
-import type { Task, Schedule, Run } from '../types'
 
-// Toast 通知系统
-interface Toast {
-  id: number
-  message: string
-  type: 'info' | 'success' | 'error'
-}
-const toasts = ref<Toast[]>([])
-let toastId = 0
-
-function showToast(message: string, type: 'info' | 'success' | 'error' = 'info') {
-  const id = ++toastId
-  toasts.value.push({ id, message, type })
-  setTimeout(() => {
-    toasts.value = toasts.value.filter(t => t.id !== id)
-  }, 3000)
-}
+const { toasts, showToast } = useToastCenter()
 
 // Set up global error handler for composables
 setErrorHandler((message, type) => {
   showToast(message, type as 'info' | 'success' | 'error')
 })
 
-const tasks = ref<Task[]>([])
-const schedules = ref<Schedule[]>([])
-const runs = ref<Run[]>([])
-const runsTotal = ref(0)
-// 任务特定的历史记录（用于分页）
-const taskRuns = ref<Run[]>([])
-const runsPage = ref(1)
-const runsPageSize = 50
-const jumpPage = ref(1)
+const {
+  tasks,
+  schedules,
+  runs,
+  runsTotal,
+  taskRuns,
+  runsPage,
+  runsPageSize,
+  jumpPage,
+  remotes,
+  currentModule,
+  historyFilterTaskId,
+  historyStatusFilter,
+} = useTaskViewState()
 
-function jumpToPage() {
-  const page = Math.min(Math.max(1, jumpPage.value || 1), currentTotalPages.value)
-  runsPage.value = page
-  jumpPage.value = page
-  loadData()
-}
+const {
+  activeRuns,
+  globalStats,
+  showGlobalStatsModal,
+  activeRunLookup,
+  lastStableByTask,
+  lastNonDecreasingTotalsByTask,
+  LINGER_MS,
+  STUCK_MS,
+} = useTaskViewRuntimeState()
 
 const {
   tasksPage,
@@ -82,47 +57,56 @@ const {
   taskSearch,
   tasksTotal,
   currentTasksPages,
-  filteredTasksRaw,
   filteredTasks,
   jumpToTasksPage,
 } = useTaskListView(tasks)
 
-const remotes = ref<string[]>([])
-const currentModule = ref<'history' | 'add' | 'tasks'>('tasks')
-const historyFilterTaskId = ref<number | null>(null)
-const historyStatusFilter = ref<string>('all') // 'all' | 'finished' | 'failed' | 'skipped' | 'hasTransfer'
-const { showDetailModal, runDetail, openRunDetailModal, closeRunDetailModal } = useRunDetailState()
-
-const showCreateModal = ref(false)
-const showGlobalStatsModal = ref(false)
-const globalStats = ref<any>({}) // 全局实时数据保留为独立弹窗，与历史态无关
-// 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度
-
-const activeRuns = ref<any[]>([])
-const activeRunLookup = useActiveRunLookup(activeRuns)
 const {
-  visible: runningHintVisible,
-  run: runningHintRun,
-  debugOpen: runningHintDebugOpen,
-  phaseText: runningHintPhaseText,
-  progressText: runningHintProgressText,
-  debugInfo: runningHintDebugInfo,
-  open: openRunningHint,
-  close: closeRunningHint,
-  toggleDebug: toggleRunningHintDebug,
-  openLog: openRunningHintLog,
-} = useRunningHint(activeRuns, openRunLog)
-// 任务卡片：完成后保留最近稳态进度的观察期（默认 15s）
-const LINGER_MS = 20000
-const lastStableByTask = ref<Record<number, { sp:any; at:number }>>({})
-const lastNonDecreasingTotalsByTask = ref<Record<number, { totalBytes:number; totalCount:number }>>({})
+  showDetailModal,
+  runDetail,
+  closeRunDetailModal,
+  runFilesPage,
+  pagedRunFiles,
+  totalRunFilesPages,
+  goPrevFilesPage,
+  goNextFilesPage,
+  getFinalSummary: getFinalSummaryFromComposable,
+  getPreflight: getPreflightFromComposable,
+  finalFiles,
+  finalCountAll,
+  finalCountSuccess,
+  finalCountFailed,
+  finalCountOther,
+  setFinalFilter,
+  finalFilesTotal,
+  totalFinalFilesPages,
+  pagedFinalFiles,
+  finalFilesJump,
+  goPrevFinalFilesPage,
+  goNextFinalFilesPage,
+  jumpFinalFilesPage,
+} = useRunDetailRuntime({ runApi })
+
+// 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度
+const {
+  runningHintVisible,
+  runningHintRun,
+  runningHintDebugOpen,
+  runningHintPhaseText,
+  runningHintProgressText,
+  runningHintDebugInfo,
+  closeRunningHint,
+  toggleRunningHintDebug,
+  openRunningHintLog,
+} = useRunningHintRuntime(activeRuns, openRunLog)
 const {
   loadData,
   loadActiveRuns,
-  loadGlobalStats,
-  openGlobalStats,
-  setupRealtimeSync,
-} = useTaskViewDataSync({
+  getRealtimeProgressByRun,
+  getTaskCardProgressByTask,
+  getDeNoisedStableByTask,
+  formatBps,
+} = useTaskViewRuntime({
   tasks,
   remotes,
   schedules,
@@ -133,239 +117,48 @@ const {
   activeRuns,
   globalStats,
   showGlobalStatsModal,
+  activeRunLookup,
   lastStableByTask,
   lastNonDecreasingTotalsByTask,
+  currentModule,
+  lingerMs: LINGER_MS,
+  stuckMs: STUCK_MS,
   taskApi,
   remoteApi,
   scheduleApi,
   runApi,
   jobApi,
 })
-// 监控帧是否停滞超过阈值（默认 25s），若是则强制刷新一次
-const STUCK_MS = 25000
+
 const {
-  getDbProgressStable,
-  getDeNoisedStableByRun,
-  getDeNoisedStableByTask,
-  formatBps,
-  calcEtaFromAvg,
-  triggerAutoRefresh,
-} = useTaskProgressSync({
-  activeRuns,
-  activeRunLookup,
-  lastStableByTask,
-  loadData,
-  loadActiveRuns,
-  lingerMs: LINGER_MS,
-})
-
-// Webhook 配置（POST 地址 + 触发来源/状态勾选）
-const showWebhookModal = ref(false)
-const webhookForm = ref<{taskId:number|null, postUrl:string, triggerId:string, notify:{manual:boolean,schedule:boolean,webhook:boolean}, status:{success:boolean,failed:boolean}}>({ taskId: null, postUrl: '', triggerId:'', notify:{manual:false,schedule:false,webhook:false}, status:{success:true,failed:true} })
-function setWebhook(task: Task){
-  webhookForm.value.taskId = task.id
-  try{
-    const opts = (task.options||task.Options||{}) as any
-    webhookForm.value.postUrl = (opts?.webhookPostUrl || '')
-    ;(webhookForm.value as any).wecomUrl = (opts?.wecomPostUrl || '')
-    webhookForm.value.triggerId = (opts?.webhookId || '')
-    const n = opts?.webhookNotifyOn || {}
-    webhookForm.value.notify = {
-      manual: !!n.manual,
-      schedule: !!n.schedule,
-      webhook: !!n.webhook,
-    }
-    const s = opts?.webhookNotifyStatus || {}
-    ;(webhookForm.value as any).status = { success: s.success!==false, failed: s.failed!==false }
-  }catch{
-    webhookForm.value.postUrl = ''
-    ;(webhookForm.value as any).wecomUrl = ''
-    webhookForm.value.triggerId = ''
-    webhookForm.value.notify = { manual:false, schedule:false, webhook:false }
-    ;(webhookForm.value as any).status = { success:true, failed:true }
-  }
-  showWebhookModal.value = true
-}
-async function saveWebhook(){
-  if (!webhookForm.value.taskId){ showWebhookModal.value=false; return }
-  try{
-    const id = webhookForm.value.taskId
-    const opts = { webhookId: webhookForm.value.triggerId, webhookPostUrl: webhookForm.value.postUrl, wecomPostUrl: (webhookForm.value as any).wecomUrl||'', webhookNotifyOn: webhookForm.value.notify, webhookNotifyStatus: (webhookForm.value as any).status }
-    const fn:any = (api as any).updateTaskOptions
-    if (typeof fn === 'function') {
-      await fn(id, opts)
-    } else {
-      // 兼容旧 bundle：直接调用 PATCH /api/tasks
-      await fetch('/api/tasks', { method:'PATCH', headers:{ 'Content-Type':'application/json', 'Authorization': `Bearer ${getToken()||''}` }, body: JSON.stringify({ id, options: opts }) })
-    }
-    showWebhookModal.value = false
-    await loadData()
-  }catch(e:any){
-    showToast(e?.message||String(e), 'error')
-  }
-}
-
-// 单例模式配置
-const showSingletonModal = ref(false)
-const singletonForm = ref<{taskId:number|null, singletonEnabled:boolean}>({ taskId: null, singletonEnabled: false })
-
-function setSingletonMode(task: Task){
-  singletonForm.value.taskId = task.id
-  try{
-    const opts = (task.options||task.Options||{}) as any
-    singletonForm.value.singletonEnabled = !!opts.singletonMode
-  }catch{
-    singletonForm.value.singletonEnabled = false
-  }
-  showSingletonModal.value = true
-}
-
-async function saveSingleton(){
-  if (!singletonForm.value.taskId){ showSingletonModal.value=false; return }
-  try{
-    const id = singletonForm.value.taskId
-    const opts = { singletonMode: singletonForm.value.singletonEnabled }
-    await taskApi.updateOptions(id, opts)
-    showSingletonModal.value = false
-    await loadData()
-  }catch(e:any){
-    showToast(e?.message||String(e), 'error')
-  }
-}
-
-function buildWecomMarkdown(p:any){
-  const taskName = p?.task?.name || '测试任务'
-  const statusZh = p?.statusZh || '演示'
-  const triggerZh = p?.triggerZh || '测试'
-  const mode = (p?.task?.mode || '').toLowerCase()
-  const okLabel = mode==='move' ? '移动' : '成功'
-  const s = p?.summary||{}
-  const total = s.totalCount ?? 0
-  const ok = s.completedCount ?? 0
-  const fail = s.failedCount ?? 0
-  const skipped = s.skippedCount ?? 0
-  const bytesFmt = formatBytes(Number(s.totalBytes||0))
-  const txFmt = formatBytes(Number(s.transferredBytes||0))
-  const spFmt = formatBytesPerSec(Number(s.avgSpeedBps||0))
-  const dur = p?.run?.durationText || '-'
-  let md = `**任务** <font color="info">${taskName}</font> 已${statusZh}（${triggerZh}）\n`
-  md += `> 总计: ${total}  ${okLabel}: ${ok}  失败: ${fail}  其他: ${skipped}\n`
-  md += `> 体积: ${bytesFmt} / 已传: ${txFmt}\n`
-  md += `> 均速: ${spFmt}  耗时: ${dur}\n`
-  if (Array.isArray(p?.files)){
-    for (const f of p.files){ md += `> ${f}\n` }
-  }
-  return md
-}
-async function testWebhook(){
-  try{
-    const url1 = (webhookForm.value.postUrl||'').trim()
-    const url2 = String((webhookForm.value as any)['wecomUrl']||'').trim()
-    if (!url1 && !url2){ showToast('请先填写对外 POST 地址或企业微信地址', 'error'); return }
-    const payload:any = {
-      title: 'RcloneFlow 测试通知',
-      triggerZh: '测试',
-      statusZh: '演示',
-      summaryZh: '这是一条测试消息，用于验证通知接收是否正常（自动识别企业微信/通用 Webhook）。',
-      task: { id: 0, name: '测试任务', mode: 'test' },
-      run: { id: 0, trigger: 'manual', status: 'success', startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), durationSeconds: 1, durationText: '1秒' },
-      summary: { totalCount: 5, completedCount: 5, failedCount: 0, skippedCount: 0, totalBytes: 10485760, transferredBytes: 10485760, avgSpeedBps: 10485760 },
-      files: ['test-a.mp4','test-b.mp4','test-c.mp4','test-d.mp4','test-e.mp4'],
-      omittedCount: 0,
-    }
-    const send = async (url:string)=>{
-      const isWecom = url.includes('qyapi.weixin.qq.com')
-      let body:any
-      if (isWecom){
-        const md = buildWecomMarkdown(payload)
-        body = JSON.stringify({ msgtype:'markdown', markdown: { content: md } })
-      }else{
-        body = JSON.stringify(payload)
-      }
-      const resp = await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body })
-      if (!resp.ok){ throw new Error(`HTTP ${resp.status}`) }
-    }
-    const fails:string[] = []
-    if (url1){ try{ await send(url1) } catch(e:any){ fails.push(`通用: ${e?.message||e}`) } }
-    if (url2){ try{ await send(url2) } catch(e:any){ fails.push(`企业微信: ${e?.message||e}`) } }
-    if (fails.length){ showToast(`测试部分失败：${fails.join('；')}`, 'error') } else { showToast('测试通知已发送（请在接收端查看）', 'success') }
-  }catch(e:any){
-    showToast(`测试发送失败：${e?.message||e}`, 'error')
-  }
-}
-
-// 仅在 phase 前进时更新：记录每个 task 的最新 phase
-const lastPhaseByTaskId: Record<number, string> = {}
-
-// 传输日志弹窗
-const showLogModal = ref(false)
-const logModalTitle = ref('传输日志')
-const logContent = ref('')
-async function openRunLog(run:any){
-  logModalTitle.value = `传输日志 #${run.id}`
-  logContent.value = '加载中…'
-  showLogModal.value = true
-  try {
-    const token = getToken() || ''
-    const resp = await fetch(`/api/runs/${run.id}/log`, {
-      headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-    })
-    if (!resp.ok){
-      // 兜底再试一次 ?auth= 兼容
-      const fallback = await fetch(`/api/runs/${run.id}/log?auth=${token}`)
-      if (!fallback.ok){
-        const txt = await fallback.text()
-        logContent.value = `加载失败：${fallback.status} ${txt}`
-        return
-      }
-      const buf2 = await fallback.arrayBuffer()
-      const dec2 = new TextDecoder('utf-8')
-      logContent.value = dec2.decode(buf2)
-      return
-    }
-    const buf = await resp.arrayBuffer()
-    const dec = new TextDecoder('utf-8')
-    logContent.value = dec.decode(buf)
-  } catch(e:any){
-    logContent.value = `加载异常：${e?.message||e}`
-  }
-}
-
-// （重复定义已移除）
-
-function showRunDetail(run:any){
-  if (run.status === 'running'){
-    // 运行中的记录不进入历史详情弹窗，而是走轻量提示小窗
-    openRunningHint(run)
-    return
-  }
-
-  // 历史详情入口：页面层只负责入口判断，详情状态与文件链已分别下沉
-  openRunDetailModal(run)
-  openRunDetailFiles(run)
-}
-
-function closeRunDetail(){
-  // 历史详情出口：页面层只保留关闭入口，具体状态由 useRunDetailState 管理
-  closeRunDetailModal()
-}
-
-
-// finalSummary.files 与统计计数已下沉到 useRunDetailComputed.ts
-// move 模式时，成功数量代表 Moved 条数；已在后端合并 Copied+Deleted 为 Moved
-// 筛选状态与 finalFilteredFiles 已下沉到 useRunDetailComputed.ts
-// 分页（按筛选后的集）
-const finalFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 420) / 34)))
-const finalFilesPage = ref(1)
-const {
+  showWebhookModal,
+  webhookForm,
+  setWebhook,
+  saveWebhook,
+  testWebhook,
+  showSingletonModal,
+  singletonForm,
+  setSingletonMode,
+  saveSingleton,
+  showLogModal,
+  logModalTitle,
+  logContent,
+  openRunLog,
   openMenuId,
   confirmModal,
-  toggleMenu,
-  closeMenus,
-  showConfirm,
   closeConfirm,
   confirmAndClose,
-} = useTaskViewUi()
+  formatTime,
+  formatDuration,
+  getStatusText,
+} = useTaskViewAuxRuntime({
+  loadData,
+  showToast,
+  taskApi,
+  getFinalSummary: getFinalSummaryFromComposable,
+})
+
+// move 模式时，成功数量代表 Moved 条数；已在后端合并 Copied+Deleted 为 Moved
 
 const {
   createForm,
@@ -375,31 +168,9 @@ const {
   showAdvancedOptions,
   resetTaskFormForCreate,
   fillTaskFormForEdit,
-} = useTaskFormState()
-
-const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
-
-function getScheduleByTaskId(taskId: number) {
-  return schedules.value.find(s => s.taskId === taskId)
-}
-
-const {
-  handleTaskFormDoneClick,
-  validateTaskForm,
-  executeTaskFormSubmit,
-} = useTaskFormSubmit({
-  createForm,
-  editingTask,
-  creatingState,
-  currentModule,
-  normalizeTaskOptions,
   getScheduleByTaskId,
-  loadData,
-  taskApi,
-  scheduleApi,
-})
-
-const {
+  creatingState,
+  createTask,
   sourcePathOptions,
   targetPathOptions,
   showSourcePathInput,
@@ -422,136 +193,26 @@ const {
   onSourceArrow,
   onTargetClick,
   onTargetArrow,
-} = useTaskPathBrowse({
-  createForm,
-  listPath: api.listPath,
-})
-
-function normalizeTaskOptions(raw: Record<string, any> | undefined | null) {
-  const options = { ...(raw || {}) }
-  if (typeof options.enableStreaming === 'undefined') {
-    options.enableStreaming = true
-  }
-  return options
-}
-
-onMounted(async () => {
-  await loadData()
-  await loadActiveRuns()
-  setupRealtimeSync()
-})
-
-function getActiveRunByTaskId(taskId: number) {
-  return activeRunLookup.getActiveRunByTaskId(taskId)
-}
-
-function formatTime(time: string | undefined) {
-  if (!time) return '-'
-  try {
-    return new Date(time).toLocaleString('zh-CN', {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit'
-    })
-  } catch {
-    return time || '-'
-  }
-}
-
-function formatDuration(startTime: string | undefined, endTime: string | undefined) {
-  if (!startTime) return '-'
-  const start = new Date(startTime).getTime()
-  const end = endTime ? new Date(endTime).getTime() : Date.now()
-  const diff = Math.max(0, end - start)
-  const seconds = Math.floor(diff / 1000) % 60
-  const minutes = Math.floor(diff / 60000) % 60
-  const hours = Math.floor(diff / 3600000)
-  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`
-  if (minutes > 0) return `${minutes}m ${seconds}s`
-  return `${seconds}s`
-}
-
-function getRunDurationText(run:any){
-  const fs = getFinalSummaryFromComposable(run)
-  if (fs && fs.durationText) return fs.durationText
-  // fallback to local compute for running
-  return formatDuration(run.startedAt, run.finishedAt)
-}
-function getStatusClass(status: string) {
-  switch (status) {
-    case 'running': return 'running'
-    case 'finished': return 'success'
-    case 'failed': return 'failed'
-    case 'skipped': return 'skipped'
-    default: return ''
-  }
-}
-
-function getStatusText(status: string) {
-  switch (status) {
-    case 'running': return '运行中'
-    case 'finished': return '已完成'
-    case 'failed': return '失败'
-    case 'skipped': return '已跳过'
-    default: return status
-  }
-}
-
-
-const { validateTaskFormBeforeSubmit } = useTaskFormPrepare({
-  createForm,
-  commandMode,
-  commandText,
+} = useTaskFormRuntime({
+  schedules,
+  currentModule,
   normalizeTaskOptions,
+  loadData,
+  taskApi,
+  scheduleApi,
+  showToast,
   parseRcloneCommand,
-  validateTaskForm,
 })
-
-const { runTaskFormFlow } = useTaskFormFlow({
-  handleTaskFormDoneClick,
-  validateTaskFormBeforeSubmit,
-  executeTaskFormSubmit,
-})
-
-async function createTask() {
-  const error = await runTaskFormFlow()
-  if (error) {
-    showToast(error, 'error')
-  }
-}
-
-const {
-  runFilesPage,
-  openRunDetailFiles,
-  pagedRunFiles,
-  totalRunFilesPages,
-  goPrevFilesPage,
-  goNextFilesPage,
-} = useRunDetailFiles({ runDetail, runApi })
-
-const {
-  getFinalSummary: getFinalSummaryFromComposable,
-  getPreflight: getPreflightFromComposable,
-  finalFiles,
-  finalCountAll,
-  finalCountSuccess,
-  finalCountFailed,
-  finalCountOther,
-  setFinalFilter,
-  finalFilesTotal,
-  totalFinalFilesPages,
-  pagedFinalFiles,
-  finalFilesJump,
-  goPrevFinalFilesPage,
-  goNextFinalFilesPage,
-  jumpFinalFilesPage,
-} = useRunDetailComputed({ runDetail, finalFilesPage, finalFilesPageSize })
 
 const {
   filteredRuns,
-  filteredRunsTotal,
   currentTotal,
   currentTotalPages,
-} = useTaskHistoryComputed({
+  viewTaskHistory,
+  jumpToPage,
+  clearRun,
+  clearAllRuns,
+} = useTaskHistoryRuntime({
   runs,
   runsTotal,
   taskRuns,
@@ -559,71 +220,33 @@ const {
   historyStatusFilter,
   runsPage,
   runsPageSize,
-  getFinalSummary: getFinalSummaryFromComposable,
-})
-
-const {
-  refreshTaskHistoryRuns,
-  viewTaskHistory,
-} = useTaskHistoryLoader({
-  taskRuns,
-  historyFilterTaskId,
-  runsPage,
   jumpPage,
   currentModule,
-  runApi,
-})
-
-const {
-  clearRun,
-  clearAllRuns,
-} = useTaskHistoryActions({
-  runs,
-  taskRuns,
-  historyFilterTaskId,
-  runsPage,
-  jumpPage,
-  filteredRuns,
+  getFinalSummary: getFinalSummaryFromComposable,
   loadData,
-  refreshTaskHistoryRuns,
   runApi,
 })
 
 const {
   deleteTask,
   toggleSchedule,
-  deleteSchedule,
   clearAllRunsWithConfirm,
-} = useTaskListActions({
-  openMenuId,
-  historyFilterTaskId,
-  schedules,
-  loadData,
-  showConfirm,
-  showToast,
-  clearAllRuns,
-  taskApi,
-  scheduleApi,
-})
-
-const {
   runningTaskId,
   stoppedTaskId,
   stopTaskAny,
   runTask,
-} = useTaskRunActions({
-  loadData,
-  showToast,
-  taskApi,
-  jobApi,
-})
-
-const {
   goToAddTask,
   editTask,
-} = useTaskFormEntry({
-  currentModule,
+} = useTaskListRuntime({
   openMenuId,
+  historyFilterTaskId,
+  schedules,
+  loadData,
+  loadActiveRuns,
+  showConfirm,
+  showToast,
+  clearAllRuns,
+  currentModule,
   remotes,
   remoteApi,
   resetTaskFormForCreate,
@@ -631,20 +254,9 @@ const {
   getScheduleByTaskId,
   fillTaskFormForEdit,
   restoreTaskPathBrowse,
+  taskApi,
+  scheduleApi,
 })
-
-function formatScheduleSpec(spec: string): string {
-  if (!spec) return ''
-  const parts = spec.split('|')
-  if (parts.length !== 5) return spec
-
-  // 标准cron格式: minute hour day month week
-  // 例如: "43|17,19|*|**|*" 显示为 "43 17,19 * * *"
-  const [minute, hour, day, month, week] = parts
-
-  // 显示为标准cron格式
-  return `${minute} ${hour} ${day} ${month} ${week}`
-}
 
 </script>
 
@@ -655,44 +267,34 @@ function formatScheduleSpec(spec: string): string {
     <ToastItem v-for="toast in toasts" :key="toast.id" :toast="toast" />
   </div>
 
-  <div v-if="currentModule === 'tasks'" class="card">
-    <div class="card-header">
-      <div class="title">任务列表</div>
-      <div class="header-actions">
-        <input v-model="taskSearch" type="text" placeholder="搜索任务..." class="search-input" />
-        <button class="primary small" @click="goToAddTask">+ 添加任务</button>
-      </div>
-    </div>
-    <div class="list">
-      <TaskCard
-        v-for="task in filteredTasks"
-        :key="task.id"
-        :task="task"
-        :schedule="getScheduleByTaskId(task.id)"
-        :active-run="getActiveRunByTaskId(task.id)"
-        :progress="getDeNoisedStableByTask(task.id)"
-        :running-task-id="runningTaskId"
-        :stopped-task-id="stoppedTaskId"
-        @run="runTask(task.id)"
-        @edit="editTask(task)"
-        @delete="deleteTask(task.id)"
-        @toggle-schedule="toggleSchedule(task.id)"
-        @view-history="viewTaskHistory(task.id)"
-        @stop="stopTaskAny(task.id)"
-        @set-webhook="setWebhook(task)"
-        @set-singleton="setSingletonMode(task)"
-      />
-      <div v-if="!filteredTasks.length" class="empty">暂无任务</div>
-    </div>
-    <!-- 任务分页 -->
-    <div class="pagination" v-if="tasksTotal > tasksPageSize">
-      <span class="page-current">第 {{ tasksPage }} / {{ currentTasksPages }} 页</span>
-      <button class="page-btn" :disabled="tasksPage <= 1" @click="tasksPage--">上一页</button>
-      <button class="page-btn" :disabled="tasksPage >= currentTasksPages" @click="tasksPage++">下一页</button>
-      <input type="number" class="page-input" v-model.number="tasksJumpPage" :min="1" :max="currentTasksPages" @keyup.enter="jumpToTasksPage" />
-      <button class="page-btn" @click="jumpToTasksPage">跳转</button>
-    </div>
-  </div>
+  <TaskListSection
+    v-if="currentModule === 'tasks'"
+    :search="taskSearch"
+    :filtered-tasks="filteredTasks"
+    :get-schedule-by-task-id="getScheduleByTaskId"
+    :get-task-card-progress-by-task="getTaskCardProgressByTask"
+    :running-task-id="runningTaskId"
+    :stopped-task-id="stoppedTaskId"
+    :tasks-total="tasksTotal"
+    :tasks-page-size="tasksPageSize"
+    :tasks-page="tasksPage"
+    :current-tasks-pages="currentTasksPages"
+    :tasks-jump-page="tasksJumpPage"
+    @update:search="taskSearch = $event"
+    @add="goToAddTask"
+    @run="runTask($event)"
+    @edit="editTask($event)"
+    @delete="deleteTask($event)"
+    @toggle-schedule="toggleSchedule($event)"
+    @view-history="viewTaskHistory($event)"
+    @stop="stopTaskAny($event)"
+    @set-webhook="setWebhook($event)"
+    @set-singleton="setSingletonMode($event)"
+    @prev-page="tasksPage--"
+    @next-page="tasksPage++"
+    @update:jump-page="tasksJumpPage = $event"
+    @jump-page="jumpToTasksPage"
+  />
 
   <!-- Webhook 配置弹窗（POST 地址 + 触发来源） -->
   <div v-if="showWebhookModal" class="modal-overlay" @click.self="showWebhookModal=false">
@@ -735,111 +337,81 @@ function formatScheduleSpec(spec: string): string {
       </div>
       <div class="modal-footer">
         <button class="primary" @click="saveWebhook">保存</button>
-        <button class="ghost" @click="testWebhook" :disabled="!webhookForm.postUrl">发送测试</button>
+        <button class="ghost" @click="testWebhook" :disabled="!webhookForm.postUrl && !(webhookForm as any).wecomUrl">发送测试</button>
         <button class="ghost" @click="showWebhookModal=false">取消</button>
       </div>
     </div>
   </div>
 
   <!-- 单例模式配置弹窗 -->
-  <div v-if="showSingletonModal" class="modal-overlay" @click.self="showSingletonModal=false">
-    <div class="modal-content" style="max-width:560px">
-      <div class="modal-header">
-        <h3>单例模式</h3>
-        <button class="close-btn" @click="showSingletonModal=false">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="detail-item full-width">
-          <label class="trigger-opt">
-            <input type="checkbox" v-model="singletonForm.singletonEnabled" />
-            <span>开启单例模式</span>
-          </label>
-          <p class="hint">开启后，该任务触发时会检测全局是否有其他传输任务在运行。有则放弃本次执行，不排队，不等待，不重试。</p>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="primary" @click="saveSingleton">保存</button>
-        <button class="ghost" @click="showSingletonModal=false">取消</button>
-      </div>
-    </div>
-  </div>
+  <SingletonConfigModal
+    :visible="showSingletonModal"
+    :singleton-enabled="singletonForm.singletonEnabled"
+    @update:singleton-enabled="singletonForm.singletonEnabled = $event"
+    @save="saveSingleton"
+    @close="showSingletonModal = false"
+  />
 
   <!-- 传输日志弹窗 -->
-  <div v-if="showLogModal" class="modal-overlay" @click.self="showLogModal=false">
-    <div class="modal-content log-modal">
-      <div class="modal-header">
-        <h3>{{ logModalTitle }}</h3>
-        <button class="close-btn" @click="showLogModal=false">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="log-box">
-          <pre class="log-pre">{{ logContent }}</pre>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="ghost" @click="showLogModal=false">关闭</button>
-      </div>
-    </div>
-  </div>
+  <RunLogModal
+    :visible="showLogModal"
+    :title="logModalTitle"
+    :content="logContent"
+    @close="showLogModal = false"
+  />
 
-  <div v-if="currentModule === 'history'">
-    <TaskHistoryPanel
-      :current-total="currentTotal"
-      :runs-page="runsPage"
-      :runs-page-size="runsPageSize"
-      :current-total-pages="currentTotalPages"
-      :jump-page="jumpPage"
-      :history-filter-task-id="historyFilterTaskId"
-      :history-status-filter="historyStatusFilter"
-      :filtered-runs="filteredRuns"
-      :get-db-progress-stable="getDbProgressStable"
-      :get-final-summary="getFinalSummaryFromComposable"
-      @back="currentModule = 'tasks'"
-      @set-status-filter="historyStatusFilter = $event"
-      @prev-page="runsPage--; loadData()"
-      @next-page="runsPage++; loadData()"
-      @update-jump-page="jumpPage = $event"
-      @jump-page="jumpToPage"
-      @clear-all="clearAllRunsWithConfirm"
-      @view-detail="showRunDetail"
-      @view-log="openRunLog"
-      @clear-run="clearRun"
-    />
-
-    <!-- 运行详情弹窗 -->
-    <RunDetailModal
-      :visible="showDetailModal"
-      :run-detail="runDetail"
-      :get-status-class="getStatusClass"
-      :get-status-text="getStatusText"
-      :get-final-summary="getFinalSummaryFromComposable"
-      :get-preflight="getPreflightFromComposable"
-      :format-bytes="formatBytes"
-      :format-time="formatTime"
-      :format-bps="formatBps"
-      :final-count-all="finalCountAll"
-      :final-count-success="finalCountSuccess"
-      :final-count-failed="finalCountFailed"
-      :final-count-other="finalCountOther"
-      :final-files-total="finalFilesTotal"
-      :final-files-page="finalFilesPage"
-      :total-final-files-pages="totalFinalFilesPages"
-      :final-files-jump="finalFilesJump"
-      :paged-final-files="pagedFinalFiles"
-      :final-files="finalFiles"
-      :paged-run-files="pagedRunFiles"
-      :run-files-page="runFilesPage"
-      :total-run-files-pages="totalRunFilesPages"
-      @close="closeRunDetail()"
-      @set-final-filter="setFinalFilter"
-      @prev-final-files-page="goPrevFinalFilesPage()"
-      @next-final-files-page="goNextFinalFilesPage()"
-      @update-final-files-jump="finalFilesJump = $event"
-      @jump-final-files-page="jumpFinalFilesPage()"
-      @prev-files-page="goPrevFilesPage()"
-      @next-files-page="goNextFilesPage()"
-    />
-  </div>
+  <TaskHistorySection
+    v-if="currentModule === 'history'"
+    :current-total="currentTotal"
+    :runs-page="runsPage"
+    :runs-page-size="runsPageSize"
+    :current-total-pages="currentTotalPages"
+    :jump-page="jumpPage"
+    :history-filter-task-id="historyFilterTaskId"
+    :history-status-filter="historyStatusFilter"
+    :filtered-runs="filteredRuns"
+    :get-db-progress-stable="getRealtimeProgressByRun"
+    :get-final-summary="getFinalSummaryFromComposable"
+    :show-detail-modal="showDetailModal"
+    :run-detail="runDetail"
+    :get-status-class="getStatusClass"
+    :get-status-text="getStatusText"
+    :get-preflight="getPreflightFromComposable"
+    :format-bytes="formatBytes"
+    :format-time="formatTime"
+    :format-bps="formatBps"
+    :final-count-all="finalCountAll"
+    :final-count-success="finalCountSuccess"
+    :final-count-failed="finalCountFailed"
+    :final-count-other="finalCountOther"
+    :final-files-total="finalFilesTotal"
+    :final-files-page="finalFilesPage"
+    :total-final-files-pages="totalFinalFilesPages"
+    :final-files-jump="finalFilesJump"
+    :paged-final-files="pagedFinalFiles"
+    :final-files="finalFiles"
+    :paged-run-files="pagedRunFiles"
+    :run-files-page="runFilesPage"
+    :total-run-files-pages="totalRunFilesPages"
+    @back="currentModule = 'tasks'"
+    @set-status-filter="historyStatusFilter = $event"
+    @prev-page="runsPage--; loadData()"
+    @next-page="runsPage++; loadData()"
+    @update-jump-page="jumpPage = $event"
+    @jump-page="jumpToPage"
+    @clear-all="clearAllRunsWithConfirm"
+    @view-detail="showRunDetail"
+    @view-log="openRunLog"
+    @clear-run="clearRun"
+    @close-detail="closeRunDetail()"
+    @set-final-filter="setFinalFilter"
+    @prev-final-files-page="goPrevFinalFilesPage()"
+    @next-final-files-page="goNextFinalFilesPage()"
+    @update-final-files-jump="finalFilesJump = $event"
+    @jump-final-files-page="jumpFinalFilesPage()"
+    @prev-files-page="goPrevFilesPage()"
+    @next-files-page="goNextFilesPage()"
+  />
 
   <!-- 运行中轻量提示小窗（不切主窗口） -->
   <RunningHintModal
@@ -890,133 +462,28 @@ function formatScheduleSpec(spec: string): string {
     />
 
   <!-- 全局实时数据弹窗 -->
-  <div v-if="showGlobalStatsModal" class="modal-overlay" @click.self="showGlobalStatsModal = false">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>全局实时数据</h3>
-        <button class="close-btn" @click="showGlobalStatsModal = false">×</button>
-      </div>
-      <div class="modal-body">
-        <div class="detail-item">
-          <label>已传输：</label>
-          <span>{{ formatBytes(globalStats.bytes) || '-' }}</span>
-        </div>
-        <div class="detail-item">
-          <label>总大小：</label>
-          <span>{{ formatBytes(globalStats.totalBytes) || '-' }}</span>
-        </div>
-        <div class="detail-item">
-          <label>当前速度：</label>
-          <span>{{ formatBytesPerSec(globalStats.speed) || '-' }}</span>
-        </div>
-        <div class="detail-item">
-          <label>平均速度：</label>
-          <span>{{ formatBytesPerSec(globalStats.speedAvg) || '-' }}</span>
-        </div>
-        <div class="detail-item">
-          <label>预计剩余时间：</label>
-          <span>{{ formatEta(globalStats.eta) || '-' }}</span>
-        </div>
-        <div class="detail-item">
-          <label>进度：</label>
-          <span>{{ globalStats.percentage !== undefined ? globalStats.percentage.toFixed(2) + '%' : '-' }}</span>
-        </div>
-        <div class="progress-bar-container">
-          <div class="progress-bar" :style="{ width: (globalStats.percentage || 0) + '%' }"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-
-
+  <GlobalStatsModal
+    :visible="showGlobalStatsModal"
+    :stats="globalStats"
+    :format-bytes="formatBytes"
+    :format-bytes-per-sec="formatBytesPerSec"
+    :format-eta="formatEta"
+    @close="showGlobalStatsModal = false"
+  />
 
   <!-- 确认删除弹窗 -->
-  <div v-if="confirmModal.show" class="modal-overlay" @click.self="closeConfirm()">
-    <div class="modal-content confirm-modal">
-      <div class="modal-header">
-        <h3>{{ confirmModal.title }}</h3>
-        <button class="close-btn" @click="closeConfirm()">×</button>
-      </div>
-      <div class="modal-body">
-        <p>{{ confirmModal.message }}</p>
-      </div>
-      <div class="modal-footer">
-        <button class="ghost" @click="closeConfirm()">取消</button>
-        <button class="primary danger" @click="confirmAndClose()">确认</button>
-      </div>
-    </div>
-  </div>
+  <ConfirmModal
+    :visible="confirmModal.show"
+    :title="confirmModal.title"
+    :message="confirmModal.message"
+    @close="closeConfirm()"
+    @confirm="confirmAndClose()"
+  />
 </template>
 
 <style scoped>
-.module-tabs {
-  display: flex;
-  gap: 8px;
-  padding: 16px 20px;
-}
-.tab-btn {
-  padding: 10px 24px;
-  border-radius: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--muted);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-.tab-btn:hover { background: var(--surface); color: var(--text); }
-.tab-btn.active { background: #1e3a5f; color: var(--accent); border-color: var(--accent-strong); }
-body.light .tab-btn { background: var(--surface); border-color: var(--border); color: var(--muted); }
-body.light .tab-btn:hover { background: #e8e8e8; color: var(--text); }
-body.light .tab-btn.active { background: #e3f2fd; color: var(--accent); border-color: #bbdefb; }
-.list-header {
-  display: flex;
-  justify-content: space-between;
-  padding: 10px 20px;
-  background: #252525;
-  font-size: 12px;
-  color: #888;
-  border-bottom: 1px solid #333;
-}
-body.light .list-header { background: #f5f5f5; color: #666; border-bottom: 1px solid #e0e0e0; }
-.list-header{ background:#0f172a; color:#cbd5e1; border-bottom:1px solid #334155 }
-.col-name { flex: 1; }
-.col-status { width: 80px; text-align: center; }
-.col-time { width: 150px; text-align: right; }
-.col-action { width: 80px; text-align: right; }
-.col-info { width: 120px; }
 /* 让卡片更宽松，展示 chips */
 .list .run-item { align-items:flex-start }
-.item {
-  display: flex;
-  align-items: center;
-  padding: 12px 20px;
-  border-bottom: 1px solid #252525;
-  gap: 12px;
-}
-body.light .item { border-color: #f0f0f0; }
-.item .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.status { width: 80px; padding: 4px 8px; border-radius: 6px; font-size: 12px; text-align: center; }
-.status.running { background: var(--accent); color: #fff; }
-.status.success { background: var(--success); color: #fff; }
-.status.failed { background: var(--danger); color: #fff; }
-.status.skipped { background: var(--warning); color: #fff; }
-.status.clickable { cursor: pointer; }
-.status.clickable:hover { opacity: 0.8; }
-.time { width: 150px; text-align: right; color: var(--muted); font-size: 13px; }
-.info { width: 120px; color: var(--muted); font-size: 13px; }
-.summary-mini { display:flex; gap:8px; flex-wrap:wrap; margin:6px 0; }
-.summary-mini .chip { padding:2px 8px; border-radius:999px; background:#1f2937; color:#e5e7eb; font-size:12px; border:1px solid #334155 }
-.summary-mini .chip.success{ background:#0a2f22; border-color:#14532d; color:#34d399 }
-.summary-mini .chip.failed{ background:#2b0a0a; border-color:#7f1d1d; color:#f87171 }
-.summary-mini .chip.other{ background:#2b1a04; border-color:#92400e; color:#fbbf24 }
-.summary-mini .chip.meta{ background:#111827; border-color:#374151; color:#cbd5e1 }
-.skipped-message{ padding:8px 12px; background:#fef3c7; border:1px solid #f59e0b; border-radius:6px; color:#92400e; font-size:13px; margin-bottom:8px; }
-body.light .skipped-message{ background:#fffbeb; color:#78350f; }
-.item-actions { display: flex; gap: 8px; }
-.danger-text { color: var(--danger) !important; }
 .form-content { padding: 20px; }
 .form-content .field-item { margin-bottom: 16px; }
 .form-content label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
@@ -1199,9 +666,6 @@ body.light .page-input{ background:#fff; color:#111827; border-color:#ddd }
 .chip .act{ color:#16a34a }
 .summary-val.est{ color:#ef4444 }
 .summary-val.act{ color:#16a34a }
-.trigger-row{ display:flex; align-items:center; gap:16px; flex-wrap:wrap }
-.trigger-opt{ display:inline-flex; align-items:center; gap:6px; cursor:pointer }
-.trigger-opt input{ width:16px; height:16px }
 /* 移动端强制列布局，彻底覆盖 global CSS */
 @media (max-width: 768px) {
   .task-main {

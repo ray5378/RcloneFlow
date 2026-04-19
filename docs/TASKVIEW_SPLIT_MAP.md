@@ -23,7 +23,12 @@
 - 但 `TaskView.vue` 仍然承担了页面主体的大量职责
 
 当前整体状态应理解为：
-> 已经打开拆分局面，但主页面仍未真正瘦身完成。
+> 已经打开拆分局面，并进入“页面装配层持续收平”的中后段；但主页面仍未真正瘦身完成。
+
+补充到当前进度：
+- `frontend/src/views/TaskView.vue` 当前约 **945 行**
+- 相比早前 1000+ 行阶段，脚本层已继续从“功能承载层”向“页面装配层”收口
+- 当前主要矛盾已不再是“关键主链完全没拆”，而是“页面顶层仍聚合了较多模块 wiring 与模板主骨架”
 
 ---
 
@@ -171,6 +176,45 @@
 后续方向：
 - 后续拆任务列表块时，把运行中展示联动进一步收口
 
+### C. 页面独立弹窗壳
+状态：**开始进入模板骨架低风险拆分**
+
+现状：
+- `frontend/src/components/task/GlobalStatsModal.vue` 已从 `TaskView.vue` 拆出并接回主链
+- 该弹窗属于纯展示型 modal，输入输出边界清晰，已验证可作为模板骨架低风险拆分的第一刀
+
+当前已拆出的独立弹窗壳：
+- `frontend/src/components/task/RunningHintModal.vue`
+- `frontend/src/components/task/RunDetailModal.vue`
+- `frontend/src/components/task/GlobalStatsModal.vue`
+- `frontend/src/components/task/RunLogModal.vue`
+- `frontend/src/components/task/SingletonConfigModal.vue`
+- `frontend/src/components/task/WebhookConfigModal.vue`
+- `frontend/src/components/task/ConfirmModal.vue`
+
+拆分经验：
+- 对这类 modal 壳，优先把模板和局部样式一起迁走，页面只保留 `visible` / 数据 props / `close` 事件接线
+- 这类块的风险明显低于任务列表主循环与表单主模板，适合作为从“脚本层收尾”过渡到“模板骨架拆分”的第一批目标
+
+### D. 轻量页面骨架壳
+状态：**持续推进中**
+
+现状：
+- 在独立 modal 壳基本收口后，已开始把更轻的页面骨架壳从 `TaskView.vue` 下沉
+- 当前已拆出 `frontend/src/components/task/TaskListHeader.vue`，承接“任务列表标题 + 搜索输入 + 添加按钮”这一层外壳
+- 当前已拆出 `frontend/src/components/task/TaskListPagination.vue`，承接任务列表分页区，但仍不触碰 `TaskCard v-for` 主循环
+- 当前已拆出 `frontend/src/components/task/TaskListSection.vue`，按“纯装配壳”方式承接 tasks 区的 header / list / empty / pagination
+- 当前已拆出 `frontend/src/components/task/TaskHistorySection.vue`，按“纯装配壳”方式承接 history 区的 `TaskHistoryPanel` + `RunDetailModal` 接线关系
+
+边界策略：
+- 先拆 header / toolbar / section 这类输入输出单纯、以页面装配为主的外壳
+- 暂不直接拆任务列表主循环、分页主块业务边界或 `AddTaskForm.vue` 模板
+
+当前进展补充：
+- `TaskCard v-for` 主循环行为边界保持不变，任务运行/编辑/删除/历史/webhook/singleton 等动作仍由页面外层原有逻辑提供，只做事件透传
+- history 区过滤、分页、日志、详情分页等业务链也保持原样，只把页面到面板 / 详情弹窗的连接层收进 section 壳
+- 页面内最后两块仍内联的辅助弹窗（webhook 配置 / 全局实时数据）也已重新切回 `WebhookConfigModal.vue` / `GlobalStatsModal.vue` 组件链，进一步减少了 `TaskView.vue` 模板内联块
+
 ---
 
 ## 4. 仍未拆的主块
@@ -218,6 +262,7 @@
 - `frontend/src/composables/useTaskHistoryComputed.ts`
 - `frontend/src/composables/useTaskHistoryLoader.ts`
 - `frontend/src/composables/useTaskHistoryActions.ts`
+- `frontend/src/composables/useTaskHistoryRuntime.ts`
 - `frontend/src/composables/useRunDetailComputed.ts`
 - `frontend/src/composables/useRunDetailFiles.ts`
 - `frontend/src/composables/useRunDetailState.ts`
