@@ -892,10 +892,6 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			"calcPct":       calcPct,
 		}
 
-		// 兼容字段：将当前稳态快照写入 stableProgress，供完成态/历史详情回看使用。
-		// 运行中 UI 主链应读取 progress；stableProgress 不应再被当作运行中主展示字段。
-		c.runSvc.UpdateRunStatus(run.ID, map[string]any{"stableProgress": stable})
-
 		item := map[string]any{
 			// progress: 运行中 UI 主字段
 			"runRecord": map[string]any{
