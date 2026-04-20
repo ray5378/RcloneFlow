@@ -144,6 +144,7 @@ function getProgressText(run: RunRecord): string {
 @import './listItemBase.css';
 @import './listItemMeta.css';
 @import './listItemActions.css';
+@import './listItemSpacing.css';
 
 .run-item {
   display: flex;

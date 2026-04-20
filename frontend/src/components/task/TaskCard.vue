@@ -86,7 +86,7 @@ function isStopped(): boolean {
 
 <template>
   <div class="task-card" :class="{ active: !!progress }" @click="emit('viewHistory', task.id!)">
-    <div class="task-main">
+    <div class="task-main list-item-primary-group">
       <div class="name list-item-name">
         <strong>{{ task.name }}</strong>
         <span class="mode-tag list-item-tag">{{ task.mode }}</span>
@@ -125,16 +125,16 @@ function isStopped(): boolean {
       </div>
     </div>
 
-    <div class="task-paths">
-      <div class="path-row">
+    <div class="task-paths list-item-secondary-group list-item-stack">
+      <div class="path-row list-item-row">
         <span class="path-label list-item-secondary-text">源:</span>
         <span class="path-value">{{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }}</span>
       </div>
-      <div class="path-row">
+      <div class="path-row list-item-row">
         <span class="path-label list-item-secondary-text">目标:</span>
         <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
       </div>
-      <div class="path-row">
+      <div class="path-row list-item-row">
         <span class="path-label list-item-secondary-text">进度:</span>
         <span class="path-value">{{ getProgressText() }}</span>
       </div>
@@ -149,6 +149,7 @@ function isStopped(): boolean {
 @import './listItemBase.css';
 @import './listItemMeta.css';
 @import './listItemActions.css';
+@import './listItemSpacing.css';
 
 .task-card.active {
   border-left: 3px solid var(--accent, #4f46e5);
@@ -157,7 +158,6 @@ function isStopped(): boolean {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
 }
 .name {
   gap: 8px;
@@ -181,16 +181,7 @@ function isStopped(): boolean {
   background: #666633;
   color: #999;
 }
-.task-paths {
-  margin-top: 8px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
 .path-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-size: 12px;
 }
 .path-label {
