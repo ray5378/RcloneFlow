@@ -341,11 +341,16 @@
   - 预加载 `golang:1.25-alpine`
   - 预加载 `alpine:3.19`
 
+### 当前执行规则
+- `third_party/*` 作为本地构建加速缓存，可以保留在工作目录中继续使用
+- 这些目录默认不再纳入 git 提交；若本地存在，应通过 `.gitignore` 忽略
+- GitHub 普通仓库不适合继续承载这类大缓存文件，尤其是 `third_party/docker/*.tar` 这类可能超过 100MB 的文件
+
 ### 后续剔除原则
 当以下条件满足时，应优先回收这套临时方案：
 - Docker 基础镜像拉取稳定
 - npm / Go / apk 镜像源稳定
-- 不再需要把大缓存文件长期保留在仓库中
+- 不再需要本地缓存优先来加速构建
 
 优先剔除顺序建议：
 1. `third_party/npm-cache/`
@@ -353,13 +358,7 @@
 3. `third_party/apk-cache/`
 4. `third_party/docker/*.tar`
 5. `Dockerfile` 中对应的临时本地缓存优先逻辑
-��缓存优先逻辑
-��
-
-优先剔除顺序建议：
-1. `third_party/npm-cache/`
-2. `third_party/go-mod-cache/`
-3. `third_party/apk-cache/`
+/`
 4. `third_party/docker/*.tar`
 5. `Dockerfile` 中对应的临时本地缓存优先逻辑
 ��缓存优先逻辑

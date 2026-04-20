@@ -43,3 +43,9 @@ data/
 frontend/dist/
 frontend/node_modules/
 frontend/package-lock.json
+
+# Local build acceleration caches (keep locally, do not commit)
+third_party/docker/
+third_party/npm-cache/
+third_party/go-mod-cache/
+third_party/apk-cache/
