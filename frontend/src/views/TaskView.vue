@@ -333,47 +333,24 @@ const {
     :next-tasks-page="() => { tasksPage++ }"
     :set-tasks-jump-page-value="setTasksJumpPageValue"
     :jump-to-tasks-page="jumpToTasksPage"
-  />
-
-  <WebhookConfigModal
-    :visible="showWebhookModal"
-    :trigger-id="webhookForm.triggerId"
-    :post-url="webhookForm.postUrl"
-    :wecom-url="(webhookForm as any).wecomUrl"
-    :notify-manual="webhookForm.notify.manual"
-    :notify-schedule="webhookForm.notify.schedule"
-    :notify-webhook="webhookForm.notify.webhook"
-    :status-success="(webhookForm as any).status.success"
-    :status-failed="(webhookForm as any).status.failed"
-    :can-test="!!webhookForm.postUrl || !!(webhookForm as any).wecomUrl"
-    @update:trigger-id="setWebhookTriggerId"
-    @update:post-url="setWebhookPostUrl"
-    @update:wecom-url="setWebhookWecomUrl"
-    @update:notify-manual="setWebhookNotifyManual"
-    @update:notify-schedule="setWebhookNotifySchedule"
-    @update:notify-webhook="setWebhookNotifyWebhook"
-    @update:status-success="setWebhookStatusSuccess"
-    @update:status-failed="setWebhookStatusFailed"
-    @save="saveWebhook"
-    @test="testWebhook"
-    @close="closeWebhookModal"
-  />
-
-  <!-- 单例模式配置弹窗 -->
-  <SingletonConfigModal
-    :visible="showSingletonModal"
-    :singleton-enabled="singletonForm.singletonEnabled"
-    @update:singleton-enabled="setSingletonEnabled"
-    @save="saveSingleton"
-    @close="closeSingletonModal"
-  />
-
-  <!-- 传输日志弹窗 -->
-  <RunLogModal
-    :visible="showLogModal"
-    :title="logModalTitle"
-    :content="logContent"
-    @close="closeLogModal"
+    :show-webhook-modal="showWebhookModal"
+    :webhook-form="webhookForm"
+    :set-webhook-trigger-id="setWebhookTriggerId"
+    :set-webhook-post-url="setWebhookPostUrl"
+    :set-webhook-wecom-url="setWebhookWecomUrl"
+    :set-webhook-notify-manual="setWebhookNotifyManual"
+    :set-webhook-notify-schedule="setWebhookNotifySchedule"
+    :set-webhook-notify-webhook="setWebhookNotifyWebhook"
+    :set-webhook-status-success="setWebhookStatusSuccess"
+    :set-webhook-status-failed="setWebhookStatusFailed"
+    :save-webhook="saveWebhook"
+    :test-webhook="testWebhook"
+    :close-webhook-modal="closeWebhookModal"
+    :show-singleton-modal="showSingletonModal"
+    :singleton-form="singletonForm"
+    :set-singleton-enabled="setSingletonEnabled"
+    :save-singleton="saveSingleton"
+    :close-singleton-modal="closeSingletonModal"
   />
 
   <TaskHistoryViewShell
