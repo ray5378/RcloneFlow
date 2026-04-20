@@ -12,9 +12,11 @@ export function useTaskProgressSync(options: {
   // 任务卡片完成态只保留一份冻结帧：
   // 1) active.progress 到 100% 时立即冻结；
   // 2) active 消失后继续沿用这同一帧；
-  // 3) 不再让 cardSummary 在任务卡片链路二次接管，避免 handoff 再抖一下。
+  // 3) 超过完成短窗口后清掉，不再继续显示进度条；
+  // 4) 不再引入第二份完成态摘要参与 handoff，避免二次抖动。
   const completedFreezeByTask: Record<number, any> = {}
   const refreshLocks: Record<number, boolean> = {}
+  const FINISH_WINDOW_MS = 15000
 
   function normalizeSummaryProgress(p: any) {
     if (!p || typeof p !== 'object') return null
@@ -83,7 +85,12 @@ export function useTaskProgressSync(options: {
       const normalizedActive = normalizeSummaryProgress(active.progress)
       const frozenActive = freezeCompletedProgress(normalizedActive || active.progress)
       if (frozenActive && Number(frozenActive.percentage || 0) >= 99.999) {
-        if (!completedFreezeByTask[taskId]) completedFreezeByTask[taskId] = { ...frozenActive }
+        if (!completedFreezeByTask[taskId]) {
+          completedFreezeByTask[taskId] = {
+            ...frozenActive,
+            __frozenAt: Date.now(),
+          }
+        }
         return completedFreezeByTask[taskId]
       }
       delete completedFreezeByTask[taskId]
@@ -92,9 +99,13 @@ export function useTaskProgressSync(options: {
 
     // 任务卡片不再在 finished 短窗口切到第二份完成态摘要。
     // 这样完成态只保留一份冻结帧，避免 active 消失后再次 handoff 造成二次抖动。
-    if (completedFreezeByTask[taskId]) return completedFreezeByTask[taskId]
+    const frozen = completedFreezeByTask[taskId]
+    if (frozen) {
+      const frozenAt = Number(frozen.__frozenAt || 0)
+      if (frozenAt > 0 && Date.now() - frozenAt <= FINISH_WINDOW_MS) return frozen
+      delete completedFreezeByTask[taskId]
+    }
 
-    delete completedFreezeByTask[taskId]
     const running = (options.runs.value || []).find((item: any) => {
       const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
       return candidateTaskId > 0 && candidateTaskId === Number(taskId) && item?.status === 'running'
