@@ -14,7 +14,6 @@ interface UseTaskViewDataSyncOptions {
   activeRuns: Ref<any[]>
   globalStats: Ref<any>
   showGlobalStatsModal: Ref<boolean>
-  lastRunningProgressByTask: Ref<Record<number, { sp: any; at: number }>>
   lastNonDecreasingTotalsByTask: Ref<Record<number, { totalBytes: number; totalCount: number }>>
   taskApi: { list: () => Promise<Task[]> }
   remoteApi: { list: () => Promise<{ remotes?: string[] }> }
@@ -61,7 +60,6 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   async function loadActiveRuns() {
     try {
       const data = await options.jobApi.list()
-      const now = Date.now()
       const list: any[] = (data || []).map((it: any) => {
         const raw: any = (it && typeof it.progress === 'object' && it.progress)
           ? { ...it.progress }
@@ -92,7 +90,6 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             totalCount: Math.max(prevTotals?.totalCount || 0, raw.totalCount || 0),
           }
           options.lastNonDecreasingTotalsByTask.value[tid] = nextTotals
-          options.lastRunningProgressByTask.value[tid] = { sp: raw, at: now }
         }
         it.progress = raw
         return it

@@ -81,9 +81,7 @@ const {
   globalStats,
   showGlobalStatsModal,
   activeRunLookup,
-  lastRunningProgressByTask,
   lastNonDecreasingTotalsByTask,
-  LINGER_MS,
   STUCK_MS,
 } = useTaskViewRuntimeState()
 

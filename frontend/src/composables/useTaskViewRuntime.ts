@@ -43,7 +43,6 @@ export function useTaskViewRuntime(options: {
     activeRuns: options.activeRuns,
     globalStats: options.globalStats,
     showGlobalStatsModal: options.showGlobalStatsModal,
-    lastRunningProgressByTask: options.lastRunningProgressByTask,
     lastNonDecreasingTotalsByTask: options.lastNonDecreasingTotalsByTask,
     taskApi: options.taskApi,
     remoteApi: options.remoteApi,
