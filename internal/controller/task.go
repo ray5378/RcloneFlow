@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -46,6 +47,10 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 		}
 		t, err := c.taskSvc.CreateTask(req)
 		if err != nil {
+			if errors.Is(err, service.ErrTaskNameExists) {
+				WriteJSON(w, 409, map[string]any{"error": err.Error()})
+				return
+			}
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
@@ -61,6 +66,10 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := c.taskSvc.UpdateTask(req.ID, req.Task); err != nil {
+			if errors.Is(err, service.ErrTaskNameExists) {
+				WriteJSON(w, 409, map[string]any{"error": err.Error()})
+				return
+			}
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}

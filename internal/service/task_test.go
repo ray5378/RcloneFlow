@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"rcloneflow/internal/store"
@@ -155,5 +156,59 @@ func TestMockTaskRunnerError(t *testing.T) {
 	_, err := runner.RunTask(context.Background(), 999, "copy", "local", "/src", "gdrive", "/dst", "manual")
 	if err != ErrTaskNotFound {
 		t.Errorf("expected ErrTaskNotFound, got %v", err)
+	}
+}
+
+func TestTaskService_CreateTask_RejectsDuplicateName(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	_, err = svc.CreateTask(store.Task{Name: "same-name", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("first CreateTask() error = %v", err)
+	}
+
+	_, err = svc.CreateTask(store.Task{Name: "same-name", Mode: "sync", SourceRemote: "src2", SourcePath: "/c", TargetRemote: "dst2", TargetPath: "/d"})
+	if err != ErrTaskNameExists {
+		t.Fatalf("expected ErrTaskNameExists, got %v", err)
+	}
+}
+
+func TestTaskService_UpdateTask_RejectsDuplicateName(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	first, err := svc.CreateTask(store.Task{Name: "task-a", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("CreateTask(first) error = %v", err)
+	}
+	second, err := svc.CreateTask(store.Task{Name: "task-b", Mode: "sync", SourceRemote: "src2", SourcePath: "/c", TargetRemote: "dst2", TargetPath: "/d"})
+	if err != nil {
+		t.Fatalf("CreateTask(second) error = %v", err)
+	}
+
+	err = svc.UpdateTask(second.ID, store.Task{Name: first.Name})
+	if err != ErrTaskNameExists {
+		t.Fatalf("expected ErrTaskNameExists, got %v", err)
 	}
 }

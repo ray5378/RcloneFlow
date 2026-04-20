@@ -32,6 +32,9 @@ func (s *TaskService) ListTasks() ([]store.Task, error) {
 
 // CreateTask 创建新任务
 func (s *TaskService) CreateTask(task store.Task) (store.Task, error) {
+	if err := s.ensureTaskNameUnique(task.Name, 0); err != nil {
+		return store.Task{}, err
+	}
 	return s.db.AddTask(task)
 }
 
@@ -63,7 +66,30 @@ func (s *TaskService) UpdateTask(id int64, task store.Task) error {
 	if len(task.Options) > 0 {
 		merged.Options = task.Options
 	}
+	if err := s.ensureTaskNameUnique(merged.Name, id); err != nil {
+		return err
+	}
 	return s.db.UpdateTask(id, merged)
+}
+
+func (s *TaskService) ensureTaskNameUnique(name string, excludeID int64) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return nil
+	}
+	tasks, err := s.db.ListTasks()
+	if err != nil {
+		return err
+	}
+	for _, task := range tasks {
+		if task.ID == excludeID {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(task.Name), trimmed) {
+			return ErrTaskNameExists
+		}
+	}
+	return nil
 }
 
 // UpdateTaskOptions 仅更新任务的 Options 字段（用于“传输选项”任务级覆盖）
