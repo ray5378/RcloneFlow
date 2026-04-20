@@ -65,6 +65,31 @@
 - 删除无效的 `queueApi` 包装和残留引用
 - 修复 `frontend/src/styles/global.css` 中缺失的 `}`
 
+### 5. TaskView / 壳组件拆分后的高频回归类型
+已确认并已修复过多轮，后续必须优先防回归：
+- barrel import 循环依赖（`from './'` / `from '../components/task'` / `from '../components/toast'`）会在压缩后表现为 `Cannot access 'Ir/Bl/... before initialization'`
+- `setup` 顶层先用后定义（TDZ）会在压缩后表现为同类 `before initialization` 错误
+- modal 下沉做一半会导致“按钮点击无反应”
+- modal 表单若直接读未初始化对象，会出现：
+  - `Cannot read properties of undefined (reading 'triggerId')`
+  - `Cannot set properties of undefined (setting 'manual'/'schedule'/...)`
+- `ref` 型表单对象若 setter 没写回 `.value`，会出现“看着改了、实际保存还是旧值”的假保存
+- `TaskView.vue` / `RunDetailModal.vue` / 其他大 SFC 在多轮 edit 后容易出现尾部模板/样式残片；遇到 `Invalid end tag.` 时优先整段回正，不做碎补
+
+### 6. 后端已清掉的一类真实残留债
+以下问题不是前端假象，而是后端真实残留，已修复，后续要防回归：
+- `runs.rc_job_id` 字段已从 schema 退场后，运行中接口 / 历史接口 / 强制停止链路里仍残留旧 SQL 查询
+- 当前要求：任何运行时 SQL 都不得再读取 `rc_job_id`；迁移 v1 历史定义可保留，但当前业务查询不允许再引用
+
+### 7. 日志清理链当前边界
+- 任务运行日志清理：已支持 `LOG_RETENTION_DAYS` 热更新，修改默认配置后无需重启即可重排并立刻执行一次清理
+- 程序日志清理：当前仍不算完整应用内能力；若 `LOG_OUTPUT` 走 stdout/stderr，应由 Docker / 宿主日志轮转负责
+- 现阶段不要把“任务运行日志清理正常”误解成“所有程序日志文件都已由应用统一自动清理”
+
+### 8. 删除任务的连带清理约定
+- 删除任务时，除数据库级联删除 task / schedules / runs 外，还应显式清理该任务关联 run 的 `summary.stderrFile`
+- 目标语义：`DeleteTask` = 删除任务 + 清理历史记录 + 清理关联运行日志文件 + 清空空日志目录壳
+
 ## 临时测试提速方案（后续应剔除）
 
 ### 当前临时方案目的
