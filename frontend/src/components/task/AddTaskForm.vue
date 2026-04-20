@@ -190,10 +190,8 @@ function onAdvancedToggleClick() {
         @update:model-value="Object.assign(createForm, $event)"
       />
 
-      <button type="button" class="ghost small" @click="onAdvancedToggleClick">
-        {{ localShowAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}
-      </button>
-      <div v-if="localShowAdvancedOptions" class="advanced-section">
+      <div class="advanced-section">
+        <div class="advanced-title">高级选项</div>
         <AdvancedOptions v-model="advancedOptionsModel" />
       </div>
 
@@ -242,10 +240,8 @@ body.light .path-browse { border-color:var(--border); background:var(--surface);
 .crumb { background: transparent; border: none; color: var(--accent); cursor: pointer; padding: 0; }
 .crumb.current { color: var(--text); font-weight: 600; cursor: default; }
 .path-list { max-height: 200px; overflow-y: auto; padding: 8px; }
-.advanced-details { margin-top: 12px; }
-.advanced-summary { list-style: none; cursor: pointer; user-select: none; display: inline-block; }
-.advanced-summary::-webkit-details-marker { display: none; }
 .advanced-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #333; }
+.advanced-title { font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 600; }
 body.light .advanced-section { border-top-color: #ddd; }
 .path-empty { padding: 20px; text-align: center; color: #666; font-size: 13px; }
 .form-actions { margin-top: 20px; }
