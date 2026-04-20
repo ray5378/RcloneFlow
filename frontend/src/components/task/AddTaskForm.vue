@@ -59,10 +59,29 @@ const showTargetPathInputModel = computed({
   set: (value: boolean) => emit('update:showTargetPathInput', value),
 })
 
-const showAdvancedOptionsModel = computed({
-  get: () => props.showAdvancedOptions,
-  set: (value: boolean) => emit('update:showAdvancedOptions', value),
+const localShowAdvancedOptions = ref(!!props.showAdvancedOptions)
+
+watch(
+  () => props.showAdvancedOptions,
+  (value) => {
+    localShowAdvancedOptions.value = !!value
+  }
+)
+
+const advancedOptionsModel = computed({
+  get: () => {
+    const raw = props.createForm?.options
+    return raw && typeof raw === 'object' ? raw : { enableStreaming: true }
+  },
+  set: (value: any) => {
+    props.createForm.options = value && typeof value === 'object' ? value : { enableStreaming: true }
+  },
 })
+
+function onAdvancedToggleClick() {
+  localShowAdvancedOptions.value = !localShowAdvancedOptions.value
+  emit('update:showAdvancedOptions', localShowAdvancedOptions.value)
+}
 </script>
 
 <template>
@@ -171,12 +190,12 @@ const showAdvancedOptionsModel = computed({
         @update:model-value="Object.assign(createForm, $event)"
       />
 
-      <details class="advanced-details" :open="localShowAdvancedOptions" @toggle="onAdvancedDetailsToggle">
-        <summary class="ghost small advanced-summary">{{ localShowAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}</summary>
-        <div class="advanced-section">
-          <AdvancedOptions v-model="advancedOptionsModel" />
-        </div>
-      </details>
+      <button type="button" class="ghost small" @click="onAdvancedToggleClick">
+        {{ localShowAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}
+      </button>
+      <div v-if="localShowAdvancedOptions" class="advanced-section">
+        <AdvancedOptions v-model="advancedOptionsModel" />
+      </div>
 
       <div class="form-actions">
         <button

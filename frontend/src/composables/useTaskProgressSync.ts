@@ -9,6 +9,7 @@ export function useTaskProgressSync(options: {
 }) {
   const lastDbFrameByRunId: Record<number, any> = {}
   const lastNonZeroSpeedByTask: Record<number, number> = {}
+  const completedFreezeByTask: Record<number, any> = {}
   const refreshLocks: Record<number, boolean> = {}
 
   function normalizeSummaryProgress(p: any) {
@@ -85,11 +86,15 @@ export function useTaskProgressSync(options: {
     const active = options.activeRunLookup.getActiveRunByTaskId(taskId)
     if (active?.progress) {
       const normalizedActive = normalizeSummaryProgress(active.progress)
-      return freezeCompletedProgress(normalizedActive || active.progress)
+      const frozenActive = freezeCompletedProgress(normalizedActive || active.progress)
+      if (frozenActive && Number(frozenActive.percentage || 0) >= 99.999) {
+        if (!completedFreezeByTask[taskId]) completedFreezeByTask[taskId] = { ...frozenActive }
+        return completedFreezeByTask[taskId]
+      }
+      delete completedFreezeByTask[taskId]
+      return frozenActive
     }
 
-    // 任务卡片只在“刚结束”的短窗口内读取 cardSummary，
-    // 用来平滑 running -> finished 切换瞬间；不能长期显示上一次完成任务的进度。
     const latest = (options.runs.value || []).find((item: any) => {
       const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
       return candidateTaskId > 0 && candidateTaskId === Number(taskId)
@@ -98,10 +103,14 @@ export function useTaskProgressSync(options: {
       const finishedAt = new Date(latest.finishedAt || latest?.summary?.finishedAt || 0).getTime()
       if (finishedAt > 0 && Date.now() - finishedAt <= 15000) {
         const cardSummary = getCardSummaryFromRun(latest)
-        if (cardSummary) return cardSummary
+        if (cardSummary) {
+          delete completedFreezeByTask[taskId]
+          return cardSummary
+        }
       }
     }
 
+    delete completedFreezeByTask[taskId]
     const running = (options.runs.value || []).find((item: any) => {
       const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
       return candidateTaskId > 0 && candidateTaskId === Number(taskId) && item?.status === 'running'
