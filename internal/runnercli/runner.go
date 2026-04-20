@@ -303,12 +303,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				finalSummary["durationSec"] = durSec
 				finalSummary["durationText"] = humanDuration(durSec)
 				finalSummary["result"] = "failed"
-				// 体量/均速
+				// 体量/均速：失败态 finalSummary 也只从 progress 读取
 				var prog map[string]any
 				if p, ok := rr.Summary["progress"].(map[string]any); ok {
 					prog = p
-				} else if sp, ok := rr.Summary["stableProgress"].(map[string]any); ok {
-					prog = sp
 				}
 				var bytes, total int64
 				if prog != nil {
