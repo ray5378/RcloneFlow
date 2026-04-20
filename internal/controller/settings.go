@@ -188,6 +188,7 @@ func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 }
 
 var ReplanCleanupHook func(intervalHours int, retentionDays int)
+var ReplanLogCleanupHook func(retentionDays int)
 
 func atoiDefault(s string, d int) int {
 	if s == "" {

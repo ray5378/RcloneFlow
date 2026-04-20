@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -18,6 +19,8 @@ type LogCleanupService struct {
 	interval      time.Duration
 	retentionDays int
 	stopCh        chan struct{}
+	replanCh      chan struct{}
+	mu            sync.RWMutex
 }
 
 func NewLogCleanupService(logsDir string, interval time.Duration, retentionDays int) *LogCleanupService {
@@ -27,12 +30,18 @@ func NewLogCleanupService(logsDir string, interval time.Duration, retentionDays 
 	if interval <= 0 {
 		interval = 24 * time.Hour
 	}
-	return &LogCleanupService{logsDir: logsDir, interval: interval, retentionDays: retentionDays, stopCh: make(chan struct{})}
+	return &LogCleanupService{
+		logsDir:       logsDir,
+		interval:      interval,
+		retentionDays: retentionDays,
+		stopCh:        make(chan struct{}),
+		replanCh:      make(chan struct{}, 1),
+	}
 }
 
 func (s *LogCleanupService) Start(ctx context.Context) {
-	logger.Info("启动日志清理服务", zap.String("logs_dir", s.logsDir), zap.Int("retention_days", s.retentionDays), zap.Duration("interval", s.interval))
-	ticker := time.NewTicker(s.interval)
+	logger.Info("启动日志清理服务", zap.String("logs_dir", s.logsDir), zap.Int("retention_days", s.getRetentionDays()), zap.Duration("interval", s.getInterval()))
+	ticker := time.NewTicker(s.getInterval())
 	defer ticker.Stop()
 
 	// 启动时先清理一次
@@ -41,6 +50,11 @@ func (s *LogCleanupService) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
+			s.cleanup()
+		case <-s.replanCh:
+			ticker.Stop()
+			ticker = time.NewTicker(s.getInterval())
+			logger.Info("日志清理计划已重排", zap.String("logs_dir", s.logsDir), zap.Int("retention_days", s.getRetentionDays()), zap.Duration("interval", s.getInterval()))
 			s.cleanup()
 		case <-s.stopCh:
 			logger.Info("停止日志清理服务")
@@ -54,9 +68,34 @@ func (s *LogCleanupService) Start(ctx context.Context) {
 
 func (s *LogCleanupService) Stop() { close(s.stopCh) }
 
+func (s *LogCleanupService) Replan(retentionDays int) {
+	s.mu.Lock()
+	if retentionDays > 0 {
+		s.retentionDays = retentionDays
+	}
+	s.mu.Unlock()
+	select {
+	case s.replanCh <- struct{}{}:
+	default:
+	}
+}
+
+func (s *LogCleanupService) getRetentionDays() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.retentionDays
+}
+
+func (s *LogCleanupService) getInterval() time.Duration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.interval
+}
+
 func (s *LogCleanupService) cleanup() {
+	retentionDays := s.getRetentionDays()
 	// 删除超出保留期的日志文件和空目录
-	cutoff := time.Now().AddDate(0, 0, -s.retentionDays)
+	cutoff := time.Now().AddDate(0, 0, -retentionDays)
 	deleted := 0
 
 	entries, err := os.ReadDir(s.logsDir)
@@ -108,7 +147,7 @@ func (s *LogCleanupService) cleanup() {
 		}
 	}
 	if deleted > 0 {
-		logger.Info("日志清理完成", zap.Int("deleted", deleted), zap.Int("retention_days", s.retentionDays))
+		logger.Info("日志清理完成", zap.Int("deleted", deleted), zap.Int("retention_days", retentionDays))
 	}
 }
 

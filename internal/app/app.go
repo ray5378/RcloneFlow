@@ -79,11 +79,17 @@ func Run(cfg *config.Config) error {
 	// 初始化路由
 	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl)
 
-	// 注入 settings → cleanup 重排钩子（在声明 cleanupSvc 之后再赋值）
+	// 注入 settings → cleanup 重排钩子（在声明服务之后再赋值）
 	var cleanupSvc *service.CleanupService
+	var logCleanupSvc *service.LogCleanupService
 	controller.ReplanCleanupHook = func(intervalHours int, retentionDays int) {
 		if cleanupSvc != nil {
 			cleanupSvc.Replan(intervalHours, retentionDays)
+		}
+	}
+	controller.ReplanLogCleanupHook = func(retentionDays int) {
+		if logCleanupSvc != nil {
+			logCleanupSvc.Replan(retentionDays)
 		}
 	}
 
@@ -110,8 +116,8 @@ func Run(cfg *config.Config) error {
 	if logRetention <= 0 {
 		logRetention = 7 // 默认7天
 	}
-	logCleanup := service.NewLogCleanupService(logsDir, 24*time.Hour, logRetention) // 每天检查一次
-	go logCleanup.Start(ctx)
+	logCleanupSvc = service.NewLogCleanupService(logsDir, 24*time.Hour, logRetention) // 每天检查一次
+	go logCleanupSvc.Start(ctx)
 
 	// 设置路由
 	mux := http.NewServeMux()
