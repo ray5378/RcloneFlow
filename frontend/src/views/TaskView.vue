@@ -32,11 +32,12 @@ import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 const { toasts, showToast } = useToastCenter()
 const { normalizeTaskOptions } = useTaskFormNormalize()
 
-// Set up global error handler for composables
+// 页面级错误统一走 toast，避免各个 composable 自己维护分散提示。
 setErrorHandler((message, type) => {
   showToast(message, type as 'info' | 'success' | 'error')
 })
 
+// 1) 基础页面状态
 const {
   tasks,
   schedules,
@@ -52,6 +53,7 @@ const {
   historyStatusFilter,
 } = useTaskViewState()
 
+// 2) 运行时状态（active runs / 全局统计）
 const {
   activeRuns,
   globalStats,
@@ -61,6 +63,7 @@ const {
   STUCK_MS,
 } = useTaskViewRuntimeState()
 
+// 3) 任务列表视图态
 const {
   tasksPage,
   tasksPageSize,
@@ -72,6 +75,7 @@ const {
   jumpToTasksPage,
 } = useTaskListView(tasks)
 
+// 4) 运行详情 / 最终总结链
 const {
   showDetailModal,
   runDetail,
@@ -100,9 +104,7 @@ const {
   jumpFinalFilesPage,
 } = useRunDetailRuntime({ runApi })
 
-const openRunLogFromHint = (run: any) => openRunLog(run)
-
-// 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度
+// 5) 主数据加载与展示计算
 const {
   runningHintVisible,
   runningHintRun,
@@ -154,6 +156,8 @@ const {
   jobApi,
 })
 
+// 6) 弹窗 / 辅助动作运行时
+// 7) 页面级 bridge：分页 / 返回 / 跳页
 const {
   setTaskSearch,
   setTasksJumpPageValue,
@@ -177,6 +181,7 @@ const {
   loadData,
 })
 
+// 8) 页面级 bridge：modal 字段绑定与开关态
 const {
   closeWebhookModal,
   closeSingletonModal,
@@ -279,6 +284,7 @@ const {
   parseRcloneCommand,
 })
 
+// 12) 历史列表运行时
 const {
   filteredRuns,
   currentTotal,
@@ -302,6 +308,7 @@ const {
   runApi,
 })
 
+// 13) 任务列表动作运行时
 const {
   deleteTask,
   toggleSchedule,
