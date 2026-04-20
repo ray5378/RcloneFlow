@@ -65,7 +65,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
       const list: any[] = (data || []).map((it: any) => {
         const raw: any = (it && typeof it.progress === 'object' && it.progress)
           ? { ...it.progress }
-          : ((it && typeof it.stableProgress === 'object' && it.stableProgress) ? { ...it.stableProgress } : null)
+          : null
         if (!raw) return it
         raw.bytes = Number(raw.bytes || 0)
         raw.totalBytes = Number(raw.totalBytes || 0)
@@ -169,7 +169,6 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             options.activeRuns.value[idx] = {
               ...cur,
               progress: nextProgress,
-              stableProgress: cur.stableProgress || nextProgress,
             }
             if (!nextProgress.completedFiles || !nextProgress.totalCount) {
               scheduleActiveRunsReload()

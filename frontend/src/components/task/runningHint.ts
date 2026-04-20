@@ -1,7 +1,7 @@
 import { formatBytes, formatBytesPerSec, formatEta } from '../../utils/format'
 
 export function getActiveProgress(active: any) {
-  return active?.progress || active?.stableProgress || null
+  return active?.progress || null
 }
 
 export function getActiveProgressText(active: any) {

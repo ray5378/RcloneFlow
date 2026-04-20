@@ -30,7 +30,6 @@ export function useTaskProgressSync(options: {
       if (tid > 0) {
         const active = options.activeRunLookup.getActiveRunByTaskId(tid)
         if (active?.progress) return active.progress
-        if (active?.stableProgress) return active.stableProgress
       }
     } catch {}
     return getDbProgressStable(run)

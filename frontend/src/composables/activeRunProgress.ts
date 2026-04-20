@@ -4,7 +4,6 @@ export function getDeNoisedStableByRun(run: any, getActiveRunByTaskId: (taskId: 
     if (tid) {
       const active = getActiveRunByTaskId(tid)
       if (active?.progress) return active.progress
-      if (active?.stableProgress) return active.stableProgress
     }
   } catch {}
   return getDbProgressStable(run)
@@ -12,7 +11,7 @@ export function getDeNoisedStableByRun(run: any, getActiveRunByTaskId: (taskId: 
 
 export function getDeNoisedStableByTask(taskId: number, getActiveRunByTaskId: (taskId: number) => any) {
   const active = getActiveRunByTaskId(taskId)
-  const raw = active?.progress || active?.stableProgress
+  const raw = active?.progress
   if (!raw) return null
   const st: any = { ...raw }
   st.bytes = Number(st.bytes || 0)
