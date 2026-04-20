@@ -2,116 +2,123 @@
 import { ref, onMounted } from 'vue'
 import { getSettings, saveSettings, resetSettings } from '../api/settings'
 
-const emit = defineEmits<{ (e: 'close'): void }>()
+const emit = defineEmits<{
+  (e: 'close'): void
+  (e: 'settings-saved', values: Record<string, string>): void
+}>()
 
 const loading = ref(true)
 const saving = ref(false)
 const saved = ref(false)
 const showResetConfirm = ref(false)
 const data = ref<any>(null)
-const form = ref<Record<string,string>>({})
-const errors = ref<Record<string,string>>({})
+const form = ref<Record<string, string>>({})
+const errors = ref<Record<string, string>>({})
 const saveFailed = ref(false)
 const durationRe = /^\s*\d+\s*(ms|s|m|h|d)\s*$/i
 
-function validate(){
+function validate() {
   errors.value = {}
-  // 数字字段 >=0（整数）
-  const intFields = ['FINAL_SUMMARY_RETENTION_DAYS','CLEANUP_INTERVAL_HOURS','WEBHOOK_MAX_FILES','LOG_RETENTION_DAYS']
-  for (const k of intFields){
+  const intFields = ['FINAL_SUMMARY_RETENTION_DAYS', 'CLEANUP_INTERVAL_HOURS', 'WEBHOOK_MAX_FILES', 'LOG_RETENTION_DAYS']
+  for (const k of intFields) {
     const v = (form.value as any)[k]
-    if (v!=='' && (isNaN(Number(v)) || !Number.isFinite(Number(v)) || Number(v) < 0)){
+    if (v !== '' && (isNaN(Number(v)) || !Number.isFinite(Number(v)) || Number(v) < 0)) {
       errors.value[k] = '请输入大于或等于 0 的数字'
     }
   }
-  // MB 字段单独校验，可小数
-  const mb = (form.value as any)['PROGRESS_FLUSH_MIN_DELTA_BYTES']
-  if (mb!=='' && (isNaN(Number(mb)) || Number(mb) < 0)){
-    errors.value['PROGRESS_FLUSH_MIN_DELTA_BYTES'] = '请输入大于或等于 0 的数字（单位：MB，可小数）'
+  const mb = (form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES
+  if (mb !== '' && (isNaN(Number(mb)) || Number(mb) < 0)) {
+    errors.value.PROGRESS_FLUSH_MIN_DELTA_BYTES = '请输入大于或等于 0 的数字（单位：MB，可小数）'
   }
-  // 百分比 0-100
-  const pct = (form.value as any)['PROGRESS_FLUSH_MIN_DELTA_PCT']
-  if (pct!=='' && (isNaN(Number(pct)) || Number(pct) < 0 || Number(pct) > 100)){
-    errors.value['PROGRESS_FLUSH_MIN_DELTA_PCT'] = '请输入 0-100 之间的数字（可带小数）'
+  const pct = (form.value as any).PROGRESS_FLUSH_MIN_DELTA_PCT
+  if (pct !== '' && (isNaN(Number(pct)) || Number(pct) < 0 || Number(pct) > 100)) {
+    errors.value.PROGRESS_FLUSH_MIN_DELTA_PCT = '请输入 0-100 之间的数字（可带小数）'
   }
-  // 时长字段
-  const durFields = ['ACCESS_TOKEN_TTL','REFRESH_TOKEN_TTL','PROGRESS_FLUSH_INTERVAL','FINISH_WAIT_INTERVAL','FINISH_WAIT_TIMEOUT']
-  for (const k of durFields){
+  const durFields = ['ACCESS_TOKEN_TTL', 'REFRESH_TOKEN_TTL', 'PROGRESS_FLUSH_INTERVAL', 'FINISH_WAIT_INTERVAL', 'FINISH_WAIT_TIMEOUT']
+  for (const k of durFields) {
     const v = (form.value as any)[k]
-    if (v && !durationRe.test(String(v))){
+    if (v && !durationRe.test(String(v))) {
       errors.value[k] = '格式应为 数字+单位（ms/s/m/h/d），例如：5s、24h、90d'
     }
   }
   return Object.keys(errors.value).length === 0
 }
 
-function flat(resp:any){
-  const out:Record<string,string> = {}
-  const patch = (grp:any)=>{ Object.keys(grp||{}).forEach(k=> out[k] = grp[k]?.effective??'') }
-  patch(resp.auth); patch(resp.log); patch(resp.history); patch(resp.precheck); patch(resp.progress); patch(resp.webdav); patch(resp.webhook)
+function flat(resp: any) {
+  const out: Record<string, string> = {}
+  const patch = (grp: any) => { Object.keys(grp || {}).forEach(k => out[k] = grp[k]?.effective ?? '') }
+  patch(resp.auth)
+  patch(resp.log)
+  patch(resp.history)
+  patch(resp.precheck)
+  patch(resp.progress)
+  patch(resp.webdav)
+  patch(resp.webhook)
   return out
 }
 
-async function load(){
+async function load() {
   loading.value = true
-  try{
-    const resp = await getSettings();
-    data.value = resp;
-    form.value = flat(resp);
-    // 将字节转为 MB（保留两位小数显示）
+  try {
+    const resp = await getSettings()
+    data.value = resp
+    form.value = flat(resp)
     const b = Number((form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES || 0)
-    if (!isNaN(b) && isFinite(b) && b>0){
-      (form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES = String(Math.round((b/1048576)*100)/100)
+    if (!isNaN(b) && isFinite(b) && b > 0) {
+      ;(form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES = String(Math.round((b / 1048576) * 100) / 100)
     }
-  } finally { loading.value=false }
+  } finally {
+    loading.value = false
+  }
 }
 
-async function onSave(){
+async function onSave() {
   if (!validate()) return
-  // 将 MB 转回字节提交
-  // 统一把所有字段转成字符串，避免后端 map[string]string 丢键
-  const payload: Record<string,string> = {}
+  const payload: Record<string, string> = {}
   Object.keys(form.value).forEach(k => {
     const v = (form.value as any)[k]
     payload[k] = v === undefined || v === null ? '' : String(v)
   })
-  // 将 MB 转回字节提交
   const mb = Number(payload.PROGRESS_FLUSH_MIN_DELTA_BYTES)
-  if (!isNaN(mb) && isFinite(mb) && mb>=0){
+  if (!isNaN(mb) && isFinite(mb) && mb >= 0) {
     payload.PROGRESS_FLUSH_MIN_DELTA_BYTES = String(Math.round(mb * 1048576))
   }
   saving.value = true
   saveFailed.value = false
-  try{
+  try {
     await saveSettings(payload)
     await load()
+    emit('settings-saved', { ...form.value })
     saved.value = true
-    setTimeout(()=>{ saved.value=false }, 10000)
-  } catch(e:any){
+    setTimeout(() => { saved.value = false }, 10000)
+  } catch (e: any) {
     console.error(e)
     saveFailed.value = true
-    setTimeout(()=>{ saveFailed.value=false }, 3000)
+    setTimeout(() => { saveFailed.value = false }, 3000)
   } finally {
-    saving.value=false
+    saving.value = false
   }
 }
 
-function onSavedClick(){
+function onSavedClick() {
   if (saved.value) emit('close')
 }
-async function onReset(){
+
+async function onReset() {
   showResetConfirm.value = true
 }
-async function doConfirmReset(){
+
+async function doConfirmReset() {
   saving.value = true
-  try{
+  try {
     await resetSettings()
     await load()
+    emit('settings-saved', { ...form.value })
     saved.value = true
-    setTimeout(()=>{ saved.value=false }, 10000)
-  }catch(e:any){
-    alert(e?.message||e)
-  }finally{
+    setTimeout(() => { saved.value = false }, 10000)
+  } catch (e: any) {
+    alert(e?.message || e)
+  } finally {
     saving.value = false
     showResetConfirm.value = false
   }
@@ -213,18 +220,16 @@ onMounted(load)
             </select>
           </div>
         </div>
-
-        <!-- 文件管理后端固定：浏览=RC，操作=CLI；此处不再暴露切换选项 -->
-
       </div>
       <div class="modal-footer">
         <button class="ghost" @click="onReset" :disabled="saving">重置为默认</button>
-        <button :class="['primary', { saved: saved, failed: saveFailed }]" @click="saved ? onSavedClick() : onSave()" :disabled="saving">{{ saved ? '已保存生效' : (saveFailed ? '保存失败' : '保存') }}</button>
+        <button :class="['primary', { saved: saved, failed: saveFailed }]" @click="saved ? onSavedClick() : onSave()" :disabled="saving">
+          {{ saved ? '已保存生效' : (saveFailed ? '保存失败' : '保存') }}
+        </button>
       </div>
     </div>
   </div>
 
-  <!-- 确认重置弹窗（与现有确认风格对齐） -->
   <div v-if="showResetConfirm" class="modal-overlay" @click.self="showResetConfirm=false">
     <div class="modal-content confirm-modal">
       <div class="modal-header">
@@ -243,13 +248,13 @@ onMounted(load)
 </template>
 
 <style scoped>
-.modal-content.large{ max-width: 720px; width: 92vw; }
-.section{ margin-bottom: 16px; }
-.section-title{ font-weight: 700; margin-bottom: 8px; color: var(--text) }
-.grid{ display:grid; grid-template-columns: 220px 1fr; gap: 8px 12px }
-input, select{ padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text) }
-.subkey{opacity:.6;margin-left:6px;font-weight:400;color:var(--muted)}
-.modal-footer .primary.saved{ background: var(--success); color:#fff; border:none }
-.modal-footer .primary.failed{ background: var(--danger); color:#fff; border:none }
-.error{ color: var(--danger); font-size:12px; margin-top:4px }
+.modal-content.large { max-width: 720px; width: 92vw; }
+.section { margin-bottom: 16px; }
+.section-title { font-weight: 700; margin-bottom: 8px; color: var(--text); }
+.grid { display: grid; grid-template-columns: 220px 1fr; gap: 8px 12px; }
+input, select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
+.subkey { opacity: .6; margin-left: 6px; font-weight: 400; color: var(--muted); }
+.modal-footer .primary.saved { background: var(--success); color: #fff; border: none; }
+.modal-footer .primary.failed { background: var(--danger); color: #fff; border: none; }
+.error { color: var(--danger); font-size: 12px; margin-top: 4px; }
 </style>

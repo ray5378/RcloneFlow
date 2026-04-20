@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed } from 'vue'
+import { ref, onMounted, reactive } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
 import LoginView from './views/LoginView.vue'
@@ -9,7 +9,7 @@ import * as api from './api'
 import { getSettings } from './api/settings'
 import { isLoggedIn as checkAuth, getUser, logout, changePassword } from './api/auth'
 
-const currentPage = ref(localStorage.getItem('currentPage') || (location.hash.replace('#','')||'browser'))
+const currentPage = ref(localStorage.getItem('currentPage') || (location.hash.replace('#','') || 'browser'))
 const taskViewKey = ref(0)
 const version = ref('加载中...')
 const isLight = ref(localStorage.getItem('theme') === 'light')
@@ -27,7 +27,7 @@ const passwordForm = reactive({
   username: user?.username || '',
   oldPassword: '',
   newPassword: '',
-  confirmPassword: ''
+  confirmPassword: '',
 })
 
 const pages: Record<string, { name: string; icon: string }> = {
@@ -35,7 +35,6 @@ const pages: Record<string, { name: string; icon: string }> = {
   tasks: { name: '任务', icon: '📋' },
 }
 
-// 检测是否移动端
 const isMobile = ref(false)
 function checkMobile() {
   isMobile.value = window.innerWidth <= 768
@@ -45,9 +44,7 @@ function switchPage(page: string) {
   currentPage.value = page
   localStorage.setItem('currentPage', page)
   location.hash = page
-  if (page === 'tasks') {
-    taskViewKey.value++
-  }
+  if (page === 'tasks') taskViewKey.value++
   showMobileMenu.value = false
 }
 
@@ -69,6 +66,10 @@ async function loadRuntimeSettings() {
   } catch {
     runningHintDebugEnabled.value = false
   }
+}
+
+function handleDefaultsSaved(values: Record<string, string>) {
+  runningHintDebugEnabled.value = String(values.RUNNING_HINT_DEBUG_ENABLED || 'false') === 'true'
 }
 
 async function handleLoginSuccess() {
@@ -114,14 +115,10 @@ function openGitHub() {
 }
 
 onMounted(async () => {
-  if (isLight.value) {
-    document.body.classList.add('light')
-  }
+  if (isLight.value) document.body.classList.add('light')
 
-  const hash = (location.hash || '').replace('#','')
-  if (hash && ['browser','tasks'].includes(hash)) {
-    currentPage.value = hash
-  }
+  const hash = (location.hash || '').replace('#', '')
+  if (hash && ['browser', 'tasks'].includes(hash)) currentPage.value = hash
 
   isAuth.value = checkAuth()
   authChecked.value = true
@@ -129,9 +126,7 @@ onMounted(async () => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
 
-  if (!isAuth.value) {
-    return
-  }
+  if (!isAuth.value) return
 
   try {
     const data = await api.listRemotes()
@@ -293,7 +288,11 @@ onMounted(async () => {
         </div>
       </div>
 
-      <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal=false" />
+      <DefaultsModal
+        v-if="showDefaultsModal"
+        @close="showDefaultsModal = false"
+        @settings-saved="handleDefaultsSaved"
+      />
     </template>
   </div>
 </template>
