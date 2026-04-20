@@ -23,7 +23,6 @@ export function useRunDetailRuntime(options: {
 
   const {
     getFinalSummary,
-    getPreflight,
     finalFiles,
     finalCountAll,
     finalCountSuccess,
@@ -51,7 +50,6 @@ export function useRunDetailRuntime(options: {
     goPrevFilesPage,
     goNextFilesPage,
     getFinalSummary,
-    getPreflight,
     finalFiles,
     finalCountAll,
     finalCountSuccess,

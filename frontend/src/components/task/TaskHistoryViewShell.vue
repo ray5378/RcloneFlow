@@ -85,7 +85,6 @@ defineProps<{
     :run-detail="runDetail"
     :get-status-class="getStatusClass"
     :get-status-text="getStatusText"
-    :get-preflight="getPreflightFromComposable"
     :format-bytes="formatBytes"
     :format-time="formatTime"
     :format-bps="formatBps"

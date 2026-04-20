@@ -93,7 +93,7 @@ func TestHandleActiveRuns_UsesProgressAndExposesDebugFields(t *testing.T) {
 	}
 }
 
-func TestHandleActiveRuns_PrefersPreflightTotalsWhenProgressTotalsRegress(t *testing.T) {
+func TestHandleActiveRuns_UsesProgressTotalsOnly(t *testing.T) {
 	summary := map[string]any{
 		"progress": map[string]any{
 			"bytes":          float64(100),
@@ -133,14 +133,14 @@ func TestHandleActiveRuns_PrefersPreflightTotalsWhenProgressTotalsRegress(t *tes
 	if prog == nil {
 		t.Fatalf("missing progress")
 	}
-	if got := int(prog["totalBytes"].(float64)); got != 1024 {
-		t.Fatalf("totalBytes=%d, want 1024", got)
+	if got := int(prog["totalBytes"].(float64)); got != 300 {
+		t.Fatalf("totalBytes=%d, want 300", got)
 	}
-	if got := int(prog["totalCount"].(float64)); got != 166 {
-		t.Fatalf("totalCount=%d, want 166", got)
+	if got := int(prog["totalCount"].(float64)); got != 33 {
+		t.Fatalf("totalCount=%d, want 33", got)
 	}
-	if got := prog["percentage"].(float64); got < 9.7 || got > 9.8 {
-		t.Fatalf("percentage=%v, want about 9.76", got)
+	if got := prog["percentage"].(float64); got < 9.9 || got > 10.1 {
+		t.Fatalf("percentage=%v, want about 10", got)
 	}
 }
 

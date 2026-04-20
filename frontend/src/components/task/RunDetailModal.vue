@@ -97,10 +97,6 @@ function onFinalFilesJumpInput(event: Event) {
                 <div class="summary-key">其他</div>
                 <div class="summary-val">{{ finalCountOther }}</div>
               </div>
-              <div class="summary-cell" v-if="getPreflight(runDetail)">
-                <div class="summary-key">总体积</div>
-                <div class="summary-val est">{{ formatBytes(getPreflight(runDetail).totalBytes || 0) }}</div>
-              </div>
               <div class="summary-cell">
                 <div class="summary-key">已传输体积</div>
                 <div class="summary-val act">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>

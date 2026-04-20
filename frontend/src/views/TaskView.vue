@@ -377,7 +377,6 @@ const {
     :run-detail="runDetail"
     :get-status-class="getStatusClass"
     :get-status-text="getStatusText"
-    :get-preflight-from-composable="getPreflightFromComposable"
     :format-bytes="formatBytes"
     :format-time="formatTime"
     :format-bps="formatBps"

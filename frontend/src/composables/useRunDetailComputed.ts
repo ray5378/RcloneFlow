@@ -20,15 +20,6 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
     return null
   }
 
-  function getPreflight(run: any) {
-    try {
-      const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
-      return sum?.preflight || null
-    } catch {
-      return null
-    }
-  }
-
   const finalFiles = computed(() => {
     if (!options?.runDetail) return [] as any[]
     return (getFinalSummary(options.runDetail.value)?.files || []) as any[]
@@ -82,7 +73,6 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
 
   return {
     getFinalSummary,
-    getPreflight,
     finalFilesPage,
     finalFilesPageSize,
     finalFiles,

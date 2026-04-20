@@ -88,7 +88,6 @@ const emit = defineEmits<{
     :get-status-class="getStatusClass"
     :get-status-text="getStatusText"
     :get-final-summary="getFinalSummary"
-    :get-preflight="getPreflight"
     :format-bytes="formatBytes"
     :format-time="formatTime"
     :format-bps="formatBps"
