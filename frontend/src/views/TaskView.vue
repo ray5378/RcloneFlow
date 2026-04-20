@@ -173,7 +173,6 @@ const {
   lastRunningProgressByTask,
   lastNonDecreasingTotalsByTask,
   currentModule,
-  lingerMs: LINGER_MS,
   stuckMs: STUCK_MS,
   taskApi,
   remoteApi,

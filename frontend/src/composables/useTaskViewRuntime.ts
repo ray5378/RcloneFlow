@@ -19,7 +19,6 @@ export function useTaskViewRuntime(options: {
   lastRunningProgressByTask: Ref<Record<number, { sp: any; at: number }>>
   lastNonDecreasingTotalsByTask: Ref<Record<number, { totalBytes: number; totalCount: number }>>
   currentModule: Ref<'history' | 'add' | 'tasks'>
-  lingerMs: number
   stuckMs: number
   taskApi: { list: () => Promise<Task[]> }
   remoteApi: { list: () => Promise<{ remotes?: string[] }> }
@@ -66,10 +65,8 @@ export function useTaskViewRuntime(options: {
     runs: options.runs,
     activeRuns: options.activeRuns,
     activeRunLookup: options.activeRunLookup,
-    lastRunningProgressByTask: options.lastRunningProgressByTask,
     loadData,
     loadActiveRuns,
-    lingerMs: options.lingerMs,
   })
 
   useTaskViewRefreshLifecycle({

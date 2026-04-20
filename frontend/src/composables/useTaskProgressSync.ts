@@ -4,10 +4,8 @@ export function useTaskProgressSync(options: {
   runs: Ref<any[]>
   activeRuns: Ref<any[]>
   activeRunLookup: { getActiveRunByTaskId: (taskId: number) => any }
-  lastRunningProgressByTask: Ref<Record<number, { sp: any; at: number }>>
   loadData: () => Promise<void>
   loadActiveRuns: () => Promise<void>
-  lingerMs: number
 }) {
   const lastDbFrameByRunId: Record<number, any> = {}
   const lastNonZeroSpeedByTask: Record<number, number> = {}
