@@ -39,15 +39,6 @@ export function useTaskProgressSync(options: {
     return frozen
   }
 
-  function getCardSummaryFromRun(run: any) {
-    try {
-      const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
-      const normalized = normalizeSummaryProgress(sum?.cardSummary)
-      return freezeCompletedProgress(normalized)
-    } catch {}
-    return null
-  }
-
   function getLiveSummaryFromDB(run: any) {
     try {
       const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
@@ -95,23 +86,9 @@ export function useTaskProgressSync(options: {
       return frozenActive
     }
 
-    const latest = (options.runs.value || []).find((item: any) => {
-      const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
-      return candidateTaskId > 0 && candidateTaskId === Number(taskId)
-    })
-    if (latest && latest.status === 'finished') {
-      const finishedAt = new Date(latest.finishedAt || latest?.summary?.finishedAt || 0).getTime()
-      if (finishedAt > 0 && Date.now() - finishedAt <= 15000) {
-        // handoff 阶段优先沿用之前冻结好的同一帧；
-        // 只有此前没冻结过，才回退使用完成态 cardSummary 补一份。
-        if (completedFreezeByTask[taskId]) return completedFreezeByTask[taskId]
-        const cardSummary = getCardSummaryFromRun(latest)
-        if (cardSummary) {
-          completedFreezeByTask[taskId] = { ...cardSummary }
-          return completedFreezeByTask[taskId]
-        }
-      }
-    }
+    // 任务卡片不再在 finished 短窗口切到 cardSummary。
+    // 这样完成态只保留一份冻结帧，避免 active 消失后再次 handoff 造成二次抖动。
+    if (completedFreezeByTask[taskId]) return completedFreezeByTask[taskId]
 
     delete completedFreezeByTask[taskId]
     const running = (options.runs.value || []).find((item: any) => {
