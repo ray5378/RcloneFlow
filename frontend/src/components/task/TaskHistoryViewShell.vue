@@ -79,7 +79,7 @@ defineProps<{
     :history-filter-task-id="historyFilterTaskId"
     :history-status-filter="historyStatusFilter"
     :filtered-runs="filteredRuns"
-    :get-db-progress-stable="getRealtimeProgressByRun"
+    :get-run-progress-from-summary="getRunProgressFromSummary"
     :get-final-summary="getFinalSummaryFromComposable"
     :show-detail-modal="showDetailModal"
     :run-detail="runDetail"
@@ -142,4 +142,3 @@ defineProps<{
     @open-log="openRunningHintLog"
   />
 </template>
-plate>
