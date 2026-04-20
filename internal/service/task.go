@@ -125,16 +125,20 @@ func (s *TaskService) DeleteTask(id int64) error {
 	if err != nil {
 		return err
 	}
+
+	logDirs := make(map[string]struct{})
 	for _, run := range runs {
 		if run.Summary == nil {
 			continue
 		}
 		if p, ok := run.Summary["stderrFile"].(string); ok && p != "" {
 			_ = os.Remove(p)
-			dir := filepath.Dir(p)
-			if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
-				_ = os.Remove(dir)
-			}
+			logDirs[filepath.Dir(p)] = struct{}{}
+		}
+	}
+	for dir := range logDirs {
+		if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
+			_ = os.Remove(dir)
 		}
 	}
 	return s.db.DeleteTask(id)

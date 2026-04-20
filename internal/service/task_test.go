@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"rcloneflow/internal/store"
@@ -210,5 +211,63 @@ func TestTaskService_UpdateTask_RejectsDuplicateName(t *testing.T) {
 	err = svc.UpdateTask(second.ID, store.Task{Name: first.Name})
 	if err != ErrTaskNameExists {
 		t.Fatalf("expected ErrTaskNameExists, got %v", err)
+	}
+}
+
+func TestTaskService_DeleteTask_RemovesAllKnownRunLogs(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	task, err := svc.CreateTask(store.Task{Name: "task-log-clean", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	logDir := filepath.Join(tmpDir, "logs", "task-log-clean-0421")
+	if err := os.MkdirAll(logDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	log1 := filepath.Join(logDir, "0001.log")
+	log2 := filepath.Join(logDir, "0002.log")
+	if err := os.WriteFile(log1, []byte("one"), 0o644); err != nil {
+		t.Fatalf("WriteFile(log1) error = %v", err)
+	}
+	if err := os.WriteFile(log2, []byte("two"), 0o644); err != nil {
+		t.Fatalf("WriteFile(log2) error = %v", err)
+	}
+
+	_, err = db.AddRun(store.Run{TaskID: task.ID, Status: "finished", Trigger: "manual", Summary: map[string]any{"stderrFile": log1}})
+	if err != nil {
+		t.Fatalf("AddRun(log1) error = %v", err)
+	}
+	_, err = db.AddRun(store.Run{TaskID: task.ID, Status: "finished", Trigger: "manual", Summary: map[string]any{"stderrFile": log2}})
+	if err != nil {
+		t.Fatalf("AddRun(log2) error = %v", err)
+	}
+
+	if err := svc.DeleteTask(task.ID); err != nil {
+		t.Fatalf("DeleteTask() error = %v", err)
+	}
+	if _, err := os.Stat(log1); !os.IsNotExist(err) {
+		t.Fatalf("expected log1 removed, got err=%v", err)
+	}
+	if _, err := os.Stat(log2); !os.IsNotExist(err) {
+		t.Fatalf("expected log2 removed, got err=%v", err)
+	}
+	if _, err := os.Stat(logDir); !os.IsNotExist(err) {
+		t.Fatalf("expected empty log dir removed, got err=%v", err)
+	}
+	if _, ok := db.GetTask(task.ID); ok {
+		t.Fatal("expected task deleted")
 	}
 }
