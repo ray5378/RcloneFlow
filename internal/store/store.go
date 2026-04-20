@@ -517,7 +517,7 @@ func (db *DB) ListRunsByTask(taskID int64) ([]Run, error) {
 	defer db.mu.RUnlock()
 
 	rows, err := db.db.Query(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
 		FROM runs WHERE task_id = ? ORDER BY id DESC LIMIT 100`, taskID)
 	if err != nil {
