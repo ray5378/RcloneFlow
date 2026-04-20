@@ -102,6 +102,8 @@ export function useTaskProgressSync(options: {
     if (latest && latest.status === 'finished') {
       const finishedAt = new Date(latest.finishedAt || latest?.summary?.finishedAt || 0).getTime()
       if (finishedAt > 0 && Date.now() - finishedAt <= 15000) {
+        // handoff 阶段优先沿用之前冻结好的同一帧；
+        // 只有此前没冻结过，才回退使用完成态 cardSummary 补一份。
         if (completedFreezeByTask[taskId]) return completedFreezeByTask[taskId]
         const cardSummary = getCardSummaryFromRun(latest)
         if (cardSummary) {
