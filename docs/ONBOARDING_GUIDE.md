@@ -62,7 +62,7 @@
 当前几条最关键的约束：
 - `dev -> master` 是固定主线流程
 - 运行中 UI 主真源是 `/api/runs/active.progress`
-- `stableProgress` 不再作为运行中主展示真源
+- 运行中主展示真源固定为 `progress`，任务卡片结束态过渡使用 `cardSummary`
 - `preflight` 保留预估语义，不直接驱动运行中主展示
 - 高风险改动优先小步推进、每步停测
 

@@ -25,7 +25,7 @@
 
 字段语义：
 - `progress`：运行中的实时进度（live frame），是运行中 UI 主数据源
-- `stableProgress`：兼容字段 / 完成态固化，不应再作为运行中主数据源
+- `cardSummary`：任务卡片结束态短窗口字段，不参与运行中主链
 - `preflight`：已从任务卡片主数据链、`/api/runs/active` 兜底链、运行详情主展示链退场，不再参与总量 / 总数 / 百分比主数据计算
 
 当前 active runs 调试字段：
@@ -83,12 +83,12 @@
 
 ### 2.3 运行中进度链来源混乱
 根因：
-- 前端曾对 `stableProgress` 做二次拼接
-- 后端和前端都存在 `progress / stableProgress / preflight` 混用
+- 前端曾对完成态/过渡态字段做二次拼接
+- 后端和前端都存在 `progress / cardSummary / finalSummary / preflight` 语义混用
 
 现状：
 - 运行中主展示已统一优先使用 `progress`
-- `stableProgress` 仅保留兼容 / 完成态固化
+- 当前代码已删除 `stableProgress`，由 `cardSummary` + `finalSummary` 分担完成态职责
 - `preflight` 已从主展示链退场
 
 ### 2.4 前端 build warning
@@ -197,7 +197,7 @@
 
 目标：
 - 在接口类型、注释、文档中继续强化语义约束
-- 尽量限制运行中页面直接接触 `stableProgress`
+- 严格限制运行中页面只接触 `progress`，不要混入 `cardSummary` / `finalSummary`
 - 降低后续维护者误用兼容字段的风险
 
 #### 4.3 旧 runner 路径已完成清理
@@ -302,3 +302,4 @@
 3. `third_party/apk-cache/`
 4. `third_party/docker/*.tar`
 5. `Dockerfile` 中对应的临时本地缓存优先逻辑
+��缓存优先逻辑

@@ -37,7 +37,7 @@
 ### 2.2 继续收敛运行中进度链注释与契约
 优先方向：
 - 在关键代码旁补充更靠近实现的注释
-- 继续减少 `progress / stableProgress / preflight` 被误用的机会
+- 继续减少 `progress / cardSummary / finalSummary / preflight` 被误用的机会
 
 ### 2.3 清理旧 runner 误导路径
 优先方向：

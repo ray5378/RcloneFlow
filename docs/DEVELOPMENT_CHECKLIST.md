@@ -183,7 +183,7 @@
 只要碰运行中显示、ETA、总量、总数、小窗、任务卡片，就优先复查这几条：
 
 - [ ] 运行中 UI 主数据源仍是 `/api/runs/active.progress`
-- [ ] 没把 `stableProgress` 重新拉回运行中主展示
+- [ ] 没把任务卡片结束态过渡重新拉回运行中主展示字段
 - [ ] 没把带 `Stable` 语义的 helper / runtime 命名重新引回运行中主链
 - [ ] 没把 `preflight` 重新当成运行中真源
 - [ ] ETA 仍只基于 live progress 算

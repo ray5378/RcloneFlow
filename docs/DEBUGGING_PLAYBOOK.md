@@ -52,7 +52,7 @@
 
 ### 不要直接从这里逆推
 - `preflight`
-- `stableProgress`
+- `cardSummary`（仅任务卡片刚结束短窗口）
 
 除非明确是在处理：
 - 完成态固化

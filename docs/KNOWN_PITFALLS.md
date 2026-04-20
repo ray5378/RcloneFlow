@@ -6,14 +6,14 @@
 
 ---
 
-## 1. `stableProgress` 容易被误当运行中真源
+## 1. 完成态字段容易被误当运行中真源
 
 现象：
 - 运行中展示看起来能显示，但语义逐渐偏离实时主链
 
 提醒：
 - 当前运行中 UI 主真源应是 `/api/runs/active.progress`
-- `stableProgress` 主要保留兼容 / 完成态固化语义
+- 应明确区分：`progress`（运行中）、`cardSummary`（刚结束卡片）、`finalSummary`（历史详情）
 
 ---
 

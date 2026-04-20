@@ -99,7 +99,8 @@
 
 ### 4.2 字段语义
 - `progress`：运行中的实时进度（live frame）
-- `stableProgress`：兼容字段 / 完成态固化，不得再作为运行中 UI 主数据源
+- `cardSummary`：任务卡片结束态过渡字段，只用于任务刚结束后的短窗口展示
+- `finalSummary`：历史详情 / 最终总结字段
 - `preflight`：预估总量（来自 `rclone size` + 过滤条件），仅用于预估展示
 
 ### 4.3 禁止事项
@@ -142,14 +143,13 @@ aggregate size pair 必须要求显式字节单位（例如 `MiB/GiB`）。
 
 接口约定：
 - `progress`：运行中实时进度主字段
-- `stableProgress`：兼容字段 / 完成态固化
 - `progressLine`：最后成功解析到的原始进度日志行
 - `progressSource`：当前进度来源
 - `progressMismatch` / `progressCheck`：后端一致性自检结果
 
 后续开发不得：
-- 删除 `progress` 并要求前端重新切回 `stableProgress`
-- 让 `stableProgress` 再次承担运行中主展示职责
+- 删除 `progress` 并要求前端把结束态过渡重新塞回运行中链
+- 让 `cardSummary` 或 `finalSummary` 再次承担运行中主展示职责
 
 ## 8. WebSocket / 前端刷新规则（必须遵守）
 
@@ -469,3 +469,8 @@ aggregate size pair 必须要求显式字节单位（例如 `MiB/GiB`）。
 - 文档应写“为什么这样约束”“适用范围是什么”，不要只写结论口号
 - 文档更新应优先追求可执行性，而不是堆空泛原则
 追求可执行性，而不是堆空泛原则
+��
+��行性，而不是堆空泛原则
+追求可执行性，而不是堆空泛原则
+��
+��

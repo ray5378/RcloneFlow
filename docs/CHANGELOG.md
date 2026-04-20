@@ -26,7 +26,7 @@
 
 ### 运行中进度链治理
 - 统一运行中 UI 主真源为 `/api/runs/active.progress`
-- 明确 `stableProgress` 不再作为运行中主展示真源
+- 明确运行中主展示真源固定为 `progress`，任务卡片结束态过渡改由 `cardSummary` 承担
 - 明确 `preflight` 保留预估语义，不直接驱动运行中主展示
 - 运行中 ETA 不再回退 `preflight`
 

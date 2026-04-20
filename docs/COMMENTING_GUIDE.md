@@ -59,7 +59,7 @@
 ## 5. 当前项目中特别应该补注释的地方
 
 - `/api/runs/active` 相关关键字段语义
-- `progress / stableProgress / preflight` 的边界
+- `progress / cardSummary / finalSummary / preflight` 的边界
 - 运行中 ETA 的计算前提
 - 旧 runner 与当前主链的区别
 - 仍在保留的兼容层和历史回退
