@@ -29,17 +29,6 @@ func readOverrides() map[string]string {
 	return m
 }
 
-// GetPrecheckMode returns preflight mode: env > settings.json > default("none")
-func GetPrecheckMode() string {
-	if v := os.Getenv("PRECHECK_MODE"); v != "" {
-		return v
-	}
-	if v := readOverrides()["PRECHECK_MODE"]; v != "" {
-		return v
-	}
-	return "none"
-}
-
 func GetProgressFlushInterval() time.Duration {
 	if v := os.Getenv("PROGRESS_FLUSH_INTERVAL"); v != "" {
 		if d, err := time.ParseDuration(v); err == nil {

@@ -43,7 +43,6 @@ func defaultsMap() map[string]string {
 		"LOG_RETENTION_DAYS":             "7",
 		"FINAL_SUMMARY_RETENTION_DAYS":   "7",
 		"CLEANUP_INTERVAL_HOURS":         "24",
-		"PRECHECK_MODE":                  "none",
 		"PROGRESS_FLUSH_INTERVAL":        "5s",
 		"PROGRESS_FLUSH_MIN_DELTA_PCT":   "1",
 		"PROGRESS_FLUSH_MIN_DELTA_BYTES": "52428800",

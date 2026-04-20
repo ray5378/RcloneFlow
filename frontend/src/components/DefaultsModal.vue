@@ -169,17 +169,6 @@ onMounted(load)
         </div>
 
         <div class="section">
-          <div class="section-title">预检/统计概览（任务启动前）</div>
-          <div class="grid">
-            <label title="任务启动前是否做体量预估（size）">预检模式 <small class="subkey">PRECHECK_MODE</small></label>
-            <select v-model="form.PRECHECK_MODE">
-              <option value="none">关闭</option>
-              <option value="size">按大小预检</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="section">
           <div class="section-title">运行中进度限流写库（热生效）</div>
           <div class="grid">
             <label title="进度写库最小时间间隔">写库最小间隔 <small class="subkey">PROGRESS_FLUSH_INTERVAL</small></label>
