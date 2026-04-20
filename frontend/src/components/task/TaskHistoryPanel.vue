@@ -11,7 +11,7 @@ const props = defineProps<{
   historyFilterTaskId: number | null
   historyStatusFilter: string
   filteredRuns: Run[]
-  getDbProgressStable: (run: Run) => any
+  getRunProgressFromSummary: (run: Run) => any
   getFinalSummary: (run: Run) => any
 }>()
 
@@ -85,7 +85,7 @@ function onHeaderClick(event: MouseEvent) {
         v-for="run in filteredRuns"
         :key="run.id"
         :run="run"
-        :progress="run.status === 'running' ? getDbProgressStable(run) : undefined"
+        :progress="run.status === 'running' ? getRunProgressFromSummary(run) : undefined"
         :summary="getFinalSummary(run)"
         @click="emit('view-detail', run)"
         @view-detail="emit('view-detail', run)"

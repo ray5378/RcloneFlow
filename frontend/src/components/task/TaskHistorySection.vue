@@ -11,7 +11,7 @@ defineProps<{
   historyFilterTaskId: number | null
   historyStatusFilter: string
   filteredRuns: any[]
-  getDbProgressStable: (run: any) => any
+  getRunProgressFromSummary: (run: any) => any
   getFinalSummary: (run: any) => any
   showDetailModal: boolean
   runDetail: any
@@ -68,7 +68,7 @@ const emit = defineEmits<{
     :history-filter-task-id="historyFilterTaskId"
     :history-status-filter="historyStatusFilter"
     :filtered-runs="filteredRuns"
-    :get-db-progress-stable="getDbProgressStable"
+    :get-run-progress-from-summary="getRunProgressFromSummary"
     :get-final-summary="getFinalSummary"
     @back="emit('back')"
     @set-status-filter="emit('set-status-filter', $event)"

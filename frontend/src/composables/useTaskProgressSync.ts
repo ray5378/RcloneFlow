@@ -4,7 +4,7 @@ export function useTaskProgressSync(options: {
   runs: Ref<any[]>
   activeRuns: Ref<any[]>
   activeRunLookup: { getActiveRunByTaskId: (taskId: number) => any }
-  lastStableByTask: Ref<Record<number, { sp: any; at: number }>>
+  lastRunningProgressByTask: Ref<Record<number, { sp: any; at: number }>>
   loadData: () => Promise<void>
   loadActiveRuns: () => Promise<void>
   lingerMs: number
@@ -13,7 +13,7 @@ export function useTaskProgressSync(options: {
   const lastNonZeroSpeedByTask: Record<number, number> = {}
   const refreshLocks: Record<number, boolean> = {}
 
-  function getDbProgressStable(run: any) {
+  function getRunProgressFromSummary(run: any) {
     const db = getLiveSummaryFromDB(run)
     const id = run?.id
     if (db && id) {
@@ -32,10 +32,10 @@ export function useTaskProgressSync(options: {
         if (active?.progress) return active.progress
       }
     } catch {}
-    return getDbProgressStable(run)
+    return getRunProgressFromSummary(run)
   }
 
-  function getDeNoisedStableByRun(run: any) {
+  function getRunningProgressByRun(run: any) {
     return getRealtimeProgressByRun(run)
   }
 
@@ -47,10 +47,10 @@ export function useTaskProgressSync(options: {
       return candidateTaskId > 0 && candidateTaskId === Number(taskId) && item?.status === 'running'
     })
     if (!run) return null
-    return getDbProgressStable(run)
+    return getRunProgressFromSummary(run)
   }
 
-  function getDeNoisedStableByTask(taskId: number) {
+  function getRunningProgressByTask(taskId: number) {
     const raw = getTaskCardProgressByTask(taskId)
     if (!raw) return null
     const st: any = { ...raw }
@@ -120,9 +120,9 @@ export function useTaskProgressSync(options: {
       await Promise.all([options.loadActiveRuns(), options.loadData()])
       await new Promise(r => setTimeout(r, 1000))
       await Promise.all([options.loadActiveRuns(), options.loadData()])
-      const st = options.lastStableByTask.value?.[taskId]
+      const st = options.lastRunningProgressByTask.value?.[taskId]
       if (st && Date.now() - st.at > options.lingerMs) {
-        delete options.lastStableByTask.value[taskId]
+        delete options.lastRunningProgressByTask.value[taskId]
       }
     } finally {
       setTimeout(() => {
@@ -133,11 +133,11 @@ export function useTaskProgressSync(options: {
   }
 
   return {
-    getDbProgressStable,
+    getRunProgressFromSummary,
     getRealtimeProgressByRun,
-    getDeNoisedStableByRun,
+    getRunningProgressByRun,
     getTaskCardProgressByTask,
-    getDeNoisedStableByTask,
+    getRunningProgressByTask,
     formatBps,
     calcEtaFromAvg,
     triggerAutoRefresh,

@@ -16,7 +16,7 @@ export function useTaskViewRuntime(options: {
   globalStats: Ref<any>
   showGlobalStatsModal: Ref<boolean>
   activeRunLookup: { getActiveRunByTaskId: (taskId: number) => any }
-  lastStableByTask: Ref<Record<number, { sp: any; at: number }>>
+  lastRunningProgressByTask: Ref<Record<number, { sp: any; at: number }>>
   lastNonDecreasingTotalsByTask: Ref<Record<number, { totalBytes: number; totalCount: number }>>
   currentModule: Ref<'history' | 'add' | 'tasks'>
   lingerMs: number
@@ -44,7 +44,7 @@ export function useTaskViewRuntime(options: {
     activeRuns: options.activeRuns,
     globalStats: options.globalStats,
     showGlobalStatsModal: options.showGlobalStatsModal,
-    lastStableByTask: options.lastStableByTask,
+    lastRunningProgressByTask: options.lastRunningProgressByTask,
     lastNonDecreasingTotalsByTask: options.lastNonDecreasingTotalsByTask,
     taskApi: options.taskApi,
     remoteApi: options.remoteApi,
@@ -54,11 +54,11 @@ export function useTaskViewRuntime(options: {
   })
 
   const {
-    getDbProgressStable,
+    getRunProgressFromSummary,
     getRealtimeProgressByRun,
-    getDeNoisedStableByRun,
+    getRunningProgressByRun,
     getTaskCardProgressByTask,
-    getDeNoisedStableByTask,
+    getRunningProgressByTask,
     formatBps,
     calcEtaFromAvg,
     triggerAutoRefresh,
@@ -66,7 +66,7 @@ export function useTaskViewRuntime(options: {
     runs: options.runs,
     activeRuns: options.activeRuns,
     activeRunLookup: options.activeRunLookup,
-    lastStableByTask: options.lastStableByTask,
+    lastRunningProgressByTask: options.lastRunningProgressByTask,
     loadData,
     loadActiveRuns,
     lingerMs: options.lingerMs,
@@ -75,7 +75,7 @@ export function useTaskViewRuntime(options: {
   useTaskViewRefreshLifecycle({
     tasks: options.tasks,
     currentModule: options.currentModule,
-    getDeNoisedStableByTask,
+    getRunningProgressByTask,
     loadData,
     loadActiveRuns,
     setupRealtimeSync,
@@ -88,11 +88,11 @@ export function useTaskViewRuntime(options: {
     loadGlobalStats,
     openGlobalStats,
     setupRealtimeSync,
-    getDbProgressStable,
+    getRunProgressFromSummary,
     getRealtimeProgressByRun,
-    getDeNoisedStableByRun,
+    getRunningProgressByRun,
     getTaskCardProgressByTask,
-    getDeNoisedStableByTask,
+    getRunningProgressByTask,
     formatBps,
     calcEtaFromAvg,
     triggerAutoRefresh,

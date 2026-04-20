@@ -3,7 +3,7 @@ import { onMounted, onUnmounted, watch, type Ref } from 'vue'
 export function useTaskViewRefreshLifecycle(options: {
   tasks: Ref<any[]>
   currentModule?: Ref<'history' | 'add' | 'tasks'>
-  getDeNoisedStableByTask: (taskId: number) => any
+  getRunningProgressByTask: (taskId: number) => any
   loadData: () => Promise<void> | void
   loadActiveRuns: () => Promise<void>
   setupRealtimeSync?: () => void
@@ -38,9 +38,9 @@ export function useTaskViewRefreshLifecycle(options: {
       try {
         const sigParts: string[] = []
         for (const t of options.tasks.value || []) {
-          const sp = options.getDeNoisedStableByTask((t as any).id) as any
-          const pct = sp ? Number(sp.percentage || 0).toFixed(3) : 'na'
-          const c = sp ? Number(sp.completedFiles || 0) : -1
+          const progress = options.getRunningProgressByTask((t as any).id) as any
+          const pct = progress ? Number(progress.percentage || 0).toFixed(3) : 'na'
+          const c = progress ? Number(progress.completedFiles || 0) : -1
           sigParts.push(`${(t as any).id}:${pct}:${c}`)
         }
         const sig = `${options.tasks.value?.length || 0}|${sigParts.join(',')}`

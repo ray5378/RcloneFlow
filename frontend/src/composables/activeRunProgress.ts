@@ -1,4 +1,4 @@
-export function getDeNoisedStableByRun(run: any, getActiveRunByTaskId: (taskId: number) => any, getDbProgressStable: (run: any) => any) {
+export function getRunningProgressByRun(run: any, getActiveRunByTaskId: (taskId: number) => any, getRunProgressFromSummary: (run: any) => any) {
   try {
     const tid = run?.taskId as number
     if (tid) {
@@ -6,10 +6,10 @@ export function getDeNoisedStableByRun(run: any, getActiveRunByTaskId: (taskId: 
       if (active?.progress) return active.progress
     }
   } catch {}
-  return getDbProgressStable(run)
+  return getRunProgressFromSummary(run)
 }
 
-export function getDeNoisedStableByTask(taskId: number, getActiveRunByTaskId: (taskId: number) => any) {
+export function getRunningProgressByTask(taskId: number, getActiveRunByTaskId: (taskId: number) => any) {
   const active = getActiveRunByTaskId(taskId)
   const raw = active?.progress
   if (!raw) return null

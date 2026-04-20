@@ -14,7 +14,7 @@ interface UseTaskViewDataSyncOptions {
   activeRuns: Ref<any[]>
   globalStats: Ref<any>
   showGlobalStatsModal: Ref<boolean>
-  lastStableByTask: Ref<Record<number, { sp: any; at: number }>>
+  lastRunningProgressByTask: Ref<Record<number, { sp: any; at: number }>>
   lastNonDecreasingTotalsByTask: Ref<Record<number, { totalBytes: number; totalCount: number }>>
   taskApi: { list: () => Promise<Task[]> }
   remoteApi: { list: () => Promise<{ remotes?: string[] }> }
@@ -92,9 +92,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             totalCount: Math.max(prevTotals?.totalCount || 0, raw.totalCount || 0),
           }
           options.lastNonDecreasingTotalsByTask.value[tid] = nextTotals
+          options.lastRunningProgressByTask.value[tid] = { sp: raw, at: now }
         }
         it.progress = raw
-        if (tid) options.lastStableByTask.value[tid] = { sp: raw, at: now }
         return it
       })
       if (list.length === 0) {

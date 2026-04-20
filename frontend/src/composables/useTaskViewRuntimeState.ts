@@ -6,7 +6,7 @@ export function useTaskViewRuntimeState() {
   const globalStats = ref<any>({})
   const showGlobalStatsModal = ref(false)
   const activeRunLookup = useActiveRunLookup(activeRuns)
-  const lastStableByTask = ref<Record<number, { sp: any; at: number }>>({})
+  const lastRunningProgressByTask = ref<Record<number, { sp: any; at: number }>>({})
   const lastNonDecreasingTotalsByTask = ref<Record<number, { totalBytes: number; totalCount: number }>>({})
 
   const LINGER_MS = 20000
@@ -17,7 +17,7 @@ export function useTaskViewRuntimeState() {
     globalStats,
     showGlobalStatsModal,
     activeRunLookup,
-    lastStableByTask,
+    lastRunningProgressByTask,
     lastNonDecreasingTotalsByTask,
     LINGER_MS,
     STUCK_MS,
