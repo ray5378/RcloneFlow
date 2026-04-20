@@ -96,6 +96,61 @@ func TestHandleActiveRuns_UsesProgressAndExposesDebugFields(t *testing.T) {
 	}
 }
 
+func TestHandleActiveRuns_DoesNotExposeFinalSummary(t *testing.T) {
+	summary := map[string]any{
+		"progress": map[string]any{
+			"bytes":          float64(100),
+			"totalBytes":     float64(300),
+			"speed":          float64(10),
+			"eta":            float64(20),
+			"percentage":     float64(33.3),
+			"completedFiles": float64(3),
+			"plannedFiles":   float64(9),
+		},
+		"finalSummary": map[string]any{
+			"result":           "success",
+			"transferredBytes": float64(9999),
+			"totalBytes":       float64(9999),
+		},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        4,
+		TaskID:    103,
+		Status:    "running",
+		StartedAt: "2026-04-17T14:30:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/active", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleActiveRuns(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &items); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("len(items)=%d, want 1", len(items))
+	}
+	it := items[0]
+	if _, ok := it["finalSummary"]; ok {
+		t.Fatalf("finalSummary should not be exposed in active run response")
+	}
+	prog, _ := it["progress"].(map[string]any)
+	if prog == nil {
+		t.Fatalf("missing progress")
+	}
+	if got := int(prog["totalBytes"].(float64)); got != 300 {
+		t.Fatalf("totalBytes=%d, want 300", got)
+	}
+	if got := int(prog["completedFiles"].(float64)); got != 3 {
+		t.Fatalf("completedFiles=%d, want 3", got)
+	}
+}
+
 func TestHandleActiveRuns_UsesProgressTotalsOnly(t *testing.T) {
 	summary := map[string]any{
 		"progress": map[string]any{

@@ -2,7 +2,11 @@ package service
 
 import "encoding/json"
 
-// RunRecord 运行记录结构
+// RunRecord 运行记录结构。
+// Summary 当前同时承载两类信息：
+// - summary.progress：历史 run 的运行中快照
+// - summary.finalSummary：历史详情 / 最终总结
+// 但 active runs 主链只允许消费 summary.progress，不得把 finalSummary 回流成运行中字段。
 type RunRecord struct {
 	ID               int64  `json:"id"`
 	TaskID           int64  `json:"taskId"`

@@ -171,3 +171,5 @@
 后续开发不得：
 - 删除 `progress` 并要求前端把结束态过渡重新塞回运行中链
 - 让 `finalSummary` 再次承担运行中主展示职责
+- 把任务卡片本地态 `completedFreezeByTask` 伪装成后端 active runs 字段
+- 在 `/api/runs/active` 响应里直接透出 `finalSummary`

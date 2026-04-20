@@ -895,7 +895,8 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		item := map[string]any{
 			// progress: 运行中 UI 主字段。
 			// 这里故意只暴露 live progress + 调试辅助字段；
-			// 不要把 finalSummary 等完成态摘要重新回流成 active runs 主字段。
+			// 不要把 finalSummary、completedFreezeByTask 语义或其他完成态摘要重新回流成 active runs 主字段。
+			// active runs 的职责只到“当前正在跑的实时帧”为止。
 			"runRecord": map[string]any{
 				"id":               run.ID,
 				"taskId":           run.TaskID,

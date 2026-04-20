@@ -204,6 +204,7 @@
 
 当前推进建议：
 - 第一轮先做低风险契约加固：补前端类型、关键 composable 就地 guardrail 注释、接口文档同步
+- 第二轮继续把约束下沉到后端注释与自动化测试，明确禁止 `finalSummary` 回流到 `/api/runs/active`
 - 这一轮不改 UI 行为，不再继续整理 `TaskView.vue` 结构
 
 #### 4.3 旧 runner 路径已完成清理
