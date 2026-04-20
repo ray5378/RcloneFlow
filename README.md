@@ -67,28 +67,27 @@ services:
     image: ray5378/rcloneflow:latest
     platform: linux/amd64
     container_name: rcloneflow
+    user: 1000:1000
     environment:
       - TZ=Asia/Shanghai
       - APP_ADDR=:17870
       - APP_DATA_DIR=/app/data
       - RCLONE_CONFIG=/app/data/rclone.conf
-      # 内置 RC（用于 remotes/providers/config/browser）
       - EMBED_RC=true
       - RCLONE_RC_URL=http://127.0.0.1:5572
       - RCLONE_RC_USER=rc
       - RCLONE_RC_PASS=rcpass
-      # 日志级别：debug|info|warn|error
-      - LOG_LEVEL=info
     volumes:
-      - ./data:/app/data
+      - ./app/data:/app/data
     ports:
-      - "17870:17870"
+      - 17870:17870
     restart: always
+networks: {}
 ```
 
 ### 配置 rclone
 
-将你的 rclone 配置文件放到 `./data/rclone.conf`
+将你的 rclone 配置文件放到 `./app/data/rclone.conf`
 
 ### 访问界面
 
