@@ -533,7 +533,7 @@ func (db *DB) ListActiveRuns() ([]Run, error) {
 	defer db.mu.Unlock()
 
 	rows, err := db.db.Query(`
-		SELECT id, task_id, rc_job_id, status, trigger, summary, error, created_at, updated_at,
+		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
 		FROM runs WHERE status = 'running' ORDER BY id DESC`)
 	if err != nil {
