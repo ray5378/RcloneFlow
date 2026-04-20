@@ -1,4 +1,6 @@
 import { computed, ref, type Ref } from 'vue'
+import type { FinalSummary } from '../api/run'
+import type { Run, RunSummaryPayload } from '../types'
 
 type FinalFilterType = 'all' | 'success' | 'failed' | 'other'
 
@@ -12,9 +14,11 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   const finalFilesPage = options?.finalFilesPage ?? ref(1)
   const finalFilesPageSize = options?.finalFilesPageSize ?? ref(Math.max(10, Math.floor((window.innerHeight - 420) / 34)))
 
-  function getFinalSummary(run: any) {
+  function getFinalSummary(run: Run | null | undefined): FinalSummary | null {
     try {
-      const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
+      const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : (run?.summary as RunSummaryPayload | undefined)
+      // 历史详情只读 finalSummary；
+      // 不从 progress / completedFreezeByTask 倒推最终总结。
       if (sum && typeof sum === 'object' && sum.finalSummary) return sum.finalSummary
     } catch {}
     return null

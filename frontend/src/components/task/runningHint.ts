@@ -1,6 +1,9 @@
+import type { ActiveRun, ActiveRunProgress } from '../../api/run'
 import { formatBytes, formatBytesPerSec, formatEta } from '../../utils/format'
 
-export function getActiveProgress(active: any) {
+export function getActiveProgress(active: ActiveRun | null | undefined): ActiveRunProgress | null {
+  // running hint 只消费 active runs 主链 progress；
+  // 不回退 finalSummary，也不消费任务卡片的 completedFreezeByTask。
   return active?.progress || null
 }
 

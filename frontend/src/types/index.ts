@@ -138,6 +138,22 @@ export interface Schedule {
   createdAt: string
 }
 
+import type { FinalSummary, RunSummaryProgress } from '../api/run'
+
+export interface RunSummaryPayload {
+  /**
+   * 历史记录里的运行中快照。
+   * 仅用于历史视图回看 run 当时的进度帧，不得替代 active runs 主链。
+   */
+  progress?: RunSummaryProgress
+  /**
+   * 历史详情 / 最终总结主字段。
+   * 不得拿来驱动任务卡片运行中 UI。
+   */
+  finalSummary?: FinalSummary
+  [key: string]: unknown
+}
+
 export interface Run {
   id: number
   taskId: number
@@ -153,7 +169,7 @@ export interface Run {
   targetPath?: string
   bytesTransferred?: number
   speed?: string
-  summary?: string
+  summary?: string | RunSummaryPayload
   error?: string
 }
 

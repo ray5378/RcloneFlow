@@ -1,4 +1,5 @@
 import { computed, ref, type Ref } from 'vue'
+import type { ActiveRun } from '../api/run'
 import { getActiveProgress, getActiveProgressText, getRunningHintDebug } from '../components/task/runningHint'
 
 const EMPTY_DEBUG_INFO = {
@@ -11,7 +12,7 @@ const EMPTY_DEBUG_INFO = {
 // 现在它由默认配置 RUNNING_HINT_DEBUG_ENABLED 控制：
 // - 默认关闭
 // - 开启后才允许展开自检 / 日志原文 / 接口进度 JSON
-export function useRunningHint(activeRuns: Ref<any[]>, openRunLog: (run: any) => void, debugEnabled = false) {
+export function useRunningHint(activeRuns: Ref<ActiveRun[]>, openRunLog: (run: any) => void, debugEnabled = false) {
   const visible = ref(false)
   const run = ref<any>(null)
   const debugOpen = ref(false)
@@ -19,7 +20,7 @@ export function useRunningHint(activeRuns: Ref<any[]>, openRunLog: (run: any) =>
   const active = computed(() => {
     const taskId = run.value?.taskId
     if (!taskId) return null
-    return (activeRuns.value || []).find((item: any) => {
+    return (activeRuns.value || []).find((item: ActiveRun & { taskId?: number }) => {
       const activeTaskId = item?.runRecord?.taskId ?? item?.taskId
       return activeTaskId === taskId
     }) || null

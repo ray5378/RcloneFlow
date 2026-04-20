@@ -82,6 +82,49 @@ export interface ActiveRunProgress {
   totalCount: number
   eta: number
   phase?: string
+  lastUpdatedAt?: string
+}
+
+/**
+ * 历史 summary.progress 仅作为历史记录里的运行中快照使用：
+ * - 可用于历史列表里回看 run 当时的实时帧
+ * - 不得替代 `/api/runs/active.progress` 成为运行中 UI 主字段
+ */
+export type RunSummaryProgress = ActiveRunProgress
+
+export interface FinalSummaryCounts {
+  success?: number
+  failed?: number
+  skipped?: number
+  deleted?: number
+  [key: string]: number | undefined
+}
+
+export interface FinalSummaryFile {
+  name?: string
+  path?: string
+  status?: string
+  action?: string
+  at?: string
+  sizeBytes?: number
+  message?: string
+}
+
+/**
+ * finalSummary 只服务于历史详情 / 最终总结展示。
+ * 不得重新回流到运行中任务卡片、running hint 或 active runs 主链。
+ */
+export interface FinalSummary {
+  startAt?: string
+  finishedAt?: string
+  durationSec?: number
+  durationText?: string
+  result?: string
+  transferredBytes?: number
+  totalBytes?: number
+  avgSpeedBps?: number
+  counts?: FinalSummaryCounts
+  files?: FinalSummaryFile[]
 }
 
 /** 运行中任务的实时状态 */

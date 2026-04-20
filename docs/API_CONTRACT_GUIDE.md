@@ -105,17 +105,24 @@
 
 ---
 
-## 3. `progress / finalSummary / preflight` 的区别
+## 3. `progress / completedFreezeByTask / finalSummary / preflight` 的区别
 
 ### 3.1 `progress`
 - 运行中实时进度
 - 当前运行中展示主数据源
+- 运行中 UI（任务卡片运行中态、running hint、ETA、自检调试）应优先读取它
 
-### 3.2 `finalSummary`
+### 3.2 `completedFreezeByTask`
+- 前端任务卡片完成短窗口使用的单份冻结帧
+- 只服务于任务卡片完成瞬间与短窗口展示
+- 不属于后端接口字段，也不应被历史详情 / running hint 复用
+
+### 3.3 `finalSummary`
 - 历史详情 / 最终总结字段
 - 用于完成态详情、统计概览、文件明细等展示
+- 不得回流成运行中 UI 主字段
 
-### 3.3 `preflight`
+### 3.4 `preflight`
 - 预估总量
 - 主要来自运行前预检
 - 仅用于预估展示或后端明确说明的兼容兜底

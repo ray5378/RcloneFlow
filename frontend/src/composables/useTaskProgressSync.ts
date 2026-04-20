@@ -1,37 +1,50 @@
 import type { Ref } from 'vue'
+import type { ActiveRunProgress } from '../api/run'
+import type { Run, RunSummaryPayload } from '../types'
 
 export function useTaskProgressSync(options: {
-  runs: Ref<any[]>
+  runs: Ref<Run[]>
   activeRuns: Ref<any[]>
   activeRunLookup: { getActiveRunByTaskId: (taskId: number) => any }
   loadData: () => Promise<void>
   loadActiveRuns: () => Promise<void>
 }) {
-  const lastDbFrameByRunId: Record<number, any> = {}
+  const lastDbFrameByRunId: Record<number, ActiveRunProgress> = {}
   const lastNonZeroSpeedByTask: Record<number, number> = {}
   // 任务卡片完成态只保留一份冻结帧：
   // 1) active.progress 到 100% 时立即冻结；
   // 2) active 消失后继续沿用这同一帧；
   // 3) 超过完成短窗口后清掉，不再继续显示进度条；
   // 4) 不再引入第二份完成态摘要参与 handoff，避免二次抖动。
-  const completedFreezeByTask: Record<number, any> = {}
+  const completedFreezeByTask: Record<number, ActiveRunProgress & { __frozenAt: number }> = {}
   const refreshLocks: Record<number, boolean> = {}
   const FINISH_WINDOW_MS = 15000
 
-  function normalizeSummaryProgress(p: any) {
+  function normalizeSummaryProgress(p: unknown): ActiveRunProgress | null {
     if (!p || typeof p !== 'object') return null
-    const bytes = Number(p.bytes || 0)
-    const totalBytes = Number(p.totalBytes || 0)
-    const speed = Number(p.speed || 0)
-    const eta = Number(p.eta || 0)
-    const totalCount = Number(p.totalCount || p.plannedFiles || 0)
-    let percentage = Number(p.percentage || 0)
+    const raw = p as Record<string, unknown>
+    const bytes = Number(raw.bytes || 0)
+    const totalBytes = Number(raw.totalBytes || 0)
+    const speed = Number(raw.speed || 0)
+    const eta = Number(raw.eta || 0)
+    const totalCount = Number(raw.totalCount || raw.plannedFiles || 0)
+    let percentage = Number(raw.percentage || 0)
     if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) percentage = (bytes / totalBytes) * 100
-    const completedFiles = Number(p.completedFiles || 0)
-    return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles, phase: p.phase }
+    const completedFiles = Number(raw.completedFiles || 0)
+    return {
+      bytes,
+      totalBytes,
+      speed,
+      eta,
+      totalCount,
+      percentage,
+      completedFiles,
+      phase: typeof raw.phase === 'string' ? raw.phase : undefined,
+      lastUpdatedAt: typeof raw.lastUpdatedAt === 'string' ? raw.lastUpdatedAt : undefined,
+    }
   }
 
-  function freezeCompletedProgress(p: any) {
+  function freezeCompletedProgress(p: ActiveRunProgress | null): ActiveRunProgress | null {
     if (!p) return null
     const frozen = { ...p }
     if (Number(frozen.percentage || 0) >= 99.999) {
@@ -45,15 +58,19 @@ export function useTaskProgressSync(options: {
     return frozen
   }
 
-  function getLiveSummaryFromDB(run: any) {
+  function getLiveSummaryFromDB(run: Run) {
     try {
-      const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
+      const sum = typeof run?.summary === 'string'
+        ? JSON.parse(run.summary)
+        : (run?.summary as RunSummaryPayload | undefined)
+      // 历史 summary.progress 只服务于历史 run 的快照回看；
+      // 运行中 UI 主链仍然必须优先走 /api/runs/active.progress。
       return normalizeSummaryProgress(sum?.progress)
     } catch {}
     return null
   }
 
-  function getRunProgressFromSummary(run: any) {
+  function getRunProgressFromSummary(run: Run) {
     const db = getLiveSummaryFromDB(run)
     const id = run?.id
     if (db && id) {
@@ -75,7 +92,7 @@ export function useTaskProgressSync(options: {
     return getRunProgressFromSummary(run)
   }
 
-  function getRunningProgressByRun(run: any) {
+  function getRunningProgressByRun(run: Run) {
     return getRealtimeProgressByRun(run)
   }
 
@@ -122,7 +139,7 @@ export function useTaskProgressSync(options: {
   function getRunningProgressByTask(taskId: number) {
     const raw = getTaskCardProgressByTask(taskId)
     if (!raw) return null
-    const st: any = { ...raw }
+    const st: ActiveRunProgress = { ...raw }
     st.bytes = Number(st.bytes || 0)
     st.totalBytes = Number(st.totalBytes || 0)
     st.speed = Number(st.speed || 0)
@@ -140,7 +157,7 @@ export function useTaskProgressSync(options: {
     return formatBytes(bps) + '/s'
   }
 
-  function calcEtaFromAvg(run: any, live: any) {
+  function calcEtaFromAvg(run: any, live: ActiveRunProgress | null) {
     try {
       if (!run?.startedAt || !live) return null
       const tid = (run.taskId || run.taskID || run.task_id || run.runRecord?.taskId) as number
@@ -149,7 +166,7 @@ export function useTaskProgressSync(options: {
       const bytes = Number(live.bytes || 0)
       if (bytes <= 0) return null
       const remaining = Math.max(0, total - bytes)
-      let speed = Number(live.speed || 0)
+      const speed = Number(live.speed || 0)
       if (formatBytesPerSec(speed) === '-') return null
       if (tid && speed > 0) lastNonZeroSpeedByTask[tid] = speed
       const sp = tid ? (lastNonZeroSpeedByTask[tid] || 0) : speed

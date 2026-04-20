@@ -202,6 +202,10 @@
 - 历史详情只接触 `finalSummary`
 - 降低后续维护者误用字段职责的风险
 
+当前推进建议：
+- 第一轮先做低风险契约加固：补前端类型、关键 composable 就地 guardrail 注释、接口文档同步
+- 这一轮不改 UI 行为，不再继续整理 `TaskView.vue` 结构
+
 #### 4.3 旧 runner 路径已完成清理
 已完成：
 - 当前主执行链固定为 `internal/runnercli/runner.go`
