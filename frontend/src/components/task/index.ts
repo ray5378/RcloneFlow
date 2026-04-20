@@ -1,7 +1,6 @@
 export { default as TaskCard } from './TaskCard.vue'
 export { default as RunItem } from './RunItem.vue'
 export { default as ScheduleOptions } from './ScheduleOptions.vue'
-export { default as AdvancedOptions } from './AdvancedOptions.vue'
 export { default as RunningHintModal } from './RunningHintModal.vue'
 export { default as TaskHistoryPanel } from './TaskHistoryPanel.vue'
 export { default as RunDetailModal } from './RunDetailModal.vue'
