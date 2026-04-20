@@ -112,18 +112,22 @@
 
 ---
 
-## 3. `progress / stableProgress / preflight` 的区别
+## 3. `progress / cardSummary / finalSummary / preflight` 的区别
 
 ### 3.1 `progress`
 - 运行中实时进度
 - 当前运行中展示主数据源
 
-### 3.2 `stableProgress`
-- 兼容字段 / 完成态固化
-- 不再作为运行中展示真源
-- 当前前端仅允许它停留在完成态 / 历史详情 / 兼容层语义，不再让运行中 helper / 运行中 UI 主链围绕它命名
+### 3.2 `cardSummary`
+- 任务卡片结束态过渡字段
+- 用于任务刚结束时的短窗口平滑展示
+- 不参与运行中主链，也不承担历史详情职责
 
-### 3.3 `preflight`
+### 3.3 `finalSummary`
+- 历史详情 / 最终总结字段
+- 用于完成态详情、统计概览、文件明细等展示
+
+### 3.4 `preflight`
 - 预估总量
 - 主要来自运行前预检
 - 仅用于预估展示或后端明确说明的兼容兜底
