@@ -190,6 +190,11 @@
 - 稳住 3 个 shell 边界，不让 `TaskView.vue` 回退去直连旧 section
 - 持续防止头部 import / wiring block 和尾部模板 / 样式块反弹
 
+当前已确认的顺序 guardrail：
+- `useRunningHintRuntime(...)` 必须放在 `useTaskViewAuxRuntime(...)` 之后，因为它依赖 `openRunLogFromHint -> openRunLog`
+- `useTaskViewModalBindings(...)` 必须放在 `useTaskFormRuntime(...)` 之后，因为它依赖 `commandMode` / `commandText` / `showAdvancedOptions`
+- 这两条都属于“看起来只是排版整理，实际上会触发 TDZ / before initialization”的高风险点；后续 4.1 只允许补分段标记、注释、局部低风险 glue 清理，不再重排这几段声明顺序
+
 #### 4.2 固化 `progress / completedFreezeByTask / finalSummary` 契约边界
 现状：
 - 主链已经理顺

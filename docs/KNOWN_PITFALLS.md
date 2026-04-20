@@ -118,3 +118,12 @@
   - 顶层 helper 依赖另一个 composable 返回的函数
   - 为了“排版更漂亮”而重排声明顺序
 - 对这类文件，不能靠“换个顺序先跑起来”当作修复完成；应把依赖顺序写实，并在验证通过后清掉临时施工脚本
+
+当前 `TaskView.vue` 已确认的两条高危顺序依赖：
+- `useRunningHintRuntime(...)` 必须在 `useTaskViewAuxRuntime(...)` 之后
+- `useTaskViewModalBindings(...)` 必须在 `useTaskFormRuntime(...)` 之后
+
+如果后续 4.1 继续推进：
+- 可以补分段注释和 guardrail
+- 可以做不改变依赖顺序的低风险 glue 清理
+- 不要再为了“脚本区更整齐”去重排这几段
