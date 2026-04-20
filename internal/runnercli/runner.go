@@ -546,12 +546,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			finalSummary["durationText"] = humanDuration(durSec)
 			// 结果
 			finalSummary["result"] = "success"
-			// 体量/均速（从 progress 或 stableProgress 回填）
+			// 体量/均速：完成态只从 progress 读取
 			var prog map[string]any
 			if p, ok := rr.Summary["progress"].(map[string]any); ok {
 				prog = p
-			} else if sp, ok := rr.Summary["stableProgress"].(map[string]any); ok {
-				prog = sp
 			}
 			var bytes, total int64
 			if prog != nil {
