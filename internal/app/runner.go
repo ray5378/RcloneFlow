@@ -29,9 +29,14 @@ type Runner struct {
 	db    *store.DB
 }
 
+// NewRunner 返回遗留 CLI runner。
+//
+// Deprecated: 当前任务执行主链使用 `runnercli.New(...)`，不要把新的运行逻辑接到这里。
 func NewRunner(db *store.DB) *Runner { return &Runner{procs: map[int64]*exec.Cmd{}, db: db} }
 
-// NewCLIRunner exported for cross-package use
+// NewCLIRunner 返回遗留 CLI runner。
+//
+// Deprecated: 仅保留给历史兼容调用；当前任务执行主链使用 `runnercli.New(...)`。
 func NewCLIRunner(db *store.DB) *Runner { return NewRunner(db) }
 
 func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcPath, dstRemote, dstPath string) error {
