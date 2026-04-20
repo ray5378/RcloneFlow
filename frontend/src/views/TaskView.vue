@@ -168,7 +168,6 @@ const {
   globalStats,
   showGlobalStatsModal,
   activeRunLookup,
-  lastRunningProgressByTask,
   lastNonDecreasingTotalsByTask,
   currentModule,
   stuckMs: STUCK_MS,

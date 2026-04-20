@@ -16,7 +16,6 @@ export function useTaskViewRuntime(options: {
   globalStats: Ref<any>
   showGlobalStatsModal: Ref<boolean>
   activeRunLookup: { getActiveRunByTaskId: (taskId: number) => any }
-  lastRunningProgressByTask: Ref<Record<number, { sp: any; at: number }>>
   lastNonDecreasingTotalsByTask: Ref<Record<number, { totalBytes: number; totalCount: number }>>
   currentModule: Ref<'history' | 'add' | 'tasks'>
   stuckMs: number
