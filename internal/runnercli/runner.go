@@ -487,7 +487,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
 			// stableProgress 保留原因：
 			// 1) 它是任务结束时冻结的一帧稳定快照，不参与运行中主链；
-			// 2) 任务卡片在 running -> finished 切换瞬间，会优先读取它来避免 progress/finalSummary 收尾时序不同导致的抖动；
+			// 2) 它现在主要作为兼容字段保留，任务卡片结束态过渡优先读取专门的 cardSummary；
 			// 3) 因此它属于“结束态兼容字段”，不是运行中字段，也不要从 active runs 接口重新暴露回去。
 			// 结束时基于 progress 生成 completed stable frame，避免运行中/完成态字段语义混淆
 			{
