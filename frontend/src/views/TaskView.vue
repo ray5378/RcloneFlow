@@ -29,14 +29,16 @@ import { useTaskViewModalBindings } from '../composables/useTaskViewModalBinding
 import { useToastCenter } from '../composables/useToastCenter'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 
+// 1) 页面级基础能力
 const { toasts, showToast } = useToastCenter()
 const { normalizeTaskOptions } = useTaskFormNormalize()
 
-// Set up global error handler for composables
+// 全局错误提示统一走 toast；不在各子块里各自弹。
 setErrorHandler((message, type) => {
   showToast(message, type as 'info' | 'success' | 'error')
 })
 
+// 2) 页面主状态（tasks / history / add 三视图共享）
 const {
   tasks,
   schedules,
@@ -52,6 +54,7 @@ const {
   historyStatusFilter,
 } = useTaskViewState()
 
+// 3) 运行时状态（active runs / 全局统计 / lookup）
 const {
   activeRuns,
   globalStats,
@@ -61,6 +64,7 @@ const {
   STUCK_MS,
 } = useTaskViewRuntimeState()
 
+// 4) 任务列表页视图态（分页 / 搜索）
 const {
   tasksPage,
   tasksPageSize,
@@ -72,6 +76,7 @@ const {
   jumpToTasksPage,
 } = useTaskListView(tasks)
 
+// 5) 运行详情 / 最终总结链
 const {
   showDetailModal,
   runDetail,
@@ -100,6 +105,7 @@ const {
   jumpFinalFilesPage,
 } = useRunDetailRuntime({ runApi })
 
+// 6) 主数据加载与进度相关派生
 const {
   loadData,
   loadActiveRuns,
@@ -129,6 +135,7 @@ const {
   jobApi,
 })
 
+// 7) 页面级 bridge：分页 / 返回 / 跳页
 const {
   setTaskSearch,
   setTasksJumpPageValue,
@@ -152,6 +159,7 @@ const {
   loadData,
 })
 
+// 8) 弹窗 / 辅助动作运行时
 const {
   showWebhookModal,
   webhookForm,
@@ -181,6 +189,7 @@ const {
   getFinalSummary: getFinalSummaryFromComposable,
 })
 
+// 9) running hint 桥：这里只做 log 入口转发，不承担主进度链职责
 const openRunLogFromHint = (run: any) => openRunLog(run)
 
 // 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度。
@@ -198,6 +207,7 @@ const {
   openRunningHintLog,
 } = useRunningHintRuntime(activeRuns, openRunLogFromHint, props.runningHintDebugEnabled === true)
 
+// 10) 运行详情入口编排
 const {
   showRunDetail,
   closeRunDetail,
@@ -208,8 +218,8 @@ const {
   closeRunDetailModal,
 })
 
+// 11) 任务编辑器运行时
 // move 模式时，成功数量代表 Moved 条数；已在后端合并 Copied+Deleted 为 Moved
-
 const {
   createForm,
   commandMode,
@@ -252,6 +262,7 @@ const {
   parseRcloneCommand,
 })
 
+// 12) 页面级 bridge：modal 字段绑定与开关态
 // webhook / singleton / editor modal 绑定桥只负责字段级 UI 接线；
 // 除了 aux runtime 暴露出的表单 ref 外，还依赖 task form runtime 的 command/advanced 状态，
 // 因此必须放在 useTaskFormRuntime 之后，避免压缩后触发 TDZ（before initialization）。
@@ -284,6 +295,7 @@ const {
   showGlobalStatsModal,
 })
 
+// 13) 历史列表运行时
 const {
   filteredRuns,
   currentTotal,
@@ -307,6 +319,7 @@ const {
   runApi,
 })
 
+// 14) 任务列表动作运行时
 const {
   deleteTask,
   toggleSchedule,
