@@ -82,6 +82,11 @@ func Open(dir string) (*DB, error) {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
 
+	// SQLite 单文件库在本项目里优先追求稳定性而不是并发吞吐；
+	// 主运行时链路收紧为单连接，减少同进程内并发写导致的 busy/locked 风险。
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
 	// Enable foreign keys
 	_, err = db.Exec("PRAGMA foreign_keys = ON")
 	if err != nil {
@@ -102,6 +107,9 @@ func openDB(path string) (*sql.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	// 内部迁移辅助连接也收紧成单连接，避免与主链形成不同的并发策略。
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
 	_, err = db.Exec("PRAGMA foreign_keys = ON")
 	if err != nil {
 		return nil, err
