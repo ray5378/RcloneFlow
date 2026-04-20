@@ -88,7 +88,7 @@
 
 现状：
 - 运行中主展示已统一优先使用 `progress`
-- 当前代码已删除 `stableProgress`，由 `finalSummary` 承担完成态摘要/详情职责
+- 当前代码已删除 `stableProgress`；完成态详情职责收敛到 `finalSummary`，任务卡片完成态则改由前端冻结帧承接
 - `preflight` 已从主展示链退场
 
 ### 2.4 前端 build warning
