@@ -19,7 +19,7 @@ const durationRe = /^\s*\d+\s*(ms|s|m|h|d)\s*$/i
 
 function validate() {
   errors.value = {}
-  const intFields = ['FINAL_SUMMARY_RETENTION_DAYS', 'CLEANUP_INTERVAL_HOURS', 'WEBHOOK_MAX_FILES', 'LOG_RETENTION_DAYS']
+  const intFields = ['FINAL_SUMMARY_RETENTION_DAYS', 'CLEANUP_INTERVAL_HOURS', 'WEBHOOK_MAX_FILES']
   for (const k of intFields) {
     const v = (form.value as any)[k]
     if (v !== '' && (isNaN(Number(v)) || !Number.isFinite(Number(v)) || Number(v) < 0)) {
