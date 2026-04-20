@@ -1,5 +1,5 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   runningHintDebugEnabled?: boolean
 }>()
 
@@ -44,6 +44,9 @@ const setTasksJumpPageValue = (value: number | null) => { tasksJumpPage.value = 
 const setHistoryStatusFilter = (value: string) => { historyStatusFilter.value = value }
 const setJumpPageValue = (value: number) => { jumpPage.value = value }
 const setFinalFilesJumpValue = (value: number | null) => { finalFilesJump.value = value }
+const prevTasksPage = () => { tasksPage.value-- }
+const nextTasksPage = () => { tasksPage.value++ }
+const backToTasks = () => { currentModule.value = tasks }
 function ensureWebhookFormShape() {
   if (!webhookForm.value.notify) {
     webhookForm.value.notify = { manual: false, schedule: false, webhook: false }
@@ -142,7 +145,7 @@ const {
   closeRunningHint,
   toggleRunningHintDebug,
   openRunningHintLog,
-} = useRunningHintRuntime(activeRuns, openRunLogFromHint)
+} = useRunningHintRuntime(activeRuns, openRunLogFromHint, props.runningHintDebugEnabled === true)
 
 const {
   showRunDetail,
@@ -181,6 +184,9 @@ const {
   runApi,
   jobApi,
 })
+
+const prevRunsPage = async () => { runsPage.value--; await loadData() }
+const nextRunsPage = async () => { runsPage.value++; await loadData() }
 
 const {
   showWebhookModal,
@@ -395,8 +401,8 @@ const {
     :run-files-page="runFilesPage"
     :total-run-files-pages="totalRunFilesPages"
     :back-to-tasks="() => { currentModule = 'tasks' }"
-    :prev-runs-page="() => { runsPage--; loadData() }"
-    :next-runs-page="() => { runsPage++; loadData() }"
+    :prev-runs-page="prevRunsPage"
+    :next-runs-page="nextRunsPage"
     :set-history-status-filter="setHistoryStatusFilter"
     :set-jump-page-value="setJumpPageValue"
     :jump-to-page="jumpToPage"
