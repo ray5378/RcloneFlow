@@ -100,31 +100,6 @@ const {
   jumpFinalFilesPage,
 } = useRunDetailRuntime({ runApi })
 
-const openRunLogFromHint = (run: any) => openRunLog(run)
-
-// 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度
-const {
-  runningHintVisible,
-  runningHintRun,
-  runningHintDebugOpen,
-  runningHintPhaseText,
-  runningHintProgressText,
-  runningHintDebugInfo,
-  openRunningHint,
-  closeRunningHint,
-  toggleRunningHintDebug,
-  openRunningHintLog,
-} = useRunningHintRuntime(activeRuns, openRunLogFromHint, props.runningHintDebugEnabled === true)
-
-const {
-  showRunDetail,
-  closeRunDetail,
-} = useRunDetailEntry({
-  openRunningHint,
-  openRunDetailModal,
-  openRunDetailFiles,
-  closeRunDetailModal,
-})
 const {
   loadData,
   loadActiveRuns,
@@ -178,35 +153,6 @@ const {
 })
 
 const {
-  closeWebhookModal,
-  closeSingletonModal,
-  closeLogModal,
-  closeGlobalStatsModal,
-  setWebhookTriggerId,
-  setWebhookPostUrl,
-  setWebhookWecomUrl,
-  setWebhookNotifyManual,
-  setWebhookNotifySchedule,
-  setWebhookNotifyWebhook,
-  setWebhookStatusSuccess,
-  setWebhookStatusFailed,
-  setSingletonEnabled,
-  setCommandMode,
-  setCommandText,
-  setShowAdvancedOptions,
-} = useTaskViewModalBindings({
-  showWebhookModal,
-  webhookForm,
-  showSingletonModal,
-  singletonForm,
-  showLogModal,
-  commandMode,
-  commandText,
-  showAdvancedOptions,
-  showGlobalStatsModal,
-})
-
-const {
   showWebhookModal,
   webhookForm,
   setWebhook,
@@ -233,6 +179,64 @@ const {
   showToast,
   taskApi,
   getFinalSummary: getFinalSummaryFromComposable,
+})
+
+const openRunLogFromHint = (run: any) => openRunLog(run)
+
+// 已移除"实时进度"弹窗逻辑，卡片直接显示稳态进度。
+// 注意：这里依赖 openRunLog，因此必须放在 useTaskViewAuxRuntime 之后。
+const {
+  runningHintVisible,
+  runningHintRun,
+  runningHintDebugOpen,
+  runningHintPhaseText,
+  runningHintProgressText,
+  runningHintDebugInfo,
+  openRunningHint,
+  closeRunningHint,
+  toggleRunningHintDebug,
+  openRunningHintLog,
+} = useRunningHintRuntime(activeRuns, openRunLogFromHint, props.runningHintDebugEnabled === true)
+
+const {
+  showRunDetail,
+  closeRunDetail,
+} = useRunDetailEntry({
+  openRunningHint,
+  openRunDetailModal,
+  openRunDetailFiles,
+  closeRunDetailModal,
+})
+
+// webhook / singleton / editor modal 绑定桥只负责字段级 UI 接线；
+// 这里同样依赖 aux runtime 暴露出的表单 ref，因此必须放在其后。
+const {
+  closeWebhookModal,
+  closeSingletonModal,
+  closeLogModal,
+  closeGlobalStatsModal,
+  setWebhookTriggerId,
+  setWebhookPostUrl,
+  setWebhookWecomUrl,
+  setWebhookNotifyManual,
+  setWebhookNotifySchedule,
+  setWebhookNotifyWebhook,
+  setWebhookStatusSuccess,
+  setWebhookStatusFailed,
+  setSingletonEnabled,
+  setCommandMode,
+  setCommandText,
+  setShowAdvancedOptions,
+} = useTaskViewModalBindings({
+  showWebhookModal,
+  webhookForm,
+  showSingletonModal,
+  singletonForm,
+  showLogModal,
+  commandMode,
+  commandText,
+  showAdvancedOptions,
+  showGlobalStatsModal,
 })
 
 // move 模式时，成功数量代表 Moved 条数；已在后端合并 Copied+Deleted 为 Moved
