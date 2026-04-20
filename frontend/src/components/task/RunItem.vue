@@ -142,18 +142,15 @@ function getProgressText(run: RunRecord): string {
 </template>
 
 <style scoped>
+@import './listItemBase.css';
+
 .run-item {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid #333;
-  cursor: pointer;
 }
-.run-item:hover {
-  background: rgba(255,255,255,0.03);
-}
+
 .name {
   display: flex;
   align-items: center;

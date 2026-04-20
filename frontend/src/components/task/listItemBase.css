@@ -1,0 +1,22 @@
+:where(.task-card, .run-item) {
+  position: relative;
+  padding: 12px 16px;
+  border-bottom: 1px solid #333;
+  cursor: pointer;
+  transition: background-color 0.18s ease, border-left-color 0.18s ease;
+  border-left: 3px solid transparent;
+}
+
+:where(.task-card, .run-item):hover {
+  background: #252525;
+  border-left-color: rgba(99, 102, 241, 0.55);
+}
+
+body.light :where(.task-card, .run-item) {
+  border-bottom-color: #e5e7eb;
+}
+
+body.light :where(.task-card, .run-item):hover {
+  background: #f8f8f8;
+  border-left-color: rgba(25, 118, 210, 0.38);
+}
