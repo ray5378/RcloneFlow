@@ -154,6 +154,7 @@ const {
 const {
   loadData,
   loadActiveRuns,
+  getRunProgressFromSummary,
   getRealtimeProgressByRun,
   getTaskCardProgressByTask,
   formatBps,
