@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // RunRecord 运行记录结构。
@@ -184,6 +185,38 @@ func cleanupRunLog(run RunRecord) {
 
 // CleanOldRuns 删除指定天数之前的运行记录，返回删除的记录数
 func (s *RunService) CleanOldRuns(days int) (int64, error) {
-	return s.db.CleanOldRuns(days)
+	if days <= 0 {
+		return 0, nil
+	}
+	cutoff := time.Now().AddDate(0, 0, -days)
+	page := 1
+	pageSize := 500
+	deleted := int64(0)
+	for {
+		runs, total, err := s.db.ListRuns(page, pageSize)
+		if err != nil {
+			return deleted, err
+		}
+		if len(runs) == 0 {
+			break
+		}
+		for _, run := range runs {
+			startedAt, err := time.Parse(time.RFC3339, run.StartedAt)
+			if err != nil {
+				continue
+			}
+			if startedAt.Before(cutoff) {
+				if err := s.DeleteRun(run.ID); err != nil {
+					return deleted, err
+				}
+				deleted++
+			}
+		}
+		if page*pageSize >= total {
+			break
+		}
+		page++
+	}
+	return deleted, nil
 }
 

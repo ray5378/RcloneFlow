@@ -30,9 +30,9 @@ Notes:
 - GET /api/runs/active → runRecord also includes computed durationSeconds, durationText (from now - startedAt); realtime only, not stored.
 
 ## Retention
-- FINAL_SUMMARY_RETENTION_DAYS (env) controls how many days runs (with finalSummary) are kept in DB. Default: 7.
+- FINAL_SUMMARY_RETENTION_DAYS (env) controls how many days run history is kept. Default: 7.
 - CLEANUP_INTERVAL_HOURS (env) controls cleanup frequency. Default: 24.
-- Log retention is separate: LOG_RETENTION_DAYS / LOG_CLEANUP_INTERVAL_HOURS.
+- When run history is cleaned, the corresponding rclone history log files are removed together.
 
 ## Frontend Behavior
 - History views render only summary.finalSummary.

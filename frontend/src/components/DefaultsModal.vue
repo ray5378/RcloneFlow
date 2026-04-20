@@ -166,7 +166,7 @@ onMounted(load)
         <div class="section">
           <div class="section-title">历史与保留（定期清理）</div>
           <div class="grid">
-            <label title="运行总结（finalSummary）保留天数">运行总结保留天数 <small class="subkey">FINAL_SUMMARY_RETENTION_DAYS</small></label>
+            <label title="运行历史保留天数；到期后数据库历史记录与对应 rclone 日志会一起清理">运行历史保留天数 <small class="subkey">FINAL_SUMMARY_RETENTION_DAYS</small></label>
             <input v-model="form.FINAL_SUMMARY_RETENTION_DAYS" type="number" min="0" />
             <div class="error" v-if="errors.FINAL_SUMMARY_RETENTION_DAYS">{{ errors.FINAL_SUMMARY_RETENTION_DAYS }}</div>
             <label title="清理任务执行间隔（小时）">清理扫描间隔（小时） <small class="subkey">CLEANUP_INTERVAL_HOURS</small></label>

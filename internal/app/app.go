@@ -110,9 +110,9 @@ func Run(cfg *config.Config) error {
 			zap.Int("retention_days", cfg.GetCleanupRetention()))
 	}
 
-	// 启动日志清理服务
+	// 启动日志清理服务（产品语义上跟随历史记录保留天数）
 	logsDir := filepath.Join(cfg.GetDataDir(), "logs")
-	logRetention := cfg.GetLogRetention()
+	logRetention := cfg.GetCleanupRetention()
 	if logRetention <= 0 {
 		logRetention = 7 // 默认7天
 	}

@@ -185,6 +185,9 @@ func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 		intervalHours := atoiDefault(cur["CLEANUP_INTERVAL_HOURS"], atoiDefault(defaultsMap()["CLEANUP_INTERVAL_HOURS"], 24))
 		retentionDays := atoiDefault(cur["FINAL_SUMMARY_RETENTION_DAYS"], atoiDefault(defaultsMap()["FINAL_SUMMARY_RETENTION_DAYS"], 7))
 		ReplanCleanupHook(intervalHours, retentionDays)
+		if ReplanLogCleanupHook != nil {
+			ReplanLogCleanupHook(retentionDays)
+		}
 	}
 	WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
