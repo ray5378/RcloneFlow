@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"rcloneflow/internal/adapter"
@@ -91,8 +93,24 @@ func (s *TaskService) UpdateTaskOptions(id int64, opts map[string]any) error {
 	return s.db.UpdateTask(id, t)
 }
 
-// DeleteTask 删除任务
+// DeleteTask 删除任务，并连带清理关联历史/日志/调度
 func (s *TaskService) DeleteTask(id int64) error {
+	runs, err := s.db.ListRunsByTask(id)
+	if err != nil {
+		return err
+	}
+	for _, run := range runs {
+		if run.Summary == nil {
+			continue
+		}
+		if p, ok := run.Summary["stderrFile"].(string); ok && p != "" {
+			_ = os.Remove(p)
+			dir := filepath.Dir(p)
+			if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
+				_ = os.Remove(dir)
+			}
+		}
+	}
 	return s.db.DeleteTask(id)
 }
 
