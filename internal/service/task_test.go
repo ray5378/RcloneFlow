@@ -221,6 +221,18 @@ func TestTaskService_DeleteTask_RemovesAllKnownRunLogs(t *testing.T) {
 	}
 	defer os.RemoveAll(tmpDir)
 
+	oldAppDataDir := os.Getenv("APP_DATA_DIR")
+	if err := os.Setenv("APP_DATA_DIR", tmpDir); err != nil {
+		t.Fatalf("Setenv(APP_DATA_DIR) error = %v", err)
+	}
+	defer func() {
+		if oldAppDataDir == "" {
+			_ = os.Unsetenv("APP_DATA_DIR")
+		} else {
+			_ = os.Setenv("APP_DATA_DIR", oldAppDataDir)
+		}
+	}()
+
 	db, err := store.Open(tmpDir)
 	if err != nil {
 		t.Fatalf("Open() error = %v", err)
@@ -233,12 +245,16 @@ func TestTaskService_DeleteTask_RemovesAllKnownRunLogs(t *testing.T) {
 		t.Fatalf("CreateTask() error = %v", err)
 	}
 
-	logDir := filepath.Join(tmpDir, "logs", "task-log-clean-0421")
-	if err := os.MkdirAll(logDir, 0o755); err != nil {
-		t.Fatalf("MkdirAll() error = %v", err)
+	logDir1 := filepath.Join(tmpDir, "logs", "task-log-clean-0421")
+	logDir2 := filepath.Join(tmpDir, "logs", "task-log-clean-0422")
+	if err := os.MkdirAll(logDir1, 0o755); err != nil {
+		t.Fatalf("MkdirAll(logDir1) error = %v", err)
 	}
-	log1 := filepath.Join(logDir, "0001.log")
-	log2 := filepath.Join(logDir, "0002.log")
+	if err := os.MkdirAll(logDir2, 0o755); err != nil {
+		t.Fatalf("MkdirAll(logDir2) error = %v", err)
+	}
+	log1 := filepath.Join(logDir1, "0001.log")
+	log2 := filepath.Join(logDir2, "0002.log")
 	if err := os.WriteFile(log1, []byte("one"), 0o644); err != nil {
 		t.Fatalf("WriteFile(log1) error = %v", err)
 	}
@@ -255,6 +271,15 @@ func TestTaskService_DeleteTask_RemovesAllKnownRunLogs(t *testing.T) {
 		t.Fatalf("AddRun(log2) error = %v", err)
 	}
 
+	orphanDir := filepath.Join(tmpDir, "logs", "task-log-clean-0423")
+	if err := os.MkdirAll(orphanDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll(orphanDir) error = %v", err)
+	}
+	orphanLog := filepath.Join(orphanDir, "9999.log")
+	if err := os.WriteFile(orphanLog, []byte("orphan"), 0o644); err != nil {
+		t.Fatalf("WriteFile(orphanLog) error = %v", err)
+	}
+
 	if err := svc.DeleteTask(task.ID); err != nil {
 		t.Fatalf("DeleteTask() error = %v", err)
 	}
@@ -264,8 +289,14 @@ func TestTaskService_DeleteTask_RemovesAllKnownRunLogs(t *testing.T) {
 	if _, err := os.Stat(log2); !os.IsNotExist(err) {
 		t.Fatalf("expected log2 removed, got err=%v", err)
 	}
-	if _, err := os.Stat(logDir); !os.IsNotExist(err) {
-		t.Fatalf("expected empty log dir removed, got err=%v", err)
+	if _, err := os.Stat(logDir1); !os.IsNotExist(err) {
+		t.Fatalf("expected logDir1 removed, got err=%v", err)
+	}
+	if _, err := os.Stat(logDir2); !os.IsNotExist(err) {
+		t.Fatalf("expected logDir2 removed, got err=%v", err)
+	}
+	if _, err := os.Stat(orphanDir); !os.IsNotExist(err) {
+		t.Fatalf("expected orphanDir removed by task-name glob, got err=%v", err)
 	}
 	if _, ok := db.GetTask(task.ID); ok {
 		t.Fatal("expected task deleted")

@@ -121,6 +121,10 @@ func (s *TaskService) UpdateTaskOptions(id int64, opts map[string]any) error {
 
 // DeleteTask 删除任务，并连带清理关联历史/日志/调度
 func (s *TaskService) DeleteTask(id int64) error {
+	task, ok := s.db.GetTask(id)
+	if !ok {
+		return ErrTaskNotFound
+	}
 	runs, err := s.db.ListRunsByTask(id)
 	if err != nil {
 		return err
@@ -141,6 +145,22 @@ func (s *TaskService) DeleteTask(id int64) error {
 			_ = os.Remove(dir)
 		}
 	}
+
+	logsBase := os.Getenv("APP_DATA_DIR")
+	if logsBase == "" {
+		logsBase = "./data"
+	}
+	logsDir := filepath.Join(logsBase, "logs")
+	trimmedName := strings.TrimSpace(task.Name)
+	if trimmedName != "" {
+		pattern := filepath.Join(logsDir, trimmedName+"-*")
+		if matches, err := filepath.Glob(pattern); err == nil {
+			for _, dir := range matches {
+				_ = os.RemoveAll(dir)
+			}
+		}
+	}
+
 	return s.db.DeleteTask(id)
 }
 
