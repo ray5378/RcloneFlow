@@ -140,10 +140,6 @@ export function useTaskProgressSync(options: {
       await Promise.all([options.loadActiveRuns(), options.loadData()])
       await new Promise(r => setTimeout(r, 1000))
       await Promise.all([options.loadActiveRuns(), options.loadData()])
-      const st = options.lastRunningProgressByTask.value?.[taskId]
-      if (st && Date.now() - st.at > options.lingerMs) {
-        delete options.lastRunningProgressByTask.value[taskId]
-      }
     } finally {
       setTimeout(() => {
         delete refreshLocks[taskId]
