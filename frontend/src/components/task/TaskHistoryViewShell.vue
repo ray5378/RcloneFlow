@@ -18,7 +18,6 @@ defineProps<{
   runDetail: any
   getStatusClass: (status: string) => string
   getStatusText: (status: string) => string
-  getPreflightFromComposable: (run: any) => any
   formatBytes: (value: number) => string
   formatTime: (value: any) => string
   formatBps: (value: number) => string
@@ -59,7 +58,6 @@ defineProps<{
   closeLogModal: () => void
   runningHintVisible: boolean
   runningHintRun: any
-  runningHintDebugEnabled: boolean
   runningHintDebugOpen: boolean
   runningHintPhaseText: string
   runningHintProgressText: string
@@ -143,4 +141,3 @@ defineProps<{
     @open-log="openRunningHintLog"
   />
 </template>
-template>

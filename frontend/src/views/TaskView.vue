@@ -89,7 +89,6 @@ const {
   goPrevFilesPage,
   goNextFilesPage,
   getFinalSummary: getFinalSummaryFromComposable,
-  getPreflight: getPreflightFromComposable,
   finalFiles,
   finalCountAll,
   finalCountSuccess,
