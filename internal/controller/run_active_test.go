@@ -25,6 +25,7 @@ func (m *mockRunSvcDB) ListActiveRuns() ([]service.RunRecord, error) {
 func (m *mockRunSvcDB) GetActiveRunByTaskID(taskID int64) (service.RunRecord, error) {
 	return service.RunRecord{}, nil
 }
+func (m *mockRunSvcDB) GetRun(id int64) (service.RunRecord, error) { return service.RunRecord{}, nil }
 func (m *mockRunSvcDB) UpdateRun(id int64, updateFn func(*service.RunRecord)) {}
 func (m *mockRunSvcDB) DeleteRun(id int64) error { return nil }
 func (m *mockRunSvcDB) DeleteAllRuns() error { return nil }

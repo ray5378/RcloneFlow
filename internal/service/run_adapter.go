@@ -89,6 +89,14 @@ func (a *storeRunAdapter) GetActiveRunByTaskID(taskID int64) (RunRecord, error) 
 	return toRunRecord(r), nil
 }
 
+func (a *storeRunAdapter) GetRun(id int64) (RunRecord, error) {
+	r, err := a.db.GetRun(id)
+	if err != nil {
+		return RunRecord{}, err
+	}
+	return toRunRecord(r), nil
+}
+
 func (a *storeRunAdapter) UpdateRun(id int64, updateFn func(*RunRecord)) {
 	a.db.UpdateRun(id, func(r *store.Run) {
 		rec := toRunRecord(*r)

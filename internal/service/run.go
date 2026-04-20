@@ -1,6 +1,10 @@
 package service
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+)
 
 // RunRecord 运行记录结构。
 // Summary 当前同时承载两类信息：
@@ -32,6 +36,7 @@ type RunServiceInterface interface {
 	ListRunsByTask(taskId int64) ([]RunRecord, error)
 	ListActiveRuns() ([]RunRecord, error)
 	GetActiveRunByTaskID(taskID int64) (RunRecord, error)
+	GetRun(id int64) (RunRecord, error)
 	UpdateRun(id int64, updateFn func(*RunRecord))
 	DeleteRun(id int64) error
 	DeleteAllRuns() error
@@ -120,6 +125,11 @@ func deepMerge(a, b map[string]any) map[string]any {
 }
 
 func (s *RunService) DeleteRun(id int64) error {
+	run, err := s.db.GetRun(id)
+	if err != nil {
+		return err
+	}
+	cleanupRunLog(run)
 	return s.db.DeleteRun(id)
 }
 
@@ -128,7 +138,33 @@ func (s *RunService) DeleteAllRuns() error {
 }
 
 func (s *RunService) DeleteRunsByTask(taskId int64) error {
+	runs, err := s.db.ListRunsByTask(taskId)
+	if err != nil {
+		return err
+	}
+	for _, run := range runs {
+		cleanupRunLog(run)
+	}
 	return s.db.DeleteRunsByTask(taskId)
+}
+
+func cleanupRunLog(run RunRecord) {
+	if run.Summary == "" {
+		return
+	}
+	var summary map[string]any
+	if err := json.Unmarshal([]byte(run.Summary), &summary); err != nil || summary == nil {
+		return
+	}
+	p, _ := summary["stderrFile"].(string)
+	if p == "" {
+		return
+	}
+	_ = os.Remove(p)
+	dir := filepath.Dir(p)
+	if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
+		_ = os.Remove(dir)
+	}
 }
 
 // CleanOldRuns 删除指定天数之前的运行记录，返回删除的记录数
