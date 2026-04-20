@@ -41,22 +41,22 @@ const setHistoryStatusFilter = (value: string) => { historyStatusFilter.value = 
 const setJumpPageValue = (value: number) => { jumpPage.value = value }
 const setFinalFilesJumpValue = (value: number | null) => { finalFilesJump.value = value }
 function ensureWebhookFormShape() {
-  if (!(webhookForm as any).notify) {
-    ;(webhookForm as any).notify = { manual: false, schedule: false, webhook: false }
+  if (!webhookForm.value.notify) {
+    webhookForm.value.notify = { manual: false, schedule: false, webhook: false }
   }
-  if (!(webhookForm as any).status) {
-    ;(webhookForm as any).status = { success: true, failed: true }
+  if (!webhookForm.value.status) {
+    webhookForm.value.status = { success: true, failed: true }
   }
 }
-const setWebhookTriggerId = (value: string) => { ;(webhookForm as any).triggerId = value }
-const setWebhookPostUrl = (value: string) => { ;(webhookForm as any).postUrl = value }
-const setWebhookWecomUrl = (value: string) => { ;(webhookForm as any).wecomUrl = value }
-const setWebhookNotifyManual = (value: boolean) => { ensureWebhookFormShape(); (webhookForm as any).notify.manual = value }
-const setWebhookNotifySchedule = (value: boolean) => { ensureWebhookFormShape(); (webhookForm as any).notify.schedule = value }
-const setWebhookNotifyWebhook = (value: boolean) => { ensureWebhookFormShape(); (webhookForm as any).notify.webhook = value }
-const setWebhookStatusSuccess = (value: boolean) => { ensureWebhookFormShape(); (webhookForm as any).status.success = value }
-const setWebhookStatusFailed = (value: boolean) => { ensureWebhookFormShape(); (webhookForm as any).status.failed = value }
-const setSingletonEnabled = (value: boolean) => { singletonForm.singletonEnabled = value }
+const setWebhookTriggerId = (value: string) => { webhookForm.value.triggerId = value }
+const setWebhookPostUrl = (value: string) => { webhookForm.value.postUrl = value }
+const setWebhookWecomUrl = (value: string) => { webhookForm.value.wecomUrl = value }
+const setWebhookNotifyManual = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.notify.manual = value }
+const setWebhookNotifySchedule = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.notify.schedule = value }
+const setWebhookNotifyWebhook = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.notify.webhook = value }
+const setWebhookStatusSuccess = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.status.success = value }
+const setWebhookStatusFailed = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.status.failed = value }
+const setSingletonEnabled = (value: boolean) => { singletonForm.value.singletonEnabled = value }
 const setCommandMode = (value: boolean) => { commandMode.value = value }
 const setCommandText = (value: string) => { commandText.value = value }
 const setShowAdvancedOptions = (value: boolean) => { showAdvancedOptions.value = value }
