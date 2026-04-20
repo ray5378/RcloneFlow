@@ -25,6 +25,7 @@ import { useTaskFormRuntime } from '../composables/useTaskFormRuntime'
 import { useTaskListRuntime } from '../composables/useTaskListRuntime'
 import { useTaskListView } from '../composables/useTaskListView'
 import { useTaskViewPagingBridge } from '../composables/useTaskViewPagingBridge'
+import { useTaskViewModalBindings } from '../composables/useTaskViewModalBindings'
 import { useToastCenter } from '../composables/useToastCenter'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 
@@ -35,31 +36,6 @@ const { normalizeTaskOptions } = useTaskFormNormalize()
 setErrorHandler((message, type) => {
   showToast(message, type as 'info' | 'success' | 'error')
 })
-
-const closeWebhookModal = () => { showWebhookModal.value = false }
-const closeSingletonModal = () => { showSingletonModal.value = false }
-const closeLogModal = () => { showLogModal.value = false }
-const closeGlobalStatsModal = () => { showGlobalStatsModal.value = false }
-function ensureWebhookFormShape() {
-  if (!webhookForm.value.notify) {
-    webhookForm.value.notify = { manual: false, schedule: false, webhook: false }
-  }
-  if (!webhookForm.value.status) {
-    webhookForm.value.status = { success: true, failed: true }
-  }
-}
-const setWebhookTriggerId = (value: string) => { webhookForm.value.triggerId = value }
-const setWebhookPostUrl = (value: string) => { webhookForm.value.postUrl = value }
-const setWebhookWecomUrl = (value: string) => { webhookForm.value.wecomUrl = value }
-const setWebhookNotifyManual = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.notify.manual = value }
-const setWebhookNotifySchedule = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.notify.schedule = value }
-const setWebhookNotifyWebhook = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.notify.webhook = value }
-const setWebhookStatusSuccess = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.status.success = value }
-const setWebhookStatusFailed = (value: boolean) => { ensureWebhookFormShape(); webhookForm.value.status.failed = value }
-const setSingletonEnabled = (value: boolean) => { singletonForm.value.singletonEnabled = value }
-const setCommandMode = (value: boolean) => { commandMode.value = value }
-const setCommandText = (value: string) => { commandText.value = value }
-const setShowAdvancedOptions = (value: boolean) => { showAdvancedOptions.value = value }
 
 const {
   tasks,
@@ -199,6 +175,35 @@ const {
   runsPage,
   currentModule,
   loadData,
+})
+
+const {
+  closeWebhookModal,
+  closeSingletonModal,
+  closeLogModal,
+  closeGlobalStatsModal,
+  setWebhookTriggerId,
+  setWebhookPostUrl,
+  setWebhookWecomUrl,
+  setWebhookNotifyManual,
+  setWebhookNotifySchedule,
+  setWebhookNotifyWebhook,
+  setWebhookStatusSuccess,
+  setWebhookStatusFailed,
+  setSingletonEnabled,
+  setCommandMode,
+  setCommandText,
+  setShowAdvancedOptions,
+} = useTaskViewModalBindings({
+  showWebhookModal,
+  webhookForm,
+  showSingletonModal,
+  singletonForm,
+  showLogModal,
+  commandMode,
+  commandText,
+  showAdvancedOptions,
+  showGlobalStatsModal,
 })
 
 const {
