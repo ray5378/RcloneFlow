@@ -238,7 +238,7 @@ onMounted(async () => {
             </div>
             <div class="settings-item" @click="showDefaultsModal = true">
               <span class="settings-icon">🛠️</span>
-              <span class="settings-text">修改默认设置</span>
+              <span class="settings-text">默认配置</span>
               <span class="settings-arrow">›</span>
             </div>
             <div class="settings-item" @click="openGitHub">

@@ -124,7 +124,7 @@ onMounted(load)
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content large">
       <div class="modal-header">
-        <h3>修改默认设置</h3>
+        <h3>默认配置</h3>
         <button class="close-btn" @click="$emit('close')">×</button>
       </div>
       <div class="modal-body" v-if="!loading">
