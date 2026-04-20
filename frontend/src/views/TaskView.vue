@@ -414,6 +414,7 @@ const {
     :close-log-modal="closeLogModal"
     :running-hint-visible="runningHintVisible"
     :running-hint-run="runningHintRun"
+    :running-hint-debug-enabled="runningHintDebugEnabled"
     :running-hint-debug-open="runningHintDebugOpen"
     :running-hint-phase-text="runningHintPhaseText"
     :running-hint-progress-text="runningHintProgressText"

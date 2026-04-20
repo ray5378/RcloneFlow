@@ -7,6 +7,7 @@ export function useRunningHintRuntime(activeRuns: Ref<any[]>, openRunLog: (run: 
   return {
     runningHintVisible: hint.visible,
     runningHintRun: hint.run,
+    runningHintDebugEnabled: hint.debugEnabled,
     runningHintDebugOpen: hint.debugOpen,
     runningHintPhaseText: hint.phaseText,
     runningHintProgressText: hint.progressText,

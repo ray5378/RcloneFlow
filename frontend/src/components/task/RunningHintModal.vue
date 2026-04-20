@@ -31,12 +31,12 @@ const emit = defineEmits<{
           <div class="detail-item"><label>任务：</label><span>{{ run?.taskName || `#${run?.taskId}` }}</span></div>
           <div class="detail-item"><label>阶段：</label><span>{{ phaseText || '-' }}</span></div>
           <div class="detail-item"><label>实时：</label><span>{{ progressText || '-' }}</span></div>
-          <div class="detail-item full-width">
+          <div v-if="debugEnabled" class="detail-item full-width">
             <button class="ghost debug-toggle" @click="emit('toggle-debug')">
               {{ debugOpen ? '收起调试详情' : '展开调试详情' }}
             </button>
           </div>
-          <template v-if="debugOpen">
+          <template v-if="debugEnabled && debugOpen">
             <div class="detail-item"><label>自检：</label><span>{{ debugCheckText || '-' }}</span></div>
             <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ debugProgressLine || '-' }}</code></div>
             <div class="detail-item full-width"><label>接口进度：</label><code class="inline-logline">{{ debugProgressJson || '-' }}</code></div>
