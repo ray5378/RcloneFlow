@@ -132,7 +132,7 @@ function getProgressText(run: RunRecord): string {
       </template>
     </div>
 
-    <div class="row-actions">
+    <div class="row-actions list-item-actions list-item-actions-right">
       <button class="ghost small" @click.stop="emit('viewDetail', run)">运行详情</button>
       <button class="ghost small" @click.stop="emit('viewLog', run)">传输日志</button>
       <button class="ghost small danger-text" @click.stop="emit('clear', run.id)">清除</button>
@@ -143,6 +143,7 @@ function getProgressText(run: RunRecord): string {
 <style scoped>
 @import './listItemBase.css';
 @import './listItemMeta.css';
+@import './listItemActions.css';
 
 .run-item {
   display: flex;
@@ -189,10 +190,5 @@ function getProgressText(run: RunRecord): string {
   padding: 4px 8px;
   background: #f59e0b22;
   border-radius: 4px;
-}
-.row-actions {
-  display: flex;
-  gap: 8px;
-  margin-left: auto;
 }
 </style>

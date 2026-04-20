@@ -102,7 +102,7 @@ function isStopped(): boolean {
         <span v-else class="no-schedule list-item-tertiary-text">未设置</span>
       </div>
 
-      <div class="item-actions">
+      <div class="item-actions list-item-actions list-item-actions-right">
         <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 任务历史记录</button>
         <button class="ghost small" :class="{ 'danger-text': isStopped() }" @click.stop="emit('stop', task.id!)">
           {{ isStopped() ? '⏹ 已经停止' : '⏹ 停止传输' }}
@@ -148,6 +148,7 @@ function isStopped(): boolean {
 <style scoped>
 @import './listItemBase.css';
 @import './listItemMeta.css';
+@import './listItemActions.css';
 
 .task-card.active {
   border-left: 3px solid var(--accent, #4f46e5);
@@ -179,12 +180,6 @@ function isStopped(): boolean {
 .schedule-badge.disabled {
   background: #666633;
   color: #999;
-}
-.item-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-left: auto;
 }
 .task-paths {
   margin-top: 8px;

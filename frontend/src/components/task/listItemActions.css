@@ -1,0 +1,18 @@
+.list-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.list-item-actions.list-item-actions-right {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.list-item-actions :where(button.ghost.small) {
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  line-height: 1.2;
+}
