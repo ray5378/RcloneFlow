@@ -14,8 +14,9 @@ export function useTaskSingletonConfig(options: {
   function setSingletonMode(task: any) {
     singletonForm.value.taskId = task.id
     try {
-      const opts = (task.options || task.Options || {}) as any
-      singletonForm.value.singletonEnabled = !!opts.singletonMode
+      const raw = task.options || task.Options || {}
+      const opts = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw
+      singletonForm.value.singletonEnabled = !!opts?.singletonMode
     } catch {
       singletonForm.value.singletonEnabled = false
     }

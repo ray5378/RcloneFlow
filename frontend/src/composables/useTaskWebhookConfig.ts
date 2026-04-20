@@ -20,7 +20,8 @@ export function useTaskWebhookConfig(options: {
   function setWebhook(task: any) {
     webhookForm.value.taskId = task.id
     try {
-      const opts = (task.options || task.Options || {}) as any
+      const raw = task.options || task.Options || {}
+      const opts = typeof raw === 'string' ? JSON.parse(raw || '{}') : raw
       webhookForm.value.postUrl = opts?.webhookPostUrl || ''
       webhookForm.value.wecomUrl = opts?.wecomPostUrl || ''
       webhookForm.value.triggerId = opts?.webhookId || ''
