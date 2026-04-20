@@ -62,7 +62,7 @@
 当前几条最关键的约束：
 - `dev -> master` 是固定主线流程
 - 运行中 UI 主真源是 `/api/runs/active.progress`
-- 运行中主展示真源固定为 `progress`，任务卡片完成态由前端冻结帧承接
+- 运行中主展示真源固定为 `progress`，任务卡片完成态由前端冻结帧 `completedFreezeByTask` 承接
 - `preflight` 保留预估语义，不直接驱动运行中主展示
 - 高风险改动优先小步推进、每步停测
 

@@ -36,17 +36,18 @@
 - 运行中任务卡片、小窗、ETA 等主展示统一优先使用 `/api/runs/active.progress`
 
 原因：
-- 之前 `progress / stableProgress / preflight` 混用，导致展示语义混乱
+- 之前 `progress / 完成态兼容字段 / preflight` 混用，导致展示语义混乱
 - 必须明确唯一主真源，才能降低前后端各自拼接的混乱度
 
 ---
 
-### 4. 运行中 / 刚结束卡片 / 历史详情三层字段必须分离
+### 4. 运行中 / 任务卡片完成态 / 历史详情三层职责必须分离
 决策：
-- 当前代码已删除 `stableProgress`，改由 `progress` / `finalSummary` 分层承载
+- 当前代码已删除 `stableProgress` 与 `cardSummary`
+- 改由 `progress` / `completedFreezeByTask` / `finalSummary` 分层承载
 
 原因：
-- 运行中场景继续混用完成态字段，会模糊 live、过渡态与最终总结之间的边界
+- 运行中场景继续混用完成态字段，会模糊 live、卡片完成态与最终总结之间的边界
 
 ---
 

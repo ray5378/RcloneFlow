@@ -190,15 +190,17 @@
 - 稳住 3 个 shell 边界，不让 `TaskView.vue` 回退去直连旧 section
 - 持续防止头部 import / wiring block 和尾部模板 / 样式块反弹
 
-#### 4.2 固化 `progress / stableProgress` 契约边界
+#### 4.2 固化 `progress / completedFreezeByTask / finalSummary` 契约边界
 现状：
 - 主链已经理顺
 - 但类型层 / 注释层 / 接口契约层仍可继续加固
 
 目标：
 - 在接口类型、注释、文档中继续强化语义约束
-- 严格限制运行中页面只接触 `progress`，不要混入 `cardSummary` / `finalSummary`
-- 降低后续维护者误用兼容字段的风险
+- 严格限制运行中页面只接触 `progress`
+- 任务卡片完成态只接触 `completedFreezeByTask`
+- 历史详情只接触 `finalSummary`
+- 降低后续维护者误用字段职责的风险
 
 #### 4.3 旧 runner 路径已完成清理
 已完成：

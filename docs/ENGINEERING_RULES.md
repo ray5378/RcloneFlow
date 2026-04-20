@@ -372,7 +372,7 @@ aggregate size pair 必须要求显式字节单位（例如 `MiB/GiB`）。
 
 不要直接从以下字段逆推运行中 UI：
 - `preflight`
-- `stableProgress`
+- 已删除的历史完成态兼容字段
 
 除非你明确是在处理：
 - 完成态固化
