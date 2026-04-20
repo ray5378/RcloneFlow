@@ -200,17 +200,14 @@
 - 尽量限制运行中页面直接接触 `stableProgress`
 - 降低后续维护者误用兼容字段的风险
 
-#### 4.3 标注或清理旧 runner
-现状：
-- 当前主执行链是 `internal/runnercli/runner.go`
-- 仓库里仍保留 `internal/app/runner.go`
+#### 4.3 旧 runner 路径已完成清理
+已完成：
+- 当前主执行链固定为 `internal/runnercli/runner.go`
+- 旧的 `internal/app/runner.go` 已删除
 
-风险：
-- 容易误导后续修改者改错地方
-
-建议：
-- 至少加注释标明谁是主链、谁是遗留实现
-- 长期看应逐步移除旧实现
+后续要求：
+- 任务执行、进度解析、日志链路、停止链路只维护 `runnercli` 主链
+- 不再恢复或重新引入并行旧 runner 实现
 
 ### 中优先级
 
