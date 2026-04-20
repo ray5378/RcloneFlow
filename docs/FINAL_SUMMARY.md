@@ -37,4 +37,4 @@ Notes:
 ## Frontend Behavior
 - History views render only summary.finalSummary.
 - "Run Detail" shows: start/end, frozen duration, result, average speed, transferred/total, and file details.
-- During an active run, the frontend prefers `/api/runs/active.progress` for live UI. Backend log parsing writes live progress into `summary.progress`; task-card finish transitions use `summary.cardSummary`, while history/detail views use `summary.finalSummary`.
+- During an active run, the frontend prefers `/api/runs/active.progress` for live UI. Backend log parsing writes live progress into `summary.progress`; history/detail views use `summary.finalSummary`.

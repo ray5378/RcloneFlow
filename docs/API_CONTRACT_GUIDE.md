@@ -112,22 +112,17 @@
 
 ---
 
-## 3. `progress / cardSummary / finalSummary / preflight` 的区别
+## 3. `progress / finalSummary / preflight` 的区别
 
 ### 3.1 `progress`
 - 运行中实时进度
 - 当前运行中展示主数据源
 
-### 3.2 `cardSummary`
-- 完成态摘要字段
-- 不参与运行中主链，也不再参与任务卡片完成态主链
-- 不承担历史详情职责
-
-### 3.3 `finalSummary`
+### 3.2 `finalSummary`
 - 历史详情 / 最终总结字段
 - 用于完成态详情、统计概览、文件明细等展示
 
-### 3.4 `preflight`
+### 3.3 `preflight`
 - 预估总量
 - 主要来自运行前预检
 - 仅用于预估展示或后端明确说明的兼容兜底

@@ -90,7 +90,7 @@ export function useTaskProgressSync(options: {
       return frozenActive
     }
 
-    // 任务卡片不再在 finished 短窗口切到 cardSummary。
+    // 任务卡片不再在 finished 短窗口切到第二份完成态摘要。
     // 这样完成态只保留一份冻结帧，避免 active 消失后再次 handoff 造成二次抖动。
     if (completedFreezeByTask[taskId]) return completedFreezeByTask[taskId]
 

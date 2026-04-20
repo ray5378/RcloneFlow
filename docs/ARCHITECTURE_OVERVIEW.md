@@ -156,7 +156,7 @@ rclone one-line progress 日志是运行中真实进度的重要来源。
 
 当前约定：
 - 运行中 UI 主数据源是 `/api/runs/active.progress`
-- 任务卡片完成态现在由前端单份冻结帧 `completedFreezeByTask` 承接，不再切到 `cardSummary`
+- 任务卡片完成态现在由前端单份冻结帧 `completedFreezeByTask` 承接
 - 前端运行中 helper / runtime / refresh 命名已开始收口到 `runningProgress` / `progress` 语义
 - `preflight` 只保留预估语义
 
@@ -208,7 +208,7 @@ rclone one-line progress 日志是运行中真实进度的重要来源。
 ### 8.1 `TaskView.vue` 仍偏大
 虽然已经拆出一部分 running hint 与 active run 逻辑，但仍属于需要继续拆分的高风险文件。
 
-### 8.2 `progress / cardSummary / finalSummary / preflight` 容易被误用
+### 8.2 `progress / finalSummary / preflight` 容易被误用
 这三个字段语义不同，后续开发时必须严格区分。
 
 ### 8.3 仓库中仍有旧 runner 痕迹

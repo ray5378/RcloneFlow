@@ -13,7 +13,7 @@
 
 提醒：
 - 当前运行中 UI 主真源应是 `/api/runs/active.progress`
-- 应明确区分：`progress`（运行中）、`cardSummary`（刚结束卡片）、`finalSummary`（历史详情）
+- 应明确区分：`progress`（运行中）、`finalSummary`（历史详情）
 
 ---
 

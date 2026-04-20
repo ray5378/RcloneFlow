@@ -99,12 +99,10 @@
 
 ### 4.2 字段语义
 - `progress`：运行中的实时进度（live frame）
-- `cardSummary`：完成态摘要字段，不参与运行中 UI，也不再参与任务卡片完成态主链
-- `finalSummary`：历史详情 / 最终总结字段
+- `- `finalSummary`：历史详情 / 最终总结字段
 - `preflight`：预估总量（来自 `rclone size` + 过滤条件），仅用于预估展示
 
 ### 4.3 禁止事项
-- 不要再让运行中 UI 读取任务卡片专用的 `cardSummary`
 - 不要再让运行中 ETA 回退到 `preflight`
 - 不要在前端对运行中进度做“历史最大值拼接”或二次抗噪合并
 - 不要把 `preflight` 当作运行中总量真源
@@ -149,7 +147,7 @@ aggregate size pair 必须要求显式字节单位（例如 `MiB/GiB`）。
 
 后续开发不得：
 - 删除 `progress` 并要求前端把结束态过渡重新塞回运行中链
-- 让 `cardSummary` 或 `finalSummary` 再次承担运行中主展示职责
+- 让 `finalSummary` 再次承担运行中主展示职责
 
 ## 8. WebSocket / 前端刷新规则（必须遵守）
 

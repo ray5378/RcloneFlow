@@ -227,7 +227,7 @@
 ### `GLOSSARY.md`
 适合场景：
 - 想确认某个关键术语到底是什么意思
-- 想区分 `progress` / `cardSummary` / `finalSummary` / `preflight` / `fallback` / `masking` 等术语
+- 想区分 `progress` / `finalSummary` / `preflight` / `fallback` / `masking` 等术语
 - 想减少沟通和文档中的语义偏差
 
 ---

@@ -43,7 +43,7 @@
 
 ### 4. 运行中 / 刚结束卡片 / 历史详情三层字段必须分离
 决策：
-- 当前代码已删除 `stableProgress`，改由 `progress` / `cardSummary` / `finalSummary` 分层承载
+- 当前代码已删除 `stableProgress`，改由 `progress` / `finalSummary` 分层承载
 
 原因：
 - 运行中场景继续混用完成态字段，会模糊 live、过渡态与最终总结之间的边界

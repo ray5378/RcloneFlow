@@ -25,7 +25,7 @@
 
 字段语义：
 - `progress`：运行中的实时进度（live frame），是运行中 UI 主数据源
-- `cardSummary`：任务卡片结束态短窗口字段，不参与运行中主链
+- 任务卡片完成态由前端冻结帧承接，不参与运行中主链
 - `preflight`：已从任务卡片主数据链、`/api/runs/active` 兜底链、运行详情主展示链退场，不再参与总量 / 总数 / 百分比主数据计算
 
 当前 active runs 调试字段：
@@ -84,11 +84,11 @@
 ### 2.3 运行中进度链来源混乱
 根因：
 - 前端曾对完成态/过渡态字段做二次拼接
-- 后端和前端都存在 `progress / cardSummary / finalSummary / preflight` 语义混用
+- 后端和前端都存在 `progress / finalSummary / preflight` 语义混用
 
 现状：
 - 运行中主展示已统一优先使用 `progress`
-- 当前代码已删除 `stableProgress`，由 `cardSummary` + `finalSummary` 分担完成态职责
+- 当前代码已删除 `stableProgress`，由 `finalSummary` 承担完成态摘要/详情职责
 - `preflight` 已从主展示链退场
 
 ### 2.4 前端 build warning
