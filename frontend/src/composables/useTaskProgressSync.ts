@@ -24,21 +24,25 @@ export function useTaskProgressSync(options: {
     return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles, phase: p.phase }
   }
 
+  function freezeCompletedProgress(p: any) {
+    if (!p) return null
+    const frozen = { ...p }
+    if (Number(frozen.percentage || 0) >= 99.999) {
+      frozen.percentage = 100
+      if (Number(frozen.totalBytes || 0) > 0) frozen.bytes = Number(frozen.totalBytes || 0)
+      if (Number(frozen.totalCount || 0) > 0) frozen.completedFiles = Number(frozen.totalCount || 0)
+      frozen.speed = 0
+      frozen.eta = 0
+      frozen.phase = 'completed'
+    }
+    return frozen
+  }
+
   function getCardSummaryFromRun(run: any) {
     try {
       const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
       const normalized = normalizeSummaryProgress(sum?.cardSummary)
-      if (!normalized) return null
-      const frozen = { ...normalized }
-      if (frozen.percentage >= 99.999) {
-        frozen.percentage = 100
-        if (frozen.totalBytes > 0) frozen.bytes = frozen.totalBytes
-        if (frozen.totalCount > 0) frozen.completedFiles = frozen.totalCount
-        frozen.speed = 0
-        frozen.eta = 0
-        frozen.phase = 'completed'
-      }
-      return frozen
+      return freezeCompletedProgress(normalized)
     } catch {}
     return null
   }
@@ -79,7 +83,10 @@ export function useTaskProgressSync(options: {
 
   function getTaskCardProgressByTask(taskId: number) {
     const active = options.activeRunLookup.getActiveRunByTaskId(taskId)
-    if (active?.progress) return active.progress
+    if (active?.progress) {
+      const normalizedActive = normalizeSummaryProgress(active.progress)
+      return freezeCompletedProgress(normalizedActive || active.progress)
+    }
 
     // 任务卡片只在“刚结束”的短窗口内读取 cardSummary，
     // 用来平滑 running -> finished 切换瞬间；不能长期显示上一次完成任务的进度。

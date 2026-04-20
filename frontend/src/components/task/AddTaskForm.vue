@@ -171,12 +171,12 @@ const showAdvancedOptionsModel = computed({
         @update:model-value="Object.assign(createForm, $event)"
       />
 
-      <button type="button" class="ghost small" @click="showAdvancedOptionsModel = !showAdvancedOptionsModel">
-        {{ showAdvancedOptionsModel ? '收起高级选项' : '+ 高级选项' }}
-      </button>
-      <div v-if="showAdvancedOptionsModel" class="advanced-section">
-        <AdvancedOptions v-model="createForm.options" />
-      </div>
+      <details class="advanced-details" :open="localShowAdvancedOptions" @toggle="onAdvancedDetailsToggle">
+        <summary class="ghost small advanced-summary">{{ localShowAdvancedOptions ? '收起高级选项' : '+ 高级选项' }}</summary>
+        <div class="advanced-section">
+          <AdvancedOptions v-model="advancedOptionsModel" />
+        </div>
+      </details>
 
       <div class="form-actions">
         <button
@@ -223,6 +223,9 @@ body.light .path-browse { border-color:var(--border); background:var(--surface);
 .crumb { background: transparent; border: none; color: var(--accent); cursor: pointer; padding: 0; }
 .crumb.current { color: var(--text); font-weight: 600; cursor: default; }
 .path-list { max-height: 200px; overflow-y: auto; padding: 8px; }
+.advanced-details { margin-top: 12px; }
+.advanced-summary { list-style: none; cursor: pointer; user-select: none; display: inline-block; }
+.advanced-summary::-webkit-details-marker { display: none; }
 .advanced-section { margin-top: 16px; padding-top: 16px; border-top: 1px solid #333; }
 body.light .advanced-section { border-top-color: #ddd; }
 .path-empty { padding: 20px; text-align: center; color: #666; font-size: 13px; }
