@@ -101,8 +101,6 @@ export interface ActiveRun {
   }
   /** 运行中 UI 主字段 */
   progress?: ActiveRunProgress
-  /** 兼容 / 完成态固化字段；不要作为运行中 UI 主字段使用 */
-  stableProgress?: ActiveRunProgress
   progressLine?: string
   progressSource?: string
   progressMismatch?: boolean

@@ -84,6 +84,9 @@ func TestHandleActiveRuns_UsesProgressAndExposesDebugFields(t *testing.T) {
 	if got := it["progressSource"].(string); got != "summary.progress" {
 		t.Fatalf("progressSource=%q, want summary.progress", got)
 	}
+	if _, ok := it["stableProgress"]; ok {
+		t.Fatalf("stableProgress should not be exposed in active run response")
+	}
 	if got := it["progressMismatch"].(bool); got {
 		t.Fatalf("progressMismatch=%v, want false", got)
 	}

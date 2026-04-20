@@ -897,6 +897,7 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		c.runSvc.UpdateRunStatus(run.ID, map[string]any{"stableProgress": stable})
 
 		item := map[string]any{
+			// progress: 运行中 UI 主字段
 			"runRecord": map[string]any{
 				"id":               run.ID,
 				"taskId":           run.TaskID,
@@ -906,9 +907,8 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				"startedAt":        run.StartedAt,
 				"finishedAt":       run.FinishedAt,
 			},
-			"progress":           stable,
-			"stableProgress":     stable,
-			"progressLine":       progressLine,
+			"progress":         stable,
+			"progressLine":     progressLine,
 			"progressSource":     "summary.progress",
 			"progressMismatch":   progressMismatch,
 			"progressCheck":      progressCheck,
