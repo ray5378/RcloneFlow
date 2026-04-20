@@ -102,10 +102,11 @@ export function useTaskProgressSync(options: {
     if (latest && latest.status === 'finished') {
       const finishedAt = new Date(latest.finishedAt || latest?.summary?.finishedAt || 0).getTime()
       if (finishedAt > 0 && Date.now() - finishedAt <= 15000) {
+        if (completedFreezeByTask[taskId]) return completedFreezeByTask[taskId]
         const cardSummary = getCardSummaryFromRun(latest)
         if (cardSummary) {
-          delete completedFreezeByTask[taskId]
-          return cardSummary
+          completedFreezeByTask[taskId] = { ...cardSummary }
+          return completedFreezeByTask[taskId]
         }
       }
     }
