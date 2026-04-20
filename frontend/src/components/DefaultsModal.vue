@@ -203,6 +203,17 @@ onMounted(load)
           </div>
         </div>
 
+        <div class="section">
+          <div class="section-title">运行中调试</div>
+          <div class="grid">
+            <label title="是否允许在任务运行中提示小窗中展开调试详情">允许展开运行中调试详情 <small class="subkey">RUNNING_HINT_DEBUG_ENABLED</small></label>
+            <select v-model="form.RUNNING_HINT_DEBUG_ENABLED">
+              <option value="false">关闭</option>
+              <option value="true">开启</option>
+            </select>
+          </div>
+        </div>
+
         <!-- 文件管理后端固定：浏览=RC，操作=CLI；此处不再暴露切换选项 -->
 
       </div>

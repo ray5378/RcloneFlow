@@ -1,4 +1,8 @@
 <script setup lang="ts">
+defineProps<{
+  runningHintDebugEnabled?: boolean
+}>()
+
 import GlobalStatsModal from '../components/task/GlobalStatsModal.vue'
 import ConfirmModal from '../components/task/ConfirmModal.vue'
 import TaskListViewShell from '../components/task/TaskListViewShell.vue'
@@ -476,5 +480,8 @@ const {
     @confirm="confirmAndClose"
   />
 </template>
+
+<style scoped src="./TaskView.css"></style>
+emplate>
 
 <style scoped src="./TaskView.css"></style>

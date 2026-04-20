@@ -6,6 +6,7 @@ import LoginView from './views/LoginView.vue'
 import DefaultsModal from './components/DefaultsModal.vue'
 
 import * as api from './api'
+import { getSettings } from './api/settings'
 import { isLoggedIn as checkAuth, getUser, logout, changePassword } from './api/auth'
 
 const currentPage = ref(localStorage.getItem('currentPage') || (location.hash.replace('#','')||'browser'))
@@ -18,6 +19,7 @@ const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
 const showDefaultsModal = ref(false)
 const showMobileMenu = ref(false)
+const runningHintDebugEnabled = ref(false)
 
 const user = getUser()
 
@@ -60,6 +62,15 @@ function toggleTheme() {
   }
 }
 
+async function loadRuntimeSettings() {
+  try {
+    const resp = await getSettings()
+    runningHintDebugEnabled.value = String(resp.webhook?.RUNNING_HINT_DEBUG_ENABLED?.effective || 'false') === 'true'
+  } catch {
+    runningHintDebugEnabled.value = false
+  }
+}
+
 async function handleLoginSuccess() {
   isAuth.value = true
   try {
@@ -68,6 +79,7 @@ async function handleLoginSuccess() {
   } catch {
     version.value = '未连接'
   }
+  await loadRuntimeSettings()
 }
 
 function handleLogout() {
@@ -106,7 +118,6 @@ onMounted(async () => {
     document.body.classList.add('light')
   }
 
-  // 恢复页面状态
   const hash = (location.hash || '').replace('#','')
   if (hash && ['browser','tasks'].includes(hash)) {
     currentPage.value = hash
@@ -115,7 +126,6 @@ onMounted(async () => {
   isAuth.value = checkAuth()
   authChecked.value = true
 
-  // 检测移动端
   checkMobile()
   window.addEventListener('resize', checkMobile)
 
@@ -129,19 +139,17 @@ onMounted(async () => {
   } catch {
     version.value = '未连接'
   }
+
+  await loadRuntimeSettings()
 })
 </script>
 
 <template>
   <div class="app">
-    <!-- 登录页面 -->
     <LoginView v-if="authChecked && !isAuth" @success="handleLoginSuccess" />
 
-    <!-- 已登录的主应用 -->
     <template v-else-if="authChecked && isAuth">
-      <!-- Header -->
       <header class="header">
-        <!-- 移动端汉堡菜单 -->
         <button v-if="isMobile" class="mobile-menu-btn" @click="showMobileMenu = !showMobileMenu">
           <span v-if="!showMobileMenu">☰</span>
           <span v-else>✕</span>
@@ -152,7 +160,6 @@ onMounted(async () => {
           <small v-if="!isMobile">{{ version }}</small>
         </div>
 
-        <!-- 桌面端导航 -->
         <nav v-if="!isMobile" class="header-nav">
           <button
             v-for="(page, key) in pages"
@@ -172,7 +179,6 @@ onMounted(async () => {
         </div>
       </header>
 
-      <!-- 移动端侧边菜单 -->
       <transition name="slide">
         <div v-if="isMobile && showMobileMenu" class="mobile-menu-overlay" @click="showMobileMenu = false">
           <div class="mobile-menu" @click.stop>
@@ -198,13 +204,15 @@ onMounted(async () => {
         </div>
       </transition>
 
-      <!-- Main Content -->
       <main class="main">
         <BrowserView v-if="currentPage === 'browser'" :version="version" />
-        <TaskView v-if="currentPage === 'tasks'" :key="taskViewKey" />
+        <TaskView
+          v-if="currentPage === 'tasks'"
+          :key="taskViewKey"
+          :running-hint-debug-enabled="runningHintDebugEnabled"
+        />
       </main>
 
-      <!-- 移动端底部导航 -->
       <nav v-if="isMobile" class="mobile-bottom-nav">
         <div
           v-for="(page, key) in pages"
@@ -218,7 +226,6 @@ onMounted(async () => {
         </div>
       </nav>
 
-      <!-- 设置弹窗 -->
       <div v-if="showSettingsModal" class="modal-overlay" @click.self="showSettingsModal = false">
         <div class="modal-content settings-modal">
           <div class="modal-header">
@@ -255,9 +262,8 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- 修改密码弹窗 -->
       <div v-if="showPasswordModal" class="modal-overlay" @click.self="showPasswordModal = false">
-        <div class="modal-content">
+        <div class="modal-content settings-modal">
           <div class="modal-header">
             <h3>账号管理</h3>
             <button class="close-btn" @click="showPasswordModal = false">×</button>
@@ -265,15 +271,15 @@ onMounted(async () => {
           <div class="modal-body">
             <div class="field-item">
               <label>用户名</label>
-              <input v-model="passwordForm.username" type="text" placeholder="输入新用户名" />
+              <input v-model="passwordForm.username" placeholder="用户名" />
             </div>
             <div class="field-item">
               <label>旧密码</label>
-              <input v-model="passwordForm.oldPassword" type="password" placeholder="输入旧密码（修改密码时必填）" />
+              <input v-model="passwordForm.oldPassword" type="password" placeholder="请输入旧密码" />
             </div>
             <div class="field-item">
               <label>新密码</label>
-              <input v-model="passwordForm.newPassword" type="password" placeholder="输入新密码（留空则不修改）" />
+              <input v-model="passwordForm.newPassword" type="password" placeholder="留空则不修改" />
             </div>
             <div class="field-item">
               <label>确认新密码</label>
@@ -286,273 +292,231 @@ onMounted(async () => {
           </div>
         </div>
       </div>
-    </template>
 
-    <!-- 修改默认设置弹窗（根级） -->
-    <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal=false" />
+      <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal=false" />
+    </template>
   </div>
 </template>
 
 <style scoped>
-.header-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.settings-btn {
-  padding: 6px 14px;
-  background: transparent;
-  border: 1px solid #333;
-  border-radius: 8px;
-  color: #ccc;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.settings-btn:hover {
-  background: #252525;
+.app {
+  min-height: 100vh;
+  background: #111;
   color: #fff;
 }
 
-body.light .settings-btn {
-  border-color: #ddd;
-  color: #666;
+.header {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  border-bottom: 1px solid #222;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: rgba(17, 17, 17, .9);
+  backdrop-filter: blur(8px);
 }
 
-body.light .settings-btn:hover {
-  background: #f0f0f0;
-  color: #333;
+.header-brand {
+  font-size: 20px;
+  font-weight: 800;
 }
 
-/* 移动端菜单按钮 */
-.mobile-menu-btn {
+.header-brand small {
+  margin-left: 8px;
+  font-size: 12px;
+  color: #999;
+}
+
+.header-nav {
+  display: flex;
+  gap: 12px;
+}
+
+.header-nav button,
+.mobile-bottom-nav .nav-item,
+.mobile-menu-nav button,
+.settings-btn,
+.close-btn,
+.modal-footer button {
+  cursor: pointer;
+}
+
+.header-nav button {
+  background: transparent;
+  border: none;
+  color: #ccc;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.header-nav button.active {
+  background: #64b5f6;
+  color: #fff;
+}
+
+.settings-btn {
+  background: transparent;
+  border: 1px solid #333;
+  color: #ddd;
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+
+.settings-btn:hover {
+  border-color: #64b5f6;
+  color: #fff;
+}
+
+.main {
+  min-height: calc(100vh - 56px);
+}
+
+.mobile-menu-btn,
+.close-btn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 22px;
+}
+
+.mobile-menu-overlay,
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .45);
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  font-size: 20px;
-  cursor: pointer;
-  border-radius: 8px;
-  padding: 0;
-}
-
-.mobile-menu-btn:active {
-  background: var(--border);
-}
-
-/* 移动端侧边菜单 */
-.mobile-menu-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 200;
+  z-index: 50;
 }
 
 .mobile-menu {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 280px;
-  background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.3);
+  width: 320px;
+  max-width: 92vw;
+  height: 100%;
+  background: #161616;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
-.mobile-menu-header {
+.mobile-menu-header,
+.modal-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
+  justify-content: space-between;
 }
 
 .mobile-menu-title {
   font-size: 18px;
   font-weight: 700;
-  color: var(--text);
 }
 
 .mobile-menu-nav {
-  flex: 1;
-  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
+  margin-top: 24px;
 }
 
 .mobile-menu-nav button {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
-  background: transparent;
-  border: none;
+  background: #222;
+  color: #eee;
+  border: 1px solid #2f2f2f;
   border-radius: 10px;
-  color: var(--text);
-  font-size: 15px;
-  cursor: pointer;
-  text-align: left;
-  width: 100%;
-}
-
-.mobile-menu-nav button .nav-icon {
-  font-size: 18px;
-}
-
-.mobile-menu-nav button:hover {
-  background: var(--border);
+  padding: 12px;
 }
 
 .mobile-menu-nav button.active {
-  background: var(--accent);
-  color: #fff;
+  border-color: #64b5f6;
+  background: rgba(100, 181, 246, .15);
 }
 
 .mobile-menu-footer {
-  padding: 16px 20px;
-  border-top: 1px solid var(--border);
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
 }
 
 .version-info {
+  color: #999;
   font-size: 12px;
-  color: var(--muted);
 }
 
-/* 侧边菜单动画 */
-.slide-enter-active,
-.slide-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.slide-enter-active .mobile-menu,
-.slide-leave-active .mobile-menu {
-  transition: transform 0.3s ease;
-}
-
-.slide-enter-from,
-.slide-leave-to {
-  opacity: 0;
-}
-
-.slide-enter-from .mobile-menu,
-.slide-leave-to .mobile-menu {
-  transform: translateX(-100%);
-}
-
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+.mobile-bottom-nav {
+  position: sticky;
+  bottom: 0;
   display: flex;
+  justify-content: space-around;
+  border-top: 1px solid #222;
+  background: rgba(17, 17, 17, .95);
+  backdrop-filter: blur(8px);
+  padding: 8px 0;
+}
+
+.mobile-bottom-nav .nav-item {
+  display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
+  color: #bbb;
+  font-size: 12px;
+}
+
+.mobile-bottom-nav .nav-item.active {
+  color: #64b5f6;
 }
 
 .modal-content {
-  background: #1e1e2f;
-  border-radius: 16px;
-  padding: 24px;
-  width: 90%;
-  max-width: 400px;
-  border: 1px solid #333;
-}
-
-body.light .modal-content {
-  background: #fff;
-  border-color: #ddd;
+  background: #1a1a1a;
+  color: #eee;
+  border: 1px solid #2f2f2f;
+  border-radius: 14px;
+  width: min(520px, 92vw);
+  padding: 18px;
+  box-sizing: border-box;
 }
 
 .settings-modal {
-  max-width: 320px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-  color: #fff;
-}
-
-body.light .modal-header h3 {
-  color: #1a1a1a;
-}
-
-.close-btn {
-  background: transparent;
-  border: none;
-  color: #888;
-  font-size: 24px;
-  cursor: pointer;
-}
-
-.close-btn:hover {
-  color: #fff;
+  width: min(460px, 92vw);
 }
 
 .settings-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 10px;
 }
 
 .settings-item {
   display: flex;
   align-items: center;
-  padding: 14px 16px;
-  background: #252525;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.2s;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 12px;
+  background: #222;
+  border: 1px solid #2f2f2f;
 }
 
 .settings-item:hover {
-  background: #333;
-}
-
-body.light .settings-item {
-  background: #f5f5f5;
-}
-
-body.light .settings-item:hover {
-  background: #e8e8e8;
+  border-color: #64b5f6;
 }
 
 .settings-item.danger .settings-icon,
 .settings-item.danger .settings-text {
-  color: #ef5350;
-}
-
-.settings-item.danger:hover {
-  background: rgba(239, 83, 80, 0.1);
+  color: #ff8a80;
 }
 
 .settings-icon {
   font-size: 18px;
-  margin-right: 12px;
 }
 
 .settings-text {
   flex: 1;
-  color: #e0e0e0;
-  font-size: 14px;
-}
-
-body.light .settings-text {
-  color: #333;
 }
 
 .settings-arrow {
@@ -583,12 +547,7 @@ body.light .settings-text {
   background: #252525;
   color: #e0e0e0;
   font-size: 14px;
-}
-
-body.light .field-item input {
-  background: #f5f5f5;
-  border-color: #ddd;
-  color: #1a1a1a;
+  box-sizing: border-box;
 }
 
 .field-item input:focus {
@@ -606,7 +565,6 @@ body.light .field-item input {
   padding: 10px 20px;
   border-radius: 8px;
   font-size: 14px;
-  cursor: pointer;
 }
 
 .modal-footer .ghost {
@@ -621,12 +579,62 @@ body.light .field-item input {
   color: #fff;
 }
 
+body.light .app {
+  background: #f5f7fb;
+  color: #1a1a1a;
+}
+
+body.light .header {
+  background: rgba(255,255,255,.86);
+  border-bottom-color: #e6e8ec;
+}
+
+body.light .header-brand small,
+body.light .version-info,
+body.light .field-item label,
+body.light .settings-arrow {
+  color: #666;
+}
+
+body.light .header-nav button {
+  color: #555;
+}
+
+body.light .settings-btn {
+  border-color: #ddd;
+  color: #444;
+}
+
+body.light .settings-btn:hover,
+body.light .settings-item:hover {
+  border-color: #64b5f6;
+}
+
+body.light .mobile-menu,
+body.light .modal-content {
+  background: #fff;
+  color: #1a1a1a;
+  border-color: #e6e8ec;
+}
+
+body.light .mobile-menu-nav button,
+body.light .settings-item {
+  background: #f8f9fb;
+  border-color: #e8ebef;
+  color: #1f2937;
+}
+
+body.light .field-item input {
+  background: #f5f5f5;
+  border-color: #ddd;
+  color: #1a1a1a;
+}
+
 body.light .modal-footer .ghost {
   border-color: #ddd;
   color: #666;
 }
 
-/* 移动端适配 */
 @media (max-width: 768px) {
   .settings-modal {
     max-width: 100%;

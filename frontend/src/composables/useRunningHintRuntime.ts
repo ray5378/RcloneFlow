@@ -1,8 +1,8 @@
 import type { Ref } from 'vue'
 import { useRunningHint } from './useRunningHint'
 
-export function useRunningHintRuntime(activeRuns: Ref<any[]>, openRunLog: (run: any) => void) {
-  const hint = useRunningHint(activeRuns, openRunLog)
+export function useRunningHintRuntime(activeRuns: Ref<any[]>, openRunLog: (run: any) => void, debugEnabled = false) {
+  const hint = useRunningHint(activeRuns, openRunLog, debugEnabled)
 
   return {
     runningHintVisible: hint.visible,

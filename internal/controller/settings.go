@@ -30,8 +30,8 @@ type settingsResponse struct {
 	Progress map[string]map[string]string `json:"progress"`
 	Webdav   map[string]map[string]string `json:"webdav"`
 	Webhook  map[string]map[string]string `json:"webhook"`
-	Stored   map[string]string            `json:"stored"` // raw overrides from settings.json
-	Meta     map[string]string            `json:"meta"`   // APP_DATA_DIR, settingsPath
+	Stored   map[string]string            `json:"stored"`
+	Meta     map[string]string            `json:"meta"`
 }
 
 func defaultsMap() map[string]string {
@@ -48,7 +48,8 @@ func defaultsMap() map[string]string {
 		"PROGRESS_FLUSH_MIN_DELTA_BYTES": "52428800",
 		"FINISH_WAIT_INTERVAL":           "5s",
 		"FINISH_WAIT_TIMEOUT":            "5h",
-		"WEBHOOK_MAX_FILES":              "0", // 0=不限制（默认）
+		"WEBHOOK_MAX_FILES":              "0",
+		"RUNNING_HINT_DEBUG_ENABLED":     "false",
 	}
 }
 
@@ -114,8 +115,8 @@ func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
 			"REFRESH_TOKEN_TTL": {"effective": eff("REFRESH_TOKEN_TTL"), "default": defs["REFRESH_TOKEN_TTL"]},
 		},
 		Log: map[string]map[string]string{
-			"LOG_LEVEL":        {"effective": eff("LOG_LEVEL"), "default": defs["LOG_LEVEL"]},
-			"LOG_OUTPUT":       {"effective": eff("LOG_OUTPUT"), "default": defs["LOG_OUTPUT"]},
+			"LOG_LEVEL":          {"effective": eff("LOG_LEVEL"), "default": defs["LOG_LEVEL"]},
+			"LOG_OUTPUT":         {"effective": eff("LOG_OUTPUT"), "default": defs["LOG_OUTPUT"]},
 			"LOG_RETENTION_DAYS": {"effective": eff("LOG_RETENTION_DAYS"), "default": defs["LOG_RETENTION_DAYS"]},
 		},
 		History: map[string]map[string]string{
@@ -135,7 +136,8 @@ func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
 			"FINISH_WAIT_TIMEOUT":  {"effective": eff("FINISH_WAIT_TIMEOUT"), "default": defs["FINISH_WAIT_TIMEOUT"]},
 		},
 		Webhook: map[string]map[string]string{
-			"WEBHOOK_MAX_FILES": {"effective": eff("WEBHOOK_MAX_FILES"), "default": defs["WEBHOOK_MAX_FILES"]},
+			"WEBHOOK_MAX_FILES":          {"effective": eff("WEBHOOK_MAX_FILES"), "default": defs["WEBHOOK_MAX_FILES"]},
+			"RUNNING_HINT_DEBUG_ENABLED": {"effective": eff("RUNNING_HINT_DEBUG_ENABLED"), "default": defs["RUNNING_HINT_DEBUG_ENABLED"]},
 		},
 		Stored: over,
 		Meta:   map[string]string{"APP_DATA_DIR": os.Getenv("APP_DATA_DIR"), "settingsPath": settingsPath()},
@@ -152,7 +154,7 @@ func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "reset": true})
 		return
 	}
-	// sanitize: only accept known keys
+
 	defs := defaultsMap()
 	cur := readOverrides()
 	for k, v := range p.Values {
@@ -166,7 +168,7 @@ func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
-	// 热生效：日志与清理
+
 	if _, ok := cur["LOG_LEVEL"]; ok || cur["LOG_OUTPUT"] != "" {
 		lev := cur["LOG_LEVEL"]
 		if lev == "" {
@@ -178,7 +180,7 @@ func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 		}
 		_ = logger.HotSet(lev, out)
 	}
-	// 清理计划重排：通过一个可选的回调（由 app 层注入）
+
 	if ReplanCleanupHook != nil {
 		intervalHours := atoiDefault(cur["CLEANUP_INTERVAL_HOURS"], atoiDefault(defaultsMap()["CLEANUP_INTERVAL_HOURS"], 24))
 		retentionDays := atoiDefault(cur["FINAL_SUMMARY_RETENTION_DAYS"], atoiDefault(defaultsMap()["FINAL_SUMMARY_RETENTION_DAYS"], 7))

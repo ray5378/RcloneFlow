@@ -7,9 +7,7 @@ const EMPTY_DEBUG_INFO = {
   progressJson: '-',
 }
 
-const RUNNING_HINT_DEBUG_ENABLED = import.meta.env.DEV
-
-export function useRunningHint(activeRuns: Ref<any[]>, openRunLog: (run: any) => void) {
+export function useRunningHint(activeRuns: Ref<any[]>, openRunLog: (run: any) => void, debugEnabled = false) {
   const visible = ref(false)
   const run = ref<any>(null)
   const debugOpen = ref(false)
@@ -41,7 +39,7 @@ export function useRunningHint(activeRuns: Ref<any[]>, openRunLog: (run: any) =>
   }
 
   function toggleDebug() {
-    if (!RUNNING_HINT_DEBUG_ENABLED) return
+    if (!debugEnabled) return
     debugOpen.value = !debugOpen.value
   }
 
@@ -54,7 +52,7 @@ export function useRunningHint(activeRuns: Ref<any[]>, openRunLog: (run: any) =>
     visible,
     run,
     debugOpen,
-    debugEnabled: RUNNING_HINT_DEBUG_ENABLED,
+    debugEnabled,
     phaseText,
     progressText,
     debugInfo,
