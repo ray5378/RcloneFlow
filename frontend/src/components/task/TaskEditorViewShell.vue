@@ -55,7 +55,7 @@ defineProps<{
     @update:command-text="setCommandText"
     @update:show-source-path-input="setShowSourcePathInput"
     @update:show-target-path-input="setShowTargetPathInput"
-    @update:show-advanced-options="setShowAdvancedOptions"
+    @update:showAdvancedOptions="setShowAdvancedOptions"
     @source-remote-change="onSourceRemoteChange"
     @target-remote-change="onTargetRemoteChange"
     @source-breadcrumb-click="onSourceBreadcrumbClick"
