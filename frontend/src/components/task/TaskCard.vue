@@ -181,6 +181,14 @@ function isStopped(): boolean {
   background: #666633;
   color: #999;
 }
+.task-paths {
+  padding: 8px 12px;
+  background: #1a1a1a;
+  border-radius: 6px;
+}
+body.light .task-paths {
+  background: #f5f5f5;
+}
 .path-row {
   font-size: 12px;
 }
