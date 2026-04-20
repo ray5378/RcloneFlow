@@ -143,7 +143,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
           const idx = options.activeRuns.value.findIndex(r => r.runRecord?.id === msg.data.run_id)
           if (idx !== -1) {
             const cur = options.activeRuns.value[idx] || {}
-            const prev = cur.progress || cur.stableProgress || {}
+            const prev = cur.progress || {}
             const tid = cur.runRecord?.taskId
             const incomingTotalBytes = Number(msg.data.total || prev.totalBytes || 0)
             const incomingTotalCount = Number(msg.data.totalCount || msg.data.plannedFiles || prev.totalCount || 0)
