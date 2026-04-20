@@ -501,9 +501,6 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			// 结束时基于 progress 生成 completed stable frame，避免运行中/完成态字段语义混淆
 			{
 				base, _ := rr.Summary["progress"].(map[string]any)
-				if base == nil {
-					base, _ = rr.Summary["stableProgress"].(map[string]any)
-				}
 				sp := map[string]any{}
 				for k, v := range base { sp[k] = v }
 				pct := 0.0
