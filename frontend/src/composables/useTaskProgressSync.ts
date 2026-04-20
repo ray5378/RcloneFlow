@@ -72,6 +72,8 @@ export function useTaskProgressSync(options: {
     const active = options.activeRunLookup.getActiveRunByTaskId(taskId)
     if (active?.progress) return active.progress
 
+    // 任务卡片在非运行中时，优先读结束态冻结帧，而不是继续依赖前端时间窗防抖。
+    // 这样可以把“刚结束瞬间”的稳定性锚定在后端冻结结果上，而不是锚定在 UI 时序上。
     const latest = (options.runs.value || []).find((item: any) => {
       const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
       return candidateTaskId > 0 && candidateTaskId === Number(taskId)
