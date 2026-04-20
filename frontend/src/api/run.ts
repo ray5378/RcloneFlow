@@ -73,15 +73,44 @@ export interface GlobalStats {
   percentage: number  // 进度百分比 (0-100)
 }
 
+export interface ActiveRunProgress {
+  bytes: number
+  totalBytes: number
+  speed: number
+  percentage: number
+  completedFiles: number
+  totalCount: number
+  eta: number
+  phase?: string
+}
+
 /** 运行中任务的实时状态 */
 export interface ActiveRun {
   runRecord: {
     id: number
     taskId: number
     status: string
-    trigger: string
-    startedAt: string
-    summary: string
-    error: string
+    trigger?: string
+    startedAt?: string
+    finishedAt?: string
+    bytesTransferred?: number
+    summary?: string
+    error?: string
+    durationSeconds?: number
+    durationText?: string
+  }
+  /** 运行中 UI 主字段 */
+  progress?: ActiveRunProgress
+  /** 兼容 / 完成态固化字段；不要作为运行中 UI 主字段使用 */
+  stableProgress?: ActiveRunProgress
+  progressLine?: string
+  progressSource?: string
+  progressMismatch?: boolean
+  progressCheck?: {
+    ok: boolean
+    pctMismatch?: boolean
+    countMismatch?: boolean
+    etaMismatch?: boolean
+    calcPct?: number
   }
 }

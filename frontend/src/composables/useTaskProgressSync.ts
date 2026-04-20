@@ -86,18 +86,6 @@ export function useTaskProgressSync(options: {
         const completedFiles = Number(p.completedFiles || 0)
         return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles }
       }
-      const sp = sum?.stableProgress
-      if (sp && typeof sp === 'object') {
-        const bytes = Number(sp.bytes || 0)
-        const totalBytes = Number(sp.totalBytes || 0)
-        const speed = Number(sp.speed || 0)
-        const eta = Number(sp.eta || 0)
-        const totalCount = Number(sp.totalCount || 0)
-        let percentage = Number(sp.percentage || 0)
-        if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) percentage = (bytes / totalBytes) * 100
-        const completedFiles = Number(sp.completedFiles || 0)
-        return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles }
-      }
     } catch {}
     return null
   }

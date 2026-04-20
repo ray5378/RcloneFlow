@@ -94,7 +94,6 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
           options.lastNonDecreasingTotalsByTask.value[tid] = nextTotals
         }
         it.progress = raw
-        if (!it.stableProgress) it.stableProgress = raw
         if (tid) options.lastStableByTask.value[tid] = { sp: raw, at: now }
         return it
       })
