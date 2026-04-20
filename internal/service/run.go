@@ -134,6 +134,21 @@ func (s *RunService) DeleteRun(id int64) error {
 }
 
 func (s *RunService) DeleteAllRuns() error {
+	page := 1
+	pageSize := 500
+	for {
+		runs, total, err := s.db.ListRuns(page, pageSize)
+		if err != nil {
+			return err
+		}
+		for _, run := range runs {
+			cleanupRunLog(run)
+		}
+		if len(runs) == 0 || page*pageSize >= total {
+			break
+		}
+		page++
+	}
 	return s.db.DeleteAllRuns()
 }
 

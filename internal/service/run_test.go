@@ -2,31 +2,42 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 )
 
 type runServiceDBMock struct {
-	runsByID     map[int64]RunRecord
-	runsByTask   map[int64][]RunRecord
-	deletedRun   []int64
-	deletedTasks []int64
+	runsByID      map[int64]RunRecord
+	runsByTask    map[int64][]RunRecord
+	listRunsPages map[int][]RunRecord
+	listRunsTotal int
+	deletedRun    []int64
+	deletedTasks  []int64
+	deleteAll     bool
 }
 
-func (m *runServiceDBMock) ListRuns(page, pageSize int) ([]RunRecord, int, error) { return nil, 0, nil }
+func (m *runServiceDBMock) ListRuns(page, pageSize int) ([]RunRecord, int, error) {
+	return m.listRunsPages[page], m.listRunsTotal, nil
+}
 func (m *runServiceDBMock) ListRunsByTask(taskId int64) ([]RunRecord, error) {
 	return m.runsByTask[taskId], nil
 }
 func (m *runServiceDBMock) ListActiveRuns() ([]RunRecord, error) { return nil, nil }
-func (m *runServiceDBMock) GetActiveRunByTaskID(taskID int64) (RunRecord, error) { return RunRecord{}, nil }
+func (m *runServiceDBMock) GetActiveRunByTaskID(taskID int64) (RunRecord, error) {
+	return RunRecord{}, nil
+}
 func (m *runServiceDBMock) GetRun(id int64) (RunRecord, error) { return m.runsByID[id], nil }
 func (m *runServiceDBMock) UpdateRun(id int64, updateFn func(*RunRecord))          {}
 func (m *runServiceDBMock) DeleteRun(id int64) error {
 	m.deletedRun = append(m.deletedRun, id)
 	return nil
 }
-func (m *runServiceDBMock) DeleteAllRuns() error { return nil }
+func (m *runServiceDBMock) DeleteAllRuns() error {
+	m.deleteAll = true
+	return nil
+}
 func (m *runServiceDBMock) DeleteRunsByTask(taskId int64) error {
 	m.deletedTasks = append(m.deletedTasks, taskId)
 	return nil
@@ -111,5 +122,55 @@ func TestRunService_DeleteRunsByTask_RemovesAllKnownLogs(t *testing.T) {
 	}
 	if len(mock.deletedTasks) != 1 || mock.deletedTasks[0] != 9 {
 		t.Fatalf("expected deleted task id 9, got %#v", mock.deletedTasks)
+	}
+}
+
+func TestRunService_DeleteAllRuns_RemovesAllKnownLogs(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_runsvc_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	makeRun := func(id int64, day string) (RunRecord, string, string) {
+		dir := filepath.Join(tmpDir, "logs", fmt.Sprintf("task-a-%s", day))
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatalf("MkdirAll(%s) error = %v", dir, err)
+		}
+		logPath := filepath.Join(dir, fmt.Sprintf("%04d.log", id))
+		if err := os.WriteFile(logPath, []byte(day), 0o644); err != nil {
+			t.Fatalf("WriteFile(%s) error = %v", logPath, err)
+		}
+		bs, _ := json.Marshal(map[string]any{"stderrFile": logPath})
+		return RunRecord{ID: id, TaskID: 9, Summary: string(bs)}, logPath, dir
+	}
+
+	run1, log1, dir1 := makeRun(1, "0421")
+	run2, log2, dir2 := makeRun(2, "0422")
+	mock := &runServiceDBMock{
+		listRunsPages: map[int][]RunRecord{
+			1: {run1, run2},
+		},
+		listRunsTotal: 2,
+	}
+
+	svc := NewRunService(mock)
+	if err := svc.DeleteAllRuns(); err != nil {
+		t.Fatalf("DeleteAllRuns() error = %v", err)
+	}
+	if _, err := os.Stat(log1); !os.IsNotExist(err) {
+		t.Fatalf("expected log1 removed, got err=%v", err)
+	}
+	if _, err := os.Stat(log2); !os.IsNotExist(err) {
+		t.Fatalf("expected log2 removed, got err=%v", err)
+	}
+	if _, err := os.Stat(dir1); !os.IsNotExist(err) {
+		t.Fatalf("expected dir1 removed, got err=%v", err)
+	}
+	if _, err := os.Stat(dir2); !os.IsNotExist(err) {
+		t.Fatalf("expected dir2 removed, got err=%v", err)
+	}
+	if !mock.deleteAll {
+		t.Fatal("expected DeleteAllRuns to be called on db")
 	}
 }
