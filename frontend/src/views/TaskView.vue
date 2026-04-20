@@ -338,8 +338,8 @@ const {
     :stop-task-any="stopTaskAny"
     :set-webhook="setWebhook"
     :set-singleton-mode="setSingletonMode"
-    :prev-tasks-page="() => { tasksPage-- }"
-    :next-tasks-page="() => { tasksPage++ }"
+    :prev-tasks-page="prevTasksPage"
+    :next-tasks-page="nextTasksPage"
     :set-tasks-jump-page-value="setTasksJumpPageValue"
     :jump-to-tasks-page="jumpToTasksPage"
     :show-webhook-modal="showWebhookModal"
@@ -480,8 +480,5 @@ const {
     @confirm="confirmAndClose"
   />
 </template>
-
-<style scoped src="./TaskView.css"></style>
-emplate>
 
 <style scoped src="./TaskView.css"></style>
