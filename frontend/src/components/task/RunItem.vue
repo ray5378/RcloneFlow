@@ -13,6 +13,7 @@ interface Progress {
 
 interface Summary {
   files?: any[]
+  totalBytes?: number
   transferredBytes?: number
   avgSpeedBps?: number
   counts?: { copied?: number; deleted?: number; failed?: number; skipped?: number }
@@ -65,7 +66,7 @@ function getStatusText(status: string) {
     finished: '完成',
     failed: '失败',
     skipped: '跳过',
-    running: '运行中'
+    running: '运行中',
   }
   return map[status] || status
 }
@@ -80,7 +81,7 @@ function getTriggerText(trigger: string) {
   const map: Record<string, string> = {
     schedule: '定时',
     webhook: 'Webhook',
-    manual: '手动'
+    manual: '手动',
   }
   return map[trigger] || trigger
 }
@@ -95,44 +96,42 @@ function getProgressText(run: RunRecord): string {
 
 <template>
   <div class="item run-item" @click="emit('click', run)">
-    <div class="name">
+    <div class="name list-item-name">
       <strong>{{ run.taskName || `任务 #${run.taskId}` }}</strong>
-      <span class="mode-tag" v-if="run.taskMode">{{ run.taskMode }}</span>
-      <span class="trigger-tag" v-if="run.trigger">{{ getTriggerText(run.trigger) }}</span>
+      <span v-if="run.taskMode" class="mode-tag list-item-tag">{{ run.taskMode }}</span>
+      <span v-if="run.trigger" class="trigger-tag list-item-tag">{{ getTriggerText(run.trigger) }}</span>
     </div>
-    
+
     <span :class="['status', getStatusClass(run.status || ''), 'clickable']" @click.stop="emit('viewDetail', run)">
       {{ getStatusText(run.status || '') }}
     </span>
-    
+
     <div class="path-full">
-      <span class="path-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
+      <span class="path-text list-item-secondary-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
     </div>
-    
-    <span class="time">{{ formatTime(run.startedAt || '') }}</span>
-    
-    <!-- 运行时进度 -->
+
+    <span class="time list-item-tertiary-text">{{ formatTime(run.startedAt || '') }}</span>
+
     <div class="summary-mini" v-if="run.status === 'running'">
-      <span class="chip meta">{{ getProgressText(run) }}</span>
+      <span class="chip list-item-chip list-item-chip-meta">{{ getProgressText(run) }}</span>
     </div>
-    
-    <!-- 完成状态摘要 -->
+
     <div class="summary-mini" v-else-if="props.summary">
       <div v-if="props.summary.message" class="skipped-message">
         {{ props.summary.message }}
       </div>
       <template v-else>
-        <span class="chip">总计 {{ props.summary.files?.length || 0 }}</span>
-        <span class="chip success">
+        <span class="chip list-item-chip">总计 {{ props.summary.files?.length || 0 }}</span>
+        <span class="chip list-item-chip list-item-chip-success">
           {{ run.taskMode === 'move' ? '移动' : '成功' }}
           {{ (props.summary.counts?.copied || 0) + (props.summary.counts?.deleted || 0) }}
         </span>
-        <span class="chip failed">失败 {{ props.summary.counts?.failed || 0 }}</span>
-        <span class="chip meta">总体积 {{ formatBytes(props.summary.totalBytes || 0) }}</span>
-        <span class="chip meta">已传输 {{ formatBytes(props.summary.transferredBytes || 0) }}</span>
+        <span class="chip list-item-chip list-item-chip-failed">失败 {{ props.summary.counts?.failed || 0 }}</span>
+        <span class="chip list-item-chip list-item-chip-meta">总体积 {{ formatBytes(props.summary.totalBytes || 0) }}</span>
+        <span class="chip list-item-chip list-item-chip-meta">已传输 {{ formatBytes(props.summary.transferredBytes || 0) }}</span>
       </template>
     </div>
-    
+
     <div class="row-actions">
       <button class="ghost small" @click.stop="emit('viewDetail', run)">运行详情</button>
       <button class="ghost small" @click.stop="emit('viewLog', run)">传输日志</button>
@@ -143,6 +142,7 @@ function getProgressText(run: RunRecord): string {
 
 <style scoped>
 @import './listItemBase.css';
+@import './listItemMeta.css';
 
 .run-item {
   display: flex;
@@ -150,24 +150,8 @@ function getProgressText(run: RunRecord): string {
   align-items: center;
   gap: 8px;
 }
-
 .name {
-  display: flex;
-  align-items: center;
   gap: 6px;
-  min-width: 150px;
-}
-.name strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mode-tag, .trigger-tag {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #333;
-  color: #aaa;
 }
 .status {
   padding: 2px 8px;
@@ -185,15 +169,11 @@ function getProgressText(run: RunRecord): string {
   overflow: hidden;
 }
 .path-text {
-  font-size: 12px;
-  color: #888;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .time {
-  font-size: 12px;
-  color: #666;
   min-width: 80px;
 }
 .summary-mini {
@@ -203,19 +183,6 @@ function getProgressText(run: RunRecord): string {
   gap: 6px;
   padding: 8px 0;
 }
-.chip {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: #333;
-  color: #ccc;
-}
-.chip.meta {
-  background: transparent;
-  color: #999;
-}
-.chip.success { background: #22c55e33; color: #22c55e; }
-.chip.failed { background: #ef444433; color: #ef4444; }
 .skipped-message {
   font-size: 12px;
   color: var(--warning, #f59e0b);

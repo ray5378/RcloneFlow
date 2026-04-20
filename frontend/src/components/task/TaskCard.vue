@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { getUnifiedProgressText } from './progressText'
 
 interface Progress {
@@ -7,7 +6,7 @@ interface Progress {
   bytes?: number
   totalBytes?: number
   speed?: number
-  eta?: number  // 后端传来的 ETA（秒）
+  eta?: number
   completedFiles?: number
   totalCount?: number
   phase?: string
@@ -88,21 +87,21 @@ function isStopped(): boolean {
 <template>
   <div class="task-card" :class="{ active: !!progress }" @click="emit('viewHistory', task.id!)">
     <div class="task-main">
-      <div class="name">
+      <div class="name list-item-name">
         <strong>{{ task.name }}</strong>
-        <span class="mode-tag">{{ task.mode }}</span>
+        <span class="mode-tag list-item-tag">{{ task.mode }}</span>
       </div>
-      
+
       <div class="schedule-info">
         <template v-if="schedule">
           <span :class="['schedule-badge', schedule.enabled ? 'enabled' : 'disabled']">
             {{ schedule.enabled ? '已启用' : '已禁用' }}
           </span>
-          <span class="schedule-rule">{{ formatSpec(schedule.spec || '') }}</span>
+          <span class="schedule-rule list-item-secondary-text">{{ formatSpec(schedule.spec || '') }}</span>
         </template>
-        <span v-else class="no-schedule">未设置</span>
+        <span v-else class="no-schedule list-item-tertiary-text">未设置</span>
       </div>
-      
+
       <div class="item-actions">
         <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 任务历史记录</button>
         <button class="ghost small" :class="{ 'danger-text': isStopped() }" @click.stop="emit('stop', task.id!)">
@@ -125,18 +124,18 @@ function isStopped(): boolean {
         <button class="ghost small danger-text" @click.stop="emit('delete', task)">🗑️</button>
       </div>
     </div>
-    
+
     <div class="task-paths">
       <div class="path-row">
-        <span class="path-label">源:</span>
+        <span class="path-label list-item-secondary-text">源:</span>
         <span class="path-value">{{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }}</span>
       </div>
       <div class="path-row">
-        <span class="path-label">目标:</span>
+        <span class="path-label list-item-secondary-text">目标:</span>
         <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
       </div>
       <div class="path-row">
-        <span class="path-label">进度:</span>
+        <span class="path-label list-item-secondary-text">进度:</span>
         <span class="path-value">{{ getProgressText() }}</span>
       </div>
       <div class="progress-bar-container" v-if="getLiveProgress() && getLiveProgress()!.phase !== 'preparing'">
@@ -148,6 +147,7 @@ function isStopped(): boolean {
 
 <style scoped>
 @import './listItemBase.css';
+@import './listItemMeta.css';
 
 .task-card.active {
   border-left: 3px solid var(--accent, #4f46e5);
@@ -159,22 +159,7 @@ function isStopped(): boolean {
   gap: 12px;
 }
 .name {
-  display: flex;
-  align-items: center;
   gap: 8px;
-  min-width: 150px;
-}
-.name strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.mode-tag {
-  font-size: 10px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #333;
-  color: #aaa;
 }
 .schedule-info {
   display: flex;
@@ -195,13 +180,6 @@ function isStopped(): boolean {
   background: #666633;
   color: #999;
 }
-.schedule-rule {
-  color: #888;
-}
-.no-schedule {
-  color: #666;
-  font-size: 12px;
-}
 .item-actions {
   display: flex;
   flex-wrap: wrap;
@@ -221,7 +199,6 @@ function isStopped(): boolean {
   font-size: 12px;
 }
 .path-label {
-  color: #888;
   min-width: 40px;
 }
 .path-value {
