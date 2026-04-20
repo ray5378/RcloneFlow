@@ -280,12 +280,6 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				rr.Summary["finished"] = true
 				rr.Summary["success"] = false
 				fin := time.Now().Local()
-				// 若无 progress 但有 stableProgress，则回填，便于历史详情展示
-				if _, ok := rr.Summary["progress"]; !ok {
-					if sp, ok2 := rr.Summary["stableProgress"].(map[string]any); ok2 {
-						rr.Summary["progress"] = sp
-					}
-				}
 				rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
 				// 冻结最终总结（失败态）
 				finalSummary := map[string]any{}
