@@ -156,7 +156,7 @@ rclone one-line progress 日志是运行中真实进度的重要来源。
 
 当前约定：
 - 运行中 UI 主数据源是 `/api/runs/active.progress`
-- 任务卡片结束态过渡已改为专门的 `cardSummary`
+- 任务卡片完成态现在由前端单份冻结帧 `completedFreezeByTask` 承接，不再切到 `cardSummary`
 - 前端运行中 helper / runtime / refresh 命名已开始收口到 `runningProgress` / `progress` 语义
 - `preflight` 只保留预估语义
 

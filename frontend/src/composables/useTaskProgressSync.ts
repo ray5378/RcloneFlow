@@ -9,6 +9,10 @@ export function useTaskProgressSync(options: {
 }) {
   const lastDbFrameByRunId: Record<number, any> = {}
   const lastNonZeroSpeedByTask: Record<number, number> = {}
+  // 任务卡片完成态只保留一份冻结帧：
+  // 1) active.progress 到 100% 时立即冻结；
+  // 2) active 消失后继续沿用这同一帧；
+  // 3) 不再让 cardSummary 在任务卡片链路二次接管，避免 handoff 再抖一下。
   const completedFreezeByTask: Record<number, any> = {}
   const refreshLocks: Record<number, boolean> = {}
 

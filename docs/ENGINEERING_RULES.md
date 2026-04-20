@@ -99,7 +99,7 @@
 
 ### 4.2 字段语义
 - `progress`：运行中的实时进度（live frame）
-- `cardSummary`：任务卡片结束态过渡字段，只用于任务刚结束后的短窗口展示
+- `cardSummary`：完成态摘要字段，不参与运行中 UI，也不再参与任务卡片完成态主链
 - `finalSummary`：历史详情 / 最终总结字段
 - `preflight`：预估总量（来自 `rclone size` + 过滤条件），仅用于预估展示
 
