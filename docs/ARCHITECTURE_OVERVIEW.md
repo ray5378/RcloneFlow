@@ -157,6 +157,7 @@ rclone one-line progress 日志是运行中真实进度的重要来源。
 当前约定：
 - 运行中 UI 主数据源是 `/api/runs/active.progress`
 - `stableProgress` 不再作为运行中主展示真源
+- 前端运行中 helper / runtime / refresh 命名已开始收口到 `runningProgress` / `progress` 语义
 - `preflight` 只保留预估语义
 
 ---
@@ -246,3 +247,4 @@ rclone one-line progress 日志是运行中真实进度的重要来源。
 - 最后在哪里展示
 
 那通常说明你还不该急着改代码，应该先把链路走通。
+通。

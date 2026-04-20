@@ -184,6 +184,7 @@
 
 - [ ] 运行中 UI 主数据源仍是 `/api/runs/active.progress`
 - [ ] 没把 `stableProgress` 重新拉回运行中主展示
+- [ ] 没把带 `Stable` 语义的 helper / runtime 命名重新引回运行中主链
 - [ ] 没把 `preflight` 重新当成运行中真源
 - [ ] ETA 仍只基于 live progress 算
 - [ ] 没在前端重新加“历史最大值拼接”式抗噪逻辑
