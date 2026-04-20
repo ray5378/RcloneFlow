@@ -151,6 +151,17 @@ function isStopped(): boolean {
 @import './listItemActions.css';
 @import './listItemSpacing.css';
 
+.task-card {
+  padding: 14px 18px;
+}
+.task-card:hover {
+  background: transparent;
+  border-left-color: rgba(99, 102, 241, 0.55);
+}
+body.light .task-card:hover {
+  background: transparent;
+  border-left-color: rgba(25, 118, 210, 0.38);
+}
 .task-card.active {
   border-left: 3px solid var(--accent, #4f46e5);
 }
