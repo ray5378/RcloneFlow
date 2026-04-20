@@ -79,6 +79,11 @@ export function useTaskProgressSync(options: {
     return getRealtimeProgressByRun(run)
   }
 
+  // 任务卡片完成态规则：
+  // - 运行中：优先读 active.progress
+  // - 完成后短窗口：只复用前端单份冻结帧 completedFreezeByTask
+  // - 超过 FINISH_WINDOW_MS：清掉冻结帧，不再继续显示进度条
+  // - 不允许再引入第二份完成态摘要 handoff，否则会把刚修好的完成态抖动带回来
   function getTaskCardProgressByTask(taskId: number) {
     const active = options.activeRunLookup.getActiveRunByTaskId(taskId)
     if (active?.progress) {

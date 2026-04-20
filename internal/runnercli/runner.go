@@ -628,7 +628,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					}
 				}
 			}
-			// 异步补全文件大小，不阻塞状态更新
+			// 异步补全文件大小，不阻塞状态更新。
+			// finalSummary 只服务于历史详情 / 最终总结展示；
+			// 不要再往回恢复 stableProgress / cardSummary 这类完成态兼容字段，
+			// 以免运行中链路与任务卡片完成态再次发生语义混用。
 			r.enrichFilesSizesAsync(run.ID, files, dst, cfg)
 			finalSummary["counts"] = counts
 			finalSummary["files"] = files
