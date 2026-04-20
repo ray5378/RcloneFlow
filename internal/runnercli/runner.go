@@ -485,13 +485,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			rr.Summary["success"] = true
 			fin := time.Now().Local()
 			rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
-			// 若无 progress 但有 stableProgress，则将最后稳态快照固化为 progress（供完成态/历史页展示）。
 			// stableProgress 本身代表结束时冻结的稳态快照，不用于运行中 UI 主展示。
-			if _, ok := rr.Summary["progress"]; !ok {
-				if sp, ok2 := rr.Summary["stableProgress"].(map[string]any); ok2 {
-					rr.Summary["progress"] = sp
-				}
-			}
 			// 结束时基于 progress 生成 completed stable frame，避免运行中/完成态字段语义混淆
 			{
 				base, _ := rr.Summary["progress"].(map[string]any)

@@ -13,6 +13,35 @@ export function useTaskProgressSync(options: {
   const lastNonZeroSpeedByTask: Record<number, number> = {}
   const refreshLocks: Record<number, boolean> = {}
 
+  function normalizeSummaryProgress(p: any) {
+    if (!p || typeof p !== 'object') return null
+    const bytes = Number(p.bytes || 0)
+    const totalBytes = Number(p.totalBytes || 0)
+    const speed = Number(p.speed || 0)
+    const eta = Number(p.eta || 0)
+    const totalCount = Number(p.totalCount || p.plannedFiles || 0)
+    let percentage = Number(p.percentage || 0)
+    if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) percentage = (bytes / totalBytes) * 100
+    const completedFiles = Number(p.completedFiles || 0)
+    return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles, phase: p.phase }
+  }
+
+  function getFrozenProgressFromSummary(run: any) {
+    try {
+      const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
+      return normalizeSummaryProgress(sum?.stableProgress)
+    } catch {}
+    return null
+  }
+
+  function getLiveSummaryFromDB(run: any) {
+    try {
+      const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
+      return normalizeSummaryProgress(sum?.progress)
+    } catch {}
+    return null
+  }
+
   function getRunProgressFromSummary(run: any) {
     const db = getLiveSummaryFromDB(run)
     const id = run?.id
@@ -43,17 +72,21 @@ export function useTaskProgressSync(options: {
     const active = options.activeRunLookup.getActiveRunByTaskId(taskId)
     if (active?.progress) return active.progress
 
-    const last = options.lastRunningProgressByTask.value?.[taskId]
-    if (last?.sp && Date.now() - Number(last.at || 0) <= options.lingerMs) {
-      return last.sp
+    const latest = (options.runs.value || []).find((item: any) => {
+      const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
+      return candidateTaskId > 0 && candidateTaskId === Number(taskId)
+    })
+    if (latest) {
+      const frozen = getFrozenProgressFromSummary(latest)
+      if (frozen) return frozen
     }
 
-    const run = (options.runs.value || []).find((item: any) => {
+    const running = (options.runs.value || []).find((item: any) => {
       const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
       return candidateTaskId > 0 && candidateTaskId === Number(taskId) && item?.status === 'running'
     })
-    if (!run) return null
-    return getRunProgressFromSummary(run)
+    if (!running) return null
+    return getRunProgressFromSummary(running)
   }
 
   function getRunningProgressByTask(taskId: number) {
@@ -75,25 +108,6 @@ export function useTaskProgressSync(options: {
   function formatBps(bps: number) {
     if (!bps || bps <= 0) return '-'
     return formatBytes(bps) + '/s'
-  }
-
-  function getLiveSummaryFromDB(run: any) {
-    try {
-      const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
-      const p = sum?.progress
-      if (p && typeof p === 'object') {
-        const bytes = Number(p.bytes || 0)
-        const totalBytes = Number(p.totalBytes || 0)
-        const speed = Number(p.speed || 0)
-        const eta = Number(p.eta || 0)
-        const totalCount = Number(p.plannedFiles || 0)
-        let percentage = Number(p.percentage || 0)
-        if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) percentage = (bytes / totalBytes) * 100
-        const completedFiles = Number(p.completedFiles || 0)
-        return { bytes, totalBytes, speed, eta, totalCount, percentage, completedFiles }
-      }
-    } catch {}
-    return null
   }
 
   function calcEtaFromAvg(run: any, live: any) {
