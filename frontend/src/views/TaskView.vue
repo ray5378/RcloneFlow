@@ -371,7 +371,7 @@ const {
     :history-filter-task-id="historyFilterTaskId"
     :history-status-filter="historyStatusFilter"
     :filtered-runs="filteredRuns"
-    :get-realtime-progress-by-run="getRealtimeProgressByRun"
+    :get-run-progress-from-summary="getRunProgressFromSummary"
     :get-final-summary-from-composable="getFinalSummaryFromComposable"
     :show-detail-modal="showDetailModal"
     :run-detail="runDetail"

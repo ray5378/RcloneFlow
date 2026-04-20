@@ -12,7 +12,7 @@ defineProps<{
   historyFilterTaskId: number | null
   historyStatusFilter: string
   filteredRuns: any[]
-  getRealtimeProgressByRun: (run: any) => any
+  getRunProgressFromSummary: (run: any) => any
   getFinalSummaryFromComposable: (run: any) => any
   showDetailModal: boolean
   runDetail: any
@@ -142,3 +142,4 @@ defineProps<{
     @open-log="openRunningHintLog"
   />
 </template>
+plate>
