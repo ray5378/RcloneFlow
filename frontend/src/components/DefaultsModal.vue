@@ -157,9 +157,6 @@ onMounted(load)
               <option value="warn">警告</option>
               <option value="error">错误</option>
             </select>
-            <label title="运行日志文件保留天数">日志文件保留天数 <small class="subkey">LOG_RETENTION_DAYS</small></label>
-            <input v-model="form.LOG_RETENTION_DAYS" type="number" min="1" placeholder="默认7天" />
-            <div class="error" v-if="errors.LOG_RETENTION_DAYS">{{ errors.LOG_RETENTION_DAYS }}</div>
           </div>
         </div>
 
