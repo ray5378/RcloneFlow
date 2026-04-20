@@ -72,15 +72,18 @@ export function useTaskProgressSync(options: {
     const active = options.activeRunLookup.getActiveRunByTaskId(taskId)
     if (active?.progress) return active.progress
 
-    // 任务卡片在非运行中时，优先读结束态冻结帧，而不是继续依赖前端时间窗防抖。
-    // 这样可以把“刚结束瞬间”的稳定性锚定在后端冻结结果上，而不是锚定在 UI 时序上。
+    // 任务卡片只在“刚结束”的短窗口内读取 stableProgress 冻结帧，
+    // 用来平滑 running -> finished 切换瞬间；不能长期显示上一次完成任务的进度。
     const latest = (options.runs.value || []).find((item: any) => {
       const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
       return candidateTaskId > 0 && candidateTaskId === Number(taskId)
     })
-    if (latest) {
-      const frozen = getFrozenProgressFromSummary(latest)
-      if (frozen) return frozen
+    if (latest && latest.status === 'finished') {
+      const finishedAt = new Date(latest.finishedAt || latest?.summary?.finishedAt || 0).getTime()
+      if (finishedAt > 0 && Date.now() - finishedAt <= 15000) {
+        const frozen = getFrozenProgressFromSummary(latest)
+        if (frozen) return frozen
+      }
     }
 
     const running = (options.runs.value || []).find((item: any) => {
