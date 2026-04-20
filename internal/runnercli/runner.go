@@ -507,11 +507,15 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				cf := int64(0)
 				if v, ok := sp["completedFiles"].(float64); ok { cf = int64(v) }
 				tc := int64(0)
-				if v, ok := sp["plannedFiles"].(float64); ok { tc = int64(v) }
+				if v, ok := sp["totalCount"].(float64); ok { tc = int64(v) }
+				if tc == 0 {
+					if v, ok := sp["plannedFiles"].(float64); ok { tc = int64(v) }
+				}
 				if pct >= 99.999 || (tc > 0 && cf >= tc-1) {
 					if tc > 0 {
 						sp["completedFiles"] = float64(tc)
 						sp["totalCount"] = float64(tc)
+						sp["plannedFiles"] = float64(tc)
 					}
 					sp["percentage"] = 100.0
 					sp["phase"] = "completed"

@@ -29,7 +29,16 @@ export function useTaskProgressSync(options: {
   function getFrozenProgressFromSummary(run: any) {
     try {
       const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
-      return normalizeSummaryProgress(sum?.stableProgress)
+      const frozen = normalizeSummaryProgress(sum?.stableProgress)
+      if (!frozen) return null
+      const finalTotal = Number(sum?.finalSummary?.counts?.total || 0)
+      if ((!frozen.totalCount || frozen.totalCount <= 0) && finalTotal > 0) {
+        frozen.totalCount = finalTotal
+      }
+      if ((!frozen.completedFiles || frozen.completedFiles <= 0) && finalTotal > 0 && Number(frozen.percentage || 0) >= 99.999) {
+        frozen.completedFiles = finalTotal
+      }
+      return frozen
     } catch {}
     return null
   }
