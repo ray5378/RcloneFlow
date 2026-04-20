@@ -368,7 +368,31 @@ func TestMigrationCreatesVersionTable(t *testing.T) {
 	if err = db.db.QueryRow("SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil {
 		t.Fatalf("failed to get migration version: %v", err)
 	}
-	if version < 1 {
-		t.Errorf("expected migration version >= 1, got %d", version)
+	if version < 3 {
+		t.Errorf("expected migration version >= 3, got %d", version)
+	}
+}
+
+func TestTaskNameUniqueIndex(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.AddTask(Task{Name: "dup-name", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("first AddTask() error = %v", err)
+	}
+
+	_, err = db.AddTask(Task{Name: "Dup-Name", Mode: "sync", SourceRemote: "src2", SourcePath: "/c", TargetRemote: "dst2", TargetPath: "/d"})
+	if err == nil {
+		t.Fatal("expected duplicate task name insert to fail")
 	}
 }

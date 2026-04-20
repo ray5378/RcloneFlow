@@ -236,6 +236,12 @@ func (db *DB) migrate() error {
 				CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
 			`,
 		},
+		{
+			version: 3,
+			sql: `
+				CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_name_unique ON tasks(name COLLATE NOCASE);
+			`,
+		},
 	}
 
 	// 获取当前版本
