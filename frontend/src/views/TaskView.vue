@@ -24,6 +24,7 @@ import { useTaskFormNormalize } from '../composables/useTaskFormNormalize'
 import { useTaskFormRuntime } from '../composables/useTaskFormRuntime'
 import { useTaskListRuntime } from '../composables/useTaskListRuntime'
 import { useTaskListView } from '../composables/useTaskListView'
+import { useTaskViewPagingBridge } from '../composables/useTaskViewPagingBridge'
 import { useToastCenter } from '../composables/useToastCenter'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 
@@ -39,14 +40,6 @@ const closeWebhookModal = () => { showWebhookModal.value = false }
 const closeSingletonModal = () => { showSingletonModal.value = false }
 const closeLogModal = () => { showLogModal.value = false }
 const closeGlobalStatsModal = () => { showGlobalStatsModal.value = false }
-const setTaskSearch = (value: string) => { taskSearch.value = value }
-const setTasksJumpPageValue = (value: number | null) => { tasksJumpPage.value = value }
-const setHistoryStatusFilter = (value: string) => { historyStatusFilter.value = value }
-const setJumpPageValue = (value: number) => { jumpPage.value = value }
-const setFinalFilesJumpValue = (value: number | null) => { finalFilesJump.value = value }
-const prevTasksPage = () => { tasksPage.value-- }
-const nextTasksPage = () => { tasksPage.value++ }
-const backToTasks = () => { currentModule.value = tasks }
 function ensureWebhookFormShape() {
   if (!webhookForm.value.notify) {
     webhookForm.value.notify = { manual: false, schedule: false, webhook: false }
@@ -185,8 +178,28 @@ const {
   jobApi,
 })
 
-const prevRunsPage = async () => { runsPage.value--; await loadData() }
-const nextRunsPage = async () => { runsPage.value++; await loadData() }
+const {
+  setTaskSearch,
+  setTasksJumpPageValue,
+  setHistoryStatusFilter,
+  setJumpPageValue,
+  setFinalFilesJumpValue,
+  prevTasksPage,
+  nextTasksPage,
+  backToTasks,
+  prevRunsPage,
+  nextRunsPage,
+} = useTaskViewPagingBridge({
+  taskSearch,
+  tasksJumpPage,
+  historyStatusFilter,
+  jumpPage,
+  finalFilesJump,
+  tasksPage,
+  runsPage,
+  currentModule,
+  loadData,
+})
 
 const {
   showWebhookModal,
@@ -400,7 +413,7 @@ const {
     :paged-run-files="pagedRunFiles"
     :run-files-page="runFilesPage"
     :total-run-files-pages="totalRunFilesPages"
-    :back-to-tasks="() => { currentModule = 'tasks' }"
+    :back-to-tasks="backToTasks"
     :prev-runs-page="prevRunsPage"
     :next-runs-page="nextRunsPage"
     :set-history-status-filter="setHistoryStatusFilter"
