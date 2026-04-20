@@ -42,6 +42,12 @@ export function useTaskProgressSync(options: {
   function getTaskCardProgressByTask(taskId: number) {
     const active = options.activeRunLookup.getActiveRunByTaskId(taskId)
     if (active?.progress) return active.progress
+
+    const last = options.lastRunningProgressByTask.value?.[taskId]
+    if (last?.sp && Date.now() - Number(last.at || 0) <= options.lingerMs) {
+      return last.sp
+    }
+
     const run = (options.runs.value || []).find((item: any) => {
       const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
       return candidateTaskId > 0 && candidateTaskId === Number(taskId) && item?.status === 'running'
