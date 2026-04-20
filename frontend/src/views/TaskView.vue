@@ -208,37 +208,6 @@ const {
   closeRunDetailModal,
 })
 
-// webhook / singleton / editor modal 绑定桥只负责字段级 UI 接线；
-// 这里同样依赖 aux runtime 暴露出的表单 ref，因此必须放在其后。
-const {
-  closeWebhookModal,
-  closeSingletonModal,
-  closeLogModal,
-  closeGlobalStatsModal,
-  setWebhookTriggerId,
-  setWebhookPostUrl,
-  setWebhookWecomUrl,
-  setWebhookNotifyManual,
-  setWebhookNotifySchedule,
-  setWebhookNotifyWebhook,
-  setWebhookStatusSuccess,
-  setWebhookStatusFailed,
-  setSingletonEnabled,
-  setCommandMode,
-  setCommandText,
-  setShowAdvancedOptions,
-} = useTaskViewModalBindings({
-  showWebhookModal,
-  webhookForm,
-  showSingletonModal,
-  singletonForm,
-  showLogModal,
-  commandMode,
-  commandText,
-  showAdvancedOptions,
-  showGlobalStatsModal,
-})
-
 // move 模式时，成功数量代表 Moved 条数；已在后端合并 Copied+Deleted 为 Moved
 
 const {
@@ -281,6 +250,38 @@ const {
   scheduleApi,
   showToast,
   parseRcloneCommand,
+})
+
+// webhook / singleton / editor modal 绑定桥只负责字段级 UI 接线；
+// 除了 aux runtime 暴露出的表单 ref 外，还依赖 task form runtime 的 command/advanced 状态，
+// 因此必须放在 useTaskFormRuntime 之后，避免压缩后触发 TDZ（before initialization）。
+const {
+  closeWebhookModal,
+  closeSingletonModal,
+  closeLogModal,
+  closeGlobalStatsModal,
+  setWebhookTriggerId,
+  setWebhookPostUrl,
+  setWebhookWecomUrl,
+  setWebhookNotifyManual,
+  setWebhookNotifySchedule,
+  setWebhookNotifyWebhook,
+  setWebhookStatusSuccess,
+  setWebhookStatusFailed,
+  setSingletonEnabled,
+  setCommandMode,
+  setCommandText,
+  setShowAdvancedOptions,
+} = useTaskViewModalBindings({
+  showWebhookModal,
+  webhookForm,
+  showSingletonModal,
+  singletonForm,
+  showLogModal,
+  commandMode,
+  commandText,
+  showAdvancedOptions,
+  showGlobalStatsModal,
 })
 
 const {
