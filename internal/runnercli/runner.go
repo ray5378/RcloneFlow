@@ -633,6 +633,29 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			finalSummary["counts"] = counts
 			finalSummary["files"] = files
 			rr.Summary["finalSummary"] = finalSummary
+
+			// 任务卡片完成态冻结帧：只给刚结束短窗口使用，避免 100% 后字节/数量继续抖动。
+			cardSummary := map[string]any{
+				"phase":          "completed",
+				"percentage":     100.0,
+				"finishedAt":     fin.Format(time.RFC3339),
+				"totalBytes":     float64(total),
+				"bytes":          float64(total),
+				"totalCount":     float64(counts["total"]),
+				"completedFiles": float64(counts["total"]),
+				"speed":          float64(0),
+				"eta":            float64(0),
+			}
+			if total <= 0 {
+				cardSummary["bytes"] = float64(bytes)
+			}
+			if counts["total"] <= 0 {
+				if v, ok := finalSummary["counts"].(map[string]int); ok {
+					cardSummary["totalCount"] = float64(v["total"])
+					cardSummary["completedFiles"] = float64(v["total"])
+				}
+			}
+			rr.Summary["cardSummary"] = cardSummary
 		})
 		websocket.Broadcast("run_status", map[string]any{
 			"run_id": run.ID,

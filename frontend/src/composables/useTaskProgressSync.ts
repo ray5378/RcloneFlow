@@ -27,7 +27,18 @@ export function useTaskProgressSync(options: {
   function getCardSummaryFromRun(run: any) {
     try {
       const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : run?.summary
-      return normalizeSummaryProgress(sum?.cardSummary)
+      const normalized = normalizeSummaryProgress(sum?.cardSummary)
+      if (!normalized) return null
+      const frozen = { ...normalized }
+      if (frozen.percentage >= 99.999) {
+        frozen.percentage = 100
+        if (frozen.totalBytes > 0) frozen.bytes = frozen.totalBytes
+        if (frozen.totalCount > 0) frozen.completedFiles = frozen.totalCount
+        frozen.speed = 0
+        frozen.eta = 0
+        frozen.phase = 'completed'
+      }
+      return frozen
     } catch {}
     return null
   }
