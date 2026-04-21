@@ -232,6 +232,13 @@ const optionHelpMap: Record<string, string> = {
   use_x_id: '是否附加 x-id URL 参数。一般不需要改，除非兼容性排障。',
   sign_accept_encoding: '是否将 Accept-Encoding 纳入签名计算。一般不需要改。',
   sdk_log_mode: 'AWS SDK 日志模式。可用于调试 Signing / Retries / Request / Response 等行为。',
+  domain: 'NTLM 认证使用的域或工作组名称。',
+  spn: '服务主体名称（SPN）。某些集群或特殊环境会要求填写，例如 cifs/remotehost:1020；不确定时留空。',
+  use_kerberos: '启用 Kerberos 认证。开启后会改用 Kerberos 而不是 NTLM，并要求系统中存在可用的 Kerberos 配置与凭据缓存。',
+  idle_timeout: '空闲连接关闭前的最长等待时间。设为 0 表示长期保持连接。',
+  hide_special_share: '隐藏特殊共享（例如 print$）等通常不应直接访问的共享。',
+  case_insensitive: '服务器是否按不区分大小写处理路径。Windows 共享通常始终为 true。',
+  kerberos_ccache: 'Kerberos 凭据缓存（krb5cc）路径。可覆盖默认的 KRB5CCNAME，用于多凭据或多用户场景。支持 FILE:/path、DIR:/path 或直接填写文件路径。',
   description: '该存储的备注说明。',
 }
 
