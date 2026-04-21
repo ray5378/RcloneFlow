@@ -601,7 +601,7 @@ async function openEditRemote(name: string) {
     </template>
     <!-- Background context menu (empty area) -->
     <template v-else>
-      <button @click="pasteItem" :disabled="!clipboardItem">粘贴到当前目录</button>
+      <button @click="pasteItem" :disabled="!clipboardItem">{{ t('browserView.pasteToCurrent') }}</button>
     </template>
   </div>
 
