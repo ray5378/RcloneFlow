@@ -135,6 +135,10 @@ export default {
     editSuccessClose: '修改成功，点击关闭',
     notSelected: '未选择存储类型',
     invalidName: '存储名称至少 2 位，且只能包含字母、数字、下划线和横线',
+    genericProviderDescription: '该类型支持通过 rclone 接入。',
+    genericOptionLabel: '配置项',
+    genericOptionHelp: '请根据你的存储服务提供的信息填写。',
+    enterPrefix: '请输入',
   },
   browserView: {
     clipboardEmpty: '剪贴板为空，请先复制或剪切文件',

@@ -135,6 +135,10 @@ export default {
     editSuccessClose: 'Updated successfully, click to close',
     notSelected: 'No storage type selected',
     invalidName: 'Storage name must be at least 2 characters and contain only letters, numbers, underscores, and hyphens',
+    genericProviderDescription: 'This storage type is supported by rclone.',
+    genericOptionLabel: 'Option',
+    genericOptionHelp: 'Fill this based on your storage provider documentation.',
+    enterPrefix: 'Enter ',
   },
   browserView: {
     clipboardEmpty: 'Clipboard is empty, copy or cut a file first',
