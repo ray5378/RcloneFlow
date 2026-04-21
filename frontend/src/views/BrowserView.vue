@@ -348,7 +348,7 @@ async function pasteItem() {
       await refreshBrowser()
     }
   } catch (e) {
-    alert('粘贴失败: ' + (e as Error).message)
+    alert(`${t('browserView.pasteFailed')}: ${(e as Error).message}`)
   }
 }
 
