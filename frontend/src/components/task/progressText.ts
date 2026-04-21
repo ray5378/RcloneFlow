@@ -1,4 +1,5 @@
 import { formatBytes, formatBytesPerSec, formatEta } from '../../utils/format'
+import { t } from '../../i18n'
 
 export interface TaskProgressLike {
   percentage?: number
@@ -15,9 +16,9 @@ export function getUnifiedProgressText(progress?: TaskProgressLike | null) {
   const p = progress || null
   if (!p) return '-'
   if (p.phase === 'preparing') {
-    return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
+    return `${t('runtime.preparing')} · ${t('runtime.transferred')} ${formatBytes(p.bytes || 0)} · ${t('runtime.speed')} ${formatBytesPerSec(p.speed || 0)}`
   }
   let etaStr = ''
-  if (p.eta && p.eta > 0) etaStr = ` · 预计完成 ${formatEta(p.eta)}`
-  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(p.bytes || 0)} / ${formatBytes(p.totalBytes || 0)} · ${formatBytesPerSec(p.speed || 0)} · 总数量 ${Number(p.totalCount || 0)} ／ 已传输 ${Number(p.completedFiles || 0)}${etaStr}`
+  if (p.eta && p.eta > 0) etaStr = ` · ${t('runtime.etaDone')} ${formatEta(p.eta)}`
+  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(p.bytes || 0)} / ${formatBytes(p.totalBytes || 0)} · ${formatBytesPerSec(p.speed || 0)} · ${t('runtime.totalCount')} ${Number(p.totalCount || 0)} ／ ${t('runtime.completedCount')} ${Number(p.completedFiles || 0)}${etaStr}`
 }

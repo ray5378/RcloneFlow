@@ -1,3 +1,5 @@
+import { t } from '../../i18n'
+
 export type ScheduleField = 'month' | 'week' | 'day' | 'hour' | 'minute'
 
 export interface ScheduleFormLike {
@@ -25,7 +27,19 @@ export const scheduleFieldOptions: Record<ScheduleField, string[]> = {
   minute: Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')),
 }
 
-export const weekLabels = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+export function getWeekLabels() {
+  return [
+    t('runtime.sunday'),
+    t('runtime.monday'),
+    t('runtime.tuesday'),
+    t('runtime.wednesday'),
+    t('runtime.thursday'),
+    t('runtime.friday'),
+    t('runtime.saturday'),
+  ]
+}
+
+export const weekLabels = getWeekLabels()
 
 export function createEmptyScheduleTempState(): ScheduleTempState {
   return {
@@ -79,20 +93,14 @@ export function toggleAllScheduleTempField(temp: ScheduleTempState, field: Sched
   }
 }
 
-export function isScheduleFieldAllSelected(field: ScheduleField, value: string[]): boolean {
-  return value.join(',') === scheduleFieldOptions[field].join(',')
+function parseScheduleField(value?: string): string[] {
+  if (!value || value === '*') return []
+  return value.split(',').map(v => v.trim()).filter(Boolean)
 }
 
-function parseScheduleField(value?: string | null): string[] {
-  if (!value || value === '*') {
-    return []
-  }
-  return value.split(',')
-}
-
-function formatScheduleField(field: ScheduleField, value: string[]): string {
-  if (!value.length || isScheduleFieldAllSelected(field, value)) {
-    return '*'
-  }
-  return value.join(',')
+function formatScheduleField(field: ScheduleField, values: string[]): string {
+  if (!values.length) return '*'
+  const all = scheduleFieldOptions[field]
+  if (values.length === all.length) return '*'
+  return [...values].sort().join(',')
 }

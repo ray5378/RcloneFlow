@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../i18n'
+
 defineProps<{
   visible: boolean
   title: string
@@ -23,7 +25,7 @@ const emit = defineEmits<{
         </div>
       </div>
       <div class="modal-footer">
-        <button class="ghost" @click="emit('close')">关闭</button>
+        <button class="ghost" @click="emit('close')">{{ t('modal.close') }}</button>
       </div>
     </div>
   </div>

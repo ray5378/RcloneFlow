@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../i18n'
+
 defineProps<{
   visible: boolean
   triggerId: string
@@ -41,45 +43,45 @@ function onCheckbox(event: Event, key: 'notifyManual' | 'notifySchedule' | 'noti
   <div v-if="visible" class="modal-overlay" @click.self="emit('close')">
     <div class="modal-content" style="max-width:560px">
       <div class="modal-header">
-        <h3>Webhook 通知</h3>
+        <h3>{{ t('webhookModal.title') }}</h3>
         <button class="close-btn" @click="emit('close')">×</button>
       </div>
       <div class="modal-body">
         <div class="detail-item full-width">
-          <label>Webhook 接收（触发ID）：</label>
-          <input :value="triggerId" type="text" placeholder="留空=使用任务ID（示例：/webhook/<任务ID> 或 /webhook/<你的ID>）" @input="onTextInput($event, 'triggerId')" />
+          <label>{{ t('webhookModal.triggerId') }}</label>
+          <input :value="triggerId" type="text" :placeholder="t('webhookModal.triggerPlaceholder')" @input="onTextInput($event, 'triggerId')" />
         </div>
         <div class="detail-item full-width">
-          <label>对外 POST 地址：</label>
+          <label>{{ t('webhookModal.postUrl') }}</label>
           <input :value="postUrl" type="text" placeholder="https://example.com/hooks/endpoint" @input="onTextInput($event, 'postUrl')" />
-          <p class="hint">任务完成或失败后，将以 POST 通知该地址。</p>
+          <p class="hint">{{ t('webhookModal.postHint') }}</p>
         </div>
         <div class="detail-item full-width">
-          <label>企业微信地址：</label>
+          <label>{{ t('webhookModal.wecomUrl') }}</label>
           <input :value="wecomUrl" type="text" placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..." @input="onTextInput($event, 'wecomUrl')" />
-          <p class="hint">若填写，将同时向企业微信机器人发送 Markdown 通知。</p>
+          <p class="hint">{{ t('webhookModal.wecomHint') }}</p>
         </div>
         <div class="detail-item">
-          <label>触发来源：</label>
+          <label>{{ t('webhookModal.triggerSource') }}</label>
           <div class="trigger-row">
-            <label class="trigger-opt"><input :checked="notifyManual" type="checkbox" @change="onCheckbox($event, 'notifyManual')" /><span>手动</span></label>
-            <label class="trigger-opt"><input :checked="notifySchedule" type="checkbox" @change="onCheckbox($event, 'notifySchedule')" /><span>定时</span></label>
-            <label class="trigger-opt"><input :checked="notifyWebhook" type="checkbox" @change="onCheckbox($event, 'notifyWebhook')" /><span>Webhook</span></label>
+            <label class="trigger-opt"><input :checked="notifyManual" type="checkbox" @change="onCheckbox($event, 'notifyManual')" /><span>{{ t('webhookModal.manual') }}</span></label>
+            <label class="trigger-opt"><input :checked="notifySchedule" type="checkbox" @change="onCheckbox($event, 'notifySchedule')" /><span>{{ t('webhookModal.schedule') }}</span></label>
+            <label class="trigger-opt"><input :checked="notifyWebhook" type="checkbox" @change="onCheckbox($event, 'notifyWebhook')" /><span>{{ t('taskCard.webhook') }}</span></label>
           </div>
         </div>
         <div class="detail-item">
-          <label>状态过滤：</label>
+          <label>{{ t('webhookModal.statusFilter') }}</label>
           <div class="trigger-row">
-            <label class="trigger-opt"><input :checked="statusSuccess" type="checkbox" @change="onCheckbox($event, 'statusSuccess')" /><span>成功</span></label>
-            <label class="trigger-opt"><input :checked="statusFailed" type="checkbox" @change="onCheckbox($event, 'statusFailed')" /><span>失败</span></label>
+            <label class="trigger-opt"><input :checked="statusSuccess" type="checkbox" @change="onCheckbox($event, 'statusSuccess')" /><span>{{ t('webhookModal.success') }}</span></label>
+            <label class="trigger-opt"><input :checked="statusFailed" type="checkbox" @change="onCheckbox($event, 'statusFailed')" /><span>{{ t('webhookModal.failed') }}</span></label>
           </div>
-          <p class="hint">仅当匹配状态时发送通知；默认两个都勾选。</p>
+          <p class="hint">{{ t('webhookModal.statusHint') }}</p>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="primary" @click="emit('save')">保存</button>
-        <button class="ghost" :disabled="!canTest" @click="emit('test')">发送测试</button>
-        <button class="ghost" @click="emit('close')">取消</button>
+        <button class="primary" @click="emit('save')">{{ t('common.save') }}</button>
+        <button class="ghost" :disabled="!canTest" @click="emit('test')">{{ t('webhookModal.test') }}</button>
+        <button class="ghost" @click="emit('close')">{{ t('common.cancel') }}</button>
       </div>
     </div>
   </div>

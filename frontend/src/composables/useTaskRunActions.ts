@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { t } from '../i18n'
 
 interface UseTaskRunActionsOptions {
   loadData: () => Promise<void>
@@ -35,7 +36,7 @@ export function useTaskRunActions(options: UseTaskRunActionsOptions) {
 
   async function runTask(taskId: number) {
     if (runningTaskId.value !== null) {
-      options.showToast('单例模式：已有任务正在运行，跳过本次执行', 'error')
+      options.showToast(t('runtime.singletonBlocked'), 'error')
       return
     }
     runningTaskId.value = taskId

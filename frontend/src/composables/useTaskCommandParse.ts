@@ -5,11 +5,13 @@ interface ParsedRcloneCommand {
   options: Record<string, any>
 }
 
+import { t } from '../i18n'
+
 export function parseRcloneCommand(cmd: string): ParsedRcloneCommand {
-  if (!cmd) throw new Error('命令为空')
+  if (!cmd) throw new Error(t('runtime.commandEmpty'))
 
   const tokens = cmd.match(/(?:"[^"]*"|'[^']*'|\S)+/g) || []
-  if (tokens.length < 3) throw new Error('缺少源/目标')
+  if (tokens.length < 3) throw new Error(t('runtime.commandMissingSrcDst'))
 
   const sub = tokens[1]
   const mode = sub === 'sync' ? 'sync' : sub === 'move' ? 'move' : 'copy'
@@ -56,7 +58,7 @@ export function parseRcloneCommand(cmd: string): ParsedRcloneCommand {
 
 function parseRemotePath(value: string) {
   const parts = value.split(':')
-  if (parts.length < 2) throw new Error('路径格式错误：' + value)
+  if (parts.length < 2) throw new Error(t('runtime.commandInvalidPath').replace('{value}', value))
   return { remote: parts[0], path: parts.slice(1).join(':') || '' }
 }
 

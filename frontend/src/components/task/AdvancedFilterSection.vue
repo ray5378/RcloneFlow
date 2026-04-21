@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../i18n'
+
 defineProps<{
   options: any
   updateOption: (key: string, value: any) => void
@@ -7,30 +9,30 @@ defineProps<{
 
 <template>
   <div class="advanced-group">
-    <div class="advanced-group-title">过滤参数</div>
+    <div class="advanced-group-title">{{ t('advancedTask.filterParams') }}</div>
     <div class="advanced-row">
-      <label>排除 (exclude)</label>
-      <textarea :value="options.exclude" @input="updateOption('exclude', ($event.target as HTMLTextAreaElement).value)" placeholder="每行一个规则, 如: *.txt&#10;备份/**" rows="3"></textarea>
+      <label>{{ t('advancedTask.exclude') }}</label>
+      <textarea :value="options.exclude" @input="updateOption('exclude', ($event.target as HTMLTextAreaElement).value)" :placeholder="t('advancedTask.excludePlaceholder')" rows="3"></textarea>
     </div>
     <div class="advanced-row">
-      <label>包含 (include)</label>
-      <textarea :value="options.include" @input="updateOption('include', ($event.target as HTMLTextAreaElement).value)" placeholder="每行一个规则, 如: *.pdf&#10;文档/**" rows="3"></textarea>
+      <label>{{ t('advancedTask.include') }}</label>
+      <textarea :value="options.include" @input="updateOption('include', ($event.target as HTMLTextAreaElement).value)" :placeholder="t('advancedTask.includePlaceholder')" rows="3"></textarea>
     </div>
     <div class="advanced-row">
-      <label>过滤规则 (filter)</label>
-      <textarea :value="options.filter" @input="updateOption('filter', ($event.target as HTMLTextAreaElement).value)" placeholder="每行一个规则, 如: - *.tmp&#10;+ *.bak" rows="3"></textarea>
+      <label>{{ t('advancedTask.filter') }}</label>
+      <textarea :value="options.filter" @input="updateOption('filter', ($event.target as HTMLTextAreaElement).value)" :placeholder="t('advancedTask.filterPlaceholder')" rows="3"></textarea>
     </div>
     <div class="advanced-row inline">
       <input type="checkbox" :checked="options.ignoreCase" @change="updateOption('ignoreCase', ($event.target as HTMLInputElement).checked)" />
-      <label>忽略大小写</label>
+      <label>{{ t('advancedTask.ignoreCase') }}</label>
     </div>
     <div class="advanced-row inline">
       <input type="checkbox" :checked="options.ignoreExisting" @change="updateOption('ignoreExisting', ($event.target as HTMLInputElement).checked)" />
-      <label>忽略已存在的文件</label>
+      <label>{{ t('advancedTask.ignoreExisting') }}</label>
     </div>
     <div class="advanced-row inline">
       <input type="checkbox" :checked="options.deleteExcluded" @change="updateOption('deleteExcluded', ($event.target as HTMLInputElement).checked)" />
-      <label>删除被排除的文件</label>
+      <label>{{ t('advancedTask.deleteExcluded') }}</label>
     </div>
   </div>
 </template>

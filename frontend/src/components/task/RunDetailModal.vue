@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { FileItem } from '../files'
+import { t } from '../../i18n'
 
 defineProps<{
   visible: boolean
@@ -42,105 +43,109 @@ function onFinalFilesJumpInput(event: Event) {
   const value = target.value === '' ? null : Number(target.value)
   emit('update-final-files-jump', value)
 }
+
+function countLine(template: string, count: number) {
+  return template.replace('{count}', String(count))
+}
 </script>
 
 <template>
   <div v-if="visible" class="modal-overlay" @click.self="emit('close')">
     <div class="modal-content detail-modal">
       <div class="modal-header">
-        <h3>运行详情</h3>
+        <h3>{{ t('modal.runDetail') }}</h3>
         <button class="close-btn" @click="emit('close')">×</button>
       </div>
       <div class="modal-body">
         <div class="detail-item">
-          <label>任务名称：</label>
+          <label>{{ t('modal.taskName') }}</label>
           <span>{{ runDetail.taskName || '-' }}</span>
         </div>
         <div class="detail-item">
-          <label>执行模式：</label>
+          <label>{{ t('modal.runMode') }}</label>
           <span>{{ runDetail.taskMode || '-' }}</span>
         </div>
         <div class="detail-item">
-          <label>状态：</label>
+          <label>{{ t('modal.status') }}</label>
           <span :class="['status', getStatusClass(runDetail.status)]">{{ getStatusText(runDetail.status) }}</span>
         </div>
         <div class="detail-item">
-          <label>触发方式：</label>
-          <span>{{ runDetail.trigger === 'schedule' ? '定时任务' : (runDetail.trigger === 'webhook' ? 'Webhook 触发' : '手动执行') }}</span>
+          <label>{{ t('modal.trigger') }}</label>
+          <span>{{ runDetail.trigger === 'schedule' ? t('modal.triggerSchedule') : (runDetail.trigger === 'webhook' ? t('modal.triggerWebhook') : t('modal.triggerManual')) }}</span>
         </div>
         <div class="detail-item full-width">
-          <label>源路径：</label>
+          <label>{{ t('modal.sourcePath') }}</label>
           <span>{{ runDetail.sourceRemote }}:{{ runDetail.sourcePath || '/' }}</span>
         </div>
         <div class="detail-item full-width">
-          <label>目标路径：</label>
+          <label>{{ t('modal.targetPath') }}</label>
           <span>{{ runDetail.targetRemote }}:{{ runDetail.targetPath || '/' }}</span>
         </div>
         <div class="detail-item full-width">
-          <label>运行总结：</label>
+          <label>{{ t('modal.summary') }}</label>
           <div class="summary-box" v-if="getFinalSummary(runDetail)">
-            <div class="summary-title">统计概览（可筛选）</div>
+            <div class="summary-title">{{ t('modal.summaryStats') }}</div>
             <div class="summary-grid">
               <div class="summary-cell clickable" @click="emit('set-final-filter', 'all')">
-                <div class="summary-key">总计</div>
+                <div class="summary-key">{{ t('modal.total') }}</div>
                 <div class="summary-val">{{ finalCountAll }}</div>
               </div>
               <div class="summary-cell clickable" @click="emit('set-final-filter', 'success')">
-                <div class="summary-key">{{ runDetail.taskMode === 'move' ? '移动' : '成功' }}</div>
+                <div class="summary-key">{{ runDetail.taskMode === 'move' ? t('modal.moved') : t('modal.success') }}</div>
                 <div class="summary-val">{{ finalCountSuccess }}</div>
               </div>
               <div class="summary-cell clickable" @click="emit('set-final-filter', 'failed')">
-                <div class="summary-key">失败</div>
+                <div class="summary-key">{{ t('modal.failed') }}</div>
                 <div class="summary-val error-text">{{ finalCountFailed }}</div>
               </div>
               <div class="summary-cell clickable" @click="emit('set-final-filter', 'other')">
-                <div class="summary-key">其他</div>
+                <div class="summary-key">{{ t('modal.other') }}</div>
                 <div class="summary-val">{{ finalCountOther }}</div>
               </div>
               <div class="summary-cell">
-                <div class="summary-key">已传输体积</div>
+                <div class="summary-key">{{ t('modal.transferredBytes') }}</div>
                 <div class="summary-val act">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
               </div>
               <div class="summary-cell">
-                <div class="summary-key">开始时间</div>
+                <div class="summary-key">{{ t('modal.startedAt') }}</div>
                 <div class="summary-val">{{ formatTime(runDetail.startedAt) }}</div>
               </div>
               <div class="summary-cell">
-                <div class="summary-key">结束时间</div>
+                <div class="summary-key">{{ t('modal.finishedAt') }}</div>
                 <div class="summary-val">{{ formatTime(runDetail.finishedAt) }}</div>
               </div>
               <div class="summary-cell">
-                <div class="summary-key">耗时</div>
+                <div class="summary-key">{{ t('modal.duration') }}</div>
                 <div class="summary-val">{{ getFinalSummary(runDetail)?.durationText || '-' }}</div>
               </div>
               <div class="summary-cell">
-                <div class="summary-key">平均速度</div>
+                <div class="summary-key">{{ t('modal.avgSpeed') }}</div>
                 <div class="summary-val">{{ formatBps(getFinalSummary(runDetail)?.avgSpeedBps || 0) }}</div>
               </div>
             </div>
           </div>
-          <pre v-else class="summary-pre">{{ JSON.stringify({ note: '无总结，可查看传输日志' }, null, 2) }}</pre>
+          <pre v-else class="summary-pre">{{ JSON.stringify({ note: t('modal.noSummary') }, null, 2) }}</pre>
         </div>
 
         <div class="detail-item full-width">
-          <label>传输明细：</label>
+          <label>{{ t('modal.details') }}</label>
           <div>
             <div class="files-toolbar">
-              <span>共 {{ finalFilesTotal }} 条</span>
+              <span>{{ countLine(t('modal.countLine'), finalFilesTotal) }}</span>
               <div class="pager-inline">
-                <button class="ghost small" :disabled="finalFilesPage <= 1" @click="emit('prev-final-files-page')">上一页</button>
+                <button class="ghost small" :disabled="finalFilesPage <= 1" @click="emit('prev-final-files-page')">{{ t('modal.prevPage') }}</button>
                 <span>{{ finalFilesPage }}/{{ totalFinalFilesPages }}</span>
-                <button class="ghost small" :disabled="finalFilesPage >= totalFinalFilesPages" @click="emit('next-final-files-page')">下一页</button>
+                <button class="ghost small" :disabled="finalFilesPage >= totalFinalFilesPages" @click="emit('next-final-files-page')">{{ t('modal.nextPage') }}</button>
                 <input class="page-input jump-input" :value="finalFilesJump ?? ''" type="number" min="1" :max="totalFinalFilesPages" @input="onFinalFilesJumpInput" />
-                <button class="ghost small" @click="emit('jump-final-files-page')">跳转</button>
+                <button class="ghost small" @click="emit('jump-final-files-page')">{{ t('modal.jump') }}</button>
               </div>
             </div>
             <div class="files-table large">
               <div class="files-header">
-                <span class="name">文件</span>
-                <span class="status">结果</span>
-                <span class="time">时间</span>
-                <span class="size">大小</span>
+                <span class="name">{{ t('modal.file') }}</span>
+                <span class="status">{{ t('modal.result') }}</span>
+                <span class="time">{{ t('modal.time') }}</span>
+                <span class="size">{{ t('modal.size') }}</span>
               </div>
               <div class="files-body">
                 <template v-if="finalFiles && finalFiles.length">
@@ -148,19 +153,19 @@ function onFinalFilesJumpInput(event: Event) {
                 </template>
                 <template v-else>
                   <FileItem v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" :item="it" />
-                  <div v-if="!pagedRunFiles.length" class="path-empty">无明细（可能日志为空或历史记录较旧）</div>
+                  <div v-if="!pagedRunFiles.length" class="path-empty">{{ t('modal.noDetail') }}</div>
                 </template>
               </div>
             </div>
             <div class="files-pager" v-if="!finalFiles || !finalFiles.length">
-              <button class="ghost small" :disabled="runFilesPage <= 1" @click="emit('prev-files-page')">上一页</button>
+              <button class="ghost small" :disabled="runFilesPage <= 1" @click="emit('prev-files-page')">{{ t('modal.prevPage') }}</button>
               <span>{{ runFilesPage }}/{{ totalRunFilesPages }}</span>
-              <button class="ghost small" :disabled="runFilesPage >= totalRunFilesPages" @click="emit('next-files-page')">下一页</button>
+              <button class="ghost small" :disabled="runFilesPage >= totalRunFilesPages" @click="emit('next-files-page')">{{ t('modal.nextPage') }}</button>
             </div>
           </div>
         </div>
         <div v-if="runDetail.error" class="detail-item full-width">
-          <label>错误信息：</label>
+          <label>{{ t('modal.error') }}</label>
           <span class="error-text">{{ runDetail.error }}</span>
         </div>
       </div>

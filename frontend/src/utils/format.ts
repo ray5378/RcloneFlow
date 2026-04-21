@@ -1,8 +1,5 @@
-// Format utilities for RcloneFlow
+import { t } from '../i18n'
 
-/**
- * Format bytes to human readable string
- */
 export function formatBytes(bytes: number): string {
   if (bytes === 0 || bytes === undefined || bytes === null) return '-'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
@@ -15,17 +12,11 @@ export function formatBytes(bytes: number): string {
   return `${size.toFixed(unitIndex > 0 ? 1 : 0)} ${units[unitIndex]}`
 }
 
-/**
- * Format bytes per second
- */
 export function formatBytesPerSec(bps: number): string {
   if (!bps || bps === 0) return '-'
   return formatBytes(bps) + '/s'
 }
 
-/**
- * Format duration from start to end time
- */
 export function formatDuration(startTime: string | undefined, endTime: string | undefined): string {
   if (!startTime) return '-'
   const start = new Date(startTime).getTime()
@@ -35,21 +26,18 @@ export function formatDuration(startTime: string | undefined, endTime: string | 
   const minutes = Math.floor(seconds / 60)
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
-  
-  if (days > 0) return `${days}天${hours % 24}小时`
-  if (hours > 0) return `${hours}小时${minutes % 60}分`
-  if (minutes > 0) return `${minutes}分${seconds % 60}秒`
-  return `${seconds}秒`
+
+  if (days > 0) return `${days}${t('runtime.daySuffix')}${hours % 24}${t('runtime.hourSuffix')}`
+  if (hours > 0) return `${hours}${t('runtime.hourSuffix')}${minutes % 60}${t('runtime.minuteSuffix')}`
+  if (minutes > 0) return `${minutes}${t('runtime.minuteSuffix')}${seconds % 60}${t('runtime.secondSuffix')}`
+  return `${seconds}${t('runtime.secondSuffix')}`
 }
 
-/**
- * Format ETA (estimated time remaining)
- */
 export function formatEta(seconds: number): string {
   if (!seconds || seconds <= 0) return '-'
   const hours = Math.floor(seconds / 3600)
   const minutes = Math.floor((seconds % 3600) / 60)
-  if (hours > 0) return `约${hours}小时${minutes}分`
-  if (minutes > 0) return `约${minutes}分`
-  return `约${seconds}秒`
+  if (hours > 0) return `${t('runtime.approx')}${hours}${t('runtime.hourSuffix')}${minutes}${t('runtime.minuteSuffix')}`
+  if (minutes > 0) return `${t('runtime.approx')}${minutes}${t('runtime.minuteSuffix')}`
+  return `${t('runtime.approx')}${seconds}${t('runtime.secondSuffix')}`
 }

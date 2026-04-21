@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../i18n'
+
 defineProps<{
   visible: boolean
   stats: any
@@ -16,32 +18,32 @@ const emit = defineEmits<{
   <div v-if="visible" class="modal-overlay" @click.self="emit('close')">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>全局实时数据</h3>
+        <h3>{{ t('modal.globalStats') }}</h3>
         <button class="close-btn" @click="emit('close')">×</button>
       </div>
       <div class="modal-body">
         <div class="detail-item">
-          <label>已传输：</label>
+          <label>{{ t('modal.transferred') }}</label>
           <span>{{ formatBytes(stats.bytes) || '-' }}</span>
         </div>
         <div class="detail-item">
-          <label>总大小：</label>
+          <label>{{ t('modal.totalSize') }}</label>
           <span>{{ formatBytes(stats.totalBytes) || '-' }}</span>
         </div>
         <div class="detail-item">
-          <label>当前速度：</label>
+          <label>{{ t('modal.currentSpeed') }}</label>
           <span>{{ formatBytesPerSec(stats.speed) || '-' }}</span>
         </div>
         <div class="detail-item">
-          <label>平均速度：</label>
+          <label>{{ t('modal.averageSpeed') }}</label>
           <span>{{ formatBytesPerSec(stats.speedAvg) || '-' }}</span>
         </div>
         <div class="detail-item">
-          <label>预计剩余时间：</label>
+          <label>{{ t('modal.eta') }}</label>
           <span>{{ formatEta(stats.eta) || '-' }}</span>
         </div>
         <div class="detail-item">
-          <label>进度：</label>
+          <label>{{ t('modal.progress') }}</label>
           <span>{{ stats.percentage !== undefined ? stats.percentage.toFixed(2) + '%' : '-' }}</span>
         </div>
         <div class="progress-bar-container">

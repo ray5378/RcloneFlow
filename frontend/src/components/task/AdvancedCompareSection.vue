@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../i18n'
+
 defineProps<{
   options: any
   updateOption: (key: string, value: any) => void
@@ -7,15 +9,15 @@ defineProps<{
 
 <template>
   <div class="advanced-group">
-    <div class="advanced-group-title">比较策略</div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.checksum" @change="updateOption('checksum', ($event.target as HTMLInputElement).checked)" /><label>校验和比较</label></div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.sizeOnly" @change="updateOption('sizeOnly', ($event.target as HTMLInputElement).checked)" /><label>仅按大小</label></div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.ignoreSize" @change="updateOption('ignoreSize', ($event.target as HTMLInputElement).checked)" /><label>忽略大小</label></div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.ignoreTimes" @change="updateOption('ignoreTimes', ($event.target as HTMLInputElement).checked)" /><label>忽略时间</label></div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.update" @change="updateOption('update', ($event.target as HTMLInputElement).checked)" /><label>更新较新的</label></div>
+    <div class="advanced-group-title">{{ t('advancedTask.compareStrategy') }}</div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.checksum" @change="updateOption('checksum', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.checksum') }}</label></div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.sizeOnly" @change="updateOption('sizeOnly', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.sizeOnly') }}</label></div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.ignoreSize" @change="updateOption('ignoreSize', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.ignoreSize') }}</label></div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.ignoreTimes" @change="updateOption('ignoreTimes', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.ignoreTimes') }}</label></div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.update" @change="updateOption('update', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.updateNewer') }}</label></div>
     <div class="advanced-row">
-      <label>时间窗口</label>
-      <input type="text" :value="options.modifyWindow" @input="updateOption('modifyWindow', ($event.target as HTMLInputElement).value)" placeholder="如: 1h2s" />
+      <label>{{ t('advancedTask.modifyWindow') }}</label>
+      <input type="text" :value="options.modifyWindow" @input="updateOption('modifyWindow', ($event.target as HTMLInputElement).value)" :placeholder="t('advancedTask.modifyWindowPlaceholder')" />
     </div>
   </div>
 </template>

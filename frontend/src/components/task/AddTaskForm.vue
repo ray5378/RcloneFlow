@@ -7,6 +7,7 @@ import AdvancedCompareSection from './AdvancedCompareSection.vue'
 import AdvancedPathSection from './AdvancedPathSection.vue'
 import AdvancedOtherSection from './AdvancedOtherSection.vue'
 import { PathItem } from '../path'
+import { t } from '../../i18n'
 
 const props = defineProps<{
   commandMode: boolean
@@ -40,7 +41,7 @@ const emit = defineEmits<{
   'source-click': [item: any]
   'target-arrow': [item: any]
   'target-click': [item: any]
-  submit: []
+  'submit': []
 }>()
 
 const commandModeModel = computed({
@@ -83,37 +84,37 @@ function updateOption(key: string, value: any) {
 
 <template>
   <div class="card">
-    <div class="card-header"><div class="title">添加任务</div></div>
+    <div class="card-header"><div class="title">{{ t('addTask.title') }}</div></div>
     <div class="form-content">
       <div class="field-item">
         <label class="inline-label">
           <input type="checkbox" v-model="commandModeModel" />
-          <span style="margin-left:8px">命令行模式（可粘贴 rclone 命令）</span>
+          <span style="margin-left:8px">{{ t('addTask.commandMode') }}</span>
         </label>
-        <textarea v-if="commandModeModel" v-model="commandTextModel" class="cmd-textarea" rows="4" placeholder='例如: rclone copy FNOS:/HDD/media openlist:/影音媒体/天翼5050 --bwlimit "07:30,2M;17:40,2M;23:00,2M" --use-server-modtime --size-only --verbose --transfers 2'></textarea>
-        <p v-if="commandModeModel" class="hint">保存时将自动解析命令，填充"模式/源/目标/选项"。任务名称仍需手动填写。</p>
+        <textarea v-if="commandModeModel" v-model="commandTextModel" class="cmd-textarea" rows="4" :placeholder="commandPlaceholder"></textarea>
+        <p v-if="commandModeModel" class="hint">{{ t('addTask.commandHint') }}</p>
       </div>
       <div class="field-item">
-        <label>任务名称 <span style="color: #dc2626">*</span></label>
-        <input v-model="createForm.name" type="text" placeholder="输入任务名称" />
+        <label>{{ t('addTask.taskName') }} <span style="color: #dc2626">*</span></label>
+        <input v-model="createForm.name" type="text" :placeholder="t('addTask.taskNamePlaceholder')" />
       </div>
       <div class="field-item">
-        <label>模式</label>
+        <label>{{ t('addTask.mode') }}</label>
         <select v-model="createForm.mode">
-          <option value="copy">复制 (copy)</option>
-          <option value="sync">同步 (sync)</option>
-          <option value="move">移动 (move)</option>
+          <option value="copy">{{ t('addTask.copy') }} (copy)</option>
+          <option value="sync">{{ t('addTask.sync') }} (sync)</option>
+          <option value="move">{{ t('addTask.move') }} (move)</option>
         </select>
       </div>
       <div class="field-item">
-        <label>源存储 <span style="color: #dc2626">*</span></label>
+        <label>{{ t('addTask.sourceStorage') }} <span style="color: #dc2626">*</span></label>
         <select v-model="createForm.sourceRemote" @change="$emit('source-remote-change')">
-          <option value="">选择源存储</option>
+          <option value="">{{ t('addTask.selectSourceStorage') }}</option>
           <option v-for="r in remotes" :key="r" :value="r">{{ r }}</option>
         </select>
       </div>
       <div class="field-item">
-        <label>源路径</label>
+        <label>{{ t('addTask.sourcePath') }}</label>
         <div class="path-selector">
           <div class="path-browse">
             <div class="pathbar">
@@ -136,22 +137,22 @@ function updateOption(key: string, value: any) {
                 @enter="$emit('source-arrow', item)"
                 @click="$emit('source-click', item)"
               />
-              <div v-if="!sourcePathOptions.length" class="path-empty">空目录</div>
+              <div v-if="!sourcePathOptions.length" class="path-empty">{{ t('addTask.emptyDir') }}</div>
             </div>
           </div>
-          <button type="button" class="ghost small" @click="showSourcePathInputModel = !showSourcePathInputModel">手动输入</button>
+          <button type="button" class="ghost small" @click="showSourcePathInputModel = !showSourcePathInputModel">{{ t('addTask.manualInput') }}</button>
         </div>
-        <input v-if="showSourcePathInputModel" v-model="createForm.sourcePath" type="text" placeholder="手动输入路径" style="margin-top: 8px" />
+        <input v-if="showSourcePathInputModel" v-model="createForm.sourcePath" type="text" :placeholder="t('addTask.manualPathPlaceholder')" style="margin-top: 8px" />
       </div>
       <div class="field-item">
-        <label>目标存储 <span style="color: #dc2626">*</span></label>
+        <label>{{ t('addTask.targetStorage') }} <span style="color: #dc2626">*</span></label>
         <select v-model="createForm.targetRemote" @change="$emit('target-remote-change')">
-          <option value="">选择目标存储</option>
+          <option value="">{{ t('addTask.selectTargetStorage') }}</option>
           <option v-for="r in remotes" :key="r" :value="r">{{ r }}</option>
         </select>
       </div>
       <div class="field-item">
-        <label>目标路径</label>
+        <label>{{ t('addTask.targetPath') }}</label>
         <div class="path-selector">
           <div class="path-browse">
             <div class="pathbar">
@@ -174,21 +175,18 @@ function updateOption(key: string, value: any) {
                 @enter="$emit('target-arrow', item)"
                 @click="$emit('target-click', item)"
               />
-              <div v-if="!targetPathOptions.length" class="path-empty">空目录</div>
+              <div v-if="!targetPathOptions.length" class="path-empty">{{ t('addTask.emptyDir') }}</div>
             </div>
           </div>
-          <button type="button" class="ghost small" @click="showTargetPathInputModel = !showTargetPathInputModel">手动输入</button>
+          <button type="button" class="ghost small" @click="showTargetPathInputModel = !showTargetPathInputModel">{{ t('addTask.manualInput') }}</button>
         </div>
-        <input v-if="showTargetPathInputModel" v-model="createForm.targetPath" type="text" placeholder="手动输入路径" style="margin-top: 8px" />
+        <input v-if="showTargetPathInputModel" v-model="createForm.targetPath" type="text" :placeholder="t('addTask.manualPathPlaceholder')" style="margin-top: 8px" />
       </div>
 
-      <ScheduleOptions
-        :model-value="createForm"
-        @update:model-value="Object.assign(createForm, $event)"
-      />
+      <ScheduleOptions :model-value="createForm" @update:model-value="Object.assign(createForm, $event)" />
 
       <div class="advanced-section">
-        <div class="advanced-title">高级选项</div>
+        <div class="advanced-title">{{ t('addTask.advancedOptions') }}</div>
         <div class="advanced-options">
           <AdvancedTransferSection :options="optionsModel" :update-option="updateOption" />
           <AdvancedFilterSection :options="optionsModel" :update-option="updateOption" />
@@ -199,16 +197,11 @@ function updateOption(key: string, value: any) {
       </div>
 
       <div class="form-actions">
-        <button
-          class="primary"
-          :class="{ 'btn-success': creatingState === 'done' }"
-          :disabled="creatingState === 'loading'"
-          @click="$emit('submit')"
-        >
-          <template v-if="creatingState === 'loading'">创建中...</template>
-          <template v-else-if="creatingState === 'done'">完成（点击返回任务列表）</template>
-          <template v-else-if="editingTask">保存修改</template>
-          <template v-else>创建任务</template>
+        <button class="primary" :class="{ 'btn-success': creatingState === 'done' }" :disabled="creatingState === 'loading'" @click="$emit('submit')">
+          <template v-if="creatingState === 'loading'">{{ t('addTask.creating') }}</template>
+          <template v-else-if="creatingState === 'done'">{{ t('addTask.done') }}</template>
+          <template v-else-if="editingTask">{{ t('addTask.saveEdit') }}</template>
+          <template v-else>{{ t('addTask.createTask') }}</template>
         </button>
       </div>
     </div>

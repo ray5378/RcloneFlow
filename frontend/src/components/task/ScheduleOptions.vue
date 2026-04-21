@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { t } from '../../i18n'
 import {
   buildScheduleFormFieldsFromTemp,
   createEmptyScheduleTempState,
@@ -57,27 +58,27 @@ function toggleAll(field: ScheduleField) {
   <div class="schedule-options">
     <div class="field-item">
       <label class="inline-label">
-        <span>启用定时调度</span>
+        <span>{{ t('schedule.enable') }}</span>
         <input type="checkbox" :checked="modelValue?.enableSchedule" @change="toggleEnable" />
       </label>
     </div>
 
     <div v-if="modelValue?.enableSchedule" class="schedule-fields">
       <div class="schedule-row">
-        <label>月份</label>
+        <label>{{ t('schedule.month') }}</label>
         <div class="chip-select">
           <button
             v-for="m in scheduleFieldOptions.month"
             :key="m"
             :class="['chip-btn', temp.month.includes(m) && 'active']"
             @click="toggleField('month', m)"
-          >{{ m }}月</button>
-          <button class="chip-btn all-btn" @click="toggleAll('month')">全选</button>
+          >{{ m }}{{ t('schedule.monthSuffix') }}</button>
+          <button class="chip-btn all-btn" @click="toggleAll('month')">{{ t('schedule.selectAll') }}</button>
         </div>
       </div>
 
       <div class="schedule-row">
-        <label>日期</label>
+        <label>{{ t('schedule.day') }}</label>
         <div class="chip-select">
           <button
             v-for="d in scheduleFieldOptions.day"
@@ -85,12 +86,12 @@ function toggleAll(field: ScheduleField) {
             :class="['chip-btn', temp.day.includes(d) && 'active']"
             @click="toggleField('day', d)"
           >{{ d }}</button>
-          <button class="chip-btn all-btn" @click="toggleAll('day')">全选</button>
+          <button class="chip-btn all-btn" @click="toggleAll('day')">{{ t('schedule.selectAll') }}</button>
         </div>
       </div>
 
       <div class="schedule-row">
-        <label>星期</label>
+        <label>{{ t('schedule.week') }}</label>
         <div class="chip-select">
           <button
             v-for="(w, i) in weekLabels"
@@ -98,25 +99,25 @@ function toggleAll(field: ScheduleField) {
             :class="['chip-btn', temp.week.includes(String(i)) && 'active']"
             @click="toggleField('week', String(i))"
           >{{ w }}</button>
-          <button class="chip-btn all-btn" @click="toggleAll('week')">全选</button>
+          <button class="chip-btn all-btn" @click="toggleAll('week')">{{ t('schedule.selectAll') }}</button>
         </div>
       </div>
 
       <div class="schedule-row">
-        <label>时</label>
+        <label>{{ t('schedule.hour') }}</label>
         <div class="chip-select">
           <button
             v-for="h in scheduleFieldOptions.hour"
             :key="h"
             :class="['chip-btn', temp.hour.includes(h) && 'active']"
             @click="toggleField('hour', h)"
-          >{{ h }}时</button>
-          <button class="chip-btn all-btn" @click="toggleAll('hour')">全选</button>
+          >{{ h }}{{ t('schedule.hourSuffix') }}</button>
+          <button class="chip-btn all-btn" @click="toggleAll('hour')">{{ t('schedule.selectAll') }}</button>
         </div>
       </div>
 
       <div class="schedule-row">
-        <label>分</label>
+        <label>{{ t('schedule.minute') }}</label>
         <div class="chip-select minute-chips">
           <button
             v-for="m in scheduleFieldOptions.minute"
@@ -124,12 +125,12 @@ function toggleAll(field: ScheduleField) {
             :class="['chip-btn', temp.minute.includes(m) && 'active']"
             @click="toggleField('minute', m)"
           >{{ m }}</button>
-          <button class="chip-btn all-btn" @click="toggleAll('minute')">全选</button>
+          <button class="chip-btn all-btn" @click="toggleAll('minute')">{{ t('schedule.selectAll') }}</button>
         </div>
       </div>
 
       <div class="schedule-preview">
-        <span class="hint">格式: {{ modelValue?.scheduleMinute || '*' }}|{{ modelValue?.scheduleHour || '*' }}|{{ modelValue?.scheduleDay || '*' }}|{{ modelValue?.scheduleMonth || '*' }}|{{ modelValue?.scheduleWeek || '*' }}</span>
+        <span class="hint">{{ t('schedule.format') }}: {{ modelValue?.scheduleMinute || '*' }}|{{ modelValue?.scheduleHour || '*' }}|{{ modelValue?.scheduleDay || '*' }}|{{ modelValue?.scheduleMonth || '*' }}|{{ modelValue?.scheduleWeek || '*' }}</span>
       </div>
     </div>
   </div>

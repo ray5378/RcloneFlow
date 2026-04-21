@@ -1,10 +1,12 @@
+import { locale, t } from '../i18n'
+
 export function useRunDisplayHelpers(options: {
   getFinalSummary: (run: any) => any
 }) {
   function formatTime(time: string | undefined) {
     if (!time) return '-'
     try {
-      return new Date(time).toLocaleString('zh-CN', {
+      return new Date(time).toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US', {
         year: 'numeric', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit'
       })
@@ -44,10 +46,10 @@ export function useRunDisplayHelpers(options: {
 
   function getStatusText(status: string) {
     switch (status) {
-      case 'running': return '运行中'
-      case 'finished': return '已完成'
-      case 'failed': return '失败'
-      case 'skipped': return '已跳过'
+      case 'running': return t('runtime.statusRunning')
+      case 'finished': return t('runtime.statusFinished')
+      case 'failed': return t('runtime.statusFailed')
+      case 'skipped': return t('runtime.statusSkipped')
       default: return status
     }
   }

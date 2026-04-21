@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import Modal from './Modal.vue'
+import { t } from '../i18n'
 
 const props = defineProps<{ modelValue: boolean, taskId?: number }>()
 const emit = defineEmits<{ 'update:modelValue': [boolean] }>()
@@ -10,7 +11,6 @@ watch(() => props.modelValue, v => show.value = v, { immediate: true })
 
 function close(){ emit('update:modelValue', false) }
 
-// form state（移除收尾校验相关字段，仅保留通用传输参数容器）
 const g = ref<Record<string, any>>({})
 
 async function loadGlobal(){
@@ -22,32 +22,31 @@ async function saveGlobal(){
   const res = await fetch('/api/settings/transfer', {
     method: 'PUT', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify(g.value)
   })
-  if(!res.ok) throw new Error('保存失败')
+  if(!res.ok) throw new Error(t('modal.saveFailed'))
 }
 
 async function saveTask(){
-  if(!props.taskId) throw new Error('缺少任务ID')
+  if(!props.taskId) throw new Error(t('modal.missingTaskId'))
   const opts:any = {}
   const res = await fetch('/api/tasks', {
     method: 'PATCH', headers: { 'Content-Type': 'application/json', ...auth() }, body: JSON.stringify({ id: props.taskId, options: opts })
   })
-  if(!res.ok) throw new Error('保存失败')
+  if(!res.ok) throw new Error(t('modal.saveFailed'))
 }
 
 function auth(){
-  try{ const t = localStorage.getItem('authToken') || ''; return t? { Authorization: 'Bearer '+t }: {} }catch{ return {} }
+  try{ const tkn = localStorage.getItem('authToken') || ''; return tkn? { Authorization: 'Bearer '+tkn }: {} }catch{ return {} }
 }
 
 onMounted(loadGlobal)
 </script>
 
 <template>
-  <Modal :show="show" title="传输选项" @close="close">
-    <div class="transfer-grid">
-    </div>
+  <Modal :show="show" :title="t('modal.transferOptions')" @close="close">
+    <div class="transfer-grid"></div>
     <div class="modal-footer">
-      <button class="ghost" @click="close">取消</button>
-      <button class="primary" @click="props.taskId? saveTask(): saveGlobal()">保存</button>
+      <button class="ghost" @click="close">{{ t('modal.cancel') }}</button>
+      <button class="primary" @click="props.taskId? saveTask(): saveGlobal()">{{ t('modal.save') }}</button>
     </div>
   </Modal>
 </template>

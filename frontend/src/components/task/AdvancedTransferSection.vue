@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../i18n'
+
 defineProps<{
   options: any
   updateOption: (key: string, value: any) => void
@@ -7,34 +9,34 @@ defineProps<{
 
 <template>
   <div class="advanced-group">
-    <div class="advanced-group-title">传输策略</div>
+    <div class="advanced-group-title">{{ t('advancedTask.transferStrategy') }}</div>
     <div class="advanced-row inline">
       <input type="checkbox" :checked="options.enableStreaming" @change="updateOption('enableStreaming', ($event.target as HTMLInputElement).checked)" />
-      <label>开启流式传输（推荐）</label>
+      <label>{{ t('advancedTask.enableStreaming') }}</label>
     </div>
   </div>
 
   <div class="advanced-group">
-    <div class="advanced-group-title">传输控制</div>
+    <div class="advanced-group-title">{{ t('advancedTask.transferControl') }}</div>
     <div class="advanced-row">
-      <label>并发传输数</label>
+      <label>{{ t('advancedTask.concurrentTransfers') }}</label>
       <input type="number" :value="options.transfers" @input="updateOption('transfers', Number(($event.target as HTMLInputElement).value))" min="1" max="100" />
     </div>
     <div class="advanced-row">
-      <label>带宽限制</label>
-      <input type="text" :value="options.bwLimit" @input="updateOption('bwLimit', ($event.target as HTMLInputElement).value)" placeholder="如: 10M" />
+      <label>{{ t('advancedTask.bandwidthLimit') }}</label>
+      <input type="text" :value="options.bwLimit" @input="updateOption('bwLimit', ($event.target as HTMLInputElement).value)" :placeholder="t('advancedTask.bandwidthPlaceholder')" />
     </div>
     <div class="advanced-row inline">
       <input type="checkbox" :checked="options.multiThreadStreams" @change="updateOption('multiThreadStreams', ($event.target as HTMLInputElement).checked)" />
-      <label>多线程传输</label>
+      <label>{{ t('advancedTask.multiThread') }}</label>
     </div>
     <div class="advanced-row">
-      <label>最大传输</label>
-      <input type="number" :value="options.maxTransfer" @input="updateOption('maxTransfer', Number(($event.target as HTMLInputElement).value))" min="0" placeholder="字节数, 0表示无限制" />
+      <label>{{ t('advancedTask.maxTransfer') }}</label>
+      <input type="number" :value="options.maxTransfer" @input="updateOption('maxTransfer', Number(($event.target as HTMLInputElement).value))" min="0" :placeholder="t('advancedTask.maxTransferPlaceholder')" />
     </div>
     <div class="advanced-row">
-      <label>最大时长</label>
-      <input type="number" :value="options.maxDuration" @input="updateOption('maxDuration', Number(($event.target as HTMLInputElement).value))" min="0" placeholder="秒, 0表示无限制" />
+      <label>{{ t('advancedTask.maxDuration') }}</label>
+      <input type="number" :value="options.maxDuration" @input="updateOption('maxDuration', Number(($event.target as HTMLInputElement).value))" min="0" :placeholder="t('advancedTask.maxDurationPlaceholder')" />
     </div>
   </div>
 </template>

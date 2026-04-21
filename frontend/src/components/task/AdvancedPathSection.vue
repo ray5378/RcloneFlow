@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../i18n'
+
 defineProps<{
   options: any
   updateOption: (key: string, value: any) => void
@@ -7,16 +9,16 @@ defineProps<{
 
 <template>
   <div class="advanced-group">
-    <div class="advanced-group-title">路径策略</div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.noTraverse" @change="updateOption('noTraverse', ($event.target as HTMLInputElement).checked)" /><label>不遍历</label></div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.noCheckDest" @change="updateOption('noCheckDest', ($event.target as HTMLInputElement).checked)" /><label>不检查目标</label></div>
+    <div class="advanced-group-title">{{ t('advancedTask.pathStrategy') }}</div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.noTraverse" @change="updateOption('noTraverse', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.noTraverse') }}</label></div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.noCheckDest" @change="updateOption('noCheckDest', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.noCheckDest') }}</label></div>
     <div class="advanced-row">
-      <label>比较目录</label>
-      <input type="text" :value="options.compareDest" @input="updateOption('compareDest', ($event.target as HTMLInputElement).value)" placeholder="remote:path" />
+      <label>{{ t('advancedTask.compareDest') }}</label>
+      <input type="text" :value="options.compareDest" @input="updateOption('compareDest', ($event.target as HTMLInputElement).value)" :placeholder="t('advancedTask.remotePathPlaceholder')" />
     </div>
     <div class="advanced-row">
-      <label>复制目录</label>
-      <input type="text" :value="options.copyDest" @input="updateOption('copyDest', ($event.target as HTMLInputElement).value)" placeholder="remote:path" />
+      <label>{{ t('advancedTask.copyDest') }}</label>
+      <input type="text" :value="options.copyDest" @input="updateOption('copyDest', ($event.target as HTMLInputElement).value)" :placeholder="t('advancedTask.remotePathPlaceholder')" />
     </div>
   </div>
 </template>

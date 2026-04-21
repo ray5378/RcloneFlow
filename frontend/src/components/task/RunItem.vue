@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { formatBytes } from '../../utils/format'
 import { getUnifiedProgressText } from './progressText'
+import { t } from '../../i18n'
 
 interface Progress {
   percentage?: number
@@ -38,18 +39,8 @@ interface RunRecord {
   progress?: Progress
 }
 
-const props = defineProps<{
-  run: RunRecord
-  progress?: Progress
-  summary?: Summary
-}>()
-
-const emit = defineEmits<{
-  click: [run: RunRecord]
-  viewDetail: [run: RunRecord]
-  viewLog: [run: RunRecord]
-  clear: [id: number]
-}>()
+const props = defineProps<{ run: RunRecord; progress?: Progress; summary?: Summary }>()
+const emit = defineEmits<{ click: [run: RunRecord]; viewDetail: [run: RunRecord]; viewLog: [run: RunRecord]; clear: [id: number] }>()
 
 function getStatusClass(status: string) {
   switch (status) {
@@ -63,10 +54,10 @@ function getStatusClass(status: string) {
 
 function getStatusText(status: string) {
   const map: Record<string, string> = {
-    finished: '完成',
-    failed: '失败',
-    skipped: '跳过',
-    running: '运行中',
+    finished: t('runItem.finished'),
+    failed: t('runItem.failed'),
+    skipped: t('runItem.skipped'),
+    running: t('runItem.running'),
   }
   return map[status] || status
 }
@@ -79,17 +70,15 @@ function formatTime(dateStr: string) {
 
 function getTriggerText(trigger: string) {
   const map: Record<string, string> = {
-    schedule: '定时',
+    schedule: t('runItem.schedule'),
     webhook: 'Webhook',
-    manual: '手动',
+    manual: t('runItem.manual'),
   }
   return map[trigger] || trigger
 }
 
 function getProgressText(run: RunRecord): string {
-  if (run.status === 'running') {
-    return getUnifiedProgressText(props.progress)
-  }
+  if (run.status === 'running') return getUnifiedProgressText(props.progress)
   return '-'
 }
 </script>
@@ -97,7 +86,7 @@ function getProgressText(run: RunRecord): string {
 <template>
   <div class="item run-item" @click="emit('click', run)">
     <div class="name list-item-name">
-      <strong>{{ run.taskName || `任务 #${run.taskId}` }}</strong>
+      <strong>{{ run.taskName || `${t('runItem.taskFallback')} #${run.taskId}` }}</strong>
       <span v-if="run.taskMode" class="mode-tag list-item-tag">{{ run.taskMode }}</span>
       <span v-if="run.trigger" class="trigger-tag list-item-tag">{{ getTriggerText(run.trigger) }}</span>
     </div>
@@ -117,25 +106,23 @@ function getProgressText(run: RunRecord): string {
     </div>
 
     <div class="summary-mini" v-else-if="props.summary">
-      <div v-if="props.summary.message" class="skipped-message">
-        {{ props.summary.message }}
-      </div>
+      <div v-if="props.summary.message" class="skipped-message">{{ props.summary.message }}</div>
       <template v-else>
-        <span class="chip list-item-chip">总计 {{ props.summary.files?.length || 0 }}</span>
+        <span class="chip list-item-chip">{{ t('runItem.total') }} {{ props.summary.files?.length || 0 }}</span>
         <span class="chip list-item-chip list-item-chip-success">
-          {{ run.taskMode === 'move' ? '移动' : '成功' }}
+          {{ run.taskMode === 'move' ? t('runItem.moved') : t('runItem.success') }}
           {{ (props.summary.counts?.copied || 0) + (props.summary.counts?.deleted || 0) }}
         </span>
-        <span class="chip list-item-chip list-item-chip-failed">失败 {{ props.summary.counts?.failed || 0 }}</span>
-        <span class="chip list-item-chip list-item-chip-meta">总体积 {{ formatBytes(props.summary.totalBytes || 0) }}</span>
-        <span class="chip list-item-chip list-item-chip-meta">已传输 {{ formatBytes(props.summary.transferredBytes || 0) }}</span>
+        <span class="chip list-item-chip list-item-chip-failed">{{ t('runItem.failed') }} {{ props.summary.counts?.failed || 0 }}</span>
+        <span class="chip list-item-chip list-item-chip-meta">{{ t('runItem.totalSize') }} {{ formatBytes(props.summary.totalBytes || 0) }}</span>
+        <span class="chip list-item-chip list-item-chip-meta">{{ t('runItem.transferred') }} {{ formatBytes(props.summary.transferredBytes || 0) }}</span>
       </template>
     </div>
 
     <div class="row-actions list-item-actions list-item-actions-right">
-      <button class="ghost small" @click.stop="emit('viewDetail', run)">运行详情</button>
-      <button class="ghost small" @click.stop="emit('viewLog', run)">传输日志</button>
-      <button class="ghost small danger-text" @click.stop="emit('clear', run.id)">清除</button>
+      <button class="ghost small" @click.stop="emit('viewDetail', run)">{{ t('runItem.viewDetail') }}</button>
+      <button class="ghost small" @click.stop="emit('viewLog', run)">{{ t('runItem.viewLog') }}</button>
+      <button class="ghost small danger-text" @click.stop="emit('clear', run.id)">{{ t('runItem.clear') }}</button>
     </div>
   </div>
 </template>
@@ -146,50 +133,17 @@ function getProgressText(run: RunRecord): string {
 @import './listItemActions.css';
 @import './listItemSpacing.css';
 
-.run-item {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-}
-.name {
-  gap: 6px;
-}
-.status {
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-}
+.run-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.name { gap: 6px; }
+.status { padding: 2px 8px; border-radius: 4px; font-size: 12px; }
 .status.success { background: var(--success-bg, #22c55e33); color: var(--success, #22c55e); }
 .status.danger { background: var(--danger-bg, #ef444433); color: var(--danger, #ef4444); }
 .status.warning { background: var(--warning-bg, #f59e0b33); color: var(--warning, #f59e0b); }
 .status.info { background: var(--accent-bg, #4f46e533); color: var(--accent, #4f46e5); }
 .status.clickable { cursor: pointer; }
-.path-full {
-  flex: 1;
-  min-width: 200px;
-  overflow: hidden;
-}
-.path-text {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.time {
-  min-width: 80px;
-}
-.summary-mini {
-  width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 8px 0;
-}
-.skipped-message {
-  font-size: 12px;
-  color: var(--warning, #f59e0b);
-  padding: 4px 8px;
-  background: #f59e0b22;
-  border-radius: 4px;
-}
+.path-full { flex: 1; min-width: 200px; overflow: hidden; }
+.path-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.time { min-width: 80px; }
+.summary-mini { width: 100%; display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 0; }
+.skipped-message { font-size: 12px; color: var(--warning, #f59e0b); padding: 4px 8px; background: #f59e0b22; border-radius: 4px; }
 </style>

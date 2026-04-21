@@ -2,6 +2,7 @@
 import TaskCard from './TaskCard.vue'
 import TaskListHeader from './TaskListHeader.vue'
 import TaskListPagination from './TaskListPagination.vue'
+import { t } from '../../i18n'
 
 defineProps<{
   search: string
@@ -57,7 +58,7 @@ const emit = defineEmits<{
         @set-webhook="emit('set-webhook', task)"
         @set-singleton="emit('set-singleton', task)"
       />
-      <div v-if="!filteredTasks.length" class="empty">暂无任务</div>
+      <div v-if="!filteredTasks.length" class="empty">{{ t('taskUI.noTasks') }}</div>
     </div>
 
     <TaskListPagination

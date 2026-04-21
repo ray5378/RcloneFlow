@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { Schedule } from '../types'
+import { t } from '../i18n'
 
 interface UseTaskListActionsOptions {
   openMenuId: Ref<number | null>
@@ -24,7 +25,7 @@ export function useTaskListActions(options: UseTaskListActionsOptions) {
   }
 
   async function deleteTask(id: number) {
-    options.showConfirm('删除任务', '确定删除此任务？此操作不可恢复！', async () => {
+    options.showConfirm(t('common.delete'), t('runtime.deleteTaskConfirm'), async () => {
       const success = await options.taskApi.delete(id)
       if (success) {
         options.openMenuId.value = null
@@ -41,17 +42,17 @@ export function useTaskListActions(options: UseTaskListActionsOptions) {
   }
 
   async function deleteSchedule(id: number) {
-    if (!confirm('确定删除此定时任务？')) return
+    if (!confirm(t('schedule.deleteConfirm'))) return
     await options.scheduleApi.delete(id)
     await options.loadData()
   }
 
   function clearAllRunsWithConfirm() {
     if (options.historyFilterTaskId.value === null) {
-      options.showToast('请先选择任务', 'error')
+      options.showToast(t('runtime.chooseTaskFirst'), 'error')
       return
     }
-    options.showConfirm('删除所有历史', '确定删除该任务所有历史记录？此操作不可恢复！', async () => {
+    options.showConfirm(t('runtime.deleteAllHistory'), t('runtime.deleteAllHistoryConfirm'), async () => {
       await options.clearAllRuns()
     })
   }

@@ -1,4 +1,5 @@
 import type { Ref } from 'vue'
+import { t } from '../i18n'
 
 interface ParsedRcloneCommand {
   mode: string
@@ -32,7 +33,7 @@ export function useTaskFormPrepare(options: UseTaskFormPrepareOptions) {
       }
       return ''
     } catch (e) {
-      return '命令解析失败：' + (e as Error).message
+      return t('runtime.commandParseFailed').replace('{message}', (e as Error).message)
     }
   }
 

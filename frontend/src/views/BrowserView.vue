@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
+import { t } from '../i18n'
 import AddRemoteModal from '../components/AddRemoteModal.vue'
 import EditDescModal from '../components/EditDescModal.vue'
 import * as api from '../api'
@@ -387,7 +388,7 @@ async function confirmRename() {
     // After rename (move), stabilize view until old name disappears
     await refreshUntilGone([oldName])
   } catch (e) {
-    alert('重命名失败: ' + (e as Error).message)
+    alert(`${t('browserView.renameFailed')}: ${(e as Error).message}`)
   }
 }
 
@@ -420,7 +421,7 @@ async function executeDelete() {
     deletingItem.value = null
     await refreshBrowser()
   } catch (e) {
-    alert('删除失败: ' + (e as Error).message)
+    alert(`${t('browserView.deleteFailed')}: ${(e as Error).message}`)
   }
 }
 
@@ -440,17 +441,17 @@ async function testRemote(name: string) {
 
 function getTestText(name: string) {
   const s = testState.value[name]
-  if (s === 'testing') return '测试中...'
-  if (s === 'success') return '成功 ✓'
-  if (s === 'failed') return '失败 ✗'
-  return '测试'
+  if (s === 'testing') return t('browserView.testing')
+  if (s === 'success') return t('browserView.testSuccess')
+  if (s === 'failed') return t('browserView.testFailed')
+  return t('browserView.test')
 }
 
 async function deleteRemote(name: string) {
   confirmModal.value = {
     show: true,
-    title: '删除存储',
-    message: `确定删除存储 "${name}"？此操作不可恢复！`,
+    title: t('remote.deleteStorage'),
+    message: t('remote.deleteStorageConfirm').replace('{name}', name),
     onConfirm: async () => {
       try {
         await api.deleteRemote(name)
@@ -503,12 +504,12 @@ async function openEditRemote(name: string) {
     <div class="card-header">
       <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
         <div>
-          <div class="title">存储节点</div>
-          <div class="subtitle">选择浏览存储文件</div>
+          <div class="title">{{ t('remote.panelTitle') }}</div>
+          <div class="subtitle">{{ t('remote.panelSubtitle') }}</div>
         </div>
         <div class="actions">
-          <button class="ghost small" @click="openManageStorage">管理存储</button>
-          <button class="ghost small" @click="openAddRemote">添加存储</button>
+          <button class="ghost small" @click="openManageStorage">{{ t('remote.manageButton') }}</button>
+          <button class="ghost small" @click="openAddRemote">{{ t('remote.addButton') }}</button>
         </div>
       </div>
     </div>
@@ -554,9 +555,9 @@ async function openEditRemote(name: string) {
       </template>
     </div>
     <div class="list-header">
-      <span class="col-name">名称</span>
-      <span class="col-time">修改时间</span>
-      <span class="col-size">大小</span>
+      <span class="col-name">{{ t('browserView.name') }}</span>
+      <span class="col-time">{{ t('browserView.modifiedTime') }}</span>
+      <span class="col-size">{{ t('browserView.size') }}</span>
     </div>
     <div class="list" @contextmenu.prevent="showBackgroundMenu($event)">
       <div
@@ -592,11 +593,11 @@ async function openEditRemote(name: string) {
   >
     <!-- Item context menu -->
     <template v-if="contextMenu.item">
-      <button @click="copyItem">复制</button>
-      <button @click="moveItem">移动</button>
-      <button @click="pasteItem" :disabled="!clipboardItem">粘贴</button>
-      <button @click="startRename">重命名</button>
-      <button class="danger" @click="confirmDelete">删除</button>
+      <button @click="copyItem">{{ t('browserView.copy') }}</button>
+      <button @click="moveItem">{{ t('browserView.move') }}</button>
+      <button @click="pasteItem" :disabled="!clipboardItem">{{ t('browserView.paste') }}</button>
+      <button @click="startRename">{{ t('browserView.rename') }}</button>
+      <button class="danger" @click="confirmDelete">{{ t('browserView.delete') }}</button>
     </template>
     <!-- Background context menu (empty area) -->
     <template v-else>
@@ -608,12 +609,12 @@ async function openEditRemote(name: string) {
   <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="showDeleteConfirm = false">
     <div class="modal delete-modal">
       <div class="modal-header">
-        <h2>确认删除</h2>
+        <h2>{{ t('browserView.confirmDelete') }}</h2>
         <button class="modal-close" @click="showDeleteConfirm = false">&times;</button>
       </div>
       <div class="modal-content">
-        <p>确定要删除 <strong>{{ deletingItem?.Name }}</strong> 吗？</p>
-        <p class="warning">⚠️ 此操作不可恢复！</p>
+        <p>{{ t('browserView.confirmDeleteText') }} <strong>{{ deletingItem?.Name }}</strong> ?</p>
+        <p class="warning">{{ t('browserView.irreversible') }}</p>
       </div>
       <div class="modal-footer">
         <button class="ghost" @click="showDeleteConfirm = false">取消</button>
@@ -626,18 +627,18 @@ async function openEditRemote(name: string) {
   <div v-if="showRenameInput" class="modal-overlay" @click.self="showRenameInput = false">
     <div class="modal">
       <div class="modal-header">
-        <h2>重命名</h2>
+        <h2>{{ t('browserView.rename') }}</h2>
         <button class="modal-close" @click="showRenameInput = false">&times;</button>
       </div>
       <div class="modal-content">
         <div class="field-item">
-          <label>新名称</label>
+          <label>{{ t('browserView.newName') }}</label>
           <input v-model="renameInput" @keyup.enter="confirmRename" />
         </div>
       </div>
       <div class="modal-footer">
-        <button class="ghost" @click="showRenameInput = false">取消</button>
-        <button class="primary" @click="confirmRename">确定</button>
+        <button class="ghost" @click="showRenameInput = false">{{ t('common.cancel') }}</button>
+        <button class="primary" @click="confirmRename">{{ t('browserView.confirm') }}</button>
       </div>
     </div>
   </div>
@@ -646,10 +647,10 @@ async function openEditRemote(name: string) {
   <div v-if="subview === 'manage-storage'" class="card">
     <div class="card-header">
       <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
-        <div class="title">管理存储</div>
+        <div class="title">{{ t('remote.manageTitle') }}</div>
         <div class="actions">
-          <button class="ghost small" @click="subview = 'explorer'">返回</button>
-          <button class="ghost small" @click="openAddRemote">添加存储</button>
+          <button class="ghost small" @click="subview = 'explorer'">{{ t('remote.backButton') }}</button>
+          <button class="ghost small" @click="openAddRemote">{{ t('remote.addButton') }}</button>
         </div>
       </div>
     </div>
@@ -659,8 +660,8 @@ async function openEditRemote(name: string) {
           <strong>{{ name }}</strong>
         </div>
         <div class="actions" @click.stop>
-          <button class="ghost small" @click="openEditRemote(name)">修改配置</button>
-          <button class="ghost small" @click="openEditDesc(name)">自定义介绍</button>
+          <button class="ghost small" @click="openEditRemote(name)">{{ t('remote.editConfig') }}</button>
+          <button class="ghost small" @click="openEditDesc(name)">{{ t('remote.editDesc') }}</button>
           <button
             class="ghost small"
             @click="testRemote(name)"
@@ -697,8 +698,8 @@ async function openEditRemote(name: string) {
         <p>{{ confirmModal.message }}</p>
       </div>
       <div class="modal-footer">
-        <button class="ghost" @click="confirmModal.show = false">取消</button>
-        <button class="primary danger" @click="() => { confirmModal.onConfirm(); confirmModal.show = false }">确认</button>
+        <button class="ghost" @click="confirmModal.show = false">{{ t('common.cancel') }}</button>
+        <button class="primary danger" @click="() => { confirmModal.onConfirm(); confirmModal.show = false }">{{ t('browserView.confirm') }}</button>
       </div>
     </div>
   </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getSettings, saveSettings, resetSettings } from '../api/settings'
+import { t } from '../i18n'
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -11,7 +12,6 @@ const loading = ref(true)
 const saving = ref(false)
 const saved = ref(false)
 const showResetConfirm = ref(false)
-const data = ref<any>(null)
 const form = ref<Record<string, string>>({})
 const errors = ref<Record<string, string>>({})
 const saveFailed = ref(false)
@@ -23,22 +23,22 @@ function validate() {
   for (const k of intFields) {
     const v = (form.value as any)[k]
     if (v !== '' && (isNaN(Number(v)) || !Number.isFinite(Number(v)) || Number(v) < 0)) {
-      errors.value[k] = '请输入大于或等于 0 的数字'
+      errors.value[k] = t('defaults.errNonNegative')
     }
   }
   const mb = (form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES
   if (mb !== '' && (isNaN(Number(mb)) || Number(mb) < 0)) {
-    errors.value.PROGRESS_FLUSH_MIN_DELTA_BYTES = '请输入大于或等于 0 的数字（单位：MB，可小数）'
+    errors.value.PROGRESS_FLUSH_MIN_DELTA_BYTES = t('defaults.errNonNegativeMb')
   }
   const pct = (form.value as any).PROGRESS_FLUSH_MIN_DELTA_PCT
   if (pct !== '' && (isNaN(Number(pct)) || Number(pct) < 0 || Number(pct) > 100)) {
-    errors.value.PROGRESS_FLUSH_MIN_DELTA_PCT = '请输入 0-100 之间的数字（可带小数）'
+    errors.value.PROGRESS_FLUSH_MIN_DELTA_PCT = t('defaults.errPct')
   }
   const durFields = ['ACCESS_TOKEN_TTL', 'REFRESH_TOKEN_TTL', 'PROGRESS_FLUSH_INTERVAL', 'FINISH_WAIT_INTERVAL', 'FINISH_WAIT_TIMEOUT']
   for (const k of durFields) {
     const v = (form.value as any)[k]
     if (v && !durationRe.test(String(v))) {
-      errors.value[k] = '格式应为 数字+单位（ms/s/m/h/d），例如：5s、24h、90d'
+      errors.value[k] = t('defaults.errDuration')
     }
   }
   return Object.keys(errors.value).length === 0
@@ -61,7 +61,6 @@ async function load() {
   loading.value = true
   try {
     const resp = await getSettings()
-    data.value = resp
     form.value = flat(resp)
     const b = Number((form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES || 0)
     if (!isNaN(b) && isFinite(b) && b > 0) {
@@ -131,97 +130,97 @@ onMounted(load)
   <div class="modal-overlay" @click.self="$emit('close')">
     <div class="modal-content large">
       <div class="modal-header">
-        <h3>默认配置</h3>
+        <h3>{{ t('settings.defaults') }}</h3>
         <button class="close-btn" @click="$emit('close')">×</button>
       </div>
       <div class="modal-body" v-if="!loading">
         <div class="section">
-          <div class="section-title">认证</div>
+          <div class="section-title">{{ t('defaults.auth') }}</div>
           <div class="grid">
-            <label title="JWT 访问令牌有效期，示例：24h">访问令牌有效期 <small class="subkey">ACCESS_TOKEN_TTL</small></label>
-            <input v-model="form.ACCESS_TOKEN_TTL" placeholder="如 24h" />
+            <label :title="t('defaults.accessTokenTtlTitle')">{{ t('defaults.accessTokenTtl') }}</label>
+            <input v-model="form.ACCESS_TOKEN_TTL" :placeholder="t('defaults.durationPlaceholder24h')" />
             <div class="error" v-if="errors.ACCESS_TOKEN_TTL">{{ errors.ACCESS_TOKEN_TTL }}</div>
-            <label title="Refresh 令牌有效期，示例：90d">刷新令牌有效期 <small class="subkey">REFRESH_TOKEN_TTL</small></label>
-            <input v-model="form.REFRESH_TOKEN_TTL" placeholder="如 90d" />
+            <label :title="t('defaults.refreshTokenTtlTitle')">{{ t('defaults.refreshTokenTtl') }}</label>
+            <input v-model="form.REFRESH_TOKEN_TTL" :placeholder="t('defaults.durationPlaceholder90d')" />
             <div class="error" v-if="errors.REFRESH_TOKEN_TTL">{{ errors.REFRESH_TOKEN_TTL }}</div>
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">日志与等级（实时生效）</div>
+          <div class="section-title">{{ t('defaults.logRealtime') }}</div>
           <div class="grid">
-            <label title="日志级别（保存后即时生效）">日志级别 <small class="subkey">LOG_LEVEL</small></label>
+            <label :title="t('defaults.logLevelTitle')">{{ t('defaults.logLevel') }}</label>
             <select v-model="form.LOG_LEVEL">
-              <option value="debug">调试</option>
-              <option value="info">信息</option>
-              <option value="warn">警告</option>
-              <option value="error">错误</option>
+              <option value="debug">{{ t('defaults.logDebug') }}</option>
+              <option value="info">{{ t('defaults.logInfo') }}</option>
+              <option value="warn">{{ t('defaults.logWarn') }}</option>
+              <option value="error">{{ t('defaults.logError') }}</option>
             </select>
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">历史与保留（定期清理）</div>
+          <div class="section-title">{{ t('defaults.historyRetention') }}</div>
           <div class="grid">
-            <label title="任务记录保留天数；到期后数据库任务记录与对应 rclone 日志会一起清理">任务记录保留天数 <small class="subkey">FINAL_SUMMARY_RETENTION_DAYS</small></label>
+            <label :title="t('defaults.retentionDaysTitle')">{{ t('defaults.retentionDays') }}</label>
             <input v-model="form.FINAL_SUMMARY_RETENTION_DAYS" type="number" min="0" />
             <div class="error" v-if="errors.FINAL_SUMMARY_RETENTION_DAYS">{{ errors.FINAL_SUMMARY_RETENTION_DAYS }}</div>
-            <label title="清理任务执行间隔（小时）">清理扫描间隔（小时） <small class="subkey">CLEANUP_INTERVAL_HOURS</small></label>
+            <label :title="t('defaults.cleanupIntervalHoursTitle')">{{ t('defaults.cleanupIntervalHours') }}</label>
             <input v-model="form.CLEANUP_INTERVAL_HOURS" type="number" min="0" />
             <div class="error" v-if="errors.CLEANUP_INTERVAL_HOURS">{{ errors.CLEANUP_INTERVAL_HOURS }}</div>
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">运行中进度限流写库（热生效）</div>
+          <div class="section-title">{{ t('defaults.progressFlush') }}</div>
           <div class="grid">
-            <label title="进度写库最小时间间隔">写库最小间隔 <small class="subkey">PROGRESS_FLUSH_INTERVAL</small></label>
-            <input v-model="form.PROGRESS_FLUSH_INTERVAL" placeholder="如 5s" />
+            <label :title="t('defaults.flushIntervalTitle')">{{ t('defaults.flushInterval') }}</label>
+            <input v-model="form.PROGRESS_FLUSH_INTERVAL" :placeholder="t('defaults.durationPlaceholder5s')" />
             <div class="error" v-if="errors.PROGRESS_FLUSH_INTERVAL">{{ errors.PROGRESS_FLUSH_INTERVAL }}</div>
-            <label title="两次写库的最小增量（百分比）">写库最小增量（百分比） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_PCT</small></label>
+            <label :title="t('defaults.flushPctTitle')">{{ t('defaults.flushPct') }}</label>
             <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_PCT" type="number" min="0" step="0.1" />
             <div class="error" v-if="errors.PROGRESS_FLUSH_MIN_DELTA_PCT">{{ errors.PROGRESS_FLUSH_MIN_DELTA_PCT }}</div>
-            <label title="两次写库的最小增量（MB）">写库最小增量（MB） <small class="subkey">PROGRESS_FLUSH_MIN_DELTA_BYTES</small></label>
+            <label :title="t('defaults.flushMbTitle')">{{ t('defaults.flushMb') }}</label>
             <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_BYTES" type="number" min="0" step="0.01" />
             <div class="error" v-if="errors.PROGRESS_FLUSH_MIN_DELTA_BYTES">{{ errors.PROGRESS_FLUSH_MIN_DELTA_BYTES }}</div>
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">WebDAV 收尾（完成确认）</div>
+          <div class="section-title">{{ t('modal.webdavFinalize') }}</div>
           <div class="grid">
-            <label title="WebDAV 收尾轮询间隔">收尾轮询间隔 <small class="subkey">FINISH_WAIT_INTERVAL</small></label>
-            <input v-model="form.FINISH_WAIT_INTERVAL" placeholder="如 5s" />
+            <label :title="t('defaults.webdavIntervalTitle')">{{ t('defaults.webdavInterval') }}</label>
+            <input v-model="form.FINISH_WAIT_INTERVAL" :placeholder="t('defaults.durationPlaceholder5s')" />
             <div class="error" v-if="errors.FINISH_WAIT_INTERVAL">{{ errors.FINISH_WAIT_INTERVAL }}</div>
-            <label title="WebDAV 收尾最长等待">收尾超时时间 <small class="subkey">FINISH_WAIT_TIMEOUT</small></label>
-            <input v-model="form.FINISH_WAIT_TIMEOUT" placeholder="如 5h" />
+            <label :title="t('defaults.webdavTimeoutTitle')">{{ t('defaults.webdavTimeout') }}</label>
+            <input v-model="form.FINISH_WAIT_TIMEOUT" :placeholder="t('defaults.durationPlaceholder5h')" />
             <div class="error" v-if="errors.FINISH_WAIT_TIMEOUT">{{ errors.FINISH_WAIT_TIMEOUT }}</div>
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">Webhook 通知</div>
+          <div class="section-title">{{ t('modal.webhookNotify') }}</div>
           <div class="grid">
-            <label title="Webhook POST 负载中的文件名数量上限；设为 0 表示不限制（传递所有文件名）">文件名上限（0=不限制） <small class="subkey">WEBHOOK_MAX_FILES</small></label>
-            <input v-model="form.WEBHOOK_MAX_FILES" type="number" min="0" placeholder="0=不限制" />
+            <label :title="t('defaults.webhookFileLimitTitle')">{{ t('defaults.webhookFileLimit') }}</label>
+            <input v-model="form.WEBHOOK_MAX_FILES" type="number" min="0" :placeholder="t('defaults.zeroUnlimited')" />
           </div>
         </div>
 
         <div class="section">
-          <div class="section-title">运行中调试</div>
+          <div class="section-title">{{ t('defaults.runningDebug') }}</div>
           <div class="grid">
-            <label title="是否允许在任务运行中提示小窗中展开调试详情">允许展开运行中调试详情 <small class="subkey">RUNNING_HINT_DEBUG_ENABLED</small></label>
+            <label :title="t('defaults.runningDebugTitle')">{{ t('defaults.runningDebugLabel') }}</label>
             <select v-model="form.RUNNING_HINT_DEBUG_ENABLED">
-              <option value="false">关闭</option>
-              <option value="true">开启</option>
+              <option value="false">{{ t('modal.off') }}</option>
+              <option value="true">{{ t('modal.on') }}</option>
             </select>
           </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="ghost" @click="onReset" :disabled="saving">重置为默认</button>
+        <button class="ghost" @click="onReset" :disabled="saving">{{ t('modal.resetDefaults') }}</button>
         <button :class="['primary', { saved: saved, failed: saveFailed }]" @click="saved ? onSavedClick() : onSave()" :disabled="saving">
-          {{ saved ? '已保存生效' : (saveFailed ? '保存失败' : '保存') }}
+          {{ saved ? t('modal.savedActive') : (saveFailed ? t('modal.saveFailed') : t('common.save')) }}
         </button>
       </div>
     </div>
@@ -230,15 +229,15 @@ onMounted(load)
   <div v-if="showResetConfirm" class="modal-overlay" @click.self="showResetConfirm=false">
     <div class="modal-content confirm-modal">
       <div class="modal-header">
-        <h3>重置为默认</h3>
+        <h3>{{ t('modal.resetDefaults') }}</h3>
         <button class="close-btn" @click="showResetConfirm=false">×</button>
       </div>
       <div class="modal-body">
-        <p>确定将所有设置重置为默认值？此操作不可撤销。</p>
+        <p>{{ t('modal.resetDefaultsConfirm') }}</p>
       </div>
       <div class="modal-footer">
-        <button class="ghost" @click="showResetConfirm=false">取消</button>
-        <button class="primary danger" @click="doConfirmReset">确认</button>
+        <button class="ghost" @click="showResetConfirm=false">{{ t('modal.cancel') }}</button>
+        <button class="primary danger" @click="doConfirmReset">{{ t('modal.confirm') }}</button>
       </div>
     </div>
   </div>
@@ -250,7 +249,6 @@ onMounted(load)
 .section-title { font-weight: 700; margin-bottom: 8px; color: var(--text); }
 .grid { display: grid; grid-template-columns: 220px 1fr; gap: 8px 12px; }
 input, select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text); }
-.subkey { opacity: .6; margin-left: 6px; font-weight: 400; color: var(--muted); }
 .modal-footer .primary.saved { background: var(--success); color: #fff; border: none; }
 .modal-footer .primary.failed { background: var(--danger); color: #fff; border: none; }
 .error { color: var(--danger); font-size: 12px; margin-top: 4px; }

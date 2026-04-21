@@ -1,10 +1,13 @@
 <script setup lang="ts">
+import { t } from '../../i18n'
+
 const props = defineProps<{
   visible: boolean
   run: any | null
   phaseText: string
   progressText: string
   debugOpen: boolean
+  debugEnabled?: boolean
   debugCheckText: string
   debugProgressLine: string
   debugProgressJson: string
@@ -21,31 +24,31 @@ const emit = defineEmits<{
   <div v-if="visible" class="modal-overlay" @click.self="emit('close')">
     <div class="modal-content" style="max-width:520px">
       <div class="modal-header">
-        <h3>任务运行中</h3>
+        <h3>{{ t('modal.runningTitle') }}</h3>
         <button class="close-btn" @click="emit('close')">×</button>
       </div>
       <div class="modal-body">
-        <p>该任务仍在传输中，运行详情（历史）仅展示最终信息。</p>
-        <p>实时日志与进度请点击"传输日志"或查看任务卡片上的实时进度。</p>
+        <p>{{ t('modal.runningHint1') }}</p>
+        <p>{{ t('modal.runningHint2') }}</p>
         <div class="hint-box">
-          <div class="detail-item"><label>任务：</label><span>{{ run?.taskName || `#${run?.taskId}` }}</span></div>
-          <div class="detail-item"><label>阶段：</label><span>{{ phaseText || '-' }}</span></div>
-          <div class="detail-item"><label>实时：</label><span>{{ progressText || '-' }}</span></div>
+          <div class="detail-item"><label>{{ t('modal.task') }}</label><span>{{ run?.taskName || `#${run?.taskId}` }}</span></div>
+          <div class="detail-item"><label>{{ t('modal.phase') }}</label><span>{{ phaseText || '-' }}</span></div>
+          <div class="detail-item"><label>{{ t('modal.live') }}</label><span>{{ progressText || '-' }}</span></div>
           <div v-if="debugEnabled" class="detail-item full-width">
             <button class="ghost debug-toggle" @click="emit('toggle-debug')">
-              {{ debugOpen ? '收起调试详情' : '展开调试详情' }}
+              {{ debugOpen ? t('modal.collapseDebug') : t('modal.expandDebug') }}
             </button>
           </div>
           <template v-if="debugEnabled && debugOpen">
-            <div class="detail-item"><label>自检：</label><span>{{ debugCheckText || '-' }}</span></div>
-            <div class="detail-item full-width"><label>日志原文：</label><code class="inline-logline">{{ debugProgressLine || '-' }}</code></div>
-            <div class="detail-item full-width"><label>接口进度：</label><code class="inline-logline">{{ debugProgressJson || '-' }}</code></div>
+            <div class="detail-item"><label>{{ t('modal.selfCheck') }}</label><span>{{ debugCheckText || '-' }}</span></div>
+            <div class="detail-item full-width"><label>{{ t('modal.rawLog') }}</label><code class="inline-logline">{{ debugProgressLine || '-' }}</code></div>
+            <div class="detail-item full-width"><label>{{ t('modal.apiProgress') }}</label><code class="inline-logline">{{ debugProgressJson || '-' }}</code></div>
           </template>
         </div>
       </div>
       <div class="modal-footer">
-        <button class="primary" @click="emit('open-log', run)">打开传输日志</button>
-        <button class="ghost" @click="emit('close')">我知道了</button>
+        <button class="primary" @click="emit('open-log', run)">{{ t('modal.openTransferLog') }}</button>
+        <button class="ghost" @click="emit('close')">{{ t('modal.gotIt') }}</button>
       </div>
     </div>
   </div>

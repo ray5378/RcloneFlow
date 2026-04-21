@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { t } from '../../i18n'
+
 defineProps<{
   options: any
   updateOption: (key: string, value: any) => void
@@ -7,26 +9,26 @@ defineProps<{
 
 <template>
   <div class="advanced-group">
-    <div class="advanced-group-title">其他参数</div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.dryRun" @change="updateOption('dryRun', ($event.target as HTMLInputElement).checked)" /><label>模拟运行 (dry-run)</label></div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.interactive" @change="updateOption('interactive', ($event.target as HTMLInputElement).checked)" /><label>交互模式</label></div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.checkFirst" @change="updateOption('checkFirst', ($event.target as HTMLInputElement).checked)" /><label>检查前先检查</label></div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.serverSideAcrossConfigs" @change="updateOption('serverSideAcrossConfigs', ($event.target as HTMLInputElement).checked)" /><label>服务器端跨配置</label></div>
+    <div class="advanced-group-title">{{ t('advancedTask.otherOptions') }}</div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.dryRun" @change="updateOption('dryRun', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.dryRun') }}</label></div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.interactive" @change="updateOption('interactive', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.interactive') }}</label></div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.checkFirst" @change="updateOption('checkFirst', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.checkFirst') }}</label></div>
+    <div class="advanced-row inline"><input type="checkbox" :checked="options.serverSideAcrossConfigs" @change="updateOption('serverSideAcrossConfigs', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.serverSideAcrossConfigs') }}</label></div>
     <div class="advanced-row">
-      <label>检查器数</label>
+      <label>{{ t('advancedTask.checkersCount') }}</label>
       <input type="number" :value="options.checkers" @input="updateOption('checkers', Number(($event.target as HTMLInputElement).value))" min="1" max="100" />
     </div>
     <div class="advanced-row">
-      <label>重试次数</label>
+      <label>{{ t('advancedTask.retries') }}</label>
       <input type="number" :value="options.retries" @input="updateOption('retries', Number(($event.target as HTMLInputElement).value))" min="0" />
     </div>
     <div class="advanced-row">
-      <label>备份目录</label>
-      <input type="text" :value="options.backupDir" @input="updateOption('backupDir', ($event.target as HTMLInputElement).value)" placeholder="remote:path" />
+      <label>{{ t('advancedTask.backupDir') }}</label>
+      <input type="text" :value="options.backupDir" @input="updateOption('backupDir', ($event.target as HTMLInputElement).value)" :placeholder="t('advancedTask.remotePathPlaceholder')" />
     </div>
     <div class="advanced-row">
-      <label>日志文件</label>
-      <input type="text" :value="options.logFile" @input="updateOption('logFile', ($event.target as HTMLInputElement).value)" placeholder="/path/to/log" />
+      <label>{{ t('advancedTask.logFile') }}</label>
+      <input type="text" :value="options.logFile" @input="updateOption('logFile', ($event.target as HTMLInputElement).value)" :placeholder="t('advancedTask.logFilePlaceholder')" />
     </div>
   </div>
 </template>

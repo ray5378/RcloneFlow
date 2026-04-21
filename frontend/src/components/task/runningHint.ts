@@ -1,9 +1,8 @@
 import type { ActiveRun, ActiveRunProgress } from '../../api/run'
 import { formatBytes, formatBytesPerSec, formatEta } from '../../utils/format'
+import { t } from '../../i18n'
 
 export function getActiveProgress(active: ActiveRun | null | undefined): ActiveRunProgress | null {
-  // running hint 只消费 active runs 主链 progress；
-  // 不回退 finalSummary，也不消费任务卡片的 completedFreezeByTask。
   return active?.progress || null
 }
 
@@ -11,11 +10,11 @@ export function getActiveProgressText(active: any) {
   const p: any = getActiveProgress(active)
   if (!p) return '-'
   if (p.phase === 'preparing') {
-    return `准备中 · 已传 ${formatBytes(p.bytes || 0)} · 速度 ${formatBytesPerSec(p.speed || 0)}`
+    return `${t('runtime.preparing')} · ${t('runtime.transferred')} ${formatBytes(p.bytes || 0)} · ${t('runtime.speed')} ${formatBytesPerSec(p.speed || 0)}`
   }
   let etaStr = ''
-  if (Number(p.eta || 0) > 0) etaStr = ` · 预计完成 ${formatEta(Number(p.eta || 0))}`
-  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · 总数量 ${Number(p.totalCount || 0)} ／ 已传输 ${Number(p.completedFiles || 0)}${etaStr}`
+  if (Number(p.eta || 0) > 0) etaStr = ` · ${t('runtime.etaDone')} ${formatEta(Number(p.eta || 0))}`
+  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · ${t('runtime.totalCount')} ${Number(p.totalCount || 0)} ／ ${t('runtime.completedCount')} ${Number(p.completedFiles || 0)}${etaStr}`
 }
 
 export function getActiveProgressLine(active: any) {
@@ -31,10 +30,10 @@ export function getActiveProgressCheckText(active: any) {
   if (!check) return '-'
   if (check.ok) return `OK · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
   const parts: string[] = []
-  if (check.pctMismatch) parts.push('百分比异常')
-  if (check.countMismatch) parts.push('数量异常')
-  if (check.etaMismatch) parts.push('ETA异常')
-  return `${parts.join(' / ') || '异常'} · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
+  if (check.pctMismatch) parts.push(t('runtime.pctMismatch'))
+  if (check.countMismatch) parts.push(t('runtime.countMismatch'))
+  if (check.etaMismatch) parts.push(t('runtime.etaMismatch'))
+  return `${parts.join(' / ') || t('runtime.abnormal')} · calcPct=${Number(check.calcPct || 0).toFixed(2)}%`
 }
 
 export function getActiveProgressJson(active: any) {

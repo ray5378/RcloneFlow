@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import * as api from '../api'
 import { getToken } from '../api/auth'
 import { formatBytes, formatBytesPerSec } from '../utils/format'
+import { t } from '../i18n'
 
 export function useTaskWebhookConfig(options: {
   loadData: () => Promise<void>
@@ -78,11 +79,11 @@ export function useTaskWebhookConfig(options: {
   }
 
   function buildWecomMarkdown(p: any) {
-    const taskName = p?.task?.name || '测试任务'
-    const statusZh = p?.statusZh || '演示'
-    const triggerZh = p?.triggerZh || '测试'
+    const taskName = p?.task?.name || t('runtime.webhookTestTask')
+    const statusZh = p?.statusZh || t('runtime.webhookTestStatus')
+    const triggerZh = p?.triggerZh || t('runtime.webhookTestTrigger')
     const mode = (p?.task?.mode || '').toLowerCase()
-    const okLabel = mode === 'move' ? '移动' : '成功'
+    const okLabel = mode === 'move' ? t('runtime.webhookMove') : t('runtime.webhookSuccess')
     const s = p?.summary || {}
     const total = s.totalCount ?? 0
     const ok = s.completedCount ?? 0
@@ -92,10 +93,10 @@ export function useTaskWebhookConfig(options: {
     const txFmt = formatBytes(Number(s.transferredBytes || 0))
     const spFmt = formatBytesPerSec(Number(s.avgSpeedBps || 0))
     const dur = p?.run?.durationText || '-'
-    let md = `**任务** <font color="info">${taskName}</font> 已${statusZh}（${triggerZh}）\n`
-    md += `> 总计: ${total}  ${okLabel}: ${ok}  失败: ${fail}  其他: ${skipped}\n`
-    md += `> 体积: ${bytesFmt} / 已传: ${txFmt}\n`
-    md += `> 均速: ${spFmt}  耗时: ${dur}\n`
+    let md = `**${t('task.title')}** <font color="info">${taskName}</font> ${statusZh}（${triggerZh}）\n`
+    md += `> ${t('runtime.webhookTotal')}: ${total}  ${okLabel}: ${ok}  ${t('runtime.webhookFailed')}: ${fail}  ${t('runtime.webhookOther')}: ${skipped}\n`
+    md += `> ${t('runtime.webhookBytes')}: ${bytesFmt} / ${t('runtime.webhookTransferred')}: ${txFmt}\n`
+    md += `> ${t('runtime.webhookAvgSpeed')}: ${spFmt}  ${t('runtime.webhookDuration')}: ${dur}\n`
     if (Array.isArray(p?.files)) {
       for (const f of p.files) md += `> ${f}\n`
     }
@@ -107,16 +108,16 @@ export function useTaskWebhookConfig(options: {
       const url1 = (webhookForm.value.postUrl || '').trim()
       const url2 = String(webhookForm.value.wecomUrl || '').trim()
       if (!url1 && !url2) {
-        options.showToast('请先填写对外 POST 地址或企业微信地址', 'error')
+        options.showToast(t('runtime.webhookNeedUrl'), 'error')
         return
       }
       const payload: any = {
-        title: 'RcloneFlow 测试通知',
-        triggerZh: '测试',
-        statusZh: '演示',
-        summaryZh: '这是一条测试消息，用于验证通知接收是否正常（自动识别企业微信/通用 Webhook）。',
-        task: { id: 0, name: '测试任务', mode: 'test' },
-        run: { id: 0, trigger: 'manual', status: 'success', startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), durationSeconds: 1, durationText: '1秒' },
+        title: t('runtime.webhookTestTitle'),
+        triggerZh: t('runtime.webhookTestTrigger'),
+        statusZh: t('runtime.webhookTestStatus'),
+        summaryZh: t('runtime.webhookTestSummary'),
+        task: { id: 0, name: t('runtime.webhookTestTask'), mode: 'test' },
+        run: { id: 0, trigger: 'manual', status: 'success', startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(), durationSeconds: 1, durationText: `1${t('runtime.secondSuffix')}` },
         summary: { totalCount: 5, completedCount: 5, failedCount: 0, skippedCount: 0, totalBytes: 10485760, transferredBytes: 10485760, avgSpeedBps: 10485760 },
         files: ['test-a.mp4', 'test-b.mp4', 'test-c.mp4', 'test-d.mp4', 'test-e.mp4'],
         omittedCount: 0,
@@ -130,15 +131,15 @@ export function useTaskWebhookConfig(options: {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
       }
       const fails: string[] = []
-      if (url1) { try { await send(url1) } catch (e: any) { fails.push(`通用: ${e?.message || e}`) } }
-      if (url2) { try { await send(url2) } catch (e: any) { fails.push(`企业微信: ${e?.message || e}`) } }
+      if (url1) { try { await send(url1) } catch (e: any) { fails.push(`Webhook: ${e?.message || e}`) } }
+      if (url2) { try { await send(url2) } catch (e: any) { fails.push(`WeCom: ${e?.message || e}`) } }
       if (fails.length) {
-        options.showToast(`测试部分失败：${fails.join('；')}`, 'error')
+        options.showToast(t('runtime.webhookPartialFail').replace('{message}', fails.join('; ')), 'error')
       } else {
-        options.showToast('测试通知已发送（请在接收端查看）', 'success')
+        options.showToast(t('runtime.webhookSent'), 'success')
       }
     } catch (e: any) {
-      options.showToast(`测试发送失败：${e?.message || e}`, 'error')
+      options.showToast(t('runtime.webhookSendFail').replace('{message}', e?.message || e), 'error')
     }
   }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { getUnifiedProgressText } from './progressText'
+import { t } from '../../i18n'
 
 interface Progress {
   percentage?: number
@@ -69,9 +70,10 @@ function formatSpec(spec: string): string {
   const parts = spec.split('|')
   if (parts.length !== 5) return spec
   const [min, hour, day, month, week] = parts
-  const weekDay = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][parseInt(week) % 7] || ''
-  const monthStr = month !== '*' ? `${month}月` : ''
-  const dayStr = day !== '*' ? `${day}日` : ''
+  const weekMap = [t('runtime.sunday'), t('runtime.monday'), t('runtime.tuesday'), t('runtime.wednesday'), t('runtime.thursday'), t('runtime.friday'), t('runtime.saturday')]
+  const weekDay = weekMap[parseInt(week) % 7] || ''
+  const monthStr = month !== '*' ? `${month}${t('schedule.monthSuffix')}` : ''
+  const dayStr = day !== '*' ? `${day}` : ''
   return `${hour}:${min} ${weekDay} ${monthStr}${dayStr}`.trim()
 }
 
@@ -95,31 +97,26 @@ function isStopped(): boolean {
       <div class="schedule-info">
         <template v-if="schedule">
           <span :class="['schedule-badge', schedule.enabled ? 'enabled' : 'disabled']">
-            {{ schedule.enabled ? '已启用' : '已禁用' }}
+            {{ schedule.enabled ? t('taskCard.enabled') : t('taskCard.disabled') }}
           </span>
           <span class="schedule-rule list-item-secondary-text">{{ formatSpec(schedule.spec || '') }}</span>
         </template>
-        <span v-else class="no-schedule list-item-tertiary-text">未设置</span>
+        <span v-else class="no-schedule list-item-tertiary-text">{{ t('taskCard.unset') }}</span>
       </div>
 
       <div class="item-actions list-item-actions list-item-actions-right">
-        <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 任务历史记录</button>
+        <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 {{ t('taskCard.history') }}</button>
         <button class="ghost small" :class="{ 'danger-text': isStopped() }" @click.stop="emit('stop', task.id!)">
-          {{ isStopped() ? '⏹ 已经停止' : '⏹ 停止传输' }}
+          {{ isStopped() ? `⏹ ${t('taskCard.stopped')}` : `⏹ ${t('taskCard.stopTransfer')}` }}
         </button>
         <button v-if="schedule" class="ghost small" @click.stop="emit('toggleSchedule', task)">
-          {{ schedule.enabled ? '⏸ 关闭定时' : '▶ 开启定时' }}
+          {{ schedule.enabled ? `⏸ ${t('taskCard.disableSchedule')}` : `▶ ${t('taskCard.enableSchedule')}` }}
         </button>
-        <button
-          class="ghost small"
-          :class="{ 'btn-running': isRunning() }"
-          :disabled="isRunning()"
-          @click.stop="emit('run', task)"
-        >
-          {{ isRunning() ? '运行成功' : '▶ 手动运行' }}
+        <button class="ghost small" :class="{ 'btn-running': isRunning() }" :disabled="isRunning()" @click.stop="emit('run', task)">
+          {{ isRunning() ? t('taskCard.runSuccess') : `▶ ${t('taskCard.manualRun')}` }}
         </button>
-        <button class="ghost small" @click.stop="emit('setWebhook', task)">🔗 Webhook</button>
-        <button class="ghost small" @click.stop="emit('setSingleton', task)">🔒 单例</button>
+        <button class="ghost small" @click.stop="emit('setWebhook', task)">🔗 {{ t('taskCard.webhook') }}</button>
+        <button class="ghost small" @click.stop="emit('setSingleton', task)">🔒 {{ t('taskCard.singleton') }}</button>
         <button class="ghost small" @click.stop="emit('edit', task)">✏️</button>
         <button class="ghost small danger-text" @click.stop="emit('delete', task)">🗑️</button>
       </div>
@@ -127,15 +124,15 @@ function isStopped(): boolean {
 
     <div class="task-paths list-item-secondary-group list-item-stack">
       <div class="path-row list-item-row">
-        <span class="path-label list-item-secondary-text">源:</span>
-        <span class="path-value">{{ task.sourceRemote }}:{{ task.sourcePath || '根目录' }}</span>
+        <span class="path-label list-item-secondary-text">{{ t('taskCard.source') }}:</span>
+        <span class="path-value">{{ task.sourceRemote }}:{{ task.sourcePath || t('taskCard.rootDir') }}</span>
       </div>
       <div class="path-row list-item-row">
-        <span class="path-label list-item-secondary-text">目标:</span>
-        <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || '根目录' }}</span>
+        <span class="path-label list-item-secondary-text">{{ t('taskCard.target') }}:</span>
+        <span class="path-value">{{ task.targetRemote }}:{{ task.targetPath || t('taskCard.rootDir') }}</span>
       </div>
       <div class="path-row list-item-row">
-        <span class="path-label list-item-secondary-text">进度:</span>
+        <span class="path-label list-item-secondary-text">{{ t('taskCard.progress') }}:</span>
         <span class="path-value">{{ getProgressText() }}</span>
       </div>
       <div class="progress-bar-container" v-if="getLiveProgress() && getLiveProgress()!.phase !== 'preparing'">
@@ -151,80 +148,22 @@ function isStopped(): boolean {
 @import './listItemActions.css';
 @import './listItemSpacing.css';
 
-.task-card {
-  padding: 14px 18px;
-}
-.task-card:hover {
-  background: transparent;
-  border-left-color: rgba(99, 102, 241, 0.55);
-}
-body.light .task-card:hover {
-  background: transparent;
-  border-left-color: rgba(25, 118, 210, 0.38);
-}
-.task-card.active {
-  border-left: 3px solid var(--accent, #4f46e5);
-}
-.task-main {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-}
-.name {
-  gap: 8px;
-}
-.schedule-info {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-}
-.schedule-badge {
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 10px;
-}
-.schedule-badge.enabled {
-  background: #22c55e33;
-  color: #22c55e;
-}
-.schedule-badge.disabled {
-  background: #666633;
-  color: #999;
-}
-.task-paths {
-  padding: 8px 12px;
-  background: #1a1a1a;
-  border-radius: 6px;
-}
-body.light .task-paths {
-  background: #f5f5f5;
-}
-.path-row {
-  font-size: 12px;
-}
-.path-label {
-  min-width: 40px;
-}
-.path-value {
-  color: #ccc;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.progress-bar-container {
-  height: 4px;
-  background: #333;
-  border-radius: 2px;
-  margin-top: 8px;
-  overflow: hidden;
-}
-.progress-bar {
-  height: 100%;
-  background: var(--accent, #4f46e5);
-  transition: width 0.3s;
-}
-.btn-running {
-  color: #22c55e !important;
-}
+.task-card { padding: 14px 18px; }
+.task-card:hover { background: transparent; border-left-color: rgba(99, 102, 241, 0.55); }
+body.light .task-card:hover { background: transparent; border-left-color: rgba(25, 118, 210, 0.38); }
+.task-card.active { border-left: 3px solid var(--accent, #4f46e5); }
+.task-main { display: flex; flex-wrap: wrap; align-items: center; }
+.name { gap: 8px; }
+.schedule-info { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.schedule-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; }
+.schedule-badge.enabled { background: #22c55e33; color: #22c55e; }
+.schedule-badge.disabled { background: #666633; color: #999; }
+.task-paths { padding: 8px 12px; background: #1a1a1a; border-radius: 6px; }
+body.light .task-paths { background: #f5f5f5; }
+.path-row { font-size: 12px; }
+.path-label { min-width: 40px; }
+.path-value { color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.progress-bar-container { height: 4px; background: #333; border-radius: 2px; margin-top: 8px; overflow: hidden; }
+.progress-bar { height: 100%; background: var(--accent, #4f46e5); transition: width 0.3s; }
+.btn-running { color: #22c55e !important; }
 </style>

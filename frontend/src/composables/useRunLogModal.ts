@@ -1,14 +1,15 @@
 import { ref } from 'vue'
 import { getToken } from '../api/auth'
+import { t } from '../i18n'
 
 export function useRunLogModal() {
   const showLogModal = ref(false)
-  const logModalTitle = ref('传输日志')
+  const logModalTitle = ref(t('modal.transferLog'))
   const logContent = ref('')
 
   async function openRunLog(run: any) {
-    logModalTitle.value = `传输日志 #${run.id}`
-    logContent.value = '加载中…'
+    logModalTitle.value = `${t('modal.transferLog')} #${run.id}`
+    logContent.value = t('modal.loading')
     showLogModal.value = true
     try {
       const token = getToken() || ''
@@ -19,7 +20,7 @@ export function useRunLogModal() {
         const fallback = await fetch(`/api/runs/${run.id}/log?auth=${token}`)
         if (!fallback.ok) {
           const txt = await fallback.text()
-          logContent.value = `加载失败：${fallback.status} ${txt}`
+          logContent.value = `${t('modal.loadFailed')} ${fallback.status} ${txt}`
           return
         }
         const buf2 = await fallback.arrayBuffer()
@@ -31,7 +32,7 @@ export function useRunLogModal() {
       const dec = new TextDecoder('utf-8')
       logContent.value = dec.decode(buf)
     } catch (e: any) {
-      logContent.value = `加载异常：${e?.message || e}`
+      logContent.value = `${t('modal.loadError')} ${e?.message || e}`
     }
   }
 

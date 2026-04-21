@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { Task } from '../types'
+import { t } from '../i18n'
 
 interface UseTaskFormSubmitOptions {
   createForm: Ref<any>
@@ -29,10 +30,10 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
 
   function validateTaskForm() {
     if (!options.createForm.value.name) {
-      return '请输入任务名称'
+      return t('runtime.enterTaskName')
     }
     if (!options.createForm.value.sourceRemote || !options.createForm.value.targetRemote) {
-      return '请选择源和目标存储'
+      return t('runtime.chooseSourceTarget')
     }
     return ''
   }
