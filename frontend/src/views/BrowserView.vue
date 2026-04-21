@@ -402,12 +402,12 @@ function confirmDelete() {
 async function executeDelete() {
   if (!deletingItem.value) return
   if (!browserFs.value) {
-    alert('请先选择一个存储节点')
+    alert(t('browserView.selectStorageFirst'))
     return
   }
 
   // 验证路径
-  if (!validatePath(deletingItem.value.Path, '删除路径')) return
+  if (!validatePath(deletingItem.value.Path, t('browserView.deletePath'))) return
 
   try {
     if (deletingItem.value.IsDir) {
