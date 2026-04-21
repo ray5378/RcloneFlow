@@ -262,7 +262,7 @@ function getOptionHelp(option: ProviderOption) {
 
 function getOptionPlaceholder(option: ProviderOption) {
   if (locale.value === 'zh') {
-    return `请输入${getOptionLabel(option)}`
+    return `${t('remote.enterPrefix')}${getOptionLabel(option)}`
   }
   return `Enter ${getOptionLabel(option)}`
 }
