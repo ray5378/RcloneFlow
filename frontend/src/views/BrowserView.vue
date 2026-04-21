@@ -363,7 +363,7 @@ function startRename() {
 async function confirmRename() {
   if (!renamingItem.value || !renameInput.value) return
   if (!browserFs.value) {
-    alert('请先选择一个存储节点')
+    alert(t('browserView.selectStorageFirst'))
     return
   }
   try {
