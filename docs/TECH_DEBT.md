@@ -254,7 +254,18 @@
 - 让开发流程、发布流程、提交检查都严格执行这条规则
 - 若未来决定改成“不再提交构建产物”，应单独作为一轮发布流程改造，不在日常改动中半切换
 
-#### 4.7 SQLite 单连接运行时策略（已落地）
+#### 4.7 添加存储中文模式文案专项已阶段性收口
+现状：
+- `AddRemoteModal.vue` 中 `optionLabelMap` / `optionHelpMap` 已完成一次集中收整
+- 本轮已收掉中文模式下真实会上屏的 option label / help 漏翻、错位、重复 key、英文透出问题
+- 已集中整理 SMB、WebDAV、crypt、local、OneDrive 及部分通用 option
+
+后续策略：
+- 默认视为已阶段性收口
+- 不再继续做低收益的地毯式补洞
+- 若后续验收中再发现个别 provider 漏网，按报点补丁修复即可
+
+#### 4.8 SQLite 单连接运行时策略（已落地）
 现状：
 - 主运行时链路 `internal/app/app.go -> store.Open(cfg.GetDataDir())` 已明确使用 SQLite 单连接模型
 - `store.Open(...)` 与内部迁移辅助 `openDB(...)` 当前都已收紧为：

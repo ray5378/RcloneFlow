@@ -44,6 +44,18 @@
   - `activeRunProgress.ts`
 - 同时完成相关接线修复和回归修复
 
+### 添加存储文案专项收尾
+- 对 `frontend/src/components/AddRemoteModal.vue` 的 `optionLabelMap` / `optionHelpMap` 做了一次集中收整
+- 重点收掉中文模式下“添加存储”真实会上屏的 option label / help 漏翻、错位、重复 key、英文透出问题
+- 本轮集中整理覆盖了 SMB、WebDAV、crypt、local、OneDrive 以及一批通用 option
+- 这条线当前已从“持续专项清理”切换为“阶段性收口 + 验收报点修复”
+
+### 仓库状态收尾
+- 分支已收敛为只保留 `dev` / `master`
+- `dev` / `master` 当前已对齐到同一提交
+- 历史 tag 已清理并重建，当前只保留 `v1.0.0`
+- 发布 / 分支 / README 口径已同步到文档
+
 ---
 
 ## 使用建议
