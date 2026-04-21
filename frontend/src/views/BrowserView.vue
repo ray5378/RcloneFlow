@@ -617,8 +617,8 @@ async function openEditRemote(name: string) {
         <p class="warning">{{ t('browserView.irreversible') }}</p>
       </div>
       <div class="modal-footer">
-        <button class="ghost" @click="showDeleteConfirm = false">取消</button>
-        <button class="danger-btn" @click="executeDelete">确定删除</button>
+        <button class="ghost" @click="showDeleteConfirm = false">{{ t('common.cancel') }}</button>
+        <button class="danger-btn" @click="executeDelete">{{ t('browserView.confirmDeleteAction') }}</button>
       </div>
     </div>
   </div>
