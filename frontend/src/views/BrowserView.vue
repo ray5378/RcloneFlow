@@ -117,9 +117,9 @@ function hasPathTraversal(path: string): boolean {
 }
 
 // 验证路径安全性
-function validatePath(path: string, name: string = '路径'): boolean {
+function validatePath(path: string, name: string = t('browserView.path')): boolean {
   if (hasPathTraversal(path)) {
-    alert(`${name}包含非法字符，存在路径穿越风险`)
+    alert(t('browserView.pathTraversalRisk').replace('{name}', name))
     return false
   }
   return true
@@ -297,11 +297,11 @@ async function moveItem() {
 
 async function pasteItem() {
   if (!clipboardItem.value || !clipboardAction.value) {
-    alert('剪贴板为空，请先复制或剪切文件')
+    alert(t('browserView.clipboardEmpty'))
     return
   }
   if (!browserFs.value) {
-    alert('请先选择一个存储节点')
+    alert(t('browserView.selectStorageFirst'))
     return
   }
 
@@ -311,8 +311,8 @@ async function pasteItem() {
   const dstFs = browserFs.value
   const srcPath = clipboardItem.value.Path.replace(/^\/+/, '')
   const dstPath = (browserPath.value ? browserPath.value.replace(/^\/+/, '') + '/' : '') + clipboardItem.value.Name
-  if (!validatePath(srcPath, '源路径')) return
-  if (!validatePath(dstPath, '目标路径')) return
+  if (!validatePath(srcPath, t('taskCard.source'))) return
+  if (!validatePath(dstPath, t('taskCard.target'))) return
 
   try {
     const isDir = clipboardItem.value.IsDir
