@@ -580,7 +580,7 @@ async function openEditRemote(name: string) {
         {{ browserError }}
       </div>
       <div v-if="!browserItems.length && !browserError" class="empty">
-        空目录 (右键可粘贴)
+        {{ t('remote.emptyDir') }}
       </div>
     </div>
   </div>
