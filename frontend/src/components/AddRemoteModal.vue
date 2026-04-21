@@ -288,7 +288,10 @@ const filteredProviders = computed(() => {
   return (providers.value || [])
     .filter(p => {
       if (!keyword) return true
-      return `${p.Name} ${p.Description || ''} ${getProviderDescription(p)}`.toLowerCase().includes(keyword)
+      const haystack = locale.value === 'zh'
+        ? `${p.Name} ${p.Description || ''} ${getProviderDescription(p)}`
+        : `${p.Name} ${p.Description || ''}`
+      return haystack.toLowerCase().includes(keyword)
     })
     .sort((a, b) => a.Name.localeCompare(b.Name))
 })
