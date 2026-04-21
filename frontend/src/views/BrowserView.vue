@@ -540,7 +540,7 @@ async function openEditRemote(name: string) {
   <!-- Browser Panel -->
   <div v-if="subview === 'explorer'" class="card">
     <div class="card-header">
-      <div class="title">文件浏览</div>
+      <div class="title">{{ t('remote.browserTitle') }}</div>
     </div>
     <div class="pathbar">
       <template v-for="(crumb, i) in breadcrumbs" :key="crumb.path">
