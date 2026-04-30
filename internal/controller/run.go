@@ -230,9 +230,9 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 		out = append(out, obj)
 	}
 	WriteJSON(w, 200, map[string]any{
-		"runs": out,
-		"total": total,
-		"page": page,
+		"runs":     out,
+		"total":    total,
+		"page":     page,
 		"pageSize": pageSize,
 	})
 }
@@ -839,6 +839,13 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		if v, ok := progress["plannedFiles"].(float64); ok {
 			totalCount = v
 		}
+		if totalCount <= 0 && summary != nil {
+			if pf, ok := summary["preflight"].(map[string]any); ok {
+				if v, ok2 := pf["totalCount"].(float64); ok2 {
+					totalCount = v
+				}
+			}
+		}
 		if totalCount > 0 && completedFiles > totalCount {
 			completedFiles = totalCount
 		}
@@ -908,9 +915,9 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			},
 			"progress":         stable,
 			"progressLine":     progressLine,
-			"progressSource":     "summary.progress",
-			"progressMismatch":   progressMismatch,
-			"progressCheck":      progressCheck,
+			"progressSource":   "summary.progress",
+			"progressMismatch": progressMismatch,
+			"progressCheck":    progressCheck,
 		}
 		items = append(items, item)
 	}

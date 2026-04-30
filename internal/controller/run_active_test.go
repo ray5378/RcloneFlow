@@ -25,12 +25,12 @@ func (m *mockRunSvcDB) ListActiveRuns() ([]service.RunRecord, error) {
 func (m *mockRunSvcDB) GetActiveRunByTaskID(taskID int64) (service.RunRecord, error) {
 	return service.RunRecord{}, nil
 }
-func (m *mockRunSvcDB) GetRun(id int64) (service.RunRecord, error) { return service.RunRecord{}, nil }
-func (m *mockRunSvcDB) UpdateRun(id int64, updateFn func(*service.RunRecord)) {}
-func (m *mockRunSvcDB) DeleteRun(id int64) error { return nil }
-func (m *mockRunSvcDB) DeleteAllRuns() error { return nil }
-func (m *mockRunSvcDB) DeleteRunsByTask(taskId int64) error { return nil }
-func (m *mockRunSvcDB) CleanOldRuns(days int) (int64, error) { return 0, nil }
+func (m *mockRunSvcDB) GetRun(id int64) (service.RunRecord, error)                        { return service.RunRecord{}, nil }
+func (m *mockRunSvcDB) UpdateRun(id int64, updateFn func(*service.RunRecord))             {}
+func (m *mockRunSvcDB) DeleteRun(id int64) error                                          { return nil }
+func (m *mockRunSvcDB) DeleteAllRuns() error                                              { return nil }
+func (m *mockRunSvcDB) DeleteRunsByTask(taskId int64) error                               { return nil }
+func (m *mockRunSvcDB) CleanOldRuns(days int) (int64, error)                              { return 0, nil }
 func (m *mockRunSvcDB) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error { return nil }
 
 func TestHandleActiveRuns_UsesProgressAndExposesDebugFields(t *testing.T) {
@@ -200,6 +200,53 @@ func TestHandleActiveRuns_UsesProgressTotalsOnly(t *testing.T) {
 	}
 	if got := prog["percentage"].(float64); got < 9.9 || got > 10.1 {
 		t.Fatalf("percentage=%v, want about 10", got)
+	}
+}
+
+func TestHandleActiveRuns_FallsBackToPreflightTotalCountWhenPlannedFilesMissing(t *testing.T) {
+	summary := map[string]any{
+		"progress": map[string]any{
+			"bytes":          float64(100),
+			"totalBytes":     float64(300),
+			"speed":          float64(10),
+			"eta":            float64(20),
+			"percentage":     float64(10),
+			"completedFiles": float64(3),
+		},
+		"preflight": map[string]any{
+			"totalBytes": float64(1024),
+			"totalCount": float64(166),
+		},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        5,
+		TaskID:    104,
+		Status:    "running",
+		StartedAt: "2026-04-17T14:30:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/active", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleActiveRuns(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &items); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	it := items[0]
+	prog, _ := it["progress"].(map[string]any)
+	if prog == nil {
+		t.Fatalf("missing progress")
+	}
+	if got := int(prog["totalCount"].(float64)); got != 166 {
+		t.Fatalf("totalCount=%d, want 166 from preflight fallback", got)
+	}
+	if got := int(prog["completedFiles"].(float64)); got != 3 {
+		t.Fatalf("completedFiles=%d, want 3", got)
 	}
 }
 
