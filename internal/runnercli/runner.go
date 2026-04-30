@@ -77,7 +77,6 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	args := []string{cmdName, src, dst, "-v", "--stats", "1s", "--stats-one-line", "--config", cfg}
 	if casCompat != nil && casCompat.ExcludeFrom != "" {
 		args = append(args, "--exclude-from", casCompat.ExcludeFrom)
-		defer os.Remove(casCompat.ExcludeFrom)
 	}
 	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
 	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
@@ -287,6 +286,11 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	go r.consume(run.ID, outR, stderrFile, false, fileStats)
 	go r.consume(run.ID, errR, stderrFile, true, fileStats)
 	go func() {
+		defer func() {
+			if casCompat != nil && casCompat.ExcludeFrom != "" {
+				_ = os.Remove(casCompat.ExcludeFrom)
+			}
+		}()
 		err := cmd.Wait()
 		outW.Close()
 		errW.Close()
