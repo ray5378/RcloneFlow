@@ -1,5 +1,7 @@
 # Run Final Summary (Frozen History)
 
+> 注：当前仓库已进入一轮阶段性收口状态。若后续对运行历史链路继续调整，应优先做契约补充或验收报点修复，不再做无边界扩改。
+
 RcloneFlow persists a frozen run summary to DB when a run finishes (success or failure). Frontend history pages render only this finalized data — no realtime fields are stored.
 
 ## Schema (summary.finalSummary)

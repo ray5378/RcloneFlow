@@ -128,6 +128,7 @@ export interface TaskOptions {
 
   // 其他
   serverSideAcrossConfigs?: boolean // --server-side-across-configs
+  openlistCasCompatible?: boolean   // 目标端启用 OpenList-CAS .cas 等效原文件兼容
 }
 
 export interface Schedule {

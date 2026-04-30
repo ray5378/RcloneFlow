@@ -2,21 +2,23 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/store"
 )
 
 // mockTaskRunner 模拟任务运行器
 type mockTaskRunner struct {
-	runTaskFn func(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string) (int64, error)
+	runTaskFn func(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string, opts *adapter.TaskOptions) (int64, error)
 }
 
-func (m *mockTaskRunner) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string) (int64, error) {
+func (m *mockTaskRunner) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string, opts *adapter.TaskOptions) (int64, error) {
 	if m.runTaskFn != nil {
-		return m.runTaskFn(ctx, taskID, mode, srcRemote, srcPath, dstRemote, dstPath, trigger)
+		return m.runTaskFn(ctx, taskID, mode, srcRemote, srcPath, dstRemote, dstPath, trigger, opts)
 	}
 	return 123, nil
 }
@@ -133,12 +135,12 @@ func TestTaskService_DeleteTask(t *testing.T) {
 
 func TestMockTaskRunner(t *testing.T) {
 	runner := &mockTaskRunner{
-		runTaskFn: func(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string) (int64, error) {
+		runTaskFn: func(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string, opts *adapter.TaskOptions) (int64, error) {
 			return 999, nil
 		},
 	}
 
-	jobID, err := runner.RunTask(context.Background(), 1, "copy", "local", "/src", "gdrive", "/dst", "manual")
+	jobID, err := runner.RunTask(context.Background(), 1, "copy", "local", "/src", "gdrive", "/dst", "manual", nil)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -149,12 +151,12 @@ func TestMockTaskRunner(t *testing.T) {
 
 func TestMockTaskRunnerError(t *testing.T) {
 	runner := &mockTaskRunner{
-		runTaskFn: func(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string) (int64, error) {
+		runTaskFn: func(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string, opts *adapter.TaskOptions) (int64, error) {
 			return 0, ErrTaskNotFound
 		},
 	}
 
-	_, err := runner.RunTask(context.Background(), 999, "copy", "local", "/src", "gdrive", "/dst", "manual")
+	_, err := runner.RunTask(context.Background(), 999, "copy", "local", "/src", "gdrive", "/dst", "manual", nil)
 	if err != ErrTaskNotFound {
 		t.Errorf("expected ErrTaskNotFound, got %v", err)
 	}
@@ -211,6 +213,65 @@ func TestTaskService_UpdateTask_RejectsDuplicateName(t *testing.T) {
 	err = svc.UpdateTask(second.ID, store.Task{Name: first.Name})
 	if err != ErrTaskNameExists {
 		t.Fatalf("expected ErrTaskNameExists, got %v", err)
+	}
+}
+
+func TestTaskService_RunTask_StoresOpenlistCASCompatibleInEffectiveOptions(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	oldAppDataDir := os.Getenv("APP_DATA_DIR")
+	if err := os.Setenv("APP_DATA_DIR", tmpDir); err != nil {
+		t.Fatalf("Setenv(APP_DATA_DIR) error = %v", err)
+	}
+	defer func() {
+		if oldAppDataDir == "" {
+			_ = os.Unsetenv("APP_DATA_DIR")
+		} else {
+			_ = os.Setenv("APP_DATA_DIR", oldAppDataDir)
+		}
+	}()
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	task, err := db.AddTask(store.Task{
+		Name:         "cas-task",
+		Mode:         "copy",
+		SourceRemote: "src",
+		SourcePath:   "/a",
+		TargetRemote: "dst",
+		TargetPath:   "/b",
+		Options:      json.RawMessage(`{"openlistCasCompatible":true}`),
+	})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+
+	svc := NewTaskService(db, nil)
+	if err := svc.RunTask(context.Background(), task.ID, "manual"); err != nil {
+		t.Fatalf("RunTask() error = %v", err)
+	}
+
+	runs, err := db.ListRunsByTask(task.ID)
+	if err != nil {
+		t.Fatalf("ListRunsByTask() error = %v", err)
+	}
+	if len(runs) == 0 {
+		t.Fatalf("expected at least one run record")
+	}
+	eff, ok := runs[0].Summary["effectiveOptions"].(map[string]any)
+	if !ok || eff == nil {
+		t.Fatalf("expected effectiveOptions in run summary, got %#v", runs[0].Summary)
+	}
+	if v, ok := eff["openlistCasCompatible"].(bool); !ok || !v {
+		t.Fatalf("expected effectiveOptions.openlistCasCompatible=true, got %#v", eff["openlistCasCompatible"])
 	}
 }
 

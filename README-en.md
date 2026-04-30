@@ -8,6 +8,8 @@ RcloneFlow is a Web UI for rclone with built-in rclone, supporting file sync, st
 
 **Current Version: v1.0.0**
 
+> Current branch policy: only `dev` (development) and `master` (stable) are kept. The current release tag is only `v1.0.0`.
+
 ## Features
 
 ### 📂 Storage Management
