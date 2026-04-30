@@ -51,6 +51,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" {
 		cmdName = "copy"
 	}
+	originalCmdName := cmdName
 	// Resolve config path
 	dataDir := os.Getenv("APP_DATA_DIR")
 	if dataDir == "" {
@@ -60,9 +61,24 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	if cfg == "" {
 		cfg = filepath.Join(dataDir, "rclone.conf")
 	}
+	var casCompat *openlistCASCompatPlan
+	if isOpenlistCASCompatible(run) {
+		plan, err := buildOpenlistCASCompatPlan(cfg, src, dst, cmdName)
+		if err != nil {
+			return fmt.Errorf("prepare openlist-cas compatibility failed: %w", err)
+		}
+		casCompat = plan
+		if cmdName == "sync" {
+			cmdName = "copy"
+		}
+	}
 	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
 	// 降低默认日志级别：从 -vv 改为 -v，显著减少日志行数和解析/写库开销
 	args := []string{cmdName, src, dst, "-v", "--stats", "1s", "--stats-one-line", "--config", cfg}
+	if casCompat != nil && casCompat.ExcludeFrom != "" {
+		args = append(args, "--exclude-from", casCompat.ExcludeFrom)
+		defer os.Remove(casCompat.ExcludeFrom)
+	}
 	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
 	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
 		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
@@ -126,7 +142,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			n := strings.TrimSpace(args[i+1])
 			if args[i] == "--bwlimit" {
 				// 兼容 07:30,2M;17:40,2M;23:00,3M → 07:30,2M 17:40,2M 23:00,3M
-				if strings.Contains(n, ";") { n = strings.ReplaceAll(n, ";", " ") }
+				if strings.Contains(n, ";") {
+					n = strings.ReplaceAll(n, ";", " ")
+				}
 				args[i+1] = n
 			}
 			pureNum := n != ""
@@ -206,7 +224,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	// Mandatory preflight: sequential pagination by top-level dirs to stabilize totals
 	if b, c, e := sizeOfPaged(&adapter.CmdRunner{}, cfg, src, effOpt); e == nil {
 		_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
-			if rr.Summary == nil { rr.Summary = map[string]any{} }
+			if rr.Summary == nil {
+				rr.Summary = map[string]any{}
+			}
 			rr.Summary["preflight"] = map[string]any{"totalCount": c, "totalBytes": b}
 		})
 	}
@@ -414,8 +434,12 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					for _, f := range files {
 						a := strings.ToLower(fmt.Sprint(f["action"]))
 						p := fmt.Sprint(f["path"])
-						if a == "copied" { copiedMap[p] = f }
-						if a == "deleted" { deletedMap[p] = f }
+						if a == "copied" {
+							copiedMap[p] = f
+						}
+						if a == "deleted" {
+							deletedMap[p] = f
+						}
 					}
 					moved := []map[string]any{}
 					others := []map[string]any{}
@@ -427,14 +451,16 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 							others = append(others, c)
 						}
 					}
-					for _, d := range deletedMap { others = append(others, d) }
+					for _, d := range deletedMap {
+						others = append(others, d)
+					}
 					files = append(moved, others...)
 					counts["copied"] = len(moved)
 					counts["deleted"] = 0
 					counts["total"] = counts["copied"] + counts["failed"] + counts["skipped"]
 				}
 				// 异步补全文件大小，不阻塞状态更新
-				r.enrichFilesSizesAsync(run.ID, files, dst, cfg)
+				r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
 				rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": humanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
 			})
 			websocket.Broadcast("run_status", map[string]any{
@@ -448,17 +474,41 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			r.mu.Unlock()
 			return
 		}
-		// WebDAV 完成确认（copy/sync/move 通用）：仅做可见性检查，不改变 rclone 语义
+		if casCompat != nil {
+			if postErr := casCompat.ApplyPostActions(cfg, src, dst, originalCmdName); postErr != nil {
+				_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+					rr.Status = "failed"
+					if rr.Summary == nil {
+						rr.Summary = map[string]any{}
+					}
+					rr.Summary["finished"] = true
+					rr.Summary["success"] = false
+					fin := time.Now().Local()
+					rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
+					rr.Error = postErr.Error()
+				})
+				websocket.Broadcast("run_status", map[string]any{
+					"run_id": run.ID,
+					"status": "failed",
+				})
+				go r.postWebhookIfNeeded(run.ID)
+				r.mu.Lock()
+				delete(r.procs, run.ID)
+				r.mu.Unlock()
+				return
+			}
+		}
+		// WebDAV 完成确认（copy/sync/move 通用）：在目录可读基础上，对预期文件做可见性确认。
 		if isWebDAVUnderlying(cfg, dstRemote) {
 			interval := config.GetFinishWaitInterval()
 			timeout := config.GetFinishWaitTimeout()
 			if timeout > 0 {
 				vr := &adapter.CmdRunner{}
 				deadline := time.Now().Add(timeout)
+				expected := expectedVisibleDestinationPaths(casCompat, originalCmdName)
 				for time.Now().Before(deadline) {
 					allOk := true
-					// 简化：检查目标目录可读可见；不做逐文件 size 校验
-					args := []string{"lsjson", dst, "--config", cfg, "--files-only"}
+					args := []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}
 					out, _, e := vr.Run(context.Background(), args...)
 					if e != nil {
 						allOk = false
@@ -466,6 +516,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					var arr []map[string]any
 					if json.Unmarshal([]byte(out), &arr) != nil {
 						allOk = false
+					}
+					if allOk && len(expected) > 0 {
+						visible := normalizeVisibleTargetPaths(arr, isOpenlistCASCompatible(run))
+						allOk = areAllExpectedPathsVisible(expected, visible)
 					}
 					if allOk {
 						break
@@ -632,7 +686,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			// finalSummary 只服务于历史详情 / 最终总结展示；
 			// 不要再往回恢复 stableProgress / cardSummary 这类完成态兼容字段，
 			// 以免运行中链路与任务卡片完成态再次发生语义混用。
-			r.enrichFilesSizesAsync(run.ID, files, dst, cfg)
+			r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
 			finalSummary["counts"] = counts
 			finalSummary["files"] = files
 			rr.Summary["finalSummary"] = finalSummary
@@ -705,7 +759,9 @@ func isWebDAVUnderlying(cfgPath, remote string) bool {
 }
 
 func addFilterFlags(args []string, opts map[string]any, fastListFlag bool) []string {
-	if opts == nil { return args }
+	if opts == nil {
+		return args
+	}
 	pass := []string{"include", "exclude", "filter", "filterFrom", "includeFrom", "excludeFrom", "filesFrom", "minSize", "maxSize", "minAge", "maxAge", "fastList"}
 	for _, k := range pass {
 		if v, ok := opts[k]; ok {
@@ -800,7 +856,9 @@ func sizeOfPaged(r *adapter.CmdRunner, cfg, target string, opts map[string]any) 
 		arr := []string{}
 		for _, ln := range strings.Split(s, "\n") {
 			ln = strings.TrimSpace(ln)
-			if ln == "" { continue }
+			if ln == "" {
+				continue
+			}
 			arr = append(arr, strings.TrimSuffix(ln, "/"))
 		}
 		return arr
@@ -815,7 +873,9 @@ func sizeOfPaged(r *adapter.CmdRunner, cfg, target string, opts map[string]any) 
 			// keep only second-level like "a/b"
 			sec := []string{}
 			for _, d := range all {
-				if strings.Count(d, "/") == 1 { sec = append(sec, d) }
+				if strings.Count(d, "/") == 1 {
+					sec = append(sec, d)
+				}
 			}
 			lines = sec
 		}
@@ -832,17 +892,25 @@ func sizeOfPaged(r *adapter.CmdRunner, cfg, target string, opts map[string]any) 
 		var arr []map[string]any
 		if json.Unmarshal([]byte(out2), &arr) == nil {
 			for _, it := range arr {
-				if sz, ok := it["Size"].(float64); ok { totalBytes += int64(sz); totalCount++ }
+				if sz, ok := it["Size"].(float64); ok {
+					totalBytes += int64(sz)
+					totalCount++
+				}
 			}
 		}
 	}
 	// sum each (sub)dir sequentially
 	for _, d := range lines {
 		child := target
-		if !strings.HasSuffix(child, "/") { child += "/" }
+		if !strings.HasSuffix(child, "/") {
+			child += "/"
+		}
 		child += d
 		b, c, e3 := sizeOf(r, cfg, child, opts)
-		if e3 == nil { totalBytes += b; totalCount += c }
+		if e3 == nil {
+			totalBytes += b
+			totalCount += c
+		}
 	}
 	return totalBytes, totalCount, nil
 }
@@ -1047,7 +1115,9 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					if prev, ok := rr.Summary["progress"].(map[string]any); ok {
 						if pc, ok2 := prev["completedFiles"].(float64); ok2 {
 							if nc, ok3 := prog["completedFiles"].(float64); ok3 {
-								if nc < pc { prog["completedFiles"] = pc }
+								if nc < pc {
+									prog["completedFiles"] = pc
+								}
 							} else {
 								prog["completedFiles"] = pc
 							}
@@ -1230,11 +1300,17 @@ func parseOneLineProgress(line string) (map[string]any, bool) {
 		if j := strings.Index(strings.ToLower(paren), "xfr#"); j >= 0 {
 			var a, b int
 			n, _ := fmt.Sscanf(paren[j:], "xfr#%d/%d", &a, &b)
-			if n >= 1 && a > 0 { xfrDone = float64(a) }
-			if n == 2 && b > 0 { planned = float64(b) }
+			if n >= 1 && a > 0 {
+				xfrDone = float64(a)
+			}
+			if n == 2 && b > 0 {
+				planned = float64(b)
+			}
 			if n == 0 { // 旧格式仅含 a
 				var aa int
-				if _, err := fmt.Sscanf(paren[j:], "xfr#%d", &aa); err == nil && aa > 0 { xfrDone = float64(aa) }
+				if _, err := fmt.Sscanf(paren[j:], "xfr#%d", &aa); err == nil && aa > 0 {
+					xfrDone = float64(aa)
+				}
 			}
 		}
 	}
@@ -1275,8 +1351,12 @@ func parseOneLineProgress(line string) (map[string]any, bool) {
 		fmt.Sscanf(pm[1], "%f", &pct)
 		prog["percentage"] = pct
 	}
-	if xfrDone > 0 { prog["completedFiles"] = xfrDone }
-	if planned > 0 { prog["plannedFiles"] = planned }
+	if xfrDone > 0 {
+		prog["completedFiles"] = xfrDone
+	}
+	if planned > 0 {
+		prog["plannedFiles"] = planned
+	}
 	return prog, true
 }
 
@@ -1288,7 +1368,7 @@ func spmValue(m []string, i int) string {
 }
 
 // enrichFilesSizesAsync 异步补全文件大小，不阻塞数据库更新和 webhook
-func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst, cfg string) {
+func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst, cfg string, openlistCASCompatible bool) {
 	go func() {
 		if len(files) == 0 {
 			return
@@ -1322,6 +1402,9 @@ func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst,
 			if p != "" {
 				p = strings.ReplaceAll(p, "\\", "/")
 				m[p] = sz
+				if openlistCASCompatible && isCASPath(p) {
+					m[trimCASSuffix(p)] = sz
+				}
 			}
 		}
 		if len(m) == 0 {
@@ -1344,4 +1427,207 @@ func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst,
 			}
 		})
 	}()
+}
+
+type openlistCASCompatPlan struct {
+	ExcludeFrom       string
+	SourceFiles       []string
+	MatchedSource     []string
+	DestinationExtras []string
+}
+
+func isOpenlistCASCompatible(run store.Run) bool {
+	if run.Summary == nil {
+		return false
+	}
+	if raw, ok := run.Summary["effectiveOptions"].(map[string]any); ok {
+		if v, ok := raw["openlistCasCompatible"].(bool); ok {
+			return v
+		}
+	}
+	return false
+}
+
+func buildOpenlistCASCompatPlan(cfg, src, dst, mode string) (*openlistCASCompatPlan, error) {
+	srcFiles, err := listRecursiveFilePaths(cfg, src)
+	if err != nil {
+		return nil, err
+	}
+	dstFiles, err := listRecursiveFilePaths(cfg, dst)
+	if err != nil {
+		return nil, err
+	}
+	plan := buildOpenlistCASCompatPlanFromPaths(srcFiles, dstFiles, mode)
+	if len(plan.MatchedSource) > 0 {
+		f, err := os.CreateTemp("", "rcloneflow-openlist-cas-*.txt")
+		if err != nil {
+			return nil, err
+		}
+		for _, p := range plan.MatchedSource {
+			if _, err := f.WriteString(p + "\n"); err != nil {
+				f.Close()
+				os.Remove(f.Name())
+				return nil, err
+			}
+		}
+		if err := f.Close(); err != nil {
+			os.Remove(f.Name())
+			return nil, err
+		}
+		plan.ExcludeFrom = f.Name()
+	}
+	return plan, nil
+}
+
+func buildOpenlistCASCompatPlanFromPaths(srcFiles, dstFiles []string, mode string) *openlistCASCompatPlan {
+	dstExact := make(map[string]struct{}, len(dstFiles))
+	for _, p := range dstFiles {
+		dstExact[p] = struct{}{}
+	}
+	srcExact := make(map[string]struct{}, len(srcFiles))
+	for _, p := range srcFiles {
+		srcExact[p] = struct{}{}
+	}
+	matched := make([]string, 0)
+	for _, p := range srcFiles {
+		if isCASPath(p) {
+			if _, ok := dstExact[p]; ok {
+				matched = append(matched, p)
+			}
+			continue
+		}
+		if _, ok := dstExact[p+".cas"]; ok {
+			matched = append(matched, p)
+		}
+	}
+	extras := make([]string, 0)
+	if mode == "sync" {
+		for _, p := range dstFiles {
+			if isCASPath(p) {
+				if _, ok := srcExact[p]; ok {
+					continue
+				}
+				if _, ok := srcExact[trimCASSuffix(p)]; ok {
+					continue
+				}
+				extras = append(extras, p)
+				continue
+			}
+			if _, ok := srcExact[p]; ok {
+				continue
+			}
+			extras = append(extras, p)
+		}
+	}
+	return &openlistCASCompatPlan{SourceFiles: append([]string(nil), srcFiles...), MatchedSource: matched, DestinationExtras: extras}
+}
+
+func (p *openlistCASCompatPlan) ApplyPostActions(cfg, src, dst, originalMode string) error {
+	if p == nil {
+		return nil
+	}
+	cr := &adapter.CmdRunner{}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+	defer cancel()
+	if originalMode == "move" {
+		for _, rel := range p.MatchedSource {
+			if _, _, err := cr.Run(ctx, []string{"deletefile", joinRemotePath(src, rel), "--config", cfg}...); err != nil {
+				return fmt.Errorf("delete matched move source %s: %w", rel, err)
+			}
+		}
+	}
+	if originalMode == "sync" {
+		for _, rel := range p.DestinationExtras {
+			if _, _, err := cr.Run(ctx, []string{"deletefile", joinRemotePath(dst, rel), "--config", cfg}...); err != nil {
+				return fmt.Errorf("delete extra sync destination %s: %w", rel, err)
+			}
+		}
+	}
+	return nil
+}
+
+func listRecursiveFilePaths(cfg, target string) ([]string, error) {
+	cr := &adapter.CmdRunner{}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+	defer cancel()
+	out, _, err := cr.Run(ctx, []string{"lsjson", target, "--config", cfg, "--files-only", "--recursive"}...)
+	if err != nil {
+		return nil, err
+	}
+	var arr []map[string]any
+	if err := json.Unmarshal([]byte(out), &arr); err != nil {
+		return nil, err
+	}
+	paths := make([]string, 0, len(arr))
+	for _, it := range arr {
+		p, _ := it["Path"].(string)
+		if p == "" {
+			p, _ = it["path"].(string)
+		}
+		p = strings.TrimSpace(strings.ReplaceAll(p, "\\", "/"))
+		if p != "" {
+			paths = append(paths, p)
+		}
+	}
+	return paths, nil
+}
+
+func isCASPath(p string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(p)), ".cas")
+}
+
+func trimCASSuffix(p string) string {
+	if !isCASPath(p) {
+		return p
+	}
+	return p[:len(p)-4]
+}
+
+func normalizeVisibleTargetPaths(arr []map[string]any, openlistCASCompatible bool) map[string]struct{} {
+	m := map[string]struct{}{}
+	for _, it := range arr {
+		p, _ := it["Path"].(string)
+		if p == "" {
+			p, _ = it["path"].(string)
+		}
+		p = strings.TrimSpace(strings.ReplaceAll(p, "\\", "/"))
+		if p == "" {
+			continue
+		}
+		m[p] = struct{}{}
+		if openlistCASCompatible && isCASPath(p) {
+			m[trimCASSuffix(p)] = struct{}{}
+		}
+	}
+	return m
+}
+
+func expectedVisibleDestinationPaths(plan *openlistCASCompatPlan, originalMode string) []string {
+	if plan == nil {
+		return nil
+	}
+	if originalMode == "move" {
+		return append([]string(nil), plan.MatchedSource...)
+	}
+	return append([]string(nil), plan.SourceFiles...)
+}
+
+func areAllExpectedPathsVisible(expected []string, visible map[string]struct{}) bool {
+	for _, p := range expected {
+		if _, ok := visible[p]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+func joinRemotePath(base, rel string) string {
+	rel = strings.TrimPrefix(strings.ReplaceAll(rel, "\\", "/"), "/")
+	if rel == "" {
+		return base
+	}
+	if strings.HasSuffix(base, ":") || strings.HasSuffix(base, "/") {
+		return base + rel
+	}
+	return base + "/" + rel
 }

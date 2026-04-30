@@ -320,6 +320,8 @@ export default {
     interactive: 'Interactive mode',
     checkFirst: 'Check first',
     serverSideAcrossConfigs: 'Server-side across configs',
+    openlistCasCompatible: 'OpenList-CAS compatibility',
+    openlistCasCompatibleHint: 'Applies only to the destination side: treat a same-name .cas on the target as an equivalent already-existing form of the original file; .cas files on the source side still follow normal logic.',
     checkersCount: 'Checkers',
     retries: 'Retries',
     backupDir: 'Backup directory',

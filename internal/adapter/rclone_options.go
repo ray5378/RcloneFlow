@@ -120,6 +120,7 @@ type TaskOptions struct {
 
 	// 其他
 	ServerSideAcrossConfigs bool `json:"serverSideAcrossConfigs,omitempty"` // --server-side-across-configs
+	OpenlistCasCompatible   bool `json:"openlistCasCompatible,omitempty"`   // 目标端启用 OpenList-CAS .cas 等效原文件兼容（仅本项目逻辑使用，不映射 rclone flag）
 }
 
 // IsEmpty 检查是否没有设置任何选项
@@ -215,7 +216,8 @@ func (o *TaskOptions) IsEmpty() bool {
 		!o.UseMmap &&
 		!o.NoUnicodeNormalization &&
 		o.Color == "" &&
-		!o.ServerSideAcrossConfigs
+		!o.ServerSideAcrossConfigs &&
+		!o.OpenlistCasCompatible
 }
 
 // DefaultStreamingTaskOptions 返回默认的流式传输配置。
