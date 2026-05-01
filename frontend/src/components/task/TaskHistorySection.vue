@@ -12,6 +12,7 @@ defineProps<{
   historyStatusFilter: string
   filteredRuns: any[]
   getRunProgressFromSummary: (run: any) => any
+  getRealtimeProgressByRun: (run: any) => any
   getFinalSummary: (run: any) => any
   showDetailModal: boolean
   runDetail: any
@@ -69,6 +70,7 @@ const emit = defineEmits<{
     :history-status-filter="historyStatusFilter"
     :filtered-runs="filteredRuns"
     :get-run-progress-from-summary="getRunProgressFromSummary"
+    :get-realtime-progress-by-run="getRealtimeProgressByRun"
     :get-final-summary="getFinalSummary"
     @back="emit('back')"
     @set-status-filter="emit('set-status-filter', $event)"
