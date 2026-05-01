@@ -13,6 +13,7 @@ defineProps<{
   historyStatusFilter: string
   filteredRuns: any[]
   getRunProgressFromSummary: (run: any) => any
+  getRealtimeProgressByRun: (run: any) => any
   getFinalSummaryFromComposable: (run: any) => any
   showDetailModal: boolean
   runDetail: any
@@ -79,6 +80,7 @@ defineProps<{
     :history-status-filter="historyStatusFilter"
     :filtered-runs="filteredRuns"
     :get-run-progress-from-summary="getRunProgressFromSummary"
+    :get-realtime-progress-by-run="getRealtimeProgressByRun"
     :get-final-summary="getFinalSummaryFromComposable"
     :show-detail-modal="showDetailModal"
     :run-detail="runDetail"

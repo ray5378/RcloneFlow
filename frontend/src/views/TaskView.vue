@@ -414,6 +414,7 @@ const {
     :history-status-filter="historyStatusFilter"
     :filtered-runs="filteredRuns"
     :get-run-progress-from-summary="getRunProgressFromSummary"
+    :get-realtime-progress-by-run="getRealtimeProgressByRun"
     :get-final-summary-from-composable="getFinalSummaryFromComposable"
     :show-detail-modal="showDetailModal"
     :run-detail="runDetail"

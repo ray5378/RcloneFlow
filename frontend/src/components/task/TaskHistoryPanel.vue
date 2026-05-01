@@ -13,6 +13,7 @@ const props = defineProps<{
   historyStatusFilter: string
   filteredRuns: Run[]
   getRunProgressFromSummary: (run: Run) => any
+  getRealtimeProgressByRun: (run: Run) => any
   getFinalSummary: (run: Run) => any
 }>()
 
@@ -74,7 +75,7 @@ function pageInfo(page: number, total: number) {
         v-for="run in filteredRuns"
         :key="run.id"
         :run="run"
-        :progress="run.status === 'running' ? getRunProgressFromSummary(run) : undefined"
+        :progress="run.status === 'running' ? getRealtimeProgressByRun(run) : undefined"
         :summary="getFinalSummary(run)"
         @click="emit('view-detail', run)"
         @view-detail="emit('view-detail', run)"
