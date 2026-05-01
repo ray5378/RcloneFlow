@@ -18,7 +18,13 @@ func (m *mockRunSvcDB) ListRuns(page, pageSize int) ([]service.RunRecord, int, e
 	return nil, 0, nil
 }
 func (m *mockRunSvcDB) ListRunsByTask(taskId int64) ([]service.RunRecord, error) {
-	return nil, nil
+	out := make([]service.RunRecord, 0, len(m.runs))
+	for _, r := range m.runs {
+		if r.TaskID == taskId {
+			out = append(out, r)
+		}
+	}
+	return out, nil
 }
 func (m *mockRunSvcDB) ListActiveRuns() ([]service.RunRecord, error) {
 	return m.runs, nil
@@ -300,6 +306,65 @@ func TestHandleActiveRuns_BackfillsCompletedFilesFromLogCASNotice(t *testing.T) 
 	}
 	if got := int(prog["completedFiles"].(float64)); got != 1 {
 		t.Fatalf("completedFiles=%d, want 1 from log fallback", got)
+	}
+}
+
+func TestHandleRunsByTask_BackfillsHistoricalFinalSummaryFromCASLog(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-history-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/01 14:01:20 NOTICE: 电视剧/国产剧/人间惊鸿客 (2026)/Season 1/人间惊鸿客 - S01E18 - 第 18 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{
+		"stderrFile": tmpFile.Name(),
+		"finalSummary": map[string]any{
+			"counts": map[string]any{"copied": float64(0), "deleted": float64(0), "failed": float64(0), "skipped": float64(0), "total": float64(0)},
+			"files":  []any{},
+		},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:         7,
+		TaskID:     106,
+		Status:     "failed",
+		StartedAt:  "2026-05-01T14:00:00+08:00",
+		FinishedAt: "2026-05-01T14:10:00+08:00",
+		Summary:    string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/task/106", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunsByTask(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &items); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	sum, _ := items[0]["summary"].(map[string]any)
+	if sum == nil {
+		t.Fatalf("missing summary")
+	}
+	fs, _ := sum["finalSummary"].(map[string]any)
+	if fs == nil {
+		t.Fatalf("missing finalSummary")
+	}
+	counts, _ := fs["counts"].(map[string]any)
+	if counts == nil {
+		t.Fatalf("missing counts")
+	}
+	if got := int(counts["copied"].(float64)); got != 1 {
+		t.Fatalf("copied=%d, want 1", got)
+	}
+	files, _ := fs["files"].([]any)
+	if len(files) != 1 {
+		t.Fatalf("files len=%d, want 1", len(files))
 	}
 }
 
