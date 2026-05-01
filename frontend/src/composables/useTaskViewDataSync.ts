@@ -15,7 +15,7 @@ interface UseTaskViewDataSyncOptions {
   globalStats: Ref<any>
   showGlobalStatsModal: Ref<boolean>
   lastNonDecreasingTotalsByTask: Ref<Record<number, { totalBytes: number; totalCount: number }>>
-  taskApi: { list: () => Promise<Task[]> }
+  taskApi: { list: () => Promise<Task[]>; bootstrap?: (page?: number, pageSize?: number) => Promise<any> }
   remoteApi: { list: () => Promise<{ remotes?: string[] }> }
   scheduleApi: { list: () => Promise<Schedule[]> }
   runApi: { list: (page: number, pageSize: number) => Promise<{ runs?: Run[]; total?: number }> }
@@ -29,6 +29,25 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   async function loadData() {
     const seq = ++loadSeq
     try {
+      if (options.taskApi.bootstrap) {
+        const boot = await options.taskApi.bootstrap(options.runsPage.value, options.runsPageSize)
+        if (seq !== loadSeq || !boot) return
+        if (Array.isArray(boot.tasks)) options.tasks.value = boot.tasks
+        if (Array.isArray(boot.remotes?.remotes)) options.remotes.value = boot.remotes.remotes
+        if (Array.isArray(boot.schedules)) options.schedules.value = boot.schedules
+        if (boot.runs?.runs) {
+          options.runs.value = boot.runs.runs
+          options.runsTotal.value = typeof boot.runs.total === 'number' ? boot.runs.total : (boot.runs.runs?.length || 0)
+        }
+        if (Array.isArray(boot.activeRuns)) {
+          options.activeRuns.value = boot.activeRuns
+        }
+        try {
+          localStorage.setItem('lastTasksSnapshot', JSON.stringify(options.tasks.value || []))
+        } catch {}
+        return
+      }
+
       const [taskData, remoteData, scheduleData, runResult] = await Promise.all([
         options.taskApi.list(),
         options.remoteApi.list(),

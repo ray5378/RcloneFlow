@@ -19,7 +19,7 @@ export function useTaskViewRuntime(options: {
   lastNonDecreasingTotalsByTask: Ref<Record<number, { totalBytes: number; totalCount: number }>>
   currentModule: Ref<'history' | 'add' | 'tasks'>
   stuckMs: number
-  taskApi: { list: () => Promise<Task[]> }
+  taskApi: { list: () => Promise<Task[]>; bootstrap?: (page?: number, pageSize?: number) => Promise<any> }
   remoteApi: { list: () => Promise<{ remotes?: string[] }> }
   scheduleApi: { list: () => Promise<Schedule[]> }
   runApi: { list: (page: number, pageSize: number) => Promise<{ runs?: Run[]; total?: number }> }

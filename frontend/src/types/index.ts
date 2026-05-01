@@ -139,7 +139,9 @@ export interface Schedule {
   createdAt: string
 }
 
-import type { FinalSummary, RunSummaryProgress } from '../api/run'
+export type { ActiveRun }
+
+import type { ActiveRun, FinalSummary, RunSummaryProgress } from '../api/run'
 
 export interface RunSummaryPayload {
   /**

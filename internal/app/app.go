@@ -60,7 +60,7 @@ func Run(cfg *config.Config) error {
 
 	// 初始化控制器
 	remoteCtrl := controller.NewRemoteController(rc)
-	taskCtrl := controller.NewTaskController(taskSvc, rc)
+	taskCtrl := controller.NewTaskController(taskSvc, scheduleSvc, runSvc, rc)
 	browserCtrl := controller.NewBrowserController(rc)
 
 	// 初始化调度器(需要在controller之前,以便传递)

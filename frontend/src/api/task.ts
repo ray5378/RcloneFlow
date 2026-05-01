@@ -3,11 +3,24 @@
  * 对应后端 TaskService
  */
 import { get, post, put, del, patch } from './client'
-import type { Task } from '../types'
+import type { ActiveRun, Run, Schedule, Task } from '../types'
 
 /** 强制终止任务的当前传输（按最近 run 定位 PID） */
 export async function killTask(taskId: number): Promise<void> {
   await post(`/api/tasks/${taskId}/kill`, {})
+}
+
+export interface TaskBootstrapPayload {
+  tasks: Task[]
+  schedules: Schedule[]
+  remotes: { remotes?: string[] }
+  runs: { runs: Run[]; total: number; page: number; pageSize: number }
+  activeRuns: ActiveRun[]
+}
+
+/** 首屏聚合加载 */
+export async function getTaskBootstrap(page = 1, pageSize = 50): Promise<TaskBootstrapPayload> {
+  return get<TaskBootstrapPayload>(`/api/tasks/bootstrap?page=${page}&pageSize=${pageSize}`)
 }
 
 /** 获取所有任务 */

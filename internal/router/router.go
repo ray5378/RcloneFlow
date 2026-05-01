@@ -86,6 +86,7 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/fs/publiclink", r.fsCtrl.HandlePublicLink)
 
 	// 任务管理
+	apiMux.HandleFunc("/api/tasks/bootstrap", r.taskCtrl.HandleBootstrap)
 	apiMux.HandleFunc("/api/tasks", r.taskCtrl.HandleTasks)
 	apiMux.HandleFunc("/api/tasks/", func(w http.ResponseWriter, req *http.Request) {
 		if strings.HasSuffix(req.URL.Path, "/kill") {

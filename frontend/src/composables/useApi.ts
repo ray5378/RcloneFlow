@@ -6,6 +6,9 @@ export const taskApi = {
   async list() {
     try { return await api.listTasks() } catch (err) { handleError(err, { module: 'Task', operation: t('runtime.taskListFetch') }); return [] }
   },
+  async bootstrap(page = 1, pageSize = 50) {
+    try { return await api.getTaskBootstrap(page, pageSize) } catch (err) { handleError(err, { module: 'Task', operation: t('runtime.taskListFetch') }); return null }
+  },
   async create(task: any) {
     try { return await api.createTask(task) } catch (err) { handleError(err, { module: 'Task', operation: t('runtime.taskCreate') }); return null }
   },
