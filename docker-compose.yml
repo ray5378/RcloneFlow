@@ -1,6 +1,9 @@
 services:
   rcloneflow:
-    image: ray5378/rcloneflow:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rcloneflow:local
     platform: linux/amd64
     container_name: rcloneflow
     user: 1000:1000

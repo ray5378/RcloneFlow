@@ -275,6 +275,63 @@ func TestTaskService_RunTask_StoresOpenlistCASCompatibleInEffectiveOptions(t *te
 	}
 }
 
+func TestTaskService_RunTask_SilentlySkipsWhenSameTaskAlreadyRunning(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	task, err := db.AddTask(store.Task{
+		Name:         "same-task-no-concurrency",
+		Mode:         "copy",
+		SourceRemote: "src",
+		SourcePath:   "/a",
+		TargetRemote: "dst",
+		TargetPath:   "/b",
+	})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+
+	_, err = db.AddRun(store.Run{
+		TaskID:       task.ID,
+		Status:       "running",
+		Trigger:      "manual",
+		TaskName:     task.Name,
+		TaskMode:     task.Mode,
+		SourceRemote: task.SourceRemote,
+		SourcePath:   task.SourcePath,
+		TargetRemote: task.TargetRemote,
+		TargetPath:   task.TargetPath,
+	})
+	if err != nil {
+		t.Fatalf("AddRun(running) error = %v", err)
+	}
+
+	svc := NewTaskService(db, nil)
+	if err := svc.RunTask(context.Background(), task.ID, "schedule"); err != nil {
+		t.Fatalf("expected silent skip with nil error, got %v", err)
+	}
+
+	runs, err := db.ListRunsByTask(task.ID)
+	if err != nil {
+		t.Fatalf("ListRunsByTask() error = %v", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("expected still only 1 running record, got %d", len(runs))
+	}
+	if runs[0].Status != "running" {
+		t.Fatalf("expected existing run to remain running, got %q", runs[0].Status)
+	}
+}
+
 func TestTaskService_DeleteTask_RemovesAllKnownRunLogs(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
 	if err != nil {

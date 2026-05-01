@@ -203,6 +203,13 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		streamingEnabled = v
 	}
 
+	// 同一任务并发保护：只要该 task 已有 running，就静默跳过后续触发。
+	// 这比全局 singletonMode 更基础，适用于 manual / schedule / webhook 全部入口。
+	// 这里不再新增 skipped 历史，避免定时重复命中时污染历史与日志。
+	if activeRun, err := s.db.GetActiveRunByTaskID(taskID); err == nil && activeRun.ID > 0 {
+		return nil
+	}
+
 	// 单例模式检查：如果开启了单例模式，使用原子操作确保只有一个任务运行
 	singletonMode, isSingleton := effectiveOptions["singletonMode"].(bool)
 

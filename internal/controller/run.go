@@ -19,6 +19,52 @@ import (
 )
 
 // resolveLogPath returns absolute log file path for a run, sharing logic for files+download
+func countCompletedFilesFromLog(logPath string) int {
+	data, err := os.ReadFile(logPath)
+	if err != nil || len(data) == 0 {
+		return 0
+	}
+	lines := strings.Split(string(data), "\n")
+	tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
+	re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
+	seen := map[string]struct{}{}
+	for _, ln := range lines {
+		l := strings.TrimSpace(ln)
+		if l == "" {
+			continue
+		}
+		segments := []string{}
+		idx := tsRe.FindAllStringIndex(l, -1)
+		if len(idx) > 1 {
+			for i := 0; i < len(idx); i++ {
+				start := idx[i][0]
+				end := len(l)
+				if i+1 < len(idx) {
+					end = idx[i+1][0]
+				}
+				segments = append(segments, strings.TrimSpace(l[start:end]))
+			}
+		} else {
+			segments = []string{l}
+		}
+		for _, seg := range segments {
+			m := re.FindStringSubmatch(seg)
+			if len(m) == 0 {
+				continue
+			}
+			name := strings.TrimSpace(m[3])
+			msg := strings.ToLower(strings.TrimSpace(m[4]))
+			if name == "" {
+				continue
+			}
+			if strings.Contains(msg, "copied") || strings.Contains(msg, "renamed") || strings.Contains(msg, "cas compatible match after source cleanup") {
+				seen[name] = struct{}{}
+			}
+		}
+	}
+	return len(seen)
+}
+
 func (c *RunController) resolveLogPath(run service.RunRecord) (string, bool) {
 	// 1) summary.stderrFile
 	if s, ok := any(run.Summary).(string); ok && s != "" {
@@ -834,6 +880,13 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		completedFiles := float64(0)
 		if v, ok := progress["completedFiles"].(float64); ok {
 			completedFiles = v
+		}
+		if completedFiles <= 0 {
+			if logPath, ok := c.resolveLogPath(run); ok && logPath != "" {
+				if n := countCompletedFilesFromLog(logPath); n > 0 {
+					completedFiles = float64(n)
+				}
+			}
 		}
 		totalCount := float64(0)
 		if v, ok := progress["plannedFiles"].(float64); ok {

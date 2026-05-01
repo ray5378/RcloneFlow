@@ -146,13 +146,17 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             const prevTotals = tid ? options.lastNonDecreasingTotalsByTask.value[tid] : undefined
             const nextTotalBytes = Math.max(prevTotals?.totalBytes || 0, incomingTotalBytes || 0)
             const nextTotalCount = Math.max(prevTotals?.totalCount || 0, incomingTotalCount || 0)
+            const nextCompletedFiles = Math.max(
+              Number(prev.completedFiles || 0),
+              Number(msg.data.completedFiles || 0),
+            )
             const nextProgress = {
               ...prev,
               bytes: Number(msg.data.bytes || 0),
               totalBytes: nextTotalBytes,
               speed: Number(msg.data.speed || 0),
               percentage: Number(msg.data.percent || prev.percentage || 0),
-              completedFiles: Number(msg.data.completedFiles || prev.completedFiles || 0),
+              completedFiles: nextCompletedFiles,
               totalCount: nextTotalCount,
               eta: Number(msg.data.eta || prev.eta || 0),
             }
@@ -185,8 +189,8 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
               totalBytes: Number(msg.data.total || prevProgress.totalBytes || 0),
               speed: Number(msg.data.speed || 0),
               percentage: Number(msg.data.percent || prevProgress.percentage || 0),
-              completedFiles: Number(msg.data.completedFiles || prevProgress.completedFiles || 0),
-              plannedFiles: Number(msg.data.totalCount || msg.data.plannedFiles || prevProgress.plannedFiles || 0),
+              completedFiles: Math.max(Number(prevProgress.completedFiles || 0), Number(msg.data.completedFiles || 0)),
+              plannedFiles: Math.max(Number(prevProgress.plannedFiles || 0), Number(msg.data.totalCount || msg.data.plannedFiles || 0)),
               eta: Number(msg.data.eta || prevProgress.eta || 0),
             }
             options.runs.value[runIdx] = {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"rcloneflow/internal/service"
@@ -247,6 +248,58 @@ func TestHandleActiveRuns_FallsBackToPreflightTotalCountWhenPlannedFilesMissing(
 	}
 	if got := int(prog["completedFiles"].(float64)); got != 3 {
 		t.Fatalf("completedFiles=%d, want 3", got)
+	}
+}
+
+func TestHandleActiveRuns_BackfillsCompletedFilesFromLogCASNotice(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/01 14:01:20 NOTICE: 电视剧/国产剧/人间惊鸿客 (2026)/Season 1/人间惊鸿客 - S01E18 - 第 18 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+
+	summary := map[string]any{
+		"progress": map[string]any{
+			"bytes":          float64(1024),
+			"totalBytes":     float64(2048),
+			"speed":          float64(1),
+			"eta":            float64(60),
+			"percentage":     float64(0),
+			"completedFiles": float64(0),
+			"plannedFiles":   float64(5),
+		},
+		"stderrFile": tmpFile.Name(),
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        6,
+		TaskID:    105,
+		Status:    "running",
+		StartedAt: "2026-05-01T14:00:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/active", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleActiveRuns(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var items []map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &items); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	prog, _ := items[0]["progress"].(map[string]any)
+	if prog == nil {
+		t.Fatalf("missing progress")
+	}
+	if got := int(prog["completedFiles"].(float64)); got != 1 {
+		t.Fatalf("completedFiles=%d, want 1 from log fallback", got)
 	}
 }
 

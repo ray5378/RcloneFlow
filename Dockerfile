@@ -68,15 +68,13 @@ RUN go build -ldflags="-s -w" -o /out/server ./cmd/server
 
 # Stage 3: runtime (Alpine)
 FROM alpine:3.19
-RUN adduser -D -u 1000 appuser \
- && mkdir -p /app/data /app/web /etc/ssl/certs /usr/share/zoneinfo \
- && chown -R appuser:appuser /app
+RUN set -eux; \
+ apk add --no-cache bash busybox ca-certificates tzdata wget curl sqlite-libs libidn2 pcre2; \
+ adduser -D -u 1000 appuser; \
+ mkdir -p /app/data /app/web /etc/ssl/certs /usr/share/zoneinfo; \
+ chown -R appuser:appuser /app
 WORKDIR /app
 
-COPY --from=gobuilder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=gobuilder /usr/share/zoneinfo /usr/share/zoneinfo
-COPY --from=gobuilder /usr/bin/wget /usr/bin/wget
-COPY --from=gobuilder /usr/lib/libsqlite3.so* /usr/lib/
 COPY --from=gobuilder /out/server /app/server
 COPY --from=webbuilder /web /app/web
 COPY --from=gobuilder /out/rclone /usr/bin/rclone

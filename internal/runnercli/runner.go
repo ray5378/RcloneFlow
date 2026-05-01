@@ -283,8 +283,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	// 两路都写入同一日志文件，并启用 one-line 解析 + 按文件统计
 	fileStats := &fileProgress{m: map[string]*fileProg{}}
 	// 仅解析 stderr（rclone 进度通常在 stderr），stdout 只写文件，减少重复解析/写库
-	go r.consume(run.ID, outR, stderrFile, false, fileStats)
-	go r.consume(run.ID, errR, stderrFile, true, fileStats)
+	casMode := isOpenlistCASCompatible(run)
+	go r.consume(run.ID, outR, stderrFile, false, fileStats, casMode)
+	go r.consume(run.ID, errR, stderrFile, true, fileStats, casMode)
 	go func() {
 		defer func() {
 			if casCompat != nil && casCompat.ExcludeFrom != "" {
@@ -398,34 +399,13 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 								level := strings.ToUpper(strings.TrimSpace(m[2]))
 								path := strings.TrimSpace(m[3])
 								msg := strings.TrimSpace(m[4])
-								row := map[string]any{"path": path, "at": at, "status": "", "action": "", "sizeBytes": 0}
-								if sz, ok := sizes[path]; ok {
-									row["sizeBytes"] = sz
+								row, bucket, ok := classifyRunLogRow(level, path, msg, sizes, isOpenlistCASCompatible(run))
+								if !ok {
+									continue
 								}
-								low := strings.ToLower(msg)
-								if level == "ERROR" {
-									row["status"] = "failed"
-									row["action"] = "Error"
-									counts["failed"]++
-								} else {
-									switch {
-									case strings.Contains(low, "copied"):
-										row["status"] = "success"
-										row["action"] = "Copied"
-										counts["copied"]++
-									case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
-										row["status"] = "success"
-										row["action"] = "Deleted"
-										counts["deleted"]++
-									case strings.Contains(low, "skipped"):
-										row["status"] = "skipped"
-										row["action"] = "Skipped"
-										counts["skipped"]++
-									default:
-										continue
-									}
-								}
+								row["at"] = at
 								files = append(files, row)
+								counts[bucket]++
 								counts["total"]++
 							}
 						}
@@ -622,31 +602,13 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 							level := strings.ToUpper(strings.TrimSpace(m[2]))
 							path := strings.TrimSpace(m[3])
 							msg := strings.TrimSpace(m[4])
-							row := map[string]any{"path": path, "at": at, "status": "", "action": "", "sizeBytes": 0}
-							low := strings.ToLower(msg)
-							if level == "ERROR" {
-								row["status"] = "failed"
-								row["action"] = "Error"
-								counts["failed"]++
-							} else {
-								switch {
-								case strings.Contains(low, "copied"):
-									row["status"] = "success"
-									row["action"] = "Copied"
-									counts["copied"]++
-								case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
-									row["status"] = "success"
-									row["action"] = "Deleted"
-									counts["deleted"]++
-								case strings.Contains(low, "skipped"):
-									row["status"] = "skipped"
-									row["action"] = "Skipped"
-									counts["skipped"]++
-								default:
-									continue
-								}
+							row, bucket, ok := classifyRunLogRow(level, path, msg, map[string]int64{}, isOpenlistCASCompatible(run))
+							if !ok {
+								continue
 							}
+							row["at"] = at
 							files = append(files, row)
+							counts[bucket]++
 							counts["total"]++
 						}
 					}
@@ -1020,15 +982,16 @@ func (fp *fileProgress) copiedList() []string {
 var statsRe = regexp.MustCompile(`INFO\s*:\s*([\d.]+\s*[KMGTP]?i?B?)\s*/\s*([\d.]+\s*[KMGTP]?i?B?),\s*([\d.]+)%,\s*([\d.]+\s*[KMGTP]?i?B?)/s`)
 var fileLineRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B,\s*(\d+(?:\.\d+)?)%?,\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B/s`)
 var fileCopiedRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*Copied\s*\(new\)`)
+var fileCASMatchedRe = regexp.MustCompile(`(?i)(?:INFO|NOTICE)\s*:\s*([^:]+):\s*CAS compatible match after source cleanup\b`)
 
-func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress) {
+func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress, openlistCASCompatible bool) {
 	wantParse := parseStats
 	s := bufio.NewScanner(rd)
 	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
 	for s.Scan() {
 		line := s.Text()
 		if len(line) > 0 {
-			_, _ = out.WriteString(line + "\n")
+			_, _ = out.WriteString(sanitizeRunLogLine(line, openlistCASCompatible) + "\n")
 		}
 		// 1) JSON 行（极少数情况下）
 		var rec map[string]any
@@ -1090,10 +1053,40 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				if rr.Summary == nil {
 					rr.Summary = map[string]any{}
 				}
+				if prev, ok := rr.Summary["progress"].(map[string]any); ok {
+					if pc, ok2 := prev["completedFiles"].(float64); ok2 {
+						if nc, ok3 := prog["completedFiles"].(float64); ok3 {
+							if nc < pc {
+								prog["completedFiles"] = pc
+							}
+						} else {
+							prog["completedFiles"] = pc
+						}
+					}
+					if pp, ok2 := prev["plannedFiles"].(float64); ok2 {
+						if np, ok3 := prog["plannedFiles"].(float64); ok3 {
+							if np < pp {
+								prog["plannedFiles"] = pp
+							}
+						} else {
+							prog["plannedFiles"] = pp
+						}
+					}
+				}
+				if fp != nil {
+					if lst := fp.copiedList(); len(lst) > 0 {
+						if nc, ok3 := prog["completedFiles"].(float64); !ok3 || float64(len(lst)) > nc {
+							prog["completedFiles"] = float64(len(lst))
+						}
+					}
+				}
 				rr.Summary["progress"] = prog
 				rr.Summary["progressLine"] = line
 				rr.BytesTransferred = int64(cur)
 				rr.Speed = fmt.Sprintf("%d B/s", int64(spd))
+				if fp != nil {
+					rr.Summary["files"] = fp.snapshot(100)
+				}
 			})
 			websocket.Broadcast("run_progress", map[string]any{
 				"run_id":         runID,
@@ -1103,6 +1096,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				"percent":        prog["percentage"],
 				"completedFiles": prog["completedFiles"],
 				"plannedFiles":   prog["plannedFiles"],
+				"totalCount":     prog["plannedFiles"],
 				"eta":            prog["eta"],
 			})
 			continue
@@ -1150,30 +1144,78 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					"percent":        prog["percentage"],
 					"completedFiles": prog["completedFiles"],
 					"plannedFiles":   prog["plannedFiles"],
+					"totalCount":     prog["plannedFiles"],
 					"eta":            prog["eta"],
 				})
 			}
-			// 解析文件级进度（INFO: name: cur/total, pct, speed）
-			if fp != nil {
-				if m := fileLineRe.FindStringSubmatch(line); len(m) > 0 {
-					name := strings.TrimSpace(m[1])
-					var cb, tb, pct, sp float64
-					fmt.Sscanf(m[2], "%f", &cb)
-					fmt.Sscanf(m[4], "%f", &tb)
-					fmt.Sscanf(m[6], "%f", &pct)
-					fmt.Sscanf(m[7], "%f", &sp)
-					fp.update(name, cb*unitToMul(m[3]), tb*unitToMul(m[5]), sp*unitToMul(m[8]), pct)
-					// 若该文件进度已达到或超过 100%，也视为已完成（补齐非英文环境缺少 "Copied (new)" 的情况）
-					if (tb > 0 && cb >= tb) || pct >= 100 {
-						fp.markCopied(name)
-					}
-					continue
+		}
+		// 文件级完成识别不依赖 wantParse：即使当前流不做 aggregate 解析，也要累计 completedFiles。
+		if fp != nil {
+			marked := false
+			if m := fileLineRe.FindStringSubmatch(line); len(m) > 0 {
+				name := strings.TrimSpace(m[1])
+				var cb, tb, pct, sp float64
+				fmt.Sscanf(m[2], "%f", &cb)
+				fmt.Sscanf(m[4], "%f", &tb)
+				fmt.Sscanf(m[6], "%f", &pct)
+				fmt.Sscanf(m[7], "%f", &sp)
+				fp.update(name, cb*unitToMul(m[3]), tb*unitToMul(m[5]), sp*unitToMul(m[8]), pct)
+				if (tb > 0 && cb >= tb) || pct >= 100 {
+					fp.markCopied(name)
+					marked = true
 				}
-				if m := fileCopiedRe.FindStringSubmatch(line); len(m) > 0 {
+				if marked {
+					_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+						if rr.Summary == nil {
+							rr.Summary = map[string]any{}
+						}
+						prog, _ := rr.Summary["progress"].(map[string]any)
+						if prog == nil {
+							prog = map[string]any{}
+						}
+						if lst := fp.copiedList(); len(lst) > 0 {
+							if nc, ok := prog["completedFiles"].(float64); !ok || float64(len(lst)) > nc {
+								prog["completedFiles"] = float64(len(lst))
+							}
+							rr.Summary["files"] = fp.snapshot(100)
+						}
+						rr.Summary["progress"] = prog
+					})
+				}
+				continue
+			}
+			if m := fileCopiedRe.FindStringSubmatch(line); len(m) > 0 {
+				name := strings.TrimSpace(m[1])
+				fp.update(name, -1, -1, -1, 100)
+				fp.markCopied(name)
+				marked = true
+			}
+			if !marked {
+				if m := fileCASMatchedRe.FindStringSubmatch(line); len(m) > 0 {
 					name := strings.TrimSpace(m[1])
 					fp.update(name, -1, -1, -1, 100)
 					fp.markCopied(name)
+					marked = true
 				}
+			}
+			if marked {
+				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+					if rr.Summary == nil {
+						rr.Summary = map[string]any{}
+					}
+					prog, _ := rr.Summary["progress"].(map[string]any)
+					if prog == nil {
+						prog = map[string]any{}
+					}
+					if lst := fp.copiedList(); len(lst) > 0 {
+						if nc, ok := prog["completedFiles"].(float64); !ok || float64(len(lst)) > nc {
+							prog["completedFiles"] = float64(len(lst))
+						}
+						rr.Summary["files"] = fp.snapshot(100)
+					}
+					rr.Summary["progress"] = prog
+				})
+				continue
 			}
 		}
 	}
@@ -1238,7 +1280,7 @@ func parseETA(s string) int {
 	if s == "-" || s == "" {
 		return 0
 	}
-	// formats: 1h2m3s | 2m3s | 45s | 01:23:45 | 12:34
+	// formats: 4d9h18m | 1h2m3s | 2m3s | 45s | 01:23:45 | 12:34
 	if strings.Contains(s, ":") {
 		parts := strings.Split(s, ":")
 		if len(parts) == 3 { // hh:mm:ss
@@ -1254,11 +1296,28 @@ func parseETA(s string) int {
 	}
 	sec := 0
 	// 显式按包含的后缀组合解析，避免 "1m26s" 被 "%dh%dm%ds" 误读成 1h
+	hasD := strings.Contains(s, "d")
 	hasH := strings.Contains(s, "h")
 	hasM := strings.Contains(s, "m")
 	hasS := strings.Contains(s, "s")
-	var h, m, ss int
+	var d, h, m, ss int
 	switch {
+	case hasD && hasH && hasM && hasS:
+		fmt.Sscanf(s, "%dd%dh%dm%ds", &d, &h, &m, &ss)
+	case hasD && hasH && hasM:
+		fmt.Sscanf(s, "%dd%dh%dm", &d, &h, &m)
+	case hasD && hasH && hasS:
+		fmt.Sscanf(s, "%dd%dh%ds", &d, &h, &ss)
+	case hasD && hasM && hasS:
+		fmt.Sscanf(s, "%dd%dm%ds", &d, &m, &ss)
+	case hasD && hasH:
+		fmt.Sscanf(s, "%dd%dh", &d, &h)
+	case hasD && hasM:
+		fmt.Sscanf(s, "%dd%dm", &d, &m)
+	case hasD && hasS:
+		fmt.Sscanf(s, "%dd%ds", &d, &ss)
+	case hasD:
+		fmt.Sscanf(s, "%dd", &d)
 	case hasH && hasM && hasS:
 		fmt.Sscanf(s, "%dh%dm%ds", &h, &m, &ss)
 	case hasH && hasM:
@@ -1274,15 +1333,15 @@ func parseETA(s string) int {
 	case hasS:
 		fmt.Sscanf(s, "%ds", &ss)
 	}
-	sec += h*3600 + m*60 + ss
+	sec += d*24*3600 + h*3600 + m*60 + ss
 	return sec
 }
 
 var bytesPairRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B\s*/\s*(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)B`)
 var speedTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*([KMGTPE]?i?)(?:B)?/s`)
 var pctTokenRe = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)%`)
-var etaTokenRe = regexp.MustCompile(`(?i)ETA\s*([0-9hms:.-]+|-)`)
-var aggregateOneLineRe = regexp.MustCompile(`(?i)^\s*(?:\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+)?(?:INFO|NOTICE)\s*:\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B\s*/\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B\s*,\s*\d+(?:\.\d+)?%\s*,\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B/s\s*,\s*ETA\s*[0-9hms:.-]+(?:\s*\(xfr#\d+(?:/\d+)?\))?\s*$`)
+var etaTokenRe = regexp.MustCompile(`(?i)ETA\s*([0-9dhms:.-]+|-)`)
+var aggregateOneLineRe = regexp.MustCompile(`(?i)^\s*(?:\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+)?(?:INFO|NOTICE)\s*:\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B\s*/\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B\s*,\s*\d+(?:\.\d+)?%\s*,\s*\d+(?:\.\d+)?\s*[KMGTPE]?i?B/s\s*,\s*ETA\s*[0-9dhms:.-]+(?:\s*\(xfr#\d+(?:/\d+)?\))?\s*$`)
 
 func parseOneLineProgress(line string) (map[string]any, bool) {
 	l := strings.TrimSpace(line)
@@ -1623,6 +1682,89 @@ func areAllExpectedPathsVisible(expected []string, visible map[string]struct{}) 
 		}
 	}
 	return true
+}
+
+func isCASCompatibleNotFound(path, msg string, openlistCASCompatible bool) bool {
+	if !openlistCASCompatible {
+		return false
+	}
+	p := strings.TrimSpace(strings.ReplaceAll(path, "\\", "/"))
+	if p == "" || isCASPath(p) {
+		return false
+	}
+	low := strings.ToLower(strings.TrimSpace(msg))
+	if low == "" {
+		return false
+	}
+	if !(strings.Contains(low, "not found") || strings.Contains(low, "no such file") || strings.Contains(low, "object not found")) {
+		return false
+	}
+	return true
+}
+
+func sanitizeRunLogLine(line string, openlistCASCompatible bool) string {
+	if !openlistCASCompatible {
+		return line
+	}
+	m := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`).FindStringSubmatch(strings.TrimSpace(line))
+	if len(m) == 0 {
+		return line
+	}
+	ts := strings.TrimSpace(m[1])
+	level := strings.ToUpper(strings.TrimSpace(m[2]))
+	path := strings.TrimSpace(m[3])
+	msg := strings.TrimSpace(m[4])
+	if level != "ERROR" || !isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
+		return line
+	}
+	prefix := "NOTICE"
+	if ts != "" {
+		prefix = ts + " NOTICE"
+	}
+	return fmt.Sprintf("%s: %s: CAS compatible match after source cleanup (%s)", prefix, path, msg)
+}
+
+func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlistCASCompatible bool) (map[string]any, string, bool) {
+	at := ""
+	row := map[string]any{"path": path, "at": at, "status": "", "action": "", "sizeBytes": 0}
+	if sz, ok := sizes[path]; ok {
+		row["sizeBytes"] = sz
+	}
+	low := strings.ToLower(strings.TrimSpace(msg))
+	upperLevel := strings.ToUpper(strings.TrimSpace(level))
+	if upperLevel == "ERROR" {
+		if isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
+			row["status"] = "success"
+			row["action"] = "CAS Matched"
+			row["message"] = msg
+			return row, "copied", true
+		}
+		row["status"] = "failed"
+		row["action"] = "Error"
+		row["message"] = msg
+		return row, "failed", true
+	}
+	switch {
+	case strings.Contains(low, "cas compatible match after source cleanup"):
+		row["status"] = "success"
+		row["action"] = "CAS Matched"
+		row["message"] = msg
+		return row, "copied", true
+	case strings.Contains(low, "copied"):
+		row["status"] = "success"
+		row["action"] = "Copied"
+		return row, "copied", true
+	case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
+		row["status"] = "success"
+		row["action"] = "Deleted"
+		return row, "deleted", true
+	case strings.Contains(low, "skipped"):
+		row["status"] = "skipped"
+		row["action"] = "Skipped"
+		return row, "skipped", true
+	default:
+		return nil, "", false
+	}
 }
 
 func joinRemotePath(base, rel string) string {

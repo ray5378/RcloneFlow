@@ -7,6 +7,72 @@ import (
 	"testing"
 )
 
+func TestIsCASCompatibleNotFound(t *testing.T) {
+	if !isCASCompatibleNotFound("dir/movie.mkv", "object not found", true) {
+		t.Fatalf("expected cas-compatible logical path not found to be tolerated")
+	}
+	if !isCASCompatibleNotFound("dir/movie.mkv", "No such file or directory", true) {
+		t.Fatalf("expected no such file to be tolerated in cas mode")
+	}
+	if isCASCompatibleNotFound("dir/movie.mkv.cas", "object not found", true) {
+		t.Fatalf("did not expect .cas path itself to be treated as logical fallback")
+	}
+	if isCASCompatibleNotFound("dir/movie.mkv", "object not found", false) {
+		t.Fatalf("did not expect tolerance outside cas mode")
+	}
+}
+
+func TestClassifyRunLogRow_CASCompatibleNotFoundBecomesSuccess(t *testing.T) {
+	row, bucket, ok := classifyRunLogRow("ERROR", "dir/movie.mkv", "object not found", map[string]int64{"dir/movie.mkv": 123}, true)
+	if !ok {
+		t.Fatalf("expected row to be classified")
+	}
+	if bucket != "copied" {
+		t.Fatalf("bucket=%q, want copied", bucket)
+	}
+	if got := row["status"]; got != "success" {
+		t.Fatalf("status=%v, want success", got)
+	}
+	if got := row["action"]; got != "CAS Matched" {
+		t.Fatalf("action=%v, want CAS Matched", got)
+	}
+	if got := row["sizeBytes"]; got != int64(123) {
+		t.Fatalf("sizeBytes=%v, want 123", got)
+	}
+}
+
+func TestClassifyRunLogRow_NormalErrorStillFails(t *testing.T) {
+	row, bucket, ok := classifyRunLogRow("ERROR", "dir/movie.mkv", "permission denied", nil, true)
+	if !ok {
+		t.Fatalf("expected normal error row to be classified")
+	}
+	if bucket != "failed" {
+		t.Fatalf("bucket=%q, want failed", bucket)
+	}
+	if got := row["status"]; got != "failed" {
+		t.Fatalf("status=%v, want failed", got)
+	}
+}
+
+func TestSanitizeRunLogLine_CASCompatibleNotFound(t *testing.T) {
+	line := `2026/05/01 11:04:20 ERROR : dir/movie.mkv: Failed to copy: object not found`
+	got := sanitizeRunLogLine(line, true)
+	if !strings.Contains(got, `NOTICE: dir/movie.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)`) {
+		t.Fatalf("unexpected sanitized line: %q", got)
+	}
+}
+
+func TestSanitizeRunLogLine_NonCASOrRealErrorUnchanged(t *testing.T) {
+	line := `2026/05/01 11:04:20 ERROR : dir/movie.mkv: Failed to copy: permission denied`
+	if got := sanitizeRunLogLine(line, true); got != line {
+		t.Fatalf("expected real error line unchanged, got %q", got)
+	}
+	line2 := `2026/05/01 11:04:20 ERROR : dir/movie.mkv: Failed to copy: object not found`
+	if got := sanitizeRunLogLine(line2, false); got != line2 {
+		t.Fatalf("expected non-cas line unchanged, got %q", got)
+	}
+}
+
 func TestIsCASPath(t *testing.T) {
 	if !isCASPath("a/b/movie.mkv.cas") {
 		t.Fatalf("expected .cas path to be recognized")

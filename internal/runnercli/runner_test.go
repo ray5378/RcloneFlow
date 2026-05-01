@@ -1,6 +1,12 @@
 package runnercli
 
-import "testing"
+import (
+	"os"
+	"strings"
+	"testing"
+
+	"rcloneflow/internal/store"
+)
 
 func TestParseOneLineProgress_AggregateWithXfrAndETA(t *testing.T) {
 	line := `2026/04/17 14:34:08 INFO : 121.377 MiB / 335.968 MiB, 36%, 2.474 MiB/s, ETA 1m26s (xfr#18/53)`
@@ -42,6 +48,23 @@ func TestParseOneLineProgress_AggregateWithETAOnly(t *testing.T) {
 	}
 }
 
+func TestParseOneLineProgress_AggregateWithDayETA(t *testing.T) {
+	line := `2026/05/01 10:52:47 INFO  :   991.070 MiB / 932.457 GiB, 0%, 2.516 MiB/s, ETA 4d9h18m (xfr#3/777)`
+	prog, ok := parseOneLineProgress(line)
+	if !ok {
+		t.Fatalf("expected aggregate day-eta line to parse")
+	}
+	if got := int(prog["completedFiles"].(float64)); got != 3 {
+		t.Fatalf("completedFiles=%d, want 3", got)
+	}
+	if got := int(prog["plannedFiles"].(float64)); got != 777 {
+		t.Fatalf("plannedFiles=%d, want 777", got)
+	}
+	if got := int(prog["eta"].(float64)); got != (4*24*3600 + 9*3600 + 18*60) {
+		t.Fatalf("eta=%d, want %d", got, 4*24*3600+9*3600+18*60)
+	}
+}
+
 func TestParseOneLineProgress_IgnoreFileLevelProgress(t *testing.T) {
 	line := `2026/04/17 14:34:08 INFO : 20260417/20260417135617-61000.mp4: 10.000 MiB / 100.000 MiB, 10%, 2.474 MiB/s`
 	if prog, ok := parseOneLineProgress(line); ok || prog != nil {
@@ -63,9 +86,110 @@ func TestParseOneLineProgress_IgnoreDeleted(t *testing.T) {
 	}
 }
 
+func TestFileCASMatchedRe_MatchesCASCompatibleNotice(t *testing.T) {
+	line := `2026/05/01 12:49:10 NOTICE: 电视剧/国产剧/佳偶天成 (2026)/Season 1/佳偶天成 - S01E16 - 第 16 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)`
+	m := fileCASMatchedRe.FindStringSubmatch(line)
+	if len(m) < 2 {
+		t.Fatalf("expected CAS compatible notice to match, got %#v", m)
+	}
+	if got := m[1]; got != `电视剧/国产剧/佳偶天成 (2026)/Season 1/佳偶天成 - S01E16 - 第 16 集.mkv` {
+		t.Fatalf("matched path=%q", got)
+	}
+}
+
 func TestParseOneLineProgress_IgnoreNonAggregateWithoutETAOrXfr(t *testing.T) {
 	line := `2026/04/17 14:34:10 NOTICE: something happened`
 	if prog, ok := parseOneLineProgress(line); ok || prog != nil {
 		t.Fatalf("expected unrelated line to be ignored, got %#v", prog)
+	}
+}
+
+func TestClassifyRunLogRow_CASNoticeCountsAsCopied(t *testing.T) {
+	row, bucket, ok := classifyRunLogRow(
+		"NOTICE",
+		"电视剧/国产剧/人间惊鸿客 (2026)/Season 1/人间惊鸿客 - S01E18 - 第 18 集.mkv",
+		"CAS compatible match after source cleanup (Failed to copy: object not found)",
+		map[string]int64{},
+		true,
+	)
+	if !ok {
+		t.Fatalf("expected CAS notice to be classified")
+	}
+	if bucket != "copied" {
+		t.Fatalf("bucket=%q, want copied", bucket)
+	}
+	if got := row["status"]; got != "success" {
+		t.Fatalf("status=%v, want success", got)
+	}
+	if got := row["action"]; got != "CAS Matched" {
+		t.Fatalf("action=%v, want CAS Matched", got)
+	}
+}
+
+func TestConsume_CASNoticeIncrementsCompletedFiles(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_runnercli_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	task, err := db.AddTask(store.Task{
+		Name:         "cas-notice-task",
+		Mode:         "copy",
+		SourceRemote: "src",
+		SourcePath:   "/a",
+		TargetRemote: "dst",
+		TargetPath:   "/b",
+	})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+
+	run, err := db.AddRun(store.Run{
+		TaskID:  task.ID,
+		Status:  "running",
+		Trigger: "manual",
+		Summary: map[string]any{
+			"progress": map[string]any{
+				"completedFiles": float64(0),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("AddRun() error = %v", err)
+	}
+
+	r := New(db)
+	fp := &fileProgress{m: map[string]*fileProg{}}
+	outFile, err := os.CreateTemp(tmpDir, "consume-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer outFile.Close()
+
+	line := "2026/05/01 14:01:20 NOTICE: 电视剧/国产剧/人间惊鸿客 (2026)/Season 1/人间惊鸿客 - S01E18 - 第 18 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true)
+
+	gotRun, err := db.GetRun(run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() error = %v", err)
+	}
+	prog, _ := gotRun.Summary["progress"].(map[string]any)
+	if prog == nil {
+		t.Fatalf("expected progress map, got %#v", gotRun.Summary)
+	}
+	if got := int(prog["completedFiles"].(float64)); got != 1 {
+		t.Fatalf("completedFiles=%d, want 1; summary=%#v", got, gotRun.Summary)
+	}
+	files, _ := gotRun.Summary["files"].([]fileProg)
+	_ = files
+	if got := len(fp.copiedList()); got != 1 {
+		t.Fatalf("fp.copied len=%d, want 1", got)
 	}
 }
