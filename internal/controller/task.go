@@ -287,34 +287,7 @@ func (c *TaskController) HandleBootstrap(w http.ResponseWriter, r *http.Request)
 		w.WriteHeader(405)
 		return
 	}
-	page := 1
-	pageSize := 50
-	if p := r.URL.Query().Get("page"); p != "" {
-		if v, err := strconv.Atoi(p); err == nil && v > 0 {
-			page = v
-		}
-	}
-	if ps := r.URL.Query().Get("pageSize"); ps != "" {
-		if v, err := strconv.Atoi(ps); err == nil && v > 0 && v <= 100 {
-			pageSize = v
-		}
-	}
 	tasks, err := c.taskSvc.ListTasks()
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
-		return
-	}
-	schedules, err := c.scheduleSvc.ListSchedules()
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
-		return
-	}
-		runList, total, err := c.runSvc.ListRuns(page, pageSize)
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
-		return
-	}
-	remotes, err := c.rc.ListRemotes(r.Context())
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
@@ -325,10 +298,7 @@ func (c *TaskController) HandleBootstrap(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	WriteJSON(w, 200, map[string]any{
-		"tasks": tasks,
-		"schedules": schedules,
-		"remotes": map[string]any{"remotes": remotes},
-		"runs": map[string]any{"runs": runList, "total": total, "page": page, "pageSize": pageSize},
+		"tasks":      tasks,
 		"activeRuns": activeRuns,
 	})
 }
