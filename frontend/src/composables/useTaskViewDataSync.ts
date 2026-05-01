@@ -170,9 +170,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
               ...cur,
               progress: nextProgress,
             }
-            if (!nextProgress.completedFiles || !nextProgress.totalCount) {
-              scheduleActiveRunsReload()
-            }
+            scheduleActiveRunsReload()
           } else {
             scheduleActiveRunsReload(0)
           }
