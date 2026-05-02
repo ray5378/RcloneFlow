@@ -35,7 +35,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version-file: go.mod
+          go-version: '1.25.0'
+
+      - name: Preflight Go module download
+        run: go mod download
 
       - name: Preflight Go build
         run: go build -ldflags="-s -w" -o /tmp/rcloneflow-server ./cmd/server
