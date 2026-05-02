@@ -28,6 +28,7 @@ RcloneFlow is a Web UI for rclone with built-in rclone, supporting file sync, st
 - Create sync tasks (copy/move)
 - Set source and target paths
 - Configure transfer options (threads, bandwidth limits, etc.)
+- Support OpenList `.cas` compatibility mode: when `F.cas` already exists on the destination, it can be treated as satisfying the source file `F`
 
 ### ⏰ Scheduled Sync
 - Cron expression support for timed triggers
