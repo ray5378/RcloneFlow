@@ -33,6 +33,14 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
         const boot = await options.taskApi.bootstrap(options.runsPage.value, options.runsPageSize)
         if (seq !== loadSeq || !boot) return
         if (Array.isArray(boot.tasks)) options.tasks.value = boot.tasks
+        if (Array.isArray(boot.schedules)) options.schedules.value = boot.schedules
+        if (Array.isArray(boot.remotes?.remotes) && boot.remotes.remotes.length > 0) {
+          options.remotes.value = boot.remotes.remotes
+        }
+        if (boot.runs?.runs) {
+          options.runs.value = boot.runs.runs
+          options.runsTotal.value = typeof boot.runs.total === 'number' ? boot.runs.total : (boot.runs.runs?.length || 0)
+        }
         if (Array.isArray(boot.activeRuns)) {
           options.activeRuns.value = boot.activeRuns
         }
