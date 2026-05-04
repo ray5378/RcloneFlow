@@ -13,15 +13,35 @@ interface UseRunDetailComputedOptions {
 export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   const finalFilesPage = options?.finalFilesPage ?? ref(1)
   const finalFilesPageSize = options?.finalFilesPageSize ?? ref(Math.max(10, Math.floor((window.innerHeight - 420) / 34)))
+  const finalSummaryByRunId = new Map<number, FinalSummary | null>()
+  const finalSummaryBySummaryText = new Map<string, FinalSummary | null>()
 
-  function getFinalSummary(run: Run | null | undefined): FinalSummary | null {
+  function parseFinalSummary(run: Run | null | undefined): FinalSummary | null {
     try {
-      const sum = typeof run?.summary === 'string' ? JSON.parse(run.summary) : (run?.summary as RunSummaryPayload | undefined)
+      const summary = run?.summary
+      if (typeof summary === 'string') {
+        if (finalSummaryBySummaryText.has(summary)) return finalSummaryBySummaryText.get(summary) || null
+        const sum = JSON.parse(summary) as RunSummaryPayload | undefined
+        const finalSummary = (sum && typeof sum === 'object' && sum.finalSummary) ? (sum.finalSummary as FinalSummary) : null
+        finalSummaryBySummaryText.set(summary, finalSummary)
+        if (run?.id) finalSummaryByRunId.set(run.id, finalSummary)
+        return finalSummary
+      }
+      const runId = run?.id
+      if (runId && finalSummaryByRunId.has(runId)) return finalSummaryByRunId.get(runId) || null
+      const sum = summary as RunSummaryPayload | undefined
       // 历史详情只读 finalSummary；
       // 不从 progress / completedFreezeByTask 倒推最终总结。
-      if (sum && typeof sum === 'object' && sum.finalSummary) return sum.finalSummary
-    } catch {}
-    return null
+      const finalSummary = (sum && typeof sum === 'object' && sum.finalSummary) ? (sum.finalSummary as FinalSummary) : null
+      if (runId) finalSummaryByRunId.set(runId, finalSummary)
+      return finalSummary
+    } catch {
+      return null
+    }
+  }
+
+  function getFinalSummary(run: Run | null | undefined): FinalSummary | null {
+    return parseFinalSummary(run)
   }
 
   const finalFiles = computed(() => {

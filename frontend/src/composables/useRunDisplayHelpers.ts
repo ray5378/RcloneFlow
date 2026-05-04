@@ -3,6 +3,7 @@ import { locale, t } from '../i18n'
 export function useRunDisplayHelpers(options: {
   getFinalSummary: (run: any) => any
 }) {
+  const durationCache = new Map<number, string>()
   function formatTime(time: string | undefined) {
     if (!time) return '-'
     try {
@@ -29,9 +30,11 @@ export function useRunDisplayHelpers(options: {
   }
 
   function getRunDurationText(run: any) {
+    if (run?.id && durationCache.has(run.id)) return durationCache.get(run.id) || '-'
     const fs = options.getFinalSummary(run)
-    if (fs && fs.durationText) return fs.durationText
-    return formatDuration(run.startedAt, run.finishedAt)
+    const text = fs && fs.durationText ? fs.durationText : formatDuration(run.startedAt, run.finishedAt)
+    if (run?.id) durationCache.set(run.id, text)
+    return text
   }
 
   function getStatusClass(status: string) {
