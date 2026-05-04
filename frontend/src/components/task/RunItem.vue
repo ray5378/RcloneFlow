@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { formatBytes } from '../../utils/format'
 import { getUnifiedProgressText } from './progressText'
 import { t } from '../../i18n'
@@ -17,7 +18,8 @@ interface Summary {
   totalBytes?: number
   transferredBytes?: number
   avgSpeedBps?: number
-  counts?: { copied?: number; deleted?: number; failed?: number; skipped?: number }
+  totalCount?: number
+  counts?: { total?: number; copied?: number; deleted?: number; failed?: number; skipped?: number }
   message?: string
 }
 
@@ -41,6 +43,19 @@ interface RunRecord {
 
 const props = defineProps<{ run: RunRecord; progress?: Progress; summary?: Summary }>()
 const emit = defineEmits<{ click: [run: RunRecord]; viewDetail: [run: RunRecord]; viewLog: [run: RunRecord]; clear: [id: number] }>()
+
+const runTitle = computed(() => props.run.taskName || `${t('runItem.taskFallback')} #${props.run.taskId}`)
+const statusClass = computed(() => getStatusClass(props.run.status || ''))
+const statusText = computed(() => getStatusText(props.run.status || ''))
+const triggerText = computed(() => props.run.trigger ? getTriggerText(props.run.trigger) : '')
+const startedText = computed(() => formatTime(props.run.startedAt || ''))
+const progressText = computed(() => props.run.status === 'running' ? getProgressText(props.run) : '-')
+const summaryTotal = computed(() => props.summary?.counts?.total ?? props.summary?.totalCount ?? props.summary?.files?.length ?? 0)
+const summarySuccess = computed(() => ((props.summary?.counts?.copied || 0) + (props.summary?.counts?.deleted || 0)))
+const summaryFailed = computed(() => props.summary?.counts?.failed || 0)
+const summaryTotalSize = computed(() => formatBytes(props.summary?.totalBytes || 0))
+const summaryTransferred = computed(() => formatBytes(props.summary?.transferredBytes || 0))
+const summaryMessage = computed(() => props.summary?.message || '')
 
 function getStatusClass(status: string) {
   switch (status) {
@@ -86,36 +101,36 @@ function getProgressText(run: RunRecord): string {
 <template>
   <div class="item run-item" @click="emit('click', run)">
     <div class="name list-item-name">
-      <strong>{{ run.taskName || `${t('runItem.taskFallback')} #${run.taskId}` }}</strong>
+      <strong>{{ runTitle }}</strong>
       <span v-if="run.taskMode" class="mode-tag list-item-tag">{{ run.taskMode }}</span>
-      <span v-if="run.trigger" class="trigger-tag list-item-tag">{{ getTriggerText(run.trigger) }}</span>
+      <span v-if="triggerText" class="trigger-tag list-item-tag">{{ triggerText }}</span>
     </div>
 
-    <span :class="['status', getStatusClass(run.status || ''), 'clickable']" @click.stop="emit('viewDetail', run)">
-      {{ getStatusText(run.status || '') }}
+    <span :class="['status', statusClass, 'clickable']" @click.stop="emit('viewDetail', run)">
+      {{ statusText }}
     </span>
 
     <div class="path-full">
       <span class="path-text list-item-secondary-text">{{ run.sourceRemote || '?' }}:{{ run.sourcePath || '/' }} → {{ run.targetRemote || '?' }}:{{ run.targetPath || '/' }}</span>
     </div>
 
-    <span class="time list-item-tertiary-text">{{ formatTime(run.startedAt || '') }}</span>
+    <span class="time list-item-tertiary-text">{{ startedText }}</span>
 
     <div class="summary-mini" v-if="run.status === 'running'">
-      <span class="chip list-item-chip list-item-chip-meta">{{ getProgressText(run) }}</span>
+      <span class="chip list-item-chip list-item-chip-meta">{{ progressText }}</span>
     </div>
 
     <div class="summary-mini" v-else-if="props.summary">
-      <div v-if="props.summary.message" class="skipped-message">{{ props.summary.message }}</div>
+      <div v-if="summaryMessage" class="skipped-message">{{ summaryMessage }}</div>
       <template v-else>
-        <span class="chip list-item-chip">{{ t('runItem.total') }} {{ props.summary.files?.length || 0 }}</span>
+        <span class="chip list-item-chip">{{ t('runItem.total') }} {{ summaryTotal }}</span>
         <span class="chip list-item-chip list-item-chip-success">
           {{ run.taskMode === 'move' ? t('runItem.moved') : t('runItem.success') }}
-          {{ (props.summary.counts?.copied || 0) + (props.summary.counts?.deleted || 0) }}
+          {{ summarySuccess }}
         </span>
-        <span class="chip list-item-chip list-item-chip-failed">{{ t('runItem.failed') }} {{ props.summary.counts?.failed || 0 }}</span>
-        <span class="chip list-item-chip list-item-chip-meta">{{ t('runItem.totalSize') }} {{ formatBytes(props.summary.totalBytes || 0) }}</span>
-        <span class="chip list-item-chip list-item-chip-meta">{{ t('runItem.transferred') }} {{ formatBytes(props.summary.transferredBytes || 0) }}</span>
+        <span class="chip list-item-chip list-item-chip-failed">{{ t('runItem.failed') }} {{ summaryFailed }}</span>
+        <span class="chip list-item-chip list-item-chip-meta">{{ t('runItem.totalSize') }} {{ summaryTotalSize }}</span>
+        <span class="chip list-item-chip list-item-chip-meta">{{ t('runItem.transferred') }} {{ summaryTransferred }}</span>
       </template>
     </div>
 

@@ -75,7 +75,6 @@ func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[str
 	lines := strings.Split(string(data), "\n")
 	re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
 	tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
-	files := make([]map[string]any, 0, 64)
 	counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
 	for _, ln := range lines {
 		l := strings.TrimSpace(ln)
@@ -101,16 +100,13 @@ func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[str
 			if len(m) == 0 {
 				continue
 			}
-			at := strings.TrimSpace(m[1])
 			level := strings.ToUpper(strings.TrimSpace(m[2]))
 			path := strings.TrimSpace(m[3])
 			msg := strings.TrimSpace(m[4])
-			row, bucket, ok := classifyHistoricalLogRow(level, path, msg)
+			_, bucket, ok := classifyHistoricalLogRow(level, path, msg)
 			if !ok {
 				continue
 			}
-			row["at"] = at
-			files = append(files, row)
 			counts[bucket]++
 			counts["total"]++
 		}
@@ -159,7 +155,24 @@ func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[str
 		fs["durationText"] = humanDuration(dur)
 	}
 	fs["counts"] = counts
-	fs["files"] = files
+	if _, ok := fs["totalCount"]; !ok {
+		fs["totalCount"] = counts["total"]
+	}
+	if _, ok := fs["filesCount"]; !ok {
+		fs["filesCount"] = counts["total"]
+	}
+	if _, ok := fs["copiedCount"]; !ok {
+		fs["copiedCount"] = counts["copied"]
+	}
+	if _, ok := fs["deletedCount"]; !ok {
+		fs["deletedCount"] = counts["deleted"]
+	}
+	if _, ok := fs["skippedCount"]; !ok {
+		fs["skippedCount"] = counts["skipped"]
+	}
+	if _, ok := fs["failedCount"]; !ok {
+		fs["failedCount"] = counts["failed"]
+	}
 	if _, ok := fs["transferredBytes"]; !ok {
 		fs["transferredBytes"] = run.BytesTransferred
 	}
@@ -178,23 +191,123 @@ func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[str
 	return fs
 }
 
+func buildLightRunObject(run service.RunRecord, sum map[string]any) map[string]any {
+	obj := map[string]any{
+		"id": run.ID,
+		"taskId": run.TaskID,
+		"status": run.Status,
+		"trigger": run.Trigger,
+		"startedAt": run.StartedAt,
+		"finishedAt": run.FinishedAt,
+		"taskName": run.TaskName,
+		"taskMode": run.TaskMode,
+		"sourceRemote": run.SourceRemote,
+		"sourcePath": run.SourcePath,
+		"targetRemote": run.TargetRemote,
+		"targetPath": run.TargetPath,
+		"bytesTransferred": run.BytesTransferred,
+		"speed": run.Speed,
+		"error": run.Error,
+	}
+	if sum != nil {
+		light := map[string]any{}
+		for _, key := range []string{"startedAt", "finishedAt", "progress", "stderrFile", "pid", "transferDefaults"} {
+			if v, ok := sum[key]; ok {
+				light[key] = v
+			}
+		}
+		if fs, ok := sum["finalSummary"].(map[string]any); ok {
+			if _, ok := fs["totalCount"]; !ok {
+				if counts, ok := fs["counts"].(map[string]any); ok {
+					if total, ok2 := counts["total"]; ok2 {
+						fs["totalCount"] = total
+						fs["filesCount"] = total
+					}
+				}
+			}
+			fsLight := map[string]any{}
+			for _, key := range []string{"startAt", "finishedAt", "durationSec", "durationText", "result", "transferredBytes", "totalBytes", "avgSpeedBps", "counts", "totalCount", "filesCount", "copiedCount", "deletedCount", "skippedCount", "failedCount"} {
+				if v, ok := fs[key]; ok {
+					fsLight[key] = v
+				}
+			}
+			if len(fsLight) > 0 {
+				light["finalSummary"] = fsLight
+			}
+		}
+		if len(light) > 0 {
+			obj["summary"] = light
+		}
+	}
+	if fs, ok := sum["finalSummary"].(map[string]any); ok {
+		if ds, ok2 := fs["durationSec"].(float64); ok2 {
+			obj["durationSeconds"] = int64(ds)
+		}
+		if dt, ok2 := fs["durationText"].(string); ok2 {
+			obj["durationText"] = dt
+		}
+	}
+	if _, ok := obj["durationText"]; !ok {
+		var start, fin time.Time
+		if run.StartedAt != "" {
+			if t, e := time.Parse(time.RFC3339, run.StartedAt); e == nil {
+				start = t
+			}
+		}
+		if run.FinishedAt != "" {
+			if t, e := time.Parse(time.RFC3339, run.FinishedAt); e == nil {
+				fin = t
+			}
+		}
+		if start.IsZero() && sum != nil {
+			if s, ok := sum["startedAt"].(string); ok {
+				if t, e := time.Parse(time.RFC3339, s); e == nil {
+					start = t
+				}
+			}
+		}
+		if fin.IsZero() && sum != nil {
+			if s, ok := sum["finishedAt"].(string); ok {
+				if t, e := time.Parse(time.RFC3339, s); e == nil {
+					fin = t
+				}
+			}
+		}
+		dur := int64(0)
+		if !start.IsZero() {
+			if !fin.IsZero() {
+				dur = int64(fin.Sub(start).Seconds())
+			} else {
+				dur = int64(time.Since(start).Seconds())
+			}
+			if dur < 0 {
+				dur = 0
+			}
+		}
+		obj["durationSeconds"] = dur
+		obj["durationText"] = humanDuration(dur)
+	}
+	return obj
+}
+
 func ensureHistoricalFinalSummary(run service.RunRecord, sum map[string]any) map[string]any {
 	if sum == nil {
 		return nil
 	}
-		fs, hasFS := sum["finalSummary"].(map[string]any)
+	fs, hasFS := sum["finalSummary"].(map[string]any)
 	need := !hasFS || fs == nil
 	if !need {
 		counts, _ := fs["counts"].(map[string]any)
-		files, _ := fs["files"].([]any)
 		copied := 0.0
 		if counts != nil {
 			if v, ok := counts["copied"].(float64); ok {
 				copied = v
 			}
 		}
-		if copied <= 0 && len(files) == 0 {
-			need = true
+		if copied <= 0 {
+			if total, ok := counts["total"].(float64); !ok || total <= 0 {
+				need = true
+			}
 		}
 	}
 	if !need {
@@ -391,13 +504,8 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
 	}
-	// attach durationSeconds/durationText (freeze when finished) and passthrough finalSummary
 	out := make([]map[string]any, 0, len(runs))
 	for _, r := range runs {
-		b, _ := json.Marshal(r)
-		var obj map[string]any
-		_ = json.Unmarshal(b, &obj)
-		// parse summary JSON for times/finalSummary
 		var sum map[string]any
 		switch v := any(r.Summary).(type) {
 		case string:
@@ -408,63 +516,7 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 			sum = v
 		}
 		sum = ensureHistoricalFinalSummary(r, sum)
-		if sum != nil {
-			obj["summary"] = sum
-		}
-		// prefer finalSummary.duration* if exists
-		if fs, ok := sum["finalSummary"].(map[string]any); ok {
-			if ds, ok2 := fs["durationSec"].(float64); ok2 {
-				obj["durationSeconds"] = int64(ds)
-			}
-			if dt, ok2 := fs["durationText"].(string); ok2 {
-				obj["durationText"] = dt
-			}
-		} else {
-			// compute from started/finished
-			var start, fin time.Time
-			if r.StartedAt != "" {
-				if t, e := time.Parse(time.RFC3339, r.StartedAt); e == nil {
-					start = t
-				}
-			}
-			if r.FinishedAt != "" {
-				if t, e := time.Parse(time.RFC3339, r.FinishedAt); e == nil {
-					fin = t
-				}
-			}
-			if start.IsZero() {
-				if sum != nil {
-					if s, ok := sum["startedAt"].(string); ok {
-						if t, e := time.Parse(time.RFC3339, s); e == nil {
-							start = t
-						}
-					}
-				}
-			}
-			if fin.IsZero() {
-				if sum != nil {
-					if s, ok := sum["finishedAt"].(string); ok {
-						if t, e := time.Parse(time.RFC3339, s); e == nil {
-							fin = t
-						}
-					}
-				}
-			}
-			dur := int64(0)
-			if !start.IsZero() {
-				if !fin.IsZero() {
-					dur = int64(fin.Sub(start).Seconds())
-				} else {
-					dur = int64(time.Since(start).Seconds())
-				}
-				if dur < 0 {
-					dur = 0
-				}
-			}
-			obj["durationSeconds"] = dur
-			obj["durationText"] = humanDuration(dur)
-		}
-		out = append(out, obj)
+		out = append(out, buildLightRunObject(r, sum))
 	}
 	WriteJSON(w, 200, map[string]any{
 		"runs":     out,
@@ -495,18 +547,12 @@ func (c *RunController) HandleRunsByTask(w http.ResponseWriter, r *http.Request)
 	}
 	out := make([]map[string]any, 0, len(runs))
 	for _, run := range runs {
-		b, _ := json.Marshal(run)
-		var obj map[string]any
-		_ = json.Unmarshal(b, &obj)
 		var sum map[string]any
 		if run.Summary != "" {
 			_ = json.Unmarshal([]byte(run.Summary), &sum)
 		}
 		sum = ensureHistoricalFinalSummary(run, sum)
-		if sum != nil {
-			obj["summary"] = sum
-		}
-		out = append(out, obj)
+		out = append(out, buildLightRunObject(run, sum))
 	}
 	WriteJSON(w, 200, out)
 }
@@ -536,10 +582,6 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		if run.ID != id {
 			continue
 		}
-		// attach duration* & passthrough finalSummary
-		b, _ := json.Marshal(run)
-		var obj map[string]any
-		_ = json.Unmarshal(b, &obj)
 		var sum map[string]any
 		switch v := any(run.Summary).(type) {
 		case string:
@@ -550,61 +592,7 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 			sum = v
 		}
 		sum = ensureHistoricalFinalSummary(run, sum)
-		if sum != nil {
-			obj["summary"] = sum
-		}
-		if fs, ok := sum["finalSummary"].(map[string]any); ok {
-			if ds, ok2 := fs["durationSec"].(float64); ok2 {
-				obj["durationSeconds"] = int64(ds)
-			}
-			if dt, ok2 := fs["durationText"].(string); ok2 {
-				obj["durationText"] = dt
-			}
-		} else {
-			var start, fin time.Time
-			if run.StartedAt != "" {
-				if t, e := time.Parse(time.RFC3339, run.StartedAt); e == nil {
-					start = t
-				}
-			}
-			if run.FinishedAt != "" {
-				if t, e := time.Parse(time.RFC3339, run.FinishedAt); e == nil {
-					fin = t
-				}
-			}
-			if start.IsZero() {
-				if sum != nil {
-					if s, ok := sum["startedAt"].(string); ok {
-						if t, e := time.Parse(time.RFC3339, s); e == nil {
-							start = t
-						}
-					}
-				}
-			}
-			if fin.IsZero() {
-				if sum != nil {
-					if s, ok := sum["finishedAt"].(string); ok {
-						if t, e := time.Parse(time.RFC3339, s); e == nil {
-							fin = t
-						}
-					}
-				}
-			}
-			dur := int64(0)
-			if !start.IsZero() {
-				if !fin.IsZero() {
-					dur = int64(fin.Sub(start).Seconds())
-				} else {
-					dur = int64(time.Since(start).Seconds())
-				}
-				if dur < 0 {
-					dur = 0
-				}
-			}
-			obj["durationSeconds"] = dur
-			obj["durationText"] = humanDuration(dur)
-		}
-		WriteJSON(w, 200, obj)
+		WriteJSON(w, 200, buildLightRunObject(run, sum))
 		return
 	}
 	WriteJSON(w, 404, map[string]any{"error": "run not found"})

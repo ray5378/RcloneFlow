@@ -14,6 +14,23 @@ export function useTaskViewRefreshLifecycle(options: {
   let stuckTimer: number | null = null
   let activePollTimer: number | null = null
 
+  function stopActivePollLoop() {
+    if (activePollTimer) {
+      clearInterval(activePollTimer)
+      activePollTimer = null
+    }
+  }
+
+  function startActivePollLoop() {
+    stopActivePollLoop()
+    if (options.currentModule && options.currentModule.value !== 'tasks') return
+    activePollTimer = window.setInterval(() => {
+      if (document.visibilityState === 'visible') {
+        options.loadActiveRuns().catch(console.error)
+      }
+    }, 3000)
+  }
+
   if (options.currentModule) {
     watch(options.currentModule, (next) => {
       if (next === 'tasks') {
@@ -24,6 +41,9 @@ export function useTaskViewRefreshLifecycle(options: {
         setTimeout(() => {
           options.loadActiveRuns().catch(console.error)
         }, 300)
+        startActivePollLoop()
+      } else {
+        stopActivePollLoop()
       }
     })
   }
@@ -34,6 +54,8 @@ export function useTaskViewRefreshLifecycle(options: {
       options.loadActiveRuns().catch(console.error),
     ]).catch(console.error)
     options.setupRealtimeSync?.()
+
+    startActivePollLoop()
 
     stuckTimer = window.setInterval(() => {
       try {
@@ -68,11 +90,6 @@ export function useTaskViewRefreshLifecycle(options: {
       } catch {}
     }, 1000)
 
-    activePollTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        options.loadActiveRuns().catch(console.error)
-      }
-    }, 3000)
   })
 
   onUnmounted(() => {

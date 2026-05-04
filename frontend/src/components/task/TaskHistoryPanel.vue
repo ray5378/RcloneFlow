@@ -74,6 +74,7 @@ function pageInfo(page: number, total: number) {
       <RunItem
         v-for="run in filteredRuns"
         :key="run.id"
+        v-memo="[run.id, run.status, run.startedAt, run.finishedAt, run.bytesTransferred]"
         :run="run"
         :progress="run.status === 'running' ? getRealtimeProgressByRun(run) : undefined"
         :summary="getFinalSummary(run)"

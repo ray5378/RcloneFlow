@@ -15,7 +15,7 @@ type mockRunSvcDB struct {
 }
 
 func (m *mockRunSvcDB) ListRuns(page, pageSize int) ([]service.RunRecord, int, error) {
-	return nil, 0, nil
+	return m.runs, len(m.runs), nil
 }
 func (m *mockRunSvcDB) ListRunsByTask(taskId int64) ([]service.RunRecord, error) {
 	out := make([]service.RunRecord, 0, len(m.runs))
@@ -257,6 +257,71 @@ func TestHandleActiveRuns_FallsBackToPreflightTotalCountWhenPlannedFilesMissing(
 	}
 }
 
+func TestHandleRuns_DoesNotExposeHistoricalFilesArray(t *testing.T) {
+	summary := map[string]any{
+		"startedAt": "2026-04-17T14:30:00+08:00",
+		"finishedAt": "2026-04-17T14:40:00+08:00",
+		"finalSummary": map[string]any{
+			"result":           "success",
+			"transferredBytes": float64(1234),
+			"totalBytes":       float64(5678),
+			"counts": map[string]any{
+				"total":   float64(2),
+				"copied":  float64(1),
+				"deleted": float64(1),
+			},
+		},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        8,
+		TaskID:    108,
+		Status:    "finished",
+		StartedAt: "2026-04-17T14:30:00+08:00",
+		FinishedAt: "2026-04-17T14:40:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs?page=1&pageSize=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRuns(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	runs, _ := resp["runs"].([]any)
+	if len(runs) != 1 {
+		t.Fatalf("len(runs)=%d, want 1", len(runs))
+	}
+	item, _ := runs[0].(map[string]any)
+	if item == nil {
+		t.Fatalf("missing run item")
+	}
+	summaryObj, _ := item["summary"].(map[string]any)
+	if summaryObj == nil {
+		t.Fatalf("missing summary")
+	}
+	if _, ok := summaryObj["files"]; ok {
+		t.Fatalf("summary.files should not be exposed in run list response")
+	}
+	fs, _ := summaryObj["finalSummary"].(map[string]any)
+	if fs == nil {
+		t.Fatalf("missing finalSummary")
+	}
+	if _, ok := fs["files"]; ok {
+		t.Fatalf("finalSummary.files should not be exposed in run list response")
+	}
+	if got := fs["totalCount"]; got == nil {
+		t.Fatalf("missing finalSummary.totalCount")
+	}
+	if got := item["durationText"]; got == nil {
+		t.Fatalf("missing durationText")
+	}
+}
+
 func TestHandleActiveRuns_BackfillsCompletedFilesFromLogCASNotice(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "rcloneflow-active-log-*.log")
 	if err != nil {
@@ -362,9 +427,11 @@ func TestHandleRunsByTask_BackfillsHistoricalFinalSummaryFromCASLog(t *testing.T
 	if got := int(counts["copied"].(float64)); got != 1 {
 		t.Fatalf("copied=%d, want 1", got)
 	}
-	files, _ := fs["files"].([]any)
-	if len(files) != 1 {
-		t.Fatalf("files len=%d, want 1", len(files))
+	if _, ok := fs["files"]; ok {
+		t.Fatalf("finalSummary.files should not be exposed in task history response")
+	}
+	if got := int(fs["totalCount"].(float64)); got != 1 {
+		t.Fatalf("totalCount=%d, want 1", got)
 	}
 }
 

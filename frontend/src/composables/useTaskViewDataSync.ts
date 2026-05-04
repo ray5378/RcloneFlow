@@ -25,6 +25,7 @@ interface UseTaskViewDataSyncOptions {
 export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   let loadSeq = 0
   let activeRunsReloadTimer: number | null = null
+  let dataReloadTimer: number | null = null
 
   async function loadData() {
     const seq = ++loadSeq
@@ -133,15 +134,26 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     }, delay)
   }
 
+  function scheduleDataReload(delay = 300) {
+    if (dataReloadTimer) return
+    dataReloadTimer = window.setTimeout(() => {
+      dataReloadTimer = null
+      loadData().catch(console.error)
+    }, delay)
+  }
+
   function setupRealtimeSync() {
     const wsClient = useWebSocket({
       onMessage: (msg) => {
         if (msg.type === 'run_status' && msg.data) {
-          const idx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
-          if (idx !== -1) {
-            options.runs.value[idx] = { ...options.runs.value[idx], status: msg.data.status }
+          if (options.currentModule.value === 'history') {
+            const idx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
+            if (idx !== -1) {
+              options.runs.value[idx] = { ...options.runs.value[idx], status: msg.data.status }
+            }
           }
           scheduleActiveRunsReload(0)
+          scheduleDataReload(800)
         } else if (msg.type === 'run_progress' && msg.data) {
           const idx = options.activeRuns.value.findIndex(r => r.runRecord?.id === msg.data.run_id)
           if (idx !== -1) {
@@ -183,26 +195,28 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
           } else {
             scheduleActiveRunsReload(0)
           }
-          const runIdx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
-          if (runIdx !== -1) {
-            const curRun = options.runs.value[runIdx] || {}
-            const sum = typeof curRun.summary === 'string'
-              ? (() => { try { return JSON.parse(curRun.summary) } catch { return {} } })()
-              : (curRun.summary || {})
-            const prevProgress = sum.progress || {}
-            sum.progress = {
-              ...prevProgress,
-              bytes: Number(msg.data.bytes || 0),
-              totalBytes: Number(msg.data.total || prevProgress.totalBytes || 0),
-              speed: Number(msg.data.speed || 0),
-              percentage: Number(msg.data.percent || prevProgress.percentage || 0),
-              completedFiles: Math.max(Number(prevProgress.completedFiles || 0), Number(msg.data.completedFiles || 0)),
-              plannedFiles: Math.max(Number(prevProgress.plannedFiles || 0), Number(msg.data.totalCount || msg.data.plannedFiles || 0)),
-              eta: Number(msg.data.eta || prevProgress.eta || 0),
-            }
-            options.runs.value[runIdx] = {
-              ...curRun,
-              summary: sum,
+          if (options.currentModule.value === 'history') {
+            const runIdx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
+            if (runIdx !== -1) {
+              const curRun = options.runs.value[runIdx] || {}
+              const sum = typeof curRun.summary === 'string'
+                ? (() => { try { return JSON.parse(curRun.summary) } catch { return {} } })()
+                : (curRun.summary || {})
+              const prevProgress = sum.progress || {}
+              sum.progress = {
+                ...prevProgress,
+                bytes: Number(msg.data.bytes || 0),
+                totalBytes: Number(msg.data.total || prevProgress.totalBytes || 0),
+                speed: Number(msg.data.speed || 0),
+                percentage: Number(msg.data.percent || prevProgress.percentage || 0),
+                completedFiles: Math.max(Number(prevProgress.completedFiles || 0), Number(msg.data.completedFiles || 0)),
+                plannedFiles: Math.max(Number(prevProgress.plannedFiles || 0), Number(msg.data.totalCount || msg.data.plannedFiles || 0)),
+                eta: Number(msg.data.eta || prevProgress.eta || 0),
+              }
+              options.runs.value[runIdx] = {
+                ...curRun,
+                summary: sum,
+              }
             }
           }
         }
