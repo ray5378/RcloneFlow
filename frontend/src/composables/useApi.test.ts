@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as api from '../api'
-import { taskApi, remoteApi, runApi } from './useApi'
+import { taskApi, remoteApi, scheduleApi, runApi } from './useApi'
 
 vi.mock('../api', () => ({
   listTasks: vi.fn(),
@@ -11,6 +11,7 @@ vi.mock('../api', () => ({
   killTask: vi.fn(),
   updateTaskOptions: vi.fn(),
   listRemotes: vi.fn(),
+  listSchedules: vi.fn(),
   listRuns: vi.fn(),
   getRun: vi.fn(),
   getRunFiles: vi.fn(),
@@ -93,6 +94,27 @@ describe('useApi - remoteApi', () => {
 
     const result = await remoteApi.list()
     expect(result).toEqual({ remotes: [] })
+  })
+})
+
+describe('useApi - scheduleApi', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('should return schedules list on success', async () => {
+    const mockSchedules = [{ id: 1, enabled: true, spec: '0 * * * *' }]
+    vi.mocked(api.listSchedules).mockResolvedValue(mockSchedules as any)
+
+    const result = await scheduleApi.list()
+    expect(result).toEqual(mockSchedules)
+  })
+
+  it('should return empty array on error', async () => {
+    vi.mocked(api.listSchedules).mockRejectedValue(new Error('API Error'))
+
+    const result = await scheduleApi.list()
+    expect(result).toEqual([])
   })
 })
 

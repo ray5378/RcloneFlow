@@ -1,4 +1,4 @@
-import type { Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import type { ActiveRunProgress } from '../api/run'
 import type { Run, RunSummaryPayload } from '../types'
 
@@ -11,6 +11,14 @@ export function useTaskProgressSync(options: {
 }) {
   const lastDbFrameByRunId: Record<number, ActiveRunProgress> = {}
   const lastNonZeroSpeedByTask: Record<number, number> = {}
+  const runningRunByTaskId = computed(() => {
+    const index = new Map<number, Run>()
+    for (const item of options.runs.value || []) {
+      const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
+      if (candidateTaskId > 0 && item?.status === 'running') index.set(candidateTaskId, item)
+    }
+    return index
+  })
   // 任务卡片完成态只保留一份冻结帧：
   // 1) active.progress 到 100% 时立即冻结；
   // 2) active 消失后继续沿用这同一帧；
@@ -128,10 +136,7 @@ export function useTaskProgressSync(options: {
       delete completedFreezeByTask[taskId]
     }
 
-    const running = (options.runs.value || []).find((item: any) => {
-      const candidateTaskId = Number(item?.taskId ?? item?.taskID ?? item?.task_id)
-      return candidateTaskId > 0 && candidateTaskId === Number(taskId) && item?.status === 'running'
-    })
+    const running = runningRunByTaskId.value.get(Number(taskId))
     if (!running) return null
     return getRunProgressFromSummary(running)
   }

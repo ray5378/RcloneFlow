@@ -69,6 +69,7 @@ export function useTaskViewRuntime(options: {
 
   useTaskViewRefreshLifecycle({
     tasks: options.tasks,
+    activeRuns: options.activeRuns,
     currentModule: options.currentModule,
     getRunningProgressByTask,
     loadData,

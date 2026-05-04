@@ -1,4 +1,4 @@
-import type { Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import type { Schedule } from '../types'
 import { t } from '../i18n'
 
@@ -20,8 +20,16 @@ interface UseTaskListActionsOptions {
 }
 
 export function useTaskListActions(options: UseTaskListActionsOptions) {
+  const scheduleByTaskId = computed(() => {
+    const index = new Map<number, Schedule>()
+    for (const s of options.schedules.value || []) {
+      if (Number(s?.taskId) > 0) index.set(Number(s.taskId), s)
+    }
+    return index
+  })
+
   function getScheduleByTaskId(taskId: number) {
-    return options.schedules.value.find(s => s.taskId === taskId)
+    return scheduleByTaskId.value.get(Number(taskId))
   }
 
   async function deleteTask(id: number) {

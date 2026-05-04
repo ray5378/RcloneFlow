@@ -2,6 +2,7 @@ import { onMounted, onUnmounted, watch, type Ref } from 'vue'
 
 export function useTaskViewRefreshLifecycle(options: {
   tasks: Ref<any[]>
+  activeRuns: Ref<any[]>
   currentModule?: Ref<'history' | 'add' | 'tasks'>
   getRunningProgressByTask: (taskId: number) => any
   loadData: () => Promise<void> | void
@@ -36,14 +37,24 @@ export function useTaskViewRefreshLifecycle(options: {
 
     stuckTimer = window.setInterval(() => {
       try {
+        if (options.currentModule && options.currentModule.value !== 'tasks') return
+        const activeTasks = new Set<number>()
+        for (const item of options.activeRuns.value || []) {
+          const taskId = Number(item?.runRecord?.taskId ?? item?.taskId ?? item?.taskID ?? item?.task_id)
+          if (taskId > 0) activeTasks.add(taskId)
+        }
+        if (activeTasks.size === 0) {
+          lastRenderedSignature = ''
+          return
+        }
         const sigParts: string[] = []
-        for (const t of options.tasks.value || []) {
-          const progress = options.getRunningProgressByTask((t as any).id) as any
+        for (const taskId of activeTasks) {
+          const progress = options.getRunningProgressByTask(taskId) as any
           const pct = progress ? Number(progress.percentage || 0).toFixed(3) : 'na'
           const c = progress ? Number(progress.completedFiles || 0) : -1
-          sigParts.push(`${(t as any).id}:${pct}:${c}`)
+          sigParts.push(`${taskId}:${pct}:${c}`)
         }
-        const sig = `${options.tasks.value?.length || 0}|${sigParts.join(',')}`
+        const sig = `${activeTasks.size}|${sigParts.join(',')}`
         if (sig === lastRenderedSignature) {
           const now = Date.now()
           const last = (window as any).__last_stuck_refresh || 0

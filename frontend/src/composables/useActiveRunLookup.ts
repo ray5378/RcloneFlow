@@ -1,15 +1,18 @@
-import { type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import { getActiveProgress, getActiveProgressText } from '../components/task/runningHint'
 
 export function useActiveRunLookup(activeRuns: Ref<any[]>) {
-  function getActiveRunByTaskId(taskId: number) {
-    const targetId = Number(taskId)
-    const cur = (activeRuns.value || []).find((item: any) => {
+  const activeRunByTaskId = computed(() => {
+    const index = new Map<number, any>()
+    for (const item of activeRuns.value || []) {
       const candidateId = Number(item?.runRecord?.taskId ?? item?.taskId ?? item?.taskID ?? item?.task_id)
-      return candidateId > 0 && candidateId === targetId
-    })
-    if (cur) return cur
-    return undefined as any
+      if (candidateId > 0) index.set(candidateId, item)
+    }
+    return index
+  })
+
+  function getActiveRunByTaskId(taskId: number) {
+    return activeRunByTaskId.value.get(Number(taskId))
   }
 
   function getActiveProgressByTaskId(taskId: number) {

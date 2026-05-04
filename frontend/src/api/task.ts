@@ -12,9 +12,6 @@ export async function killTask(taskId: number): Promise<void> {
 
 export interface TaskBootstrapPayload {
   tasks: Task[]
-  schedules?: Schedule[]
-  remotes?: { remotes?: string[] }
-  runs?: { runs: Run[]; total: number; page: number; pageSize: number }
   activeRuns: ActiveRun[]
 }
 

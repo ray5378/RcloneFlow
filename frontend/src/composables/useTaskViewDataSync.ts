@@ -33,31 +33,17 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
         const boot = await options.taskApi.bootstrap(options.runsPage.value, options.runsPageSize)
         if (seq !== loadSeq || !boot) return
         if (Array.isArray(boot.tasks)) options.tasks.value = boot.tasks
-        if (Array.isArray(boot.schedules)) options.schedules.value = boot.schedules
-        if (Array.isArray(boot.remotes?.remotes) && boot.remotes.remotes.length > 0) {
-          options.remotes.value = boot.remotes.remotes
-        }
-        if (boot.runs?.runs) {
-          options.runs.value = boot.runs.runs
-          options.runsTotal.value = typeof boot.runs.total === 'number' ? boot.runs.total : (boot.runs.runs?.length || 0)
-        }
         if (Array.isArray(boot.activeRuns)) {
           options.activeRuns.value = boot.activeRuns
         }
-        try {
-          localStorage.setItem('lastTasksSnapshot', JSON.stringify(options.tasks.value || []))
-        } catch {}
-        return
       }
 
-      const [taskData, remoteData, scheduleData, runResult] = await Promise.all([
-        options.taskApi.list(),
+      const [remoteData, scheduleData, runResult] = await Promise.all([
         options.remoteApi.list(),
         options.scheduleApi.list(),
         options.runApi.list(options.runsPage.value, options.runsPageSize),
       ])
       if (seq !== loadSeq) return
-      if (Array.isArray(taskData)) options.tasks.value = taskData
       if (Array.isArray(remoteData?.remotes) && remoteData.remotes.length > 0) options.remotes.value = remoteData.remotes
       if (Array.isArray(scheduleData) && scheduleData.length > 0) options.schedules.value = scheduleData
       if (runResult?.runs) {

@@ -17,13 +17,19 @@ export function useRunningHint(activeRuns: Ref<ActiveRun[]>, openRunLog: (run: a
   const run = ref<any>(null)
   const debugOpen = ref(false)
 
+  const activeRunByTaskId = computed(() => {
+    const index = new Map<number, ActiveRun>()
+    for (const item of activeRuns.value || []) {
+      const activeTaskId = Number(item?.runRecord?.taskId ?? item?.taskId)
+      if (activeTaskId > 0) index.set(activeTaskId, item)
+    }
+    return index
+  })
+
   const active = computed(() => {
-    const taskId = run.value?.taskId
+    const taskId = Number(run.value?.taskId)
     if (!taskId) return null
-    return (activeRuns.value || []).find((item: ActiveRun & { taskId?: number }) => {
-      const activeTaskId = item?.runRecord?.taskId ?? item?.taskId
-      return activeTaskId === taskId
-    }) || null
+    return activeRunByTaskId.value.get(taskId) || null
   })
 
   const phaseText = computed(() => getActiveProgress(active.value)?.phase || '-')
