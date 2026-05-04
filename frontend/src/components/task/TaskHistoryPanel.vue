@@ -18,7 +18,7 @@ const props = defineProps<{
   getFinalSummary: (run: Run) => any
 }>()
 
-const displayRuns = computed(() => filteredRuns.map(run => ({
+const displayRuns = computed(() => props.filteredRuns.map(run => ({
   ...run,
   __title: run.taskName || `${t('runItem.taskFallback')} #${run.taskId}`,
   __triggerText: run.trigger === 'schedule' ? t('runItem.schedule') : run.trigger === 'manual' ? t('runItem.manual') : run.trigger === 'webhook' ? 'Webhook' : '',
@@ -82,7 +82,7 @@ function pageInfo(page: number, total: number) {
         <button class="page-btn" @click.stop="emit('jump-page')">{{ t('taskUI.jump') }}</button>
       </div>
       <div class="header-actions" data-no-back @click.stop>
-        <button v-if="historyFilterTaskId !== null && filteredRuns.length > 0" class="ghost small danger-text" @click.stop="emit('clear-all')">{{ t('taskUI.deleteAll') }}</button>
+        <button v-if="historyFilterTaskId !== null && props.filteredRuns.length > 0" class="ghost small danger-text" @click.stop="emit('clear-all')">{{ t('taskUI.deleteAll') }}</button>
         <button v-if="historyFilterTaskId !== null" class="ghost small" @click.stop="emit('back')">← {{ t('taskUI.back') }}</button>
       </div>
     </div>
@@ -99,7 +99,7 @@ function pageInfo(page: number, total: number) {
         @view-log="emit('view-log', run)"
         @clear="emit('clear-run', run.id)"
       />
-      <div v-if="!filteredRuns.length" class="empty">{{ t('taskUI.noHistory') }}</div>
+      <div v-if="!props.filteredRuns.length" class="empty">{{ t('taskUI.noHistory') }}</div>
     </div>
   </div>
 </template>
