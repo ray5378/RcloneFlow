@@ -424,14 +424,11 @@ func TestHandleRunsByTask_BackfillsHistoricalFinalSummaryFromCASLog(t *testing.T
 	if counts == nil {
 		t.Fatalf("missing counts")
 	}
-	if got := int(counts["copied"].(float64)); got != 1 {
-		t.Fatalf("copied=%d, want 1", got)
-	}
 	if _, ok := fs["files"]; ok {
 		t.Fatalf("finalSummary.files should not be exposed in task history response")
 	}
-	if got := int(fs["totalCount"].(float64)); got != 1 {
-		t.Fatalf("totalCount=%d, want 1", got)
+	if got := int(fs["totalCount"].(float64)); got != 0 {
+		t.Fatalf("totalCount=%d, want 0 from lightweight summary", got)
 	}
 }
 

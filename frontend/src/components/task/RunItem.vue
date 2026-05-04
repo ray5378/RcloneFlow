@@ -14,11 +14,8 @@ interface Progress {
 }
 
 interface Summary {
-  files?: any[]
   totalBytes?: number
   transferredBytes?: number
-  avgSpeedBps?: number
-  totalCount?: number
   counts?: { total?: number; copied?: number; deleted?: number; failed?: number; skipped?: number }
   message?: string
 }
@@ -50,7 +47,7 @@ const statusText = computed(() => getStatusText(props.run.status || ''))
 const triggerText = computed(() => props.run.trigger ? getTriggerText(props.run.trigger) : '')
 const startedText = computed(() => formatTime(props.run.startedAt || ''))
 const progressText = computed(() => props.run.status === 'running' ? getProgressText(props.run) : '-')
-const summaryTotal = computed(() => props.summary?.counts?.total ?? props.summary?.totalCount ?? props.summary?.files?.length ?? 0)
+const summaryTotal = computed(() => props.summary?.counts?.total ?? 0)
 const summarySuccess = computed(() => ((props.summary?.counts?.copied || 0) + (props.summary?.counts?.deleted || 0)))
 const summaryFailed = computed(() => props.summary?.counts?.failed || 0)
 const summaryTotalSize = computed(() => formatBytes(props.summary?.totalBytes || 0))

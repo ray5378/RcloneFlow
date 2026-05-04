@@ -221,12 +221,11 @@ func buildLightRunObject(run service.RunRecord, sum map[string]any) map[string]a
 				if counts, ok := fs["counts"].(map[string]any); ok {
 					if total, ok2 := counts["total"]; ok2 {
 						fs["totalCount"] = total
-						fs["filesCount"] = total
 					}
 				}
 			}
 			fsLight := map[string]any{}
-			for _, key := range []string{"startAt", "finishedAt", "durationSec", "durationText", "result", "transferredBytes", "totalBytes", "avgSpeedBps", "counts", "totalCount", "filesCount", "copiedCount", "deletedCount", "skippedCount", "failedCount"} {
+			for _, key := range []string{"startAt", "finishedAt", "durationSec", "durationText", "result", "transferredBytes", "totalBytes", "avgSpeedBps", "counts", "totalCount"} {
 				if v, ok := fs[key]; ok {
 					fsLight[key] = v
 				}
@@ -515,7 +514,6 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 		case map[string]any:
 			sum = v
 		}
-		sum = ensureHistoricalFinalSummary(r, sum)
 		out = append(out, buildLightRunObject(r, sum))
 	}
 	WriteJSON(w, 200, map[string]any{
@@ -551,7 +549,6 @@ func (c *RunController) HandleRunsByTask(w http.ResponseWriter, r *http.Request)
 		if run.Summary != "" {
 			_ = json.Unmarshal([]byte(run.Summary), &sum)
 		}
-		sum = ensureHistoricalFinalSummary(run, sum)
 		out = append(out, buildLightRunObject(run, sum))
 	}
 	WriteJSON(w, 200, out)
@@ -591,7 +588,6 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		case map[string]any:
 			sum = v
 		}
-		sum = ensureHistoricalFinalSummary(run, sum)
 		WriteJSON(w, 200, buildLightRunObject(run, sum))
 		return
 	}

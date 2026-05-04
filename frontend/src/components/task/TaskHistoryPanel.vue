@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import RunItem from './RunItem.vue'
 import type { Run } from '../../types'
 import { t } from '../../i18n'
@@ -16,6 +17,21 @@ const props = defineProps<{
   getRealtimeProgressByRun: (run: Run) => any
   getFinalSummary: (run: Run) => any
 }>()
+
+const displayRuns = computed(() => filteredRuns.map(run => ({
+  ...run,
+  __title: run.taskName || `${t('runItem.taskFallback')} #${run.taskId}`,
+  __triggerText: run.trigger === 'schedule' ? t('runItem.schedule') : run.trigger === 'manual' ? t('runItem.manual') : run.trigger === 'webhook' ? 'Webhook' : '',
+  __statusText: run.status === 'finished' ? t('runItem.finished') : run.status === 'failed' ? t('runItem.failed') : run.status === 'skipped' ? t('runItem.skipped') : run.status === 'running' ? t('runItem.running') : run.status,
+  __statusClass: run.status === 'finished' ? 'success' : run.status === 'failed' ? 'danger' : run.status === 'skipped' ? 'warning' : run.status === 'running' ? 'info' : '',
+  __startedText: run.startedAt ? new Date(run.startedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-',
+  __summaryTotal: (run as any)?.summary?.counts?.total ?? 0,
+  __summarySuccess: (((run as any)?.summary?.counts?.copied || 0) + ((run as any)?.summary?.counts?.deleted || 0)),
+  __summaryFailed: (run as any)?.summary?.counts?.failed || 0,
+  __summaryTotalSize: (run as any)?.summary?.totalBytes || 0,
+  __summaryTransferred: (run as any)?.summary?.transferredBytes || 0,
+  __summaryMessage: (run as any)?.summary?.message || '',
+})))
 
 const emit = defineEmits<{
   (e: 'back'): void
@@ -72,12 +88,12 @@ function pageInfo(page: number, total: number) {
     </div>
     <div class="list">
       <RunItem
-        v-for="run in filteredRuns"
+        v-for="run in displayRuns"
         :key="run.id"
         v-memo="[run.id, run.status, run.startedAt, run.finishedAt, run.bytesTransferred]"
         :run="run"
         :progress="run.status === 'running' ? getRealtimeProgressByRun(run) : undefined"
-        :summary="getFinalSummary(run)"
+        :summary="(run as any).summary"
         @click="emit('view-detail', run)"
         @view-detail="emit('view-detail', run)"
         @view-log="emit('view-log', run)"
