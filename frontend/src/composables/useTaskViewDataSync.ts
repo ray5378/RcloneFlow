@@ -14,6 +14,7 @@ interface UseTaskViewDataSyncOptions {
   activeRuns: Ref<any[]>
   globalStats: Ref<any>
   showGlobalStatsModal: Ref<boolean>
+  currentModule: Ref<'history' | 'add' | 'tasks'>
   lastNonDecreasingTotalsByTask: Ref<Record<number, { totalBytes: number; totalCount: number }>>
   taskApi: { list: () => Promise<Task[]>; bootstrap?: (page?: number, pageSize?: number) => Promise<any> }
   remoteApi: { list: () => Promise<{ remotes?: string[] }> }
@@ -146,7 +147,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     const wsClient = useWebSocket({
       onMessage: (msg) => {
         if (msg.type === 'run_status' && msg.data) {
-          if (options.currentModule.value === 'history') {
+          if (options.currentModule?.value === 'history') {
             const idx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
             if (idx !== -1) {
               options.runs.value[idx] = { ...options.runs.value[idx], status: msg.data.status }
@@ -195,7 +196,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
           } else {
             scheduleActiveRunsReload(0)
           }
-          if (options.currentModule.value === 'history') {
+          if (options.currentModule?.value === 'history') {
             const runIdx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
             if (runIdx !== -1) {
               const curRun = options.runs.value[runIdx] || {}
