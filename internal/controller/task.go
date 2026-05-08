@@ -198,7 +198,13 @@ func (c *TaskController) buildActiveRunItems() ([]map[string]any, error) {
 		if v, ok := progress["plannedFiles"].(float64); ok {
 			totalCount = v
 		}
-		if totalCount <= 0 && summary != nil {
+		casCompatible := false
+		if summary != nil {
+			if opts, ok := summary["effectiveOptions"].(map[string]any); ok {
+				casCompatible, _ = opts["openlistCasCompatible"].(bool)
+			}
+		}
+		if totalCount <= 0 && summary != nil && !casCompatible {
 			if pf, ok := summary["preflight"].(map[string]any); ok {
 				if v, ok2 := pf["totalCount"].(float64); ok2 {
 					totalCount = v

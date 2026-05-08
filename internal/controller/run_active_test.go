@@ -208,11 +208,11 @@ func TestHandleActiveRuns_UsesLogicalTotalsAndKeepsPlannedFiles(t *testing.T) {
 	if got := int(prog["plannedFiles"].(float64)); got != 33 {
 		t.Fatalf("plannedFiles=%d, want 33", got)
 	}
-	if got := int(prog["logicalTotalCount"].(float64)); got != 166 {
-		t.Fatalf("logicalTotalCount=%d, want 166", got)
+	if got := int(prog["logicalTotalCount"].(float64)); got != 33 {
+		t.Fatalf("logicalTotalCount=%d, want 33", got)
 	}
-	if got := int(prog["totalCount"].(float64)); got != 166 {
-		t.Fatalf("totalCount=%d, want 166", got)
+	if got := int(prog["totalCount"].(float64)); got != 33 {
+		t.Fatalf("totalCount=%d, want 33", got)
 	}
 	if got := prog["percentage"].(float64); got < 9.9 || got > 10.1 {
 		t.Fatalf("percentage=%v, want about 10", got)
