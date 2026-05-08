@@ -6,7 +6,7 @@ export function useTaskViewRuntimeState() {
   const globalStats = ref<any>({})
   const showGlobalStatsModal = ref(false)
   const activeRunLookup = useActiveRunLookup(activeRuns)
-  const lastNonDecreasingTotalsByTask = ref<Record<number, { totalBytes: number; totalCount: number }>>({})
+  const lastNonDecreasingTotalsByTask = ref<Record<number, { runId?: number; totalBytes: number; totalCount: number }>>({})
 
   const STUCK_MS = 25000
 

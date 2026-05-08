@@ -15,7 +15,7 @@ interface UseTaskViewDataSyncOptions {
   globalStats: Ref<any>
   showGlobalStatsModal: Ref<boolean>
   currentModule: Ref<'history' | 'add' | 'tasks'>
-  lastNonDecreasingTotalsByTask: Ref<Record<number, { totalBytes: number; totalCount: number }>>
+  lastNonDecreasingTotalsByTask: Ref<Record<number, { runId?: number; totalBytes: number; totalCount: number }>>
   taskApi: { list: () => Promise<Task[]>; bootstrap?: (page?: number, pageSize?: number) => Promise<any> }
   remoteApi: { list: () => Promise<{ remotes?: string[] }> }
   scheduleApi: { list: () => Promise<Schedule[]> }
@@ -84,9 +84,11 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
         if (raw.percentage < 0) raw.percentage = 0
         if (raw.percentage > 100) raw.percentage = 100
         const tid = it.runRecord?.taskId
+        const runId = it.runRecord?.id
         if (tid) {
-          const prevTotals = options.lastNonDecreasingTotalsByTask.value[tid]
-          if (prevTotals) {
+          const prevTotals = options.lastNonDecreasingTotalsByTask.value[tid] as any
+          const prevRunId = prevTotals?.runId
+          if (prevTotals && prevRunId === runId) {
             if (prevTotals.totalBytes > 0 && raw.totalBytes > 0 && raw.totalBytes < prevTotals.totalBytes) {
               raw.totalBytes = prevTotals.totalBytes
             }
@@ -95,8 +97,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             }
           }
           const nextTotals = {
-            totalBytes: Math.max(prevTotals?.totalBytes || 0, raw.totalBytes || 0),
-            totalCount: Math.max(prevTotals?.totalCount || 0, raw.totalCount || 0),
+            runId,
+            totalBytes: Math.max(prevRunId === runId ? (prevTotals?.totalBytes || 0) : 0, raw.totalBytes || 0),
+            totalCount: Math.max(prevRunId === runId ? (prevTotals?.totalCount || 0) : 0, raw.totalCount || 0),
           }
           options.lastNonDecreasingTotalsByTask.value[tid] = nextTotals
         }
@@ -161,11 +164,13 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             const cur = options.activeRuns.value[idx] || {}
             const prev = cur.progress || {}
             const tid = cur.runRecord?.taskId
+            const runId = cur.runRecord?.id
             const incomingTotalBytes = Number(msg.data.total || prev.totalBytes || 0)
             const incomingTotalCount = Number(msg.data.totalCount || msg.data.plannedFiles || prev.totalCount || 0)
-            const prevTotals = tid ? options.lastNonDecreasingTotalsByTask.value[tid] : undefined
-            const nextTotalBytes = Math.max(prevTotals?.totalBytes || 0, incomingTotalBytes || 0)
-            const nextTotalCount = Math.max(prevTotals?.totalCount || 0, incomingTotalCount || 0)
+            const prevTotals = tid ? (options.lastNonDecreasingTotalsByTask.value[tid] as any) : undefined
+            const prevRunId = prevTotals?.runId
+            const nextTotalBytes = Math.max(prevRunId === runId ? (prevTotals?.totalBytes || 0) : 0, incomingTotalBytes || 0)
+            const nextTotalCount = Math.max(prevRunId === runId ? (prevTotals?.totalCount || 0) : 0, incomingTotalCount || 0)
             const nextCompletedFiles = Math.max(
               Number(prev.completedFiles || 0),
               Number(msg.data.completedFiles || 0),
@@ -182,6 +187,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             }
             if (tid) {
               options.lastNonDecreasingTotalsByTask.value[tid] = {
+                runId,
                 totalBytes: nextTotalBytes,
                 totalCount: nextTotalCount,
               }
