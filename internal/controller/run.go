@@ -357,9 +357,8 @@ func countCompletedFilesFromLog(logPath string) int {
 			if name == "" {
 				continue
 			}
-			// 只统计明确的单文件完成事件，避免把 CAS 失败重试、扫描阶段的 notice、
-			// 或者其他“看起来像完成”的日志误算进 completedFiles。
-			if !fileDoneRe.MatchString(msg) {
+			// 统计明确的单文件完成事件；CAS 命中属于等效已传输，也计入完成数。
+			if !(fileDoneRe.MatchString(msg) || strings.Contains(msg, "cas compatible match after source cleanup")) {
 				continue
 			}
 			seen[name] = struct{}{}

@@ -322,7 +322,7 @@ func TestHandleRuns_DoesNotExposeHistoricalFilesArray(t *testing.T) {
 	}
 }
 
-func TestHandleActiveRuns_DoesNotCountCASMatchAsCompletedFiles(t *testing.T) {
+func TestHandleActiveRuns_CountsCASMatchAsCompletedFiles(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "rcloneflow-active-log-*.log")
 	if err != nil {
 		t.Fatalf("CreateTemp() error = %v", err)
@@ -369,8 +369,8 @@ func TestHandleActiveRuns_DoesNotCountCASMatchAsCompletedFiles(t *testing.T) {
 	if prog == nil {
 		t.Fatalf("missing progress")
 	}
-	if got := int(prog["completedFiles"].(float64)); got != 0 {
-		t.Fatalf("completedFiles=%d, want 0 for CAS match notice", got)
+	if got := int(prog["completedFiles"].(float64)); got != 1 {
+		t.Fatalf("completedFiles=%d, want 1 for CAS match notice", got)
 	}
 }
 
