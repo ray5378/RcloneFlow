@@ -77,7 +77,7 @@ func Run(cfg *config.Config) error {
 	authCtrl := controller.NewAuthController(db)
 
 	// 初始化路由
-	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl)
+	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, cfg.GetStaticDir())
 
 	// 注入 settings → cleanup 重排钩子（在声明服务之后再赋值）
 	var cleanupSvc *service.CleanupService

@@ -256,9 +256,7 @@
 - `cd /root/.openclaw/workspace/rcloneflow/frontend && npx tsc --noEmit -p tsconfig.json`
 - `cd /root/.openclaw/workspace/rcloneflow/frontend && npm run build`
 
-若前端源码改动触发构建产物变更，还要同步提交：
-- `web/index.html`
-- `web/assets/*`
+若前端源码改动触发构建产物变更，只需确认 `web/` 可由构建重建，不再要求手工提交产物。
 
 提交后必须再次确认：
 - `git status --short` 最终为空

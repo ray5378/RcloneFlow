@@ -1,7 +1,9 @@
 package router
 
 import (
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 
 	"rcloneflow/internal/auth"
@@ -18,6 +20,7 @@ type Router struct {
 	runCtrl      *controller.RunController
 	fsCtrl       *controller.FsController
 	authCtrl     *controller.AuthController
+	staticDir    string
 }
 
 // New 创建路由实例
@@ -29,6 +32,7 @@ func New(
 	runCtrl *controller.RunController,
 	fsCtrl *controller.FsController,
 	authCtrl *controller.AuthController,
+	staticDir string,
 ) *Router {
 	return &Router{
 		remoteCtrl:   rc,
@@ -38,6 +42,7 @@ func New(
 		runCtrl:      runCtrl,
 		fsCtrl:       fsCtrl,
 		authCtrl:     authCtrl,
+		staticDir:    staticDir,
 	}
 }
 
@@ -136,5 +141,17 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	mux.Handle("/api/", protectedMux)
 
 	// 静态文件（公开）
-	mux.Handle("/", http.FileServer(http.Dir("./web")))
+	mux.Handle("/", staticFileHandler(r.staticDir))
+}
+
+func staticFileHandler(staticDir string) http.Handler {
+	if _, err := os.Stat(staticDir); err != nil {
+		message := fmt.Sprintf(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RcloneFlow</title><style>body{font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#111827;color:#e5e7eb}main{max-width:720px;padding:32px}code{background:#1f2937;padding:2px 6px;border-radius:4px}a{color:#93c5fd}</style></head><body><main><h1>前端构建产物缺失</h1><p>当前静态目录 <code>%s</code> 不存在。请先执行 <code>cd frontend && npm run build</code>，或使用 Docker 镜像启动。</p></main></body></html>`, staticDir)
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(message))
+		})
+	}
+	return http.FileServer(http.Dir(staticDir))
 }

@@ -43,6 +43,7 @@ data/
 frontend/dist/
 frontend/node_modules/
 frontend/package-lock.json
+web/
 
 # Local build acceleration caches (keep locally, do not commit)
 third_party/docker/

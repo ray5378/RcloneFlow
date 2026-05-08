@@ -213,7 +213,7 @@ rcloneflow/
 │   ├── service/     # 业务逻辑
 │   ├── store/       # 数据层
 │   └── adapter/     # 适配器
-├── frontend/        # 前端
-├── web/             # 前端构建产物
+├── frontend/        # 前端源码
+├── web/             # 前端构建输出（可重建）
 └── Dockerfile
 ```
