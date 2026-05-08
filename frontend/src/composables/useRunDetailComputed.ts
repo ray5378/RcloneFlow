@@ -6,6 +6,7 @@ type FinalFilterType = 'all' | 'success' | 'failed' | 'other'
 
 interface UseRunDetailComputedOptions {
   runDetail?: Ref<any>
+  detailFiles?: Ref<any[]>
   finalFilesPage?: Ref<number>
   finalFilesPageSize?: Ref<number>
 }
@@ -45,9 +46,9 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   }
 
   const finalFiles = computed(() => {
+    if (options?.detailFiles?.value && Array.isArray(options.detailFiles.value)) return options.detailFiles.value as any[]
     if (!options?.runDetail) return [] as any[]
     const detail = options.runDetail.value as any
-    if (Array.isArray(detail?.__files)) return detail.__files as any[]
     return (getFinalSummary(detail)?.files || []) as any[]
   })
 

@@ -37,10 +37,6 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
       }
       runFiles.value = allItems
       runFilesTotal.value = total || allItems.length
-      if (options.runDetail.value) {
-        options.runDetail.value.__files = allItems
-        options.runDetail.value.__filesTotal = runFilesTotal.value
-      }
     } catch (e) {
       console.error(e)
     }

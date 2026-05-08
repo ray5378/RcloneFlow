@@ -37,7 +37,7 @@ export function useRunDetailRuntime(options: {
     goPrevFinalFilesPage,
     goNextFinalFilesPage,
     jumpFinalFilesPage,
-  } = useRunDetailComputed({ runDetail })
+  } = useRunDetailComputed({ runDetail, detailFiles: runFiles })
 
   return {
     showDetailModal,
