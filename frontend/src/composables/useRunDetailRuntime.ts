@@ -13,6 +13,7 @@ export function useRunDetailRuntime(options: {
   } = useRunDetailState()
 
   const {
+    runFiles,
     runFilesPage,
     openRunDetailFiles,
     pagedRunFiles,
