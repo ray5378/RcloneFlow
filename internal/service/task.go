@@ -237,8 +237,8 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			return fmt.Errorf("单例模式：申请运行记录失败，%w", err)
 		}
 		if existed {
-			// 记录跳过到历史
-			s.db.AddRun(store.Run{
+			// 记录跳过到历史，但对外按“正常跳过”处理，不当作错误返回。
+			_, _ = s.db.AddRun(store.Run{
 				TaskID:  taskID,
 				Status:  "skipped",
 				Trigger: trigger,
@@ -254,7 +254,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 				TargetRemote: t.TargetRemote,
 				TargetPath:   t.TargetPath,
 			})
-			return fmt.Errorf("单例模式：有其他任务正在运行，跳过本次执行")
+			return nil
 		}
 		// 成功创建记录，run 已填充
 		// 成功创建记录，run 已填充
