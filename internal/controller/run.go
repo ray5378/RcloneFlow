@@ -1085,19 +1085,31 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 				}
 			}
 		}
-		totalCount := float64(0)
+		plannedFiles := float64(0)
 		if v, ok := progress["plannedFiles"].(float64); ok {
-			totalCount = v
+			plannedFiles = v
 		}
-		if totalCount <= 0 && summary != nil {
-			if pf, ok := summary["preflight"].(map[string]any); ok {
-				if v, ok2 := pf["totalCount"].(float64); ok2 {
-					totalCount = v
+		logicalTotalCount := plannedFiles
+		if summary != nil {
+			if opts, ok := summary["effectiveOptions"].(map[string]any); ok {
+				if casCompatible, ok := opts["openlistCasCompatible"].(bool); ok && casCompatible {
+					if pf, ok := summary["preflight"].(map[string]any); ok {
+						if v, ok2 := pf["totalCount"].(float64); ok2 && v > 0 {
+							logicalTotalCount = v
+						}
+					}
 				}
 			}
 		}
-		if totalCount > 0 && completedFiles > totalCount {
-			completedFiles = totalCount
+		if logicalTotalCount <= 0 && summary != nil {
+			if pf, ok := summary["preflight"].(map[string]any); ok {
+				if v, ok2 := pf["totalCount"].(float64); ok2 {
+					logicalTotalCount = v
+				}
+			}
+		}
+		if logicalTotalCount > 0 && completedFiles > logicalTotalCount {
+			completedFiles = logicalTotalCount
 		}
 
 		phase := "transferring"
@@ -1122,15 +1134,17 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		}
 
 		stable := map[string]any{
-			"bytes":          bytes,
-			"totalBytes":     total,
-			"speed":          speed,
-			"eta":            eta,
-			"percentage":     pct,
-			"phase":          phase,
-			"lastUpdatedAt":  time.Now().Format(time.RFC3339),
-			"completedFiles": completedFiles,
-			"totalCount":     totalCount,
+			"bytes":             bytes,
+			"totalBytes":        total,
+			"speed":             speed,
+			"eta":               eta,
+			"percentage":        pct,
+			"phase":             phase,
+			"lastUpdatedAt":     time.Now().Format(time.RFC3339),
+			"completedFiles":    completedFiles,
+			"plannedFiles":      plannedFiles,
+			"logicalTotalCount":  logicalTotalCount,
+			"totalCount":        logicalTotalCount,
 		}
 
 		calcPct := 0.0
@@ -1138,7 +1152,7 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			calcPct = float64(bytes) / float64(total) * 100
 		}
 		pctMismatch := total > 0 && math.Abs(calcPct-pct) > 1.5
-		countMismatch := totalCount > 0 && completedFiles > totalCount
+		countMismatch := logicalTotalCount > 0 && completedFiles > logicalTotalCount
 		etaMismatch := eta > 0 && speed > 0 && total > bytes && math.Abs((float64(total-bytes)/float64(speed))-eta) > 300
 		progressMismatch := pctMismatch || countMismatch || etaMismatch
 		progressCheck := map[string]any{

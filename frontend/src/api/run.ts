@@ -79,6 +79,8 @@ export interface ActiveRunProgress {
   speed: number
   percentage: number
   completedFiles: number
+  plannedFiles?: number
+  logicalTotalCount?: number
   totalCount: number
   eta: number
   phase?: string

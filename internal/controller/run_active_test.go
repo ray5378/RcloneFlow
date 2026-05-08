@@ -159,7 +159,7 @@ func TestHandleActiveRuns_DoesNotExposeFinalSummary(t *testing.T) {
 	}
 }
 
-func TestHandleActiveRuns_UsesProgressTotalsOnly(t *testing.T) {
+func TestHandleActiveRuns_UsesLogicalTotalsAndKeepsPlannedFiles(t *testing.T) {
 	summary := map[string]any{
 		"progress": map[string]any{
 			"bytes":          float64(100),
@@ -173,6 +173,9 @@ func TestHandleActiveRuns_UsesProgressTotalsOnly(t *testing.T) {
 		"preflight": map[string]any{
 			"totalBytes": float64(1024),
 			"totalCount": float64(166),
+		},
+		"effectiveOptions": map[string]any{
+			"openlistCasCompatible": true,
 		},
 	}
 	bs, _ := json.Marshal(summary)
@@ -202,15 +205,21 @@ func TestHandleActiveRuns_UsesProgressTotalsOnly(t *testing.T) {
 	if got := int(prog["totalBytes"].(float64)); got != 300 {
 		t.Fatalf("totalBytes=%d, want 300", got)
 	}
-	if got := int(prog["totalCount"].(float64)); got != 33 {
-		t.Fatalf("totalCount=%d, want 33", got)
+	if got := int(prog["plannedFiles"].(float64)); got != 33 {
+		t.Fatalf("plannedFiles=%d, want 33", got)
+	}
+	if got := int(prog["logicalTotalCount"].(float64)); got != 166 {
+		t.Fatalf("logicalTotalCount=%d, want 166", got)
+	}
+	if got := int(prog["totalCount"].(float64)); got != 166 {
+		t.Fatalf("totalCount=%d, want 166", got)
 	}
 	if got := prog["percentage"].(float64); got < 9.9 || got > 10.1 {
 		t.Fatalf("percentage=%v, want about 10", got)
 	}
 }
 
-func TestHandleActiveRuns_FallsBackToPreflightTotalCountWhenPlannedFilesMissing(t *testing.T) {
+func TestHandleActiveRuns_UsesPreflightTotalCountForCASCompatibleRuns(t *testing.T) {
 	summary := map[string]any{
 		"progress": map[string]any{
 			"bytes":          float64(100),
