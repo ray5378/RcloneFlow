@@ -322,14 +322,14 @@ func TestHandleRuns_DoesNotExposeHistoricalFilesArray(t *testing.T) {
 	}
 }
 
-func TestHandleActiveRuns_BackfillsCompletedFilesFromLogCASNotice(t *testing.T) {
+func TestHandleActiveRuns_DoesNotCountCASMatchAsCompletedFiles(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "rcloneflow-active-log-*.log")
 	if err != nil {
 		t.Fatalf("CreateTemp() error = %v", err)
 	}
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
-	logText := "2026/05/01 14:01:20 NOTICE: 电视剧/国产剧/人间惊鸿客 (2026)/Season 1/人间惊鸿客 - S01E18 - 第 18 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	logText := "2026/05/08 18:45:46 NOTICE: 电视剧/国产剧/低智商犯罪 (2026)/Season 1/低智商犯罪 - S01E12 - 第 12 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
 	if _, err := tmpFile.WriteString(logText); err != nil {
 		t.Fatalf("WriteString() error = %v", err)
 	}
@@ -369,8 +369,8 @@ func TestHandleActiveRuns_BackfillsCompletedFilesFromLogCASNotice(t *testing.T) 
 	if prog == nil {
 		t.Fatalf("missing progress")
 	}
-	if got := int(prog["completedFiles"].(float64)); got != 1 {
-		t.Fatalf("completedFiles=%d, want 1 from log fallback", got)
+	if got := int(prog["completedFiles"].(float64)); got != 0 {
+		t.Fatalf("completedFiles=%d, want 0 for CAS match notice", got)
 	}
 }
 

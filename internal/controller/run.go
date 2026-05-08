@@ -326,6 +326,7 @@ func countCompletedFilesFromLog(logPath string) int {
 	lines := strings.Split(string(data), "\n")
 	tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
 	re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
+	fileDoneRe := regexp.MustCompile(`(?i)^(?:copied\s*\(new\)|renamed\b|moved\b|deleted\b|removed\b|purged\b)`)
 	seen := map[string]struct{}{}
 	for _, ln := range lines {
 		l := strings.TrimSpace(ln)
@@ -356,9 +357,12 @@ func countCompletedFilesFromLog(logPath string) int {
 			if name == "" {
 				continue
 			}
-			if strings.Contains(msg, "copied") || strings.Contains(msg, "renamed") || strings.Contains(msg, "cas compatible match after source cleanup") {
-				seen[name] = struct{}{}
+			// 只统计明确的单文件完成事件，避免把 CAS 失败重试、扫描阶段的 notice、
+			// 或者其他“看起来像完成”的日志误算进 completedFiles。
+			if !fileDoneRe.MatchString(msg) {
+				continue
 			}
+			seen[name] = struct{}{}
 		}
 	}
 	return len(seen)
