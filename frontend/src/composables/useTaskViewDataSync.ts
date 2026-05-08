@@ -163,11 +163,12 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             const tid = cur.runRecord?.taskId
             const runId = cur.runRecord?.id
             const incomingTotalBytes = Number(msg.data.total || prev.totalBytes || 0)
-            const incomingTotalCount = Number(msg.data.totalCount || prev.totalCount || 0)
+            const incomingPlannedFiles = Number(msg.data.plannedFiles || 0)
+            const incomingLogicalTotalCount = Number(msg.data.logicalTotalCount || msg.data.totalCount || incomingPlannedFiles || prev.logicalTotalCount || prev.totalCount || 0)
             const prevTotals = tid ? (options.lastNonDecreasingTotalsByTask.value[tid] as any) : undefined
             const prevRunId = prevTotals?.runId
             const nextTotalBytes = Math.max(prevRunId === runId ? (prevTotals?.totalBytes || 0) : 0, incomingTotalBytes || 0)
-            const nextTotalCount = incomingTotalCount > 0 ? incomingTotalCount : (prevRunId === runId ? (prevTotals?.totalCount || 0) : 0)
+            const nextLogicalTotalCount = incomingLogicalTotalCount > 0 ? incomingLogicalTotalCount : (prevRunId === runId ? (prevTotals?.totalCount || 0) : 0)
             const nextCompletedFiles = Math.max(
               Number(prev.completedFiles || 0),
               Number(msg.data.completedFiles || 0),
@@ -179,7 +180,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
               speed: Number(msg.data.speed || 0),
               percentage: Number(msg.data.percent || prev.percentage || 0),
               completedFiles: nextCompletedFiles,
-              totalCount: nextTotalCount,
+              plannedFiles: Math.max(Number(prev.plannedFiles || 0), incomingPlannedFiles),
+              logicalTotalCount: nextLogicalTotalCount,
+              totalCount: nextLogicalTotalCount,
               eta: Number(msg.data.eta || prev.eta || 0),
             }
             if (tid) {
@@ -207,6 +210,11 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
                 ? (() => { try { return JSON.parse(curRun.summary) } catch { return {} } })()
                 : (curRun.summary || {})
               const prevProgress = sum.progress || {}
+              const nextPlannedFiles = Math.max(Number(prevProgress.plannedFiles || 0), Number(msg.data.plannedFiles || 0))
+              const nextLogicalTotalCount = Math.max(
+                Number(prevProgress.logicalTotalCount || prevProgress.totalCount || 0),
+                Number(msg.data.logicalTotalCount || msg.data.totalCount || msg.data.plannedFiles || 0),
+              )
               sum.progress = {
                 ...prevProgress,
                 bytes: Number(msg.data.bytes || 0),
@@ -214,7 +222,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
                 speed: Number(msg.data.speed || 0),
                 percentage: Number(msg.data.percent || prevProgress.percentage || 0),
                 completedFiles: Math.max(Number(prevProgress.completedFiles || 0), Number(msg.data.completedFiles || 0)),
-                plannedFiles: Math.max(Number(prevProgress.plannedFiles || 0), Number(msg.data.plannedFiles || msg.data.totalCount || 0)),
+                plannedFiles: nextPlannedFiles,
+                logicalTotalCount: nextLogicalTotalCount,
+                totalCount: nextLogicalTotalCount,
                 eta: Number(msg.data.eta || prevProgress.eta || 0),
               }
               options.runs.value[runIdx] = {

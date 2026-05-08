@@ -14,7 +14,8 @@ export function getActiveProgressText(active: any) {
   }
   let etaStr = ''
   if (Number(p.eta || 0) > 0) etaStr = ` · ${t('runtime.etaDone')} ${formatEta(Number(p.eta || 0))}`
-  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · ${t('runtime.totalCount')} ${Number(p.totalCount || 0)} ／ ${t('runtime.completedCount')} ${Number(p.completedFiles || 0)}${etaStr}`
+  const totalCount = Number(p.logicalTotalCount || p.totalCount || 0)
+  return `${Number(p.percentage || 0).toFixed(2)}% · ${formatBytes(Number(p.bytes || 0))} / ${formatBytes(Number(p.totalBytes || 0))} · ${formatBytesPerSec(Number(p.speed || 0))} · ${t('runtime.totalCount')} ${totalCount} ／ ${t('runtime.completedCount')} ${Number(p.completedFiles || 0)}${etaStr}`
 }
 
 export function getActiveProgressLine(active: any) {

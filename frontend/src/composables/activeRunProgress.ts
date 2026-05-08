@@ -19,7 +19,7 @@ export function getRunningProgressByTask(taskId: number, getActiveRunByTaskId: (
   st.speed = Number(st.speed || 0)
   st.percentage = Number(st.percentage || 0)
   st.completedFiles = Number(st.completedFiles || 0)
-  st.totalCount = Number(st.totalCount || 0)
+  st.totalCount = Number(st.logicalTotalCount || st.totalCount || 0)
   st.eta = Number(st.eta || 0)
   if (st.percentage < 0) st.percentage = 0
   if (st.percentage > 100) st.percentage = 100
