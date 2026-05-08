@@ -38,6 +38,12 @@ const emit = defineEmits<{
   (e: 'next-files-page'): void
 }>()
 
+function getSuccessLabel(mode?: string) {
+  if (mode === 'move') return t('modal.moved')
+  if (mode === 'sync') return t('modal.synced')
+  return t('modal.copied')
+}
+
 function onFinalFilesJumpInput(event: Event) {
   const target = event.target as HTMLInputElement
   const value = target.value === '' ? null : Number(target.value)
@@ -91,7 +97,7 @@ function countLine(template: string, count: number) {
                 <div class="summary-val">{{ finalCountAll }}</div>
               </div>
               <div class="summary-cell clickable" @click="emit('set-final-filter', 'success')">
-                <div class="summary-key">{{ runDetail.taskMode === 'move' ? t('modal.moved') : t('modal.success') }}</div>
+                <div class="summary-key">{{ getSuccessLabel(runDetail.taskMode) }}</div>
                 <div class="summary-val">{{ finalCountSuccess }}</div>
               </div>
               <div class="summary-cell clickable" @click="emit('set-final-filter', 'failed')">

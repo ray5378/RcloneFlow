@@ -52,11 +52,22 @@ const normalizedSummary = computed(() => {
   return raw?.finalSummary && typeof raw.finalSummary === 'object' ? raw.finalSummary : raw
 })
 const summaryTotal = computed(() => normalizedSummary.value?.counts?.total ?? 0)
-const summarySuccess = computed(() => ((normalizedSummary.value?.counts?.copied || 0) + (normalizedSummary.value?.counts?.deleted || 0)))
+const summarySuccess = computed(() => {
+  const counts = normalizedSummary.value?.counts || {}
+  return props.run.taskMode === 'move'
+    ? (counts.copied || 0)
+    : ((counts.copied || 0) + (counts.deleted || 0))
+})
 const summaryFailed = computed(() => normalizedSummary.value?.counts?.failed || 0)
 const summaryTotalSize = computed(() => formatBytes(normalizedSummary.value?.totalBytes || 0))
 const summaryTransferred = computed(() => formatBytes(normalizedSummary.value?.transferredBytes || 0))
 const summaryMessage = computed(() => normalizedSummary.value?.message || '')
+
+function getSuccessLabel(mode?: string) {
+  if (mode === 'move') return t('runItem.moved')
+  if (mode === 'sync') return t('runItem.synced')
+  return t('runItem.copied')
+}
 
 function getStatusClass(status: string) {
   switch (status) {
@@ -126,7 +137,7 @@ function getProgressText(run: RunRecord): string {
       <template v-else>
         <span class="chip list-item-chip">{{ t('runItem.total') }} {{ summaryTotal }}</span>
         <span class="chip list-item-chip list-item-chip-success">
-          {{ run.taskMode === 'move' ? t('runItem.moved') : t('runItem.success') }}
+          {{ getSuccessLabel(run.taskMode) }}
           {{ summarySuccess }}
         </span>
         <span class="chip list-item-chip list-item-chip-failed">{{ t('runItem.failed') }} {{ summaryFailed }}</span>

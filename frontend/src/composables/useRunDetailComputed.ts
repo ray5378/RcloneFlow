@@ -49,10 +49,27 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
     return (getFinalSummary(options.runDetail.value)?.files || []) as any[]
   })
 
-  const finalCountAll = computed(() => finalFiles.value.length)
-  const finalCountSuccess = computed(() => finalFiles.value.filter(it => (it.status || '') === 'success').length)
-  const finalCountFailed = computed(() => finalFiles.value.filter(it => (it.status || '') === 'failed').length)
-  const finalCountOther = computed(() => finalFiles.value.filter(it => (it.status || '') === 'skipped').length)
+  function getSummaryCounts(run: Run | null | undefined) {
+    const fs = getFinalSummary(run)
+    const counts = (fs?.counts && typeof fs.counts === 'object') ? fs.counts : null
+    return {
+      all: Number(counts?.total || finalFiles.value.length || 0),
+      copied: Number(counts?.copied || 0),
+      deleted: Number(counts?.deleted || 0),
+      failed: Number(counts?.failed || 0),
+      skipped: Number(counts?.skipped || 0),
+    }
+  }
+
+  const finalCountAll = computed(() => getSummaryCounts(options?.runDetail?.value).all)
+  const finalCountSuccess = computed(() => {
+    const counts = getSummaryCounts(options?.runDetail?.value)
+    return options?.runDetail?.value?.taskMode === 'move'
+      ? counts.copied
+      : counts.copied + counts.deleted
+  })
+  const finalCountFailed = computed(() => getSummaryCounts(options?.runDetail?.value).failed)
+  const finalCountOther = computed(() => getSummaryCounts(options?.runDetail?.value).skipped)
 
   const currentFinalFilter = ref<FinalFilterType>('all')
   function setFinalFilter(filter: FinalFilterType) {
