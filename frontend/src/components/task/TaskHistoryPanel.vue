@@ -18,20 +18,25 @@ const props = defineProps<{
   getFinalSummary: (run: Run) => any
 }>()
 
-const displayRuns = computed(() => props.filteredRuns.map(run => ({
-  ...run,
-  __title: run.taskName || `${t('runItem.taskFallback')} #${run.taskId}`,
-  __triggerText: run.trigger === 'schedule' ? t('runItem.schedule') : run.trigger === 'manual' ? t('runItem.manual') : run.trigger === 'webhook' ? 'Webhook' : '',
-  __statusText: run.status === 'finished' ? t('runItem.finished') : run.status === 'failed' ? t('runItem.failed') : run.status === 'skipped' ? t('runItem.skipped') : run.status === 'running' ? t('runItem.running') : run.status,
-  __statusClass: run.status === 'finished' ? 'success' : run.status === 'failed' ? 'danger' : run.status === 'skipped' ? 'warning' : run.status === 'running' ? 'info' : '',
-  __startedText: run.startedAt ? new Date(run.startedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-',
-  __summaryTotal: (run as any)?.summary?.counts?.total ?? 0,
-  __summarySuccess: (((run as any)?.summary?.counts?.copied || 0) + ((run as any)?.summary?.counts?.deleted || 0)),
-  __summaryFailed: (run as any)?.summary?.counts?.failed || 0,
-  __summaryTotalSize: (run as any)?.summary?.totalBytes || 0,
-  __summaryTransferred: (run as any)?.summary?.transferredBytes || 0,
-  __summaryMessage: (run as any)?.summary?.message || '',
-})))
+const displayRuns = computed(() => props.filteredRuns.map(run => {
+  const summary = (run as any)?.summary?.finalSummary && typeof (run as any).summary.finalSummary === 'object'
+    ? (run as any).summary.finalSummary
+    : (run as any)?.summary
+  return {
+    ...run,
+    __title: run.taskName || `${t('runItem.taskFallback')} #${run.taskId}`,
+    __triggerText: run.trigger === 'schedule' ? t('runItem.schedule') : run.trigger === 'manual' ? t('runItem.manual') : run.trigger === 'webhook' ? 'Webhook' : '',
+    __statusText: run.status === 'finished' ? t('runItem.finished') : run.status === 'failed' ? t('runItem.failed') : run.status === 'skipped' ? t('runItem.skipped') : run.status === 'running' ? t('runItem.running') : run.status,
+    __statusClass: run.status === 'finished' ? 'success' : run.status === 'failed' ? 'danger' : run.status === 'skipped' ? 'warning' : run.status === 'running' ? 'info' : '',
+    __startedText: run.startedAt ? new Date(run.startedAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '-',
+    __summaryTotal: summary?.counts?.total ?? 0,
+    __summarySuccess: ((summary?.counts?.copied || 0) + (summary?.counts?.deleted || 0)),
+    __summaryFailed: summary?.counts?.failed || 0,
+    __summaryTotalSize: summary?.totalBytes || 0,
+    __summaryTransferred: summary?.transferredBytes || 0,
+    __summaryMessage: summary?.message || '',
+  }
+}))
 
 const emit = defineEmits<{
   (e: 'back'): void

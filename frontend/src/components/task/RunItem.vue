@@ -47,12 +47,16 @@ const statusText = computed(() => getStatusText(props.run.status || ''))
 const triggerText = computed(() => props.run.trigger ? getTriggerText(props.run.trigger) : '')
 const startedText = computed(() => formatTime(props.run.startedAt || ''))
 const progressText = computed(() => props.run.status === 'running' ? getProgressText(props.run) : '-')
-const summaryTotal = computed(() => props.summary?.counts?.total ?? 0)
-const summarySuccess = computed(() => ((props.summary?.counts?.copied || 0) + (props.summary?.counts?.deleted || 0)))
-const summaryFailed = computed(() => props.summary?.counts?.failed || 0)
-const summaryTotalSize = computed(() => formatBytes(props.summary?.totalBytes || 0))
-const summaryTransferred = computed(() => formatBytes(props.summary?.transferredBytes || 0))
-const summaryMessage = computed(() => props.summary?.message || '')
+const normalizedSummary = computed(() => {
+  const raw = props.summary as any
+  return raw?.finalSummary && typeof raw.finalSummary === 'object' ? raw.finalSummary : raw
+})
+const summaryTotal = computed(() => normalizedSummary.value?.counts?.total ?? 0)
+const summarySuccess = computed(() => ((normalizedSummary.value?.counts?.copied || 0) + (normalizedSummary.value?.counts?.deleted || 0)))
+const summaryFailed = computed(() => normalizedSummary.value?.counts?.failed || 0)
+const summaryTotalSize = computed(() => formatBytes(normalizedSummary.value?.totalBytes || 0))
+const summaryTransferred = computed(() => formatBytes(normalizedSummary.value?.transferredBytes || 0))
+const summaryMessage = computed(() => normalizedSummary.value?.message || '')
 
 function getStatusClass(status: string) {
   switch (status) {
