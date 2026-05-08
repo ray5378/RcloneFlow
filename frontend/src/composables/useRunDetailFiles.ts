@@ -22,10 +22,25 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
   async function reloadRunFiles() {
     try {
       if (!options.runDetail.value?.id) return
-      const pageOffset = (runFilesPage.value - 1) * runFilesPageSize.value
-      const res = await options.runApi.getFiles(options.runDetail.value.id, pageOffset, runFilesPageSize.value)
-      runFiles.value = res.items || []
-      runFilesTotal.value = res.total || 0
+      const pageSize = Math.min(1000, Math.max(100, runFilesPageSize.value * 4))
+      const allItems: any[] = []
+      let offset = 0
+      let total = 0
+      while (true) {
+        const res = await options.runApi.getFiles(options.runDetail.value.id, offset, pageSize)
+        const items = res.items || []
+        total = res.total || total || 0
+        allItems.push(...items)
+        if (items.length < pageSize) break
+        if (total > 0 && allItems.length >= total) break
+        offset += pageSize
+      }
+      runFiles.value = allItems
+      runFilesTotal.value = total || allItems.length
+      if (options.runDetail.value) {
+        options.runDetail.value.__files = allItems
+        options.runDetail.value.__filesTotal = runFilesTotal.value
+      }
     } catch (e) {
       console.error(e)
     }
@@ -37,20 +52,23 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
     void reloadRunFiles()
   }
 
-  const pagedRunFiles = computed(() => runFiles.value)
+  const pagedRunFiles = computed(() => {
+    const page = runFilesPage.value || 1
+    const pageSize = runFilesPageSize.value || 1
+    const start = (page - 1) * pageSize
+    return runFiles.value.slice(start, start + pageSize)
+  })
   const totalRunFilesPages = computed(() => Math.max(1, Math.ceil((runFilesTotal.value || 0) / runFilesPageSize.value)))
 
   function goPrevFilesPage() {
     if (runFilesPage.value > 1) {
       runFilesPage.value--
-      reloadRunFiles()
     }
   }
 
   function goNextFilesPage() {
     if (runFilesPage.value < totalRunFilesPages.value) {
       runFilesPage.value++
-      reloadRunFiles()
     }
   }
 

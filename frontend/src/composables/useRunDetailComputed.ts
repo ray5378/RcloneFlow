@@ -46,7 +46,9 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
 
   const finalFiles = computed(() => {
     if (!options?.runDetail) return [] as any[]
-    return (getFinalSummary(options.runDetail.value)?.files || []) as any[]
+    const detail = options.runDetail.value as any
+    if (Array.isArray(detail?.__files)) return detail.__files as any[]
+    return (getFinalSummary(detail)?.files || []) as any[]
   })
 
   function getSummaryCounts(run: Run | null | undefined) {
@@ -75,6 +77,7 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   function setFinalFilter(filter: FinalFilterType) {
     currentFinalFilter.value = filter
     finalFilesPage.value = 1
+    finalFilesJump.value = null
   }
 
   const finalFilteredFiles = computed(() => {
