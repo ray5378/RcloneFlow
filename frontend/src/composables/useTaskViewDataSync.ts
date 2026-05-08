@@ -92,14 +92,11 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             if (prevTotals.totalBytes > 0 && raw.totalBytes > 0 && raw.totalBytes < prevTotals.totalBytes) {
               raw.totalBytes = prevTotals.totalBytes
             }
-            if (prevTotals.totalCount > 0 && raw.totalCount > 0 && raw.totalCount < prevTotals.totalCount) {
-              raw.totalCount = prevTotals.totalCount
-            }
           }
           const nextTotals = {
             runId,
             totalBytes: Math.max(prevRunId === runId ? (prevTotals?.totalBytes || 0) : 0, raw.totalBytes || 0),
-            totalCount: Math.max(prevRunId === runId ? (prevTotals?.totalCount || 0) : 0, raw.totalCount || 0),
+            totalCount: raw.totalCount || 0,
           }
           options.lastNonDecreasingTotalsByTask.value[tid] = nextTotals
         }
@@ -170,7 +167,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             const prevTotals = tid ? (options.lastNonDecreasingTotalsByTask.value[tid] as any) : undefined
             const prevRunId = prevTotals?.runId
             const nextTotalBytes = Math.max(prevRunId === runId ? (prevTotals?.totalBytes || 0) : 0, incomingTotalBytes || 0)
-            const nextTotalCount = Math.max(prevRunId === runId ? (prevTotals?.totalCount || 0) : 0, incomingTotalCount || 0)
+            const nextTotalCount = incomingTotalCount > 0 ? incomingTotalCount : (prevRunId === runId ? (prevTotals?.totalCount || 0) : 0)
             const nextCompletedFiles = Math.max(
               Number(prev.completedFiles || 0),
               Number(msg.data.completedFiles || 0),
