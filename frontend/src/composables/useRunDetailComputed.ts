@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import type { FinalSummary } from '../api/run'
 import type { Run, RunSummaryPayload } from '../types'
 
@@ -100,6 +100,12 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   })
 
   const finalFilesJump = ref<number | null>(null)
+
+  watch(() => options?.runDetail?.value?.id, () => {
+    currentFinalFilter.value = 'all'
+    finalFilesPage.value = 1
+    finalFilesJump.value = null
+  }, { immediate: true })
 
   function goPrevFinalFilesPage() {
     if (finalFilesPage.value > 1) finalFilesPage.value--
