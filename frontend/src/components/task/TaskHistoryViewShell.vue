@@ -41,6 +41,7 @@ defineProps<{
   openRunLog: (run: any) => void
   clearRun: (run: any) => void
   closeRunDetail: () => void
+  setFinalFilter: (filter: string) => void
   goPrevFilesPage: () => void
   goNextFilesPage: () => void
   showLogModal: boolean
@@ -98,6 +99,7 @@ defineProps<{
     @view-log="openRunLog"
     @clear-run="clearRun"
     @close-detail="closeRunDetail"
+    @set-final-filter="setFinalFilter"
     @prev-files-page="goPrevFilesPage"
     @next-files-page="goNextFilesPage"
   />

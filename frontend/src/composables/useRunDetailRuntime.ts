@@ -14,9 +14,9 @@ export function useRunDetailRuntime(options: {
 
   const {
     runFiles,
-    runFilesTotal,
     runFilesPage,
     openRunDetailFiles,
+    visibleRunFiles,
     pagedRunFiles,
     totalRunFilesPages,
     goPrevFilesPage,
@@ -47,7 +47,7 @@ export function useRunDetailRuntime(options: {
     runDetail,
     openRunDetailModal,
     closeRunDetailModal,
-    runFilesTotal,
+    runFilesTotal: visibleRunFiles,
     runFilesPage,
     openRunDetailFiles,
     pagedRunFiles,

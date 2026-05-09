@@ -94,6 +94,7 @@ const {
   finalCountSuccess,
   finalCountFailed,
   finalCountOther,
+  setFinalFilter,
 } = useRunDetailRuntime({ runApi })
 
 // 6) 主数据加载与进度相关派生
@@ -432,6 +433,7 @@ const {
     :open-run-log="openRunLog"
     :clear-run="clearRun"
     :close-run-detail="closeRunDetail"
+    :set-final-filter="setFinalFilter"
     :go-prev-files-page="goPrevFilesPage"
     :go-next-files-page="goNextFilesPage"
     :show-log-modal="showLogModal"

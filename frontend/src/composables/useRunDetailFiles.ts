@@ -1,4 +1,5 @@
 import { computed, ref, type Ref } from 'vue'
+import type { RunFileRow } from '../api/run'
 
 interface UseRunDetailFilesOptions {
   runDetail: Ref<any>
@@ -48,13 +49,21 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
     void reloadRunFiles()
   }
 
+  const visibleRunFiles = computed<RunFileRow[]>(() => {
+    const items = Array.isArray(runFiles.value) ? (runFiles.value as RunFileRow[]) : []
+    if (options.runDetail.value?.taskMode === 'move') {
+      return items.filter(it => (it.status || '') !== 'deleted')
+    }
+    return items
+  })
+
   const pagedRunFiles = computed(() => {
     const page = runFilesPage.value || 1
     const pageSize = runFilesPageSize.value || 1
     const start = (page - 1) * pageSize
-    return runFiles.value.slice(start, start + pageSize)
+    return visibleRunFiles.value.slice(start, start + pageSize)
   })
-  const totalRunFilesPages = computed(() => Math.max(1, Math.ceil((runFilesTotal.value || 0) / runFilesPageSize.value)))
+  const totalRunFilesPages = computed(() => Math.max(1, Math.ceil((visibleRunFiles.value.length || 0) / runFilesPageSize.value)))
 
   function goPrevFilesPage() {
     if (runFilesPage.value > 1) {
@@ -73,6 +82,7 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
     runFilesTotal,
     runFilesPage,
     runFilesPageSize,
+    visibleRunFiles,
     resetRunFiles,
     reloadRunFiles,
     openRunDetailFiles,

@@ -44,6 +44,7 @@ const emit = defineEmits<{
   (e: 'view-log', run: any): void
   (e: 'clear-run', runId: number): void
   (e: 'close-detail'): void
+  (e: 'set-final-filter', value: 'all' | 'success' | 'failed' | 'other'): void
   (e: 'prev-files-page'): void
   (e: 'next-files-page'): void
 }>()
@@ -92,6 +93,7 @@ const emit = defineEmits<{
     :run-files-page="runFilesPage"
     :total-run-files-pages="totalRunFilesPages"
     @close="emit('close-detail')"
+    @set-final-filter="emit('set-final-filter', $event)"
     @prev-files-page="emit('prev-files-page')"
     @next-files-page="emit('next-files-page')"
   />

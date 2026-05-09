@@ -25,6 +25,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'set-final-filter', value: 'all' | 'success' | 'failed' | 'other'): void
   (e: 'prev-files-page'): void
   (e: 'next-files-page'): void
 }>()
@@ -81,19 +82,19 @@ const activeFilesTotal = computed(() => Math.max(0, Number(props.runFilesTotal) 
           <div class="summary-box" v-if="props.getFinalSummary(props.runDetail)">
             <div class="summary-title">{{ t('modal.summaryStats') }}</div>
             <div class="summary-grid">
-              <div class="summary-cell">
+              <div class="summary-cell clickable" @click="emit('set-final-filter', 'all')">
                 <div class="summary-key">{{ t('modal.total') }}</div>
                 <div class="summary-val">{{ finalCountAll }}</div>
               </div>
-              <div class="summary-cell">
+              <div class="summary-cell clickable" @click="emit('set-final-filter', 'success')">
                 <div class="summary-key">{{ getSuccessLabel(props.runDetail.taskMode) }}</div>
                 <div class="summary-val">{{ finalCountSuccess }}</div>
               </div>
-              <div class="summary-cell">
+              <div class="summary-cell clickable" @click="emit('set-final-filter', 'failed')">
                 <div class="summary-key">{{ t('modal.failed') }}</div>
                 <div class="summary-val error-text">{{ finalCountFailed }}</div>
               </div>
-              <div class="summary-cell">
+              <div class="summary-cell clickable" @click="emit('set-final-filter', 'other')">
                 <div class="summary-key">{{ t('modal.other') }}</div>
                 <div class="summary-val">{{ finalCountOther }}</div>
               </div>
@@ -173,6 +174,7 @@ body.light .summary-key{color:#64748b}
 body.light .summary-val{color:#111827}
 .summary-cell.clickable{cursor:pointer;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
 .summary-cell.clickable:hover{background:#1f2937;border-color:#475569;box-shadow:0 0 0 1px #334155 inset}
+body.light .summary-cell.clickable:hover{background:#f0f4f8;border-color:#cbd5e1;box-shadow:0 0 0 1px #cbd5e1 inset}
 .files-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;max-width:1200px}
 .files-table{margin-top:14px;border:1px solid #333;border-radius:10px;overflow:hidden}
 .files-table.large{max-width:1200px}
