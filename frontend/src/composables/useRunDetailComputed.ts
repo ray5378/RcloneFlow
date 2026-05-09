@@ -56,8 +56,10 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
     return options.detailFiles.value as any[]
   })
 
+  const hasFinalSummaryFiles = computed(() => summaryFiles.value.length > 0)
+
   const finalFiles = computed(() => {
-    if (summaryFiles.value.length) return summaryFiles.value
+    if (hasFinalSummaryFiles.value) return summaryFiles.value
     return detailFiles.value
   })
 
@@ -143,6 +145,7 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
     getFinalSummary,
     finalFilesPage,
     finalFilesPageSize,
+    hasFinalSummaryFiles,
     finalFiles,
     finalCountAll,
     finalCountSuccess,

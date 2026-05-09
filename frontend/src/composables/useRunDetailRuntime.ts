@@ -14,6 +14,7 @@ export function useRunDetailRuntime(options: {
 
   const {
     runFiles,
+    runFilesTotal,
     runFilesPage,
     openRunDetailFiles,
     pagedRunFiles,
@@ -24,6 +25,7 @@ export function useRunDetailRuntime(options: {
 
   const {
     getFinalSummary,
+    hasFinalSummaryFiles,
     finalFiles,
     finalCountAll,
     finalCountSuccess,
@@ -45,6 +47,7 @@ export function useRunDetailRuntime(options: {
     runDetail,
     openRunDetailModal,
     closeRunDetailModal,
+    runFilesTotal,
     runFilesPage,
     openRunDetailFiles,
     pagedRunFiles,
@@ -52,6 +55,7 @@ export function useRunDetailRuntime(options: {
     goPrevFilesPage,
     goNextFilesPage,
     getFinalSummary,
+    hasFinalSummaryFiles,
     finalFiles,
     finalCountAll,
     finalCountSuccess,

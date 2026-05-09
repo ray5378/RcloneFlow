@@ -82,6 +82,7 @@ const {
   runDetail,
   openRunDetailModal,
   closeRunDetailModal,
+  runFilesTotal,
   runFilesPage,
   openRunDetailFiles,
   pagedRunFiles,
@@ -90,6 +91,7 @@ const {
   goNextFilesPage,
   getFinalSummary: getFinalSummaryFromComposable,
   finalFiles,
+  hasFinalSummaryFiles,
   finalCountAll,
   finalCountSuccess,
   finalCountFailed,
@@ -433,7 +435,9 @@ const {
     :final-files-jump="finalFilesJump"
     :paged-final-files="pagedFinalFiles"
     :final-files="finalFiles"
+    :has-final-summary-files="hasFinalSummaryFiles"
     :paged-run-files="pagedRunFiles"
+    :run-files-total="runFilesTotal"
     :run-files-page="runFilesPage"
     :total-run-files-pages="totalRunFilesPages"
     :back-to-tasks="backToTasks"

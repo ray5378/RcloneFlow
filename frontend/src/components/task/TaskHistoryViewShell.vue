@@ -32,7 +32,9 @@ defineProps<{
   finalFilesJump: number | null
   pagedFinalFiles: any[]
   finalFiles: any[]
+  hasFinalSummaryFiles: boolean
   pagedRunFiles: any[]
+  runFilesTotal: number
   runFilesPage: number
   totalRunFilesPages: number
   backToTasks: () => void
@@ -99,7 +101,9 @@ defineProps<{
     :final-files-jump="finalFilesJump"
     :paged-final-files="pagedFinalFiles"
     :final-files="finalFiles"
+    :has-final-summary-files="hasFinalSummaryFiles"
     :paged-run-files="pagedRunFiles"
+    :run-files-total="runFilesTotal"
     :run-files-page="runFilesPage"
     :total-run-files-pages="totalRunFilesPages"
     @back="backToTasks"

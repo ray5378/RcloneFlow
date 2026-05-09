@@ -3,6 +3,42 @@ import { nextTick, ref } from 'vue'
 import { useRunDetailComputed } from './useRunDetailComputed'
 
 describe('useRunDetailComputed', () => {
+  it('marks whether final summary files are the active detail source', async () => {
+    const runDetail = ref({
+      id: 201,
+      taskMode: 'copy',
+      summary: {
+        finalSummary: {
+          counts: { total: 2, copied: 2, deleted: 0, failed: 0, skipped: 0 },
+          files: [
+            { name: 'a', status: 'success' },
+            { name: 'b', status: 'success' },
+          ],
+        },
+      },
+    })
+    const detailFiles = ref([
+      { name: 'x', status: 'success' },
+      { name: 'y', status: 'failed' },
+    ])
+
+    const api = useRunDetailComputed({ runDetail, detailFiles })
+    await nextTick()
+
+    expect(api.hasFinalSummaryFiles.value).toBe(true)
+    expect(api.finalFiles.value.map(it => it.name)).toEqual(['a', 'b'])
+
+    runDetail.value = {
+      id: 202,
+      taskMode: 'copy',
+      summary: null,
+    }
+    await nextTick()
+
+    expect(api.hasFinalSummaryFiles.value).toBe(false)
+    expect(api.finalFiles.value.map(it => it.name)).toEqual(['x', 'y'])
+  })
+
   it('keeps final file pagination state in sync with the active data source', async () => {
     const runDetail = ref({
       id: 101,

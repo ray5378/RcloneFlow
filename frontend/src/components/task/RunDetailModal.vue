@@ -23,7 +23,9 @@ const props = defineProps<{
   finalFilesJump: number | null
   pagedFinalFiles: any[]
   finalFiles: any[]
+  hasFinalSummaryFiles: boolean
   pagedRunFiles: any[]
+  runFilesTotal: number
   runFilesPage: number
   totalRunFilesPages: number
 }>()
@@ -55,10 +57,11 @@ function countLine(template: string, count: number) {
   return template.replace('{count}', String(count))
 }
 
-const showingFinalFiles = computed(() => Array.isArray(props.finalFiles) && props.finalFiles.length > 0)
+const showingFinalFiles = computed(() => props.hasFinalSummaryFiles)
 const activeFilesPage = computed(() => Math.max(1, Number(showingFinalFiles.value ? props.finalFilesPage : props.runFilesPage) || 1))
 const activeTotalFilesPages = computed(() => Math.max(1, Number(showingFinalFiles.value ? props.totalFinalFilesPages : props.totalRunFilesPages) || 1))
 const activeIsFinalFiles = computed(() => showingFinalFiles.value)
+const activeFilesTotal = computed(() => Math.max(0, Number(showingFinalFiles.value ? props.finalFilesTotal : props.runFilesTotal) || 0))
 </script>
 
 <template>
@@ -143,7 +146,7 @@ const activeIsFinalFiles = computed(() => showingFinalFiles.value)
           <label>{{ t('modal.details') }}</label>
           <div>
             <div class="files-toolbar">
-              <span>{{ countLine(t('modal.countLine'), finalFilesTotal) }}</span>
+              <span>{{ countLine(t('modal.countLine'), activeFilesTotal) }}</span>
               <div class="pager-inline">
                 <button class="ghost small" :disabled="activeFilesPage <= 1" @click="emit(activeIsFinalFiles ? 'prev-final-files-page' : 'prev-files-page')">{{ t('modal.prevPage') }}</button>
                 <span>{{ activeFilesPage }}/{{ activeTotalFilesPages }}</span>
@@ -162,7 +165,7 @@ const activeIsFinalFiles = computed(() => showingFinalFiles.value)
                 <span class="size">{{ t('modal.size') }}</span>
               </div>
               <div class="files-body">
-                <template v-if="finalFiles && finalFiles.length">
+                <template v-if="showingFinalFiles">
                   <FileItem v-for="it in pagedFinalFiles" :key="(it.path || it.name) + (it.at || '') + (it.status || '')" :item="it" />
                 </template>
                 <template v-else>
