@@ -36,11 +36,12 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 	// 优先：数字则按任务ID直接触发
 	if tid, err := strconv.ParseInt(id, 10, 64); err == nil {
 		if t, ok := c.taskSvc.GetTask(tid); ok {
-			if err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook"); err != nil {
+			result, err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook")
+			if err != nil {
 				WriteJSON(w, 500, map[string]any{"error": err.Error()})
 				return
 			}
-			WriteJSON(w, 200, map[string]any{"started": true, "taskId": t.ID})
+			WriteJSON(w, 200, result)
 			return
 		}
 		WriteJSON(w, 404, map[string]any{"error": "task not found"})
@@ -65,11 +66,12 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 		if wid == "" || wid != id {
 			continue
 		}
-		if err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook"); err != nil {
+		result, err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook")
+		if err != nil {
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
-		WriteJSON(w, 200, map[string]any{"started": true, "taskId": t.ID})
+		WriteJSON(w, 200, result)
 		return
 	}
 	WriteJSON(w, 404, map[string]any{"error": "webhook id not found"})

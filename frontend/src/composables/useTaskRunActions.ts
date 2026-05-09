@@ -40,25 +40,38 @@ export function useTaskRunActions(options: UseTaskRunActionsOptions) {
       return
     }
     runningTaskId.value = taskId
-    const result = await options.taskApi.run(taskId)
-    if (!result) {
+    try {
+      const result = await options.taskApi.run(taskId)
+      if (!result) {
+        runningTaskId.value = null
+        return
+      }
+
+      if (result.started === false) {
+        runningTaskId.value = null
+        options.showToast(result.message || t('runtime.singletonBlocked'), 'error')
+        return result
+      }
+
+      try {
+        await options.loadData()
+        await options.loadActiveRuns?.()
+        setTimeout(() => { options.loadActiveRuns?.().catch(console.error) }, 300)
+        setTimeout(() => { options.loadActiveRuns?.().catch(console.error) }, 1200)
+      } catch (e) {
+        console.error(e)
+      }
+      setTimeout(() => {
+        if (runningTaskId.value === taskId) {
+          runningTaskId.value = null
+        }
+      }, 5000)
+      return result
+    } catch (e) {
       runningTaskId.value = null
+      options.showToast((e as Error).message, 'error')
       return
     }
-    try {
-      await options.loadData()
-      await options.loadActiveRuns?.()
-      setTimeout(() => { options.loadActiveRuns?.().catch(console.error) }, 300)
-      setTimeout(() => { options.loadActiveRuns?.().catch(console.error) }, 1200)
-    } catch (e) {
-      console.error(e)
-    }
-    setTimeout(() => {
-      if (runningTaskId.value === taskId) {
-        runningTaskId.value = null
-      }
-    }, 5000)
-    return result
   }
 
   return {

@@ -164,11 +164,18 @@ func (s *TaskService) DeleteTask(id int64) error {
 	return s.db.DeleteTask(id)
 }
 
+type TaskRunResult struct {
+	Started bool   `json:"started"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+	TaskID  int64  `json:"taskId,omitempty"`
+}
+
 // RunTask 运行指定任务
-func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string) error {
+func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string) (TaskRunResult, error) {
 	t, ok := s.db.GetTask(taskID)
 	if !ok {
-		return ErrTaskNotFound
+		return TaskRunResult{}, ErrTaskNotFound
 	}
 
 	// 解析任务选项
@@ -207,7 +214,12 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	// 这比全局 singletonMode 更基础，适用于 manual / schedule / webhook 全部入口。
 	// 这里不再新增 skipped 历史，避免定时重复命中时污染历史与日志。
 	if activeRun, err := s.db.GetActiveRunByTaskID(taskID); err == nil && activeRun.ID > 0 {
-		return nil
+		return TaskRunResult{
+			Started: false,
+			Reason:  "already_running",
+			Message: "任务已在运行中，跳过本次执行",
+			TaskID:  taskID,
+		}, nil
 	}
 
 	// 单例模式检查：如果开启了单例模式，使用原子操作确保只有一个任务运行
@@ -234,7 +246,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	if isSingleton && singletonMode {
 		run, existed, err := s.db.TryAcquireRun(&newRun)
 		if err != nil {
-			return fmt.Errorf("单例模式：申请运行记录失败，%w", err)
+			return TaskRunResult{}, fmt.Errorf("单例模式：申请运行记录失败，%w", err)
 		}
 		if existed {
 			// 记录跳过到历史，但对外按“正常跳过”处理，不当作错误返回。
@@ -254,7 +266,12 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 				TargetRemote: t.TargetRemote,
 				TargetPath:   t.TargetPath,
 			})
-			return nil
+			return TaskRunResult{
+				Started: false,
+				Reason:  "singleton_blocked",
+				Message: "单例模式：有其他任务正在运行，跳过本次执行",
+				TaskID:  taskID,
+			}, nil
 		}
 		// 成功创建记录，run 已填充
 		// 成功创建记录，run 已填充
@@ -271,13 +288,13 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		go func() {
 			_ = runnercli.New(s.db).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
 		}()
-		return nil
+		return TaskRunResult{Started: true, TaskID: taskID}, nil
 	}
 
 	// 非单例模式：直接创建运行记录
 	run, err := s.db.AddRun(newRun)
 	if err != nil {
-		return err
+		return TaskRunResult{}, err
 	}
 	// 合并全局传输设置
 	if ts, err := settings.Load(); err == nil {
@@ -291,7 +308,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	go func() {
 		_ = runnercli.New(s.db).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
 	}()
-	return nil
+	return TaskRunResult{Started: true, TaskID: taskID}, nil
 }
 
 // GetTask 获取单个任务

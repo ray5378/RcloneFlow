@@ -40,9 +40,16 @@ export async function updateTaskOptions(taskId: number, options: Record<string, 
   return patch('/api/tasks', { id: taskId, options })
 }
 
+export interface RunTaskResult {
+  started: boolean
+  reason?: 'singleton_blocked' | 'already_running' | string
+  message?: string
+  taskId?: number
+}
+
 /** 运行任务 */
-export async function runTask(taskId: number): Promise<{ jobId: number }> {
-  return post<{ jobId: number }>(`/api/tasks/${taskId}/run`, {})
+export async function runTask(taskId: number): Promise<RunTaskResult> {
+  return post<RunTaskResult>(`/api/tasks/${taskId}/run`, {})
 }
 
 /** 删除任务 */

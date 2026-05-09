@@ -77,12 +77,21 @@ describe('task API', () => {
 
   describe('runTask', () => {
     it('should call post with task id', async () => {
-      const mockResponse = { jobId: 123 }
+      const mockResponse = { started: true, taskId: 1 }
       ;(post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockResponse)
 
       const result = await runTask(1)
 
       expect(post).toHaveBeenCalledWith('/api/tasks/1/run', {})
+      expect(result).toEqual(mockResponse)
+    })
+
+    it('should preserve singleton blocked response', async () => {
+      const mockResponse = { started: false, reason: 'singleton_blocked', message: '单例模式：有其他任务正在运行，跳过本次执行', taskId: 1 }
+      ;(post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockResponse)
+
+      const result = await runTask(1)
+
       expect(result).toEqual(mockResponse)
     })
   })

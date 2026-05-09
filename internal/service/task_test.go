@@ -255,8 +255,12 @@ func TestTaskService_RunTask_StoresOpenlistCASCompatibleInEffectiveOptions(t *te
 	}
 
 	svc := NewTaskService(db, nil)
-	if err := svc.RunTask(context.Background(), task.ID, "manual"); err != nil {
+	result, err := svc.RunTask(context.Background(), task.ID, "manual")
+	if err != nil {
 		t.Fatalf("RunTask() error = %v", err)
+	}
+	if !result.Started {
+		t.Fatalf("expected started result, got %#v", result)
 	}
 
 	runs, err := db.ListRunsByTask(task.ID)
@@ -316,8 +320,15 @@ func TestTaskService_RunTask_SilentlySkipsWhenSameTaskAlreadyRunning(t *testing.
 	}
 
 	svc := NewTaskService(db, nil)
-	if err := svc.RunTask(context.Background(), task.ID, "schedule"); err != nil {
-		t.Fatalf("expected silent skip with nil error, got %v", err)
+	result, err := svc.RunTask(context.Background(), task.ID, "schedule")
+	if err != nil {
+		t.Fatalf("expected skip result with nil error, got %v", err)
+	}
+	if result.Started {
+		t.Fatalf("expected not started when same task already running, got %#v", result)
+	}
+	if result.Reason != "already_running" {
+		t.Fatalf("expected reason already_running, got %#v", result)
 	}
 
 	runs, err := db.ListRunsByTask(task.ID)
@@ -329,6 +340,76 @@ func TestTaskService_RunTask_SilentlySkipsWhenSameTaskAlreadyRunning(t *testing.
 	}
 	if runs[0].Status != "running" {
 		t.Fatalf("expected existing run to remain running, got %q", runs[0].Status)
+	}
+}
+
+func TestTaskService_RunTask_ReturnsSingletonBlockedResultWhenGlobalSingletonIsOccupied(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	otherTask, err := db.AddTask(store.Task{
+		Name:         "other-running-task",
+		Mode:         "copy",
+		SourceRemote: "src",
+		SourcePath:   "/a",
+		TargetRemote: "dst",
+		TargetPath:   "/b",
+	})
+	if err != nil {
+		t.Fatalf("AddTask(otherTask) error = %v", err)
+	}
+
+	_, err = db.AddRun(store.Run{TaskID: otherTask.ID, Status: "running", Trigger: "manual", TaskName: otherTask.Name, TaskMode: otherTask.Mode, SourceRemote: otherTask.SourceRemote, SourcePath: otherTask.SourcePath, TargetRemote: otherTask.TargetRemote, TargetPath: otherTask.TargetPath})
+	if err != nil {
+		t.Fatalf("AddRun(other running) error = %v", err)
+	}
+
+	task, err := db.AddTask(store.Task{
+		Name:         "singleton-task",
+		Mode:         "copy",
+		SourceRemote: "src",
+		SourcePath:   "/a",
+		TargetRemote: "dst",
+		TargetPath:   "/b",
+		Options:      json.RawMessage(`{"singletonMode":true}`),
+	})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+
+	svc := NewTaskService(db, nil)
+	result, err := svc.RunTask(context.Background(), task.ID, "manual")
+	if err != nil {
+		t.Fatalf("expected singleton blocked result with nil error, got %v", err)
+	}
+	if result.Started {
+		t.Fatalf("expected singleton blocked result, got %#v", result)
+	}
+	if result.Reason != "singleton_blocked" {
+		t.Fatalf("expected reason singleton_blocked, got %#v", result)
+	}
+	if result.Message == "" {
+		t.Fatalf("expected singleton blocked message, got %#v", result)
+	}
+
+	runs, err := db.ListRunsByTask(task.ID)
+	if err != nil {
+		t.Fatalf("ListRunsByTask() error = %v", err)
+	}
+	if len(runs) != 1 {
+		t.Fatalf("expected 1 skipped run record, got %d", len(runs))
+	}
+	if runs[0].Status != "skipped" {
+		t.Fatalf("expected skipped run record, got %q", runs[0].Status)
 	}
 }
 

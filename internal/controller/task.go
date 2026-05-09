@@ -336,14 +336,15 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 	idStr := strings.TrimSuffix(p, "/run")
 	id, _ := strconv.ParseInt(strings.Trim(idStr, "/"), 10, 64)
 
-	if err := c.RunTask(r.Context(), id, "manual"); err != nil {
+	result, err := c.RunTask(r.Context(), id, "manual")
+	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
 	}
-	WriteJSON(w, 200, map[string]any{"started": true})
+	WriteJSON(w, 200, result)
 }
 
 // RunTask 运行指定任务
-func (c *TaskController) RunTask(ctx context.Context, taskID int64, trigger string) error {
+func (c *TaskController) RunTask(ctx context.Context, taskID int64, trigger string) (service.TaskRunResult, error) {
 	return c.taskSvc.RunTask(ctx, taskID, trigger)
 }
