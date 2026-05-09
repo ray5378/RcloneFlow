@@ -19,6 +19,15 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type taskServiceSchedulerRunner struct {
+	svc *service.TaskService
+}
+
+func (r taskServiceSchedulerRunner) RunTask(ctx context.Context, taskID int64, trigger string) error {
+	_, err := r.svc.RunTask(ctx, taskID, trigger)
+	return err
+}
+
 // Run 启动服务器
 func Run(cfg *config.Config) error {
 	// 初始化日志
@@ -65,7 +74,7 @@ func Run(cfg *config.Config) error {
 
 	// 初始化调度器(需要在controller之前,以便传递)
 	// 使用 TaskService 作为 Runner，以统一走 CLI Runner（生成 stderr 日志文件）
-	sched := scheduler.NewWithRunner(db, taskSvc)
+	sched := scheduler.NewWithRunner(db, taskServiceSchedulerRunner{svc: taskSvc})
 	if err := sched.Start(); err != nil {
 		logger.Error("调度器初始化失败", zap.Error(err))
 		return err
