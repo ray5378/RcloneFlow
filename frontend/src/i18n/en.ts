@@ -245,6 +245,8 @@ export default {
     manualRun: 'Run manually',
     webhook: 'Webhook',
     singleton: 'Singleton',
+    edit: 'Edit',
+    delete: 'Delete',
     source: 'Source',
     target: 'Target',
     progress: 'Progress',

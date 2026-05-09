@@ -245,6 +245,8 @@ export default {
     manualRun: '手动运行',
     webhook: 'Webhook',
     singleton: '单例',
+    edit: '编辑',
+    delete: '删除',
     source: '源',
     target: '目标',
     progress: '进度',
