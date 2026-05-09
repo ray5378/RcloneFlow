@@ -26,13 +26,6 @@ defineProps<{
   finalCountSuccess: number
   finalCountFailed: number
   finalCountOther: number
-  finalFilesTotal: number
-  finalFilesPage: number
-  totalFinalFilesPages: number
-  finalFilesJump: number | null
-  pagedFinalFiles: any[]
-  finalFiles: any[]
-  hasFinalSummaryFiles: boolean
   pagedRunFiles: any[]
   runFilesTotal: number
   runFilesPage: number
@@ -48,11 +41,6 @@ defineProps<{
   openRunLog: (run: any) => void
   clearRun: (run: any) => void
   closeRunDetail: () => void
-  setFinalFilter: (filter: string) => void
-  goPrevFinalFilesPage: () => void
-  goNextFinalFilesPage: () => void
-  setFinalFilesJumpValue: (value: number | null) => void
-  jumpFinalFilesPage: () => void
   goPrevFilesPage: () => void
   goNextFilesPage: () => void
   showLogModal: boolean
@@ -95,13 +83,6 @@ defineProps<{
     :final-count-success="finalCountSuccess"
     :final-count-failed="finalCountFailed"
     :final-count-other="finalCountOther"
-    :final-files-total="finalFilesTotal"
-    :final-files-page="finalFilesPage"
-    :total-final-files-pages="totalFinalFilesPages"
-    :final-files-jump="finalFilesJump"
-    :paged-final-files="pagedFinalFiles"
-    :final-files="finalFiles"
-    :has-final-summary-files="hasFinalSummaryFiles"
     :paged-run-files="pagedRunFiles"
     :run-files-total="runFilesTotal"
     :run-files-page="runFilesPage"
@@ -117,11 +98,6 @@ defineProps<{
     @view-log="openRunLog"
     @clear-run="clearRun"
     @close-detail="closeRunDetail"
-    @set-final-filter="setFinalFilter"
-    @prev-final-files-page="goPrevFinalFilesPage"
-    @next-final-files-page="goNextFinalFilesPage"
-    @update-final-files-jump="setFinalFilesJumpValue"
-    @jump-final-files-page="jumpFinalFilesPage"
     @prev-files-page="goPrevFilesPage"
     @next-files-page="goNextFilesPage"
   />

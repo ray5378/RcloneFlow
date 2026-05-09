@@ -26,13 +26,6 @@ defineProps<{
   finalCountSuccess: number
   finalCountFailed: number
   finalCountOther: number
-  finalFilesTotal: number
-  finalFilesPage: number
-  totalFinalFilesPages: number
-  finalFilesJump: number | null
-  pagedFinalFiles: any[]
-  finalFiles: any[]
-  hasFinalSummaryFiles: boolean
   pagedRunFiles: any[]
   runFilesTotal: number
   runFilesPage: number
@@ -51,11 +44,6 @@ const emit = defineEmits<{
   (e: 'view-log', run: any): void
   (e: 'clear-run', runId: number): void
   (e: 'close-detail'): void
-  (e: 'set-final-filter', value: 'all' | 'success' | 'failed' | 'other'): void
-  (e: 'prev-final-files-page'): void
-  (e: 'next-final-files-page'): void
-  (e: 'update-final-files-jump', value: number | null): void
-  (e: 'jump-final-files-page'): void
   (e: 'prev-files-page'): void
   (e: 'next-files-page'): void
 }>()
@@ -99,23 +87,11 @@ const emit = defineEmits<{
     :final-count-success="finalCountSuccess"
     :final-count-failed="finalCountFailed"
     :final-count-other="finalCountOther"
-    :final-files-total="finalFilesTotal"
-    :final-files-page="finalFilesPage"
-    :total-final-files-pages="totalFinalFilesPages"
-    :final-files-jump="finalFilesJump"
-    :paged-final-files="pagedFinalFiles"
-    :final-files="finalFiles"
-    :has-final-summary-files="hasFinalSummaryFiles"
     :paged-run-files="pagedRunFiles"
     :run-files-total="runFilesTotal"
     :run-files-page="runFilesPage"
     :total-run-files-pages="totalRunFilesPages"
     @close="emit('close-detail')"
-    @set-final-filter="emit('set-final-filter', $event)"
-    @prev-final-files-page="emit('prev-final-files-page')"
-    @next-final-files-page="emit('next-final-files-page')"
-    @update-final-files-jump="emit('update-final-files-jump', $event)"
-    @jump-final-files-page="emit('jump-final-files-page')"
     @prev-files-page="emit('prev-files-page')"
     @next-files-page="emit('next-files-page')"
   />

@@ -90,20 +90,10 @@ const {
   goPrevFilesPage,
   goNextFilesPage,
   getFinalSummary: getFinalSummaryFromComposable,
-  finalFiles,
-  hasFinalSummaryFiles,
   finalCountAll,
   finalCountSuccess,
   finalCountFailed,
   finalCountOther,
-  setFinalFilter,
-  finalFilesTotal,
-  totalFinalFilesPages,
-  pagedFinalFiles,
-  finalFilesJump,
-  goPrevFinalFilesPage,
-  goNextFinalFilesPage,
-  jumpFinalFilesPage,
 } = useRunDetailRuntime({ runApi })
 
 // 6) 主数据加载与进度相关派生
@@ -142,7 +132,6 @@ const {
   setTasksJumpPageValue,
   setHistoryStatusFilter,
   setJumpPageValue,
-  setFinalFilesJumpValue,
   prevTasksPage,
   nextTasksPage,
   backToTasks,
@@ -429,13 +418,6 @@ const {
     :final-count-success="finalCountSuccess"
     :final-count-failed="finalCountFailed"
     :final-count-other="finalCountOther"
-    :final-files-total="finalFilesTotal"
-    :final-files-page="finalFilesPage"
-    :total-final-files-pages="totalFinalFilesPages"
-    :final-files-jump="finalFilesJump"
-    :paged-final-files="pagedFinalFiles"
-    :final-files="finalFiles"
-    :has-final-summary-files="hasFinalSummaryFiles"
     :paged-run-files="pagedRunFiles"
     :run-files-total="runFilesTotal"
     :run-files-page="runFilesPage"
@@ -451,11 +433,6 @@ const {
     :open-run-log="openRunLog"
     :clear-run="clearRun"
     :close-run-detail="closeRunDetail"
-    :set-final-filter="setFinalFilter"
-    :go-prev-final-files-page="goPrevFinalFilesPage"
-    :go-next-final-files-page="goNextFinalFilesPage"
-    :set-final-files-jump-value="setFinalFilesJumpValue"
-    :jump-final-files-page="jumpFinalFilesPage"
     :go-prev-files-page="goPrevFilesPage"
     :go-next-files-page="goNextFilesPage"
     :show-log-modal="showLogModal"

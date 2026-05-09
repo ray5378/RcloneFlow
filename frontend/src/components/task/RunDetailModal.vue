@@ -17,13 +17,6 @@ const props = defineProps<{
   finalCountSuccess: number
   finalCountFailed: number
   finalCountOther: number
-  finalFilesTotal: number
-  finalFilesPage: number
-  totalFinalFilesPages: number
-  finalFilesJump: number | null
-  pagedFinalFiles: any[]
-  finalFiles: any[]
-  hasFinalSummaryFiles: boolean
   pagedRunFiles: any[]
   runFilesTotal: number
   runFilesPage: number
@@ -32,11 +25,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'set-final-filter', value: 'all' | 'success' | 'failed' | 'other'): void
-  (e: 'prev-final-files-page'): void
-  (e: 'next-final-files-page'): void
-  (e: 'update-final-files-jump', value: number | null): void
-  (e: 'jump-final-files-page'): void
   (e: 'prev-files-page'): void
   (e: 'next-files-page'): void
 }>()
@@ -47,21 +35,13 @@ function getSuccessLabel(mode?: string) {
   return t('modal.copied')
 }
 
-function onFinalFilesJumpInput(event: Event) {
-  const target = event.target as HTMLInputElement
-  const value = target.value === '' ? null : Number(target.value)
-  emit('update-final-files-jump', value)
-}
-
 function countLine(template: string, count: number) {
   return template.replace('{count}', String(count))
 }
 
-const showingFinalFiles = computed(() => props.hasFinalSummaryFiles)
-const activeFilesPage = computed(() => Math.max(1, Number(showingFinalFiles.value ? props.finalFilesPage : props.runFilesPage) || 1))
-const activeTotalFilesPages = computed(() => Math.max(1, Number(showingFinalFiles.value ? props.totalFinalFilesPages : props.totalRunFilesPages) || 1))
-const activeIsFinalFiles = computed(() => showingFinalFiles.value)
-const activeFilesTotal = computed(() => Math.max(0, Number(showingFinalFiles.value ? props.finalFilesTotal : props.runFilesTotal) || 0))
+const activeFilesPage = computed(() => Math.max(1, Number(props.runFilesPage) || 1))
+const activeTotalFilesPages = computed(() => Math.max(1, Number(props.totalRunFilesPages) || 1))
+const activeFilesTotal = computed(() => Math.max(0, Number(props.runFilesTotal) || 0))
 </script>
 
 <template>
@@ -101,19 +81,19 @@ const activeFilesTotal = computed(() => Math.max(0, Number(showingFinalFiles.val
           <div class="summary-box" v-if="props.getFinalSummary(props.runDetail)">
             <div class="summary-title">{{ t('modal.summaryStats') }}</div>
             <div class="summary-grid">
-              <div class="summary-cell clickable" @click="emit('set-final-filter', 'all')">
+              <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.total') }}</div>
                 <div class="summary-val">{{ finalCountAll }}</div>
               </div>
-              <div class="summary-cell clickable" @click="emit('set-final-filter', 'success')">
+              <div class="summary-cell">
                 <div class="summary-key">{{ getSuccessLabel(props.runDetail.taskMode) }}</div>
                 <div class="summary-val">{{ finalCountSuccess }}</div>
               </div>
-              <div class="summary-cell clickable" @click="emit('set-final-filter', 'failed')">
+              <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.failed') }}</div>
                 <div class="summary-val error-text">{{ finalCountFailed }}</div>
               </div>
-              <div class="summary-cell clickable" @click="emit('set-final-filter', 'other')">
+              <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.other') }}</div>
                 <div class="summary-val">{{ finalCountOther }}</div>
               </div>
@@ -148,13 +128,9 @@ const activeFilesTotal = computed(() => Math.max(0, Number(showingFinalFiles.val
             <div class="files-toolbar">
               <span>{{ countLine(t('modal.countLine'), activeFilesTotal) }}</span>
               <div class="pager-inline">
-                <button class="ghost small" :disabled="activeFilesPage <= 1" @click="emit(activeIsFinalFiles ? 'prev-final-files-page' : 'prev-files-page')">{{ t('modal.prevPage') }}</button>
+                <button class="ghost small" :disabled="activeFilesPage <= 1" @click="emit('prev-files-page')">{{ t('modal.prevPage') }}</button>
                 <span>{{ activeFilesPage }}/{{ activeTotalFilesPages }}</span>
-                <button class="ghost small" :disabled="activeFilesPage >= activeTotalFilesPages" @click="emit(activeIsFinalFiles ? 'next-final-files-page' : 'next-files-page')">{{ t('modal.nextPage') }}</button>
-                <template v-if="activeIsFinalFiles">
-                  <input class="page-input jump-input" :value="finalFilesJump ?? ''" type="number" min="1" :max="activeTotalFilesPages" @input="onFinalFilesJumpInput" />
-                  <button class="ghost small" @click="emit('jump-final-files-page')">{{ t('modal.jump') }}</button>
-                </template>
+                <button class="ghost small" :disabled="activeFilesPage >= activeTotalFilesPages" @click="emit('next-files-page')">{{ t('modal.nextPage') }}</button>
               </div>
             </div>
             <div class="files-table large">
@@ -165,13 +141,8 @@ const activeFilesTotal = computed(() => Math.max(0, Number(showingFinalFiles.val
                 <span class="size">{{ t('modal.size') }}</span>
               </div>
               <div class="files-body">
-                <template v-if="showingFinalFiles">
-                  <FileItem v-for="it in pagedFinalFiles" :key="(it.path || it.name) + (it.at || '') + (it.status || '')" :item="it" />
-                </template>
-                <template v-else>
-                  <FileItem v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" :item="it" />
-                  <div v-if="!pagedRunFiles.length" class="path-empty">{{ t('modal.noDetail') }}</div>
-                </template>
+                <FileItem v-for="it in pagedRunFiles" :key="it.name + it.at + it.status" :item="it" />
+                <div v-if="!pagedRunFiles.length" class="path-empty">{{ t('modal.noDetail') }}</div>
               </div>
             </div>
           </div>
@@ -202,7 +173,6 @@ body.light .summary-key{color:#64748b}
 body.light .summary-val{color:#111827}
 .summary-cell.clickable{cursor:pointer;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
 .summary-cell.clickable:hover{background:#1f2937;border-color:#475569;box-shadow:0 0 0 1px #334155 inset}
-body.light .summary-cell.clickable:hover{background:#f0f4f8;border-color:#cbd5e1;box-shadow:0 0 0 1px #cbd5e1 inset}
 .files-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;max-width:1200px}
 .files-table{margin-top:14px;border:1px solid #333;border-radius:10px;overflow:hidden}
 .files-table.large{max-width:1200px}
