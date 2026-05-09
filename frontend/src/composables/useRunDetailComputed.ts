@@ -9,6 +9,7 @@ interface UseRunDetailComputedOptions {
   detailFiles?: Ref<any[]>
   finalFilesPage?: Ref<number>
   finalFilesPageSize?: Ref<number>
+  currentFinalFilter?: Ref<FinalFilterType>
 }
 
 export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
@@ -85,7 +86,7 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   const finalCountFailed = computed(() => getSummaryCounts(options?.runDetail?.value).failed)
   const finalCountOther = computed(() => getSummaryCounts(options?.runDetail?.value).skipped)
 
-  const currentFinalFilter = ref<FinalFilterType>('all')
+  const currentFinalFilter = options?.currentFinalFilter ?? ref<FinalFilterType>('all')
   function setFinalFilter(filter: FinalFilterType) {
     currentFinalFilter.value = filter
     finalFilesPage.value = 1

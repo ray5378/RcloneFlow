@@ -1,8 +1,11 @@
 import { computed, ref, type Ref } from 'vue'
 import type { RunFileRow } from '../api/run'
 
+type FinalFilterType = 'all' | 'success' | 'failed' | 'other'
+
 interface UseRunDetailFilesOptions {
   runDetail: Ref<any>
+  currentFinalFilter?: Ref<FinalFilterType>
   runApi: {
     getFiles: (runId: number, offset: number, limit: number) => Promise<{ items?: any[]; total?: number }>
   }
@@ -49,11 +52,20 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
     void reloadRunFiles()
   }
 
-  const visibleRunFiles = computed<RunFileRow[]>(() => {
+  const moveFilteredRunFiles = computed<RunFileRow[]>(() => {
     const items = Array.isArray(runFiles.value) ? (runFiles.value as RunFileRow[]) : []
     if (options.runDetail.value?.taskMode === 'move') {
       return items.filter(it => (it.status || '') !== 'deleted')
     }
+    return items
+  })
+
+  const visibleRunFiles = computed<RunFileRow[]>(() => {
+    const items = moveFilteredRunFiles.value
+    const filter = options.currentFinalFilter?.value || 'all'
+    if (filter === 'success') return items.filter(it => (it.status || '') === 'success')
+    if (filter === 'failed') return items.filter(it => (it.status || '') === 'failed')
+    if (filter === 'other') return items.filter(it => (it.status || '') === 'skipped')
     return items
   })
 

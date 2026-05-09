@@ -3,20 +3,24 @@ import { nextTick, ref } from 'vue'
 import { useRunDetailFiles } from './useRunDetailFiles'
 
 describe('useRunDetailFiles', () => {
-  it('filters deleted rows from move run details', async () => {
+  it('filters deleted rows from move run details and applies summary filters to visible detail rows', async () => {
     const getFiles = vi.fn()
       .mockResolvedValueOnce({
         items: [
           { name: 'copied-a', status: 'success' },
           { name: 'source-a', status: 'deleted' },
+          { name: 'failed-a', status: 'failed' },
+          { name: 'skipped-a', status: 'skipped' },
           { name: 'copied-b', status: 'success' },
         ],
-        total: 3,
+        total: 5,
       })
     const runDetail = ref<any>({ id: 9, taskMode: 'move' })
+    const currentFinalFilter = ref<'all' | 'success' | 'failed' | 'other'>('all')
 
     const api = useRunDetailFiles({
       runDetail,
+      currentFinalFilter,
       runApi: { getFiles },
     })
 
@@ -24,9 +28,21 @@ describe('useRunDetailFiles', () => {
     await api.reloadRunFiles()
     await nextTick()
 
-    expect(api.visibleRunFiles.value.map(it => it.name)).toEqual(['copied-a', 'copied-b'])
-    expect(api.pagedRunFiles.value.map(it => it.name)).toEqual(['copied-a', 'copied-b'])
+    expect(api.visibleRunFiles.value.map(it => it.name)).toEqual(['copied-a', 'failed-a', 'skipped-a', 'copied-b'])
+    expect(api.pagedRunFiles.value.map(it => it.name)).toEqual(['copied-a', 'failed-a', 'skipped-a', 'copied-b'])
     expect(api.totalRunFilesPages.value).toBe(1)
+
+    currentFinalFilter.value = 'success'
+    await nextTick()
+    expect(api.visibleRunFiles.value.map(it => it.name)).toEqual(['copied-a', 'copied-b'])
+
+    currentFinalFilter.value = 'failed'
+    await nextTick()
+    expect(api.visibleRunFiles.value.map(it => it.name)).toEqual(['failed-a'])
+
+    currentFinalFilter.value = 'other'
+    await nextTick()
+    expect(api.visibleRunFiles.value.map(it => it.name)).toEqual(['skipped-a'])
   })
 
   it('resets file pagination when a new run detail is opened', async () => {

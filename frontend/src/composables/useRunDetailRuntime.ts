@@ -1,3 +1,4 @@
+import { ref } from 'vue'
 import { useRunDetailState } from './useRunDetailState'
 import { useRunDetailFiles } from './useRunDetailFiles'
 import { useRunDetailComputed } from './useRunDetailComputed'
@@ -12,6 +13,8 @@ export function useRunDetailRuntime(options: {
     closeRunDetailModal,
   } = useRunDetailState()
 
+  const currentFinalFilter = ref<'all' | 'success' | 'failed' | 'other'>('all')
+
   const {
     runFiles,
     runFilesPage,
@@ -21,7 +24,7 @@ export function useRunDetailRuntime(options: {
     totalRunFilesPages,
     goPrevFilesPage,
     goNextFilesPage,
-  } = useRunDetailFiles({ runDetail, runApi: options.runApi })
+  } = useRunDetailFiles({ runDetail, currentFinalFilter, runApi: options.runApi })
 
   const {
     getFinalSummary,
@@ -40,14 +43,14 @@ export function useRunDetailRuntime(options: {
     goPrevFinalFilesPage,
     goNextFinalFilesPage,
     jumpFinalFilesPage,
-  } = useRunDetailComputed({ runDetail, detailFiles: runFiles })
+  } = useRunDetailComputed({ runDetail, detailFiles: runFiles, currentFinalFilter })
 
   return {
     showDetailModal,
     runDetail,
     openRunDetailModal,
     closeRunDetailModal,
-    runFilesTotal: visibleRunFiles,
+    runFilesTotal: visibleRunFiles.value.length,
     runFilesPage,
     openRunDetailFiles,
     pagedRunFiles,
