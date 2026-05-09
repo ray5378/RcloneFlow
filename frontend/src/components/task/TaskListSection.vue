@@ -29,6 +29,7 @@ const emit = defineEmits<{
   (e: 'stop', taskId: number): void
   (e: 'set-webhook', task: any): void
   (e: 'set-singleton', task: any): void
+  (e: 'open-transfer-detail', taskId: number): void
   (e: 'prev-page'): void
   (e: 'next-page'): void
   (e: 'update:jump-page', value: number | null): void
@@ -57,6 +58,7 @@ const emit = defineEmits<{
         @stop="emit('stop', task.id)"
         @set-webhook="emit('set-webhook', task)"
         @set-singleton="emit('set-singleton', task)"
+        @open-transfer-detail="emit('open-transfer-detail', task.id)"
       />
       <div v-if="!filteredTasks.length" class="empty">{{ t('taskUI.noTasks') }}</div>
     </div>

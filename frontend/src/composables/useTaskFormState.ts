@@ -1,15 +1,9 @@
 import { ref } from 'vue'
 import type { Task } from '../types'
-
-function normalizeTaskOptions(raw: Record<string, any> | undefined | null) {
-  const options = { ...(raw || {}) }
-  if (typeof options.enableStreaming === 'undefined') {
-    options.enableStreaming = true
-  }
-  return options
-}
+import { useTaskFormNormalize } from './useTaskFormNormalize'
 
 export function useTaskFormState() {
+  const { normalizeTaskOptionsForForm } = useTaskFormNormalize()
   const createForm = ref({
     name: '',
     mode: 'copy',
@@ -74,7 +68,7 @@ export function useTaskFormState() {
         scheduleDay: parts[2] || '*',
         scheduleMonth: parts[3] || '*',
         scheduleWeek: parts[4] || '*',
-        options: task.options || {},
+        options: normalizeTaskOptionsForForm(task.options as Record<string, any>),
       }
       return parts
     }
@@ -92,7 +86,7 @@ export function useTaskFormState() {
       scheduleDay: '',
       scheduleHour: '00',
       scheduleMinute: '00',
-      options: normalizeTaskOptions(task.options as Record<string, any>),
+      options: normalizeTaskOptionsForForm(task.options as Record<string, any>),
     }
     return null
   }

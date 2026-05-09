@@ -9,6 +9,7 @@ import TaskListViewShell from '../components/task/TaskListViewShell.vue'
 import TaskHistoryViewShell from '../components/task/TaskHistoryViewShell.vue'
 import TaskEditorViewShell from '../components/task/TaskEditorViewShell.vue'
 import ToastCenter from '../components/toast/ToastCenter.vue'
+import TransferringModal from '../components/task/transferring/TransferringModal.vue'
 import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatEta } from '../utils/format'
@@ -28,10 +29,29 @@ import { useTaskViewPagingBridge } from '../composables/useTaskViewPagingBridge'
 import { useTaskViewModalBindings } from '../composables/useTaskViewModalBindings'
 import { useToastCenter } from '../composables/useToastCenter'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
+import { useActiveTransferDetail } from '../composables/useActiveTransferDetail'
 
 // 1) 页面级基础能力
 const { toasts, showToast } = useToastCenter()
 const { normalizeTaskOptions } = useTaskFormNormalize()
+const {
+  activeTransferVisible,
+  activeTransferTrackingMode,
+  activeTransferSummary,
+  activeTransferCurrentFile,
+  activeTransferCompletedItems,
+  activeTransferPendingItems,
+  activeTransferCompletedTotal,
+  activeTransferPendingTotal,
+  activeTransferDegraded,
+  activeTransferLoading,
+  activeTransferError,
+  openActiveTransfer,
+  closeActiveTransfer,
+  refreshActiveTransfer,
+  loadMoreActiveTransferCompleted,
+  loadMoreActiveTransferPending,
+} = useActiveTransferDetail()
 
 // 全局错误提示统一走 toast；不在各子块里各自弹。
 setErrorHandler((message, type) => {
@@ -370,6 +390,7 @@ const {
     :stop-task-any="stopTaskAny"
     :set-webhook="setWebhook"
     :set-singleton-mode="setSingletonMode"
+    :open-transfer-detail="openActiveTransfer"
     :prev-tasks-page="prevTasksPage"
     :next-tasks-page="nextTasksPage"
     :set-tasks-jump-page-value="setTasksJumpPageValue"
@@ -483,6 +504,24 @@ const {
     :on-target-arrow="onTargetArrow"
     :on-target-click="onTargetClick"
     :create-task="createTask"
+  />
+
+  <TransferringModal
+    :visible="activeTransferVisible"
+    :tracking-mode="activeTransferTrackingMode"
+    :summary="activeTransferSummary"
+    :current-file="activeTransferCurrentFile"
+    :completed-items="activeTransferCompletedItems"
+    :pending-items="activeTransferPendingItems"
+    :completed-total="activeTransferCompletedTotal"
+    :pending-total="activeTransferPendingTotal"
+    :degraded="activeTransferDegraded"
+    :loading="activeTransferLoading"
+    :error="activeTransferError"
+    @close="closeActiveTransfer"
+    @refresh="refreshActiveTransfer"
+    @load-more-completed="loadMoreActiveTransferCompleted"
+    @load-more-pending="loadMoreActiveTransferPending"
   />
 
   <!-- 全局实时数据弹窗 -->

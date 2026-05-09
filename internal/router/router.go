@@ -17,10 +17,11 @@ type Router struct {
 	taskCtrl     *controller.TaskController
 	browserCtrl  *controller.BrowserController
 	scheduleCtrl *controller.ScheduleController
-	runCtrl      *controller.RunController
-	fsCtrl       *controller.FsController
-	authCtrl     *controller.AuthController
-	staticDir    string
+	runCtrl            *controller.RunController
+	fsCtrl             *controller.FsController
+	authCtrl           *controller.AuthController
+	activeTransferCtrl *controller.ActiveTransferController
+	staticDir          string
 }
 
 // New 创建路由实例
@@ -32,6 +33,7 @@ func New(
 	runCtrl *controller.RunController,
 	fsCtrl *controller.FsController,
 	authCtrl *controller.AuthController,
+	activeTransferCtrl *controller.ActiveTransferController,
 	staticDir string,
 ) *Router {
 	return &Router{
@@ -39,10 +41,11 @@ func New(
 		taskCtrl:     taskCtrl,
 		browserCtrl:  browserCtrl,
 		scheduleCtrl: scheduleCtrl,
-		runCtrl:      runCtrl,
-		fsCtrl:       fsCtrl,
-		authCtrl:     authCtrl,
-		staticDir:    staticDir,
+		runCtrl:            runCtrl,
+		fsCtrl:             fsCtrl,
+		authCtrl:           authCtrl,
+		activeTransferCtrl: activeTransferCtrl,
+		staticDir:          staticDir,
 	}
 }
 
@@ -94,6 +97,18 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/tasks/bootstrap", r.taskCtrl.HandleBootstrap)
 	apiMux.HandleFunc("/api/tasks", r.taskCtrl.HandleTasks)
 	apiMux.HandleFunc("/api/tasks/", func(w http.ResponseWriter, req *http.Request) {
+		if strings.HasSuffix(req.URL.Path, "/active-transfer/completed") {
+			r.activeTransferCtrl.HandleCompleted(w, req)
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/active-transfer/pending") {
+			r.activeTransferCtrl.HandlePending(w, req)
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/active-transfer") {
+			r.activeTransferCtrl.HandleOverview(w, req)
+			return
+		}
 		if strings.HasSuffix(req.URL.Path, "/kill") {
 			r.runCtrl.HandleTaskKill(w, req)
 			return

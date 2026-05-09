@@ -25,6 +25,7 @@ defineProps<{
   stopTaskAny: (task: any) => void
   setWebhook: (task: any) => void
   setSingletonMode: (task: any) => void
+  openTransferDetail: (taskId: number) => void
   prevTasksPage: () => void
   nextTasksPage: () => void
   setTasksJumpPageValue: (value: number | null) => void
@@ -73,6 +74,7 @@ defineProps<{
     @stop="stopTaskAny"
     @set-webhook="setWebhook"
     @set-singleton="setSingletonMode"
+    @open-transfer-detail="openTransferDetail"
     @prev-page="prevTasksPage"
     @next-page="nextTasksPage"
     @update:jump-page="setTasksJumpPageValue"

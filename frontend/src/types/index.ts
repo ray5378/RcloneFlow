@@ -20,9 +20,13 @@ export interface TaskOptions {
   include?: string[]           // --include
   includeFrom?: string[]       // --include-from
   filter?: string[]            // --filter
-  filterFrom?: string[]         // --filter-from
+  filterFrom?: string[]        // --filter-from
   filesFrom?: string[]         // --files-from
   filesFromRaw?: string[]      // --files-from-raw
+  minSize?: string             // --min-size
+  maxSize?: string             // --max-size
+  minAge?: string              // --min-age
+  maxAge?: string              // --max-age
   deleteExcluded?: boolean     // --delete-excluded
   ignoreCase?: boolean         // --ignore-case
   ignoreCaseSync?: boolean     // --ignore-case-sync

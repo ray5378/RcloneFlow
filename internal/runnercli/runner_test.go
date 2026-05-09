@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"rcloneflow/internal/active_transfer"
 	"rcloneflow/internal/store"
 )
 
@@ -174,7 +175,7 @@ func TestConsume_CASNoticeIncrementsCompletedFiles(t *testing.T) {
 	defer outFile.Close()
 
 	line := "2026/05/01 14:01:20 NOTICE: 电视剧/国产剧/人间惊鸿客 (2026)/Season 1/人间惊鸿客 - S01E18 - 第 18 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
-	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true)
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true, false)
 
 	gotRun, err := db.GetRun(run.ID)
 	if err != nil {
@@ -191,5 +192,50 @@ func TestConsume_CASNoticeIncrementsCompletedFiles(t *testing.T) {
 	_ = files
 	if got := len(fp.copiedList()); got != 1 {
 		t.Fatalf("fp.copied len=%d, want 1", got)
+	}
+}
+
+func TestConsume_MoveDeletedDoesNotMarkActiveTransferDeleted(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_runnercli_move_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	task, err := db.AddTask(store.Task{Name: "move-task", Mode: "move", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+	run, err := db.AddRun(store.Run{TaskID: task.ID, Status: "running", Trigger: "manual", Summary: map[string]any{}})
+	if err != nil {
+		t.Fatalf("AddRun() error = %v", err)
+	}
+
+	mgr := active_transfer.NewManager()
+	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeNormal, []active_transfer.TransferCandidateFile{{Path: "a.mp4", Name: "a.mp4"}})
+	r := New(db, mgr)
+	fp := &fileProgress{m: map[string]*fileProg{}}
+	outFile, err := os.CreateTemp(tmpDir, "consume-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer outFile.Close()
+
+	line := "2026/05/10 00:20:00 INFO : a.mp4: Deleted\n"
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, false, true)
+
+	completed := mgr.ListCompleted(task.ID, 0, 10)
+	if completed.Total != 0 {
+		t.Fatalf("completed total=%d, want 0", completed.Total)
+	}
+	pending := mgr.ListPending(task.ID, 0, 10)
+	if pending.Total != 1 {
+		t.Fatalf("pending total=%d, want 1", pending.Total)
 	}
 }

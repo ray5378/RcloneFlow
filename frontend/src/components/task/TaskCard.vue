@@ -49,6 +49,7 @@ const emit = defineEmits<{
   stop: [taskId: number]
   setWebhook: [task: Task]
   setSingleton: [task: Task]
+  openTransferDetail: [taskId: number]
 }>()
 
 function getLiveProgress(): Progress | null {
@@ -106,6 +107,7 @@ function isStopped(): boolean {
 
       <div class="item-actions list-item-actions list-item-actions-right">
         <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 {{ t('taskCard.history') }}</button>
+        <button class="ghost small" @click.stop="emit('openTransferDetail', task.id!)">📦 {{ t('activeTransfer.title') }}</button>
         <button class="ghost small" :class="{ 'danger-text': isStopped() }" @click.stop="emit('stop', task.id!)">
           {{ isStopped() ? `⏹ ${t('taskCard.stopped')}` : `⏹ ${t('taskCard.stopTransfer')}` }}
         </button>

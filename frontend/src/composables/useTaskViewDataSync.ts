@@ -189,7 +189,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
               options.lastNonDecreasingTotalsByTask.value[tid] = {
                 runId,
                 totalBytes: nextTotalBytes,
-                totalCount: nextTotalCount,
+                totalCount: nextLogicalTotalCount,
               }
             }
             options.activeRuns.value[idx] = {

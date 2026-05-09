@@ -24,6 +24,9 @@ export { getSchedules as listSchedules } from './schedule'
 export { getRuns, getRun, clearRun, clearAllRuns, clearRunsByTask, getActiveRuns, getGlobalStats, getRunFiles, getRunsByTask } from './run'
 export { getRuns as listRuns } from './run'
 
+// ============ Active Transfer API ============
+export { getActiveTransfer, getActiveTransferCompleted, getActiveTransferPending } from './activeTransfer'
+
 // ============ Remote API ============
 export { getRemotes, createRemote, updateRemote, getRemoteConfig, deleteRemote, testRemote, getProviders } from './remote'
 export { getRemotes as listRemotes } from './remote'

@@ -79,3 +79,15 @@ export const jobApi = {
     try { return await api.getActiveRuns() } catch (err) { handleError(err, { module: 'ActiveRun', operation: t('runtime.activeRunList') }); return [] }
   }
 }
+
+export const activeTransferApi = {
+  async get(taskId: number) {
+    try { return await api.getActiveTransfer(taskId) } catch (err) { handleError(err, { module: 'ActiveTransfer', operation: 'overview' }); return null }
+  },
+  async getCompleted(taskId: number, offset = 0, limit = 100) {
+    try { return await api.getActiveTransferCompleted(taskId, offset, limit) } catch (err) { handleError(err, { module: 'ActiveTransfer', operation: 'completed' }); return { total: 0, items: [] } }
+  },
+  async getPending(taskId: number, offset = 0, limit = 100) {
+    try { return await api.getActiveTransferPending(taskId, offset, limit) } catch (err) { handleError(err, { module: 'ActiveTransfer', operation: 'pending' }); return { total: 0, items: [] } }
+  }
+}

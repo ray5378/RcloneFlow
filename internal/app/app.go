@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"rcloneflow/internal/active_transfer"
 	"rcloneflow/internal/config"
 	"rcloneflow/internal/controller"
 	"rcloneflow/internal/logger"
@@ -63,7 +64,18 @@ func Run(cfg *config.Config) error {
 	}
 
 	// 初始化服务层（定时任务采用 TaskService 以使用 CLI Runner，确保产生日志 stderrFile）
-	taskSvc := service.NewTaskService(db, rc)
+	activeMgr := active_transfer.NewManager()
+	activeMgr.SetPersistFunc(func(runID int64, snap active_transfer.ActiveTransferSnapshot) {
+		_ = db.UpdateRun(runID, func(rr *store.Run) {
+			if rr.Summary == nil {
+				rr.Summary = map[string]any{}
+			}
+			for k, v := range active_transfer.SnapshotEnvelope(snap) {
+				rr.Summary[k] = v
+			}
+		})
+	})
+	taskSvc := service.NewTaskService(db, rc, activeMgr)
 	scheduleSvc := service.NewScheduleService(db)
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
 
@@ -71,6 +83,7 @@ func Run(cfg *config.Config) error {
 	remoteCtrl := controller.NewRemoteController(rc)
 	taskCtrl := controller.NewTaskController(taskSvc, scheduleSvc, runSvc, rc)
 	browserCtrl := controller.NewBrowserController(rc)
+	activeTransferCtrl := controller.NewActiveTransferController(activeMgr, runSvc)
 
 	// 初始化调度器(需要在controller之前,以便传递)
 	// 使用 TaskService 作为 Runner，以统一走 CLI Runner（生成 stderr 日志文件）
@@ -86,7 +99,7 @@ func Run(cfg *config.Config) error {
 	authCtrl := controller.NewAuthController(db)
 
 	// 初始化路由
-	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, cfg.GetStaticDir())
+	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, cfg.GetStaticDir())
 
 	// 注入 settings → cleanup 重排钩子（在声明服务之后再赋值）
 	var cleanupSvc *service.CleanupService

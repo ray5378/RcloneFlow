@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"rcloneflow/internal/active_transfer"
 	"rcloneflow/internal/adapter"
 	runnercli "rcloneflow/internal/runnercli"
 	"rcloneflow/internal/settings"
@@ -16,13 +17,18 @@ import (
 
 // TaskService 任务服务层
 type TaskService struct {
-	db     *store.DB
-	runner adapter.TaskRunner
+	db        *store.DB
+	runner    adapter.TaskRunner
+	activeMgr *active_transfer.Manager
 }
 
 // NewTaskService 创建任务服务
-func NewTaskService(db *store.DB, runner adapter.TaskRunner) *TaskService {
-	return &TaskService{db: db, runner: runner}
+func NewTaskService(db *store.DB, runner adapter.TaskRunner, activeMgr ...*active_transfer.Manager) *TaskService {
+	var mgr *active_transfer.Manager
+	if len(activeMgr) > 0 {
+		mgr = activeMgr[0]
+	}
+	return &TaskService{db: db, runner: runner, activeMgr: mgr}
 }
 
 // ListTasks 获取所有任务
@@ -285,8 +291,27 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			})
 		}
 		// 异步启动任务
+		if s.activeMgr != nil {
+			mode := active_transfer.TrackingModeNormal
+			if opts != nil && opts.OpenlistCasCompatible {
+				mode = active_transfer.TrackingModeCAS
+			}
+			cfg := os.Getenv("RCLONE_CONFIG")
+			if cfg == "" {
+				dataDir := os.Getenv("APP_DATA_DIR")
+				if dataDir == "" {
+					dataDir = "./data"
+				}
+				cfg = filepath.Join(dataDir, "rclone.conf")
+			}
+			src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
+			dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
+			if candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts); err == nil {
+				s.activeMgr.InitState(run.ID, taskID, mode, candidates)
+			}
+		}
 		go func() {
-			_ = runnercli.New(s.db).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+			_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
 		}()
 		return TaskRunResult{Started: true, TaskID: taskID}, nil
 	}
@@ -305,8 +330,27 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			rr.Summary["transferDefaults"] = ts
 		})
 	}
+	if s.activeMgr != nil {
+		mode := active_transfer.TrackingModeNormal
+		if opts != nil && opts.OpenlistCasCompatible {
+			mode = active_transfer.TrackingModeCAS
+		}
+		cfg := os.Getenv("RCLONE_CONFIG")
+		if cfg == "" {
+			dataDir := os.Getenv("APP_DATA_DIR")
+			if dataDir == "" {
+				dataDir = "./data"
+			}
+			cfg = filepath.Join(dataDir, "rclone.conf")
+		}
+		src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
+		dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
+		if candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts); err == nil {
+			s.activeMgr.InitState(run.ID, taskID, mode, candidates)
+		}
+	}
 	go func() {
-		_ = runnercli.New(s.db).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+		_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
 	}()
 	return TaskRunResult{Started: true, TaskID: taskID}, nil
 }

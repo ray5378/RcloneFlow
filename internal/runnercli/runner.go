@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"rcloneflow/internal/active_transfer"
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/config"
 	"rcloneflow/internal/logger"
@@ -29,12 +30,19 @@ import (
 
 // Runner manages CLI transfers with progress/logs and stop control.
 type Runner struct {
-	mu    sync.Mutex
-	procs map[int64]*exec.Cmd
-	db    *store.DB
+	mu        sync.Mutex
+	procs     map[int64]*exec.Cmd
+	db        *store.DB
+	activeMgr *active_transfer.Manager
 }
 
-func New(db *store.DB) *Runner { return &Runner{procs: map[int64]*exec.Cmd{}, db: db} }
+func New(db *store.DB, activeMgr ...*active_transfer.Manager) *Runner {
+	var mgr *active_transfer.Manager
+	if len(activeMgr) > 0 {
+		mgr = activeMgr[0]
+	}
+	return &Runner{procs: map[int64]*exec.Cmd{}, db: db, activeMgr: mgr}
+}
 
 func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcPath, dstRemote, dstPath string) error {
 	r.mu.Lock()
@@ -284,8 +292,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	fileStats := &fileProgress{m: map[string]*fileProg{}}
 	// 仅解析 stderr（rclone 进度通常在 stderr），stdout 只写文件，减少重复解析/写库
 	casMode := isOpenlistCASCompatible(run)
-	go r.consume(run.ID, outR, stderrFile, false, fileStats, casMode)
-	go r.consume(run.ID, errR, stderrFile, true, fileStats, casMode)
+	go r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move")
+	go r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move")
 	go func() {
 		defer func() {
 			if casCompat != nil && casCompat.ExcludeFrom != "" {
@@ -451,6 +459,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				"run_id": run.ID,
 				"status": "failed",
 			})
+			if r.activeMgr != nil {
+				r.activeMgr.RemoveState(run.ID)
+			}
 			// fire webhook for failed run
 			go r.postWebhookIfNeeded(run.ID)
 			r.mu.Lock()
@@ -475,6 +486,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					"run_id": run.ID,
 					"status": "failed",
 				})
+				if r.activeMgr != nil {
+					r.activeMgr.RemoveState(run.ID)
+				}
 				go r.postWebhookIfNeeded(run.ID)
 				r.mu.Lock()
 				delete(r.procs, run.ID)
@@ -662,6 +676,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			"run_id": run.ID,
 			"status": "finished",
 		})
+		if r.activeMgr != nil {
+			r.activeMgr.RemoveState(run.ID)
+		}
 		// fire webhook for successful run
 		go r.postWebhookIfNeeded(run.ID)
 		r.mu.Lock()
@@ -984,7 +1001,7 @@ var fileLineRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*(\d+(?:\.\d+)?)\s
 var fileCopiedRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*Copied\s*\(new\)`)
 var fileCASMatchedRe = regexp.MustCompile(`(?i)(?:INFO|NOTICE)\s*:\s*([^:]+):\s*CAS compatible match after source cleanup\b`)
 
-func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress, openlistCASCompatible bool) {
+func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress, openlistCASCompatible bool, isMove bool) {
 	wantParse := parseStats
 	s := bufio.NewScanner(rd)
 	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
@@ -1160,8 +1177,15 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				fmt.Sscanf(m[6], "%f", &pct)
 				fmt.Sscanf(m[7], "%f", &sp)
 				fp.update(name, cb*unitToMul(m[3]), tb*unitToMul(m[5]), sp*unitToMul(m[8]), pct)
+				if r.activeMgr != nil {
+					pctCopy := pct
+					r.activeMgr.OnFileProgress(runID, name, int64(cb*unitToMul(m[3])), int64(tb*unitToMul(m[5])), int64(sp*unitToMul(m[8])), &pctCopy)
+				}
 				if (tb > 0 && cb >= tb) || pct >= 100 {
 					fp.markCopied(name)
+					if r.activeMgr != nil {
+						r.activeMgr.OnFileCopied(runID, name)
+					}
 					marked = true
 				}
 				if marked {
@@ -1188,6 +1212,9 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				name := strings.TrimSpace(m[1])
 				fp.update(name, -1, -1, -1, 100)
 				fp.markCopied(name)
+				if r.activeMgr != nil {
+					r.activeMgr.OnFileCopied(runID, name)
+				}
 				marked = true
 			}
 			if !marked {
@@ -1195,7 +1222,27 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					name := strings.TrimSpace(m[1])
 					fp.update(name, -1, -1, -1, 100)
 					fp.markCopied(name)
+					if r.activeMgr != nil {
+						r.activeMgr.OnFileCASMatched(runID, name)
+					}
 					marked = true
+				}
+			}
+			if !marked {
+				if row, _, ok := classifyRunLogRow("INFO", strings.TrimSpace(extractPathFromLogLine(line)), strings.TrimSpace(extractMsgFromLogLine(line)), map[string]int64{}, openlistCASCompatible); ok && r.activeMgr != nil {
+					path := strings.TrimSpace(anyString(row["path"]))
+					action := strings.ToLower(strings.TrimSpace(anyString(row["action"])))
+					msg := strings.TrimSpace(anyString(row["message"]))
+					switch action {
+					case "deleted":
+						if !isMove {
+							r.activeMgr.OnFileDeleted(runID, path)
+						}
+					case "skipped":
+						r.activeMgr.OnFileSkipped(runID, path, msg)
+					case "error":
+						r.activeMgr.OnFileFailed(runID, path, msg)
+					}
 				}
 			}
 			if marked {
@@ -1776,4 +1823,25 @@ func joinRemotePath(base, rel string) string {
 		return base + rel
 	}
 	return base + "/" + rel
+}
+
+func extractPathFromLogLine(line string) string {
+	m := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`).FindStringSubmatch(strings.TrimSpace(line))
+	if len(m) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(m[3])
+}
+
+func extractMsgFromLogLine(line string) string {
+	m := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`).FindStringSubmatch(strings.TrimSpace(line))
+	if len(m) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(m[4])
+}
+
+func anyString(v any) string {
+	s, _ := v.(string)
+	return s
 }

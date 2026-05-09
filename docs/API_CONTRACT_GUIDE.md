@@ -46,7 +46,73 @@
 - `completedFiles`
 - `totalCount`
 - `phase`
-- `lastUpdatedAt`
+- `lastUpdatedA`
+
+## 2. `/api/tasks/{id}/active-transfer`
+
+### 2.1 作用
+用于提供任务“传输中”弹窗的运行中文件级详情总览。
+
+### 2.2 返回要点
+- `taskId`
+- `runId`
+- `trackingMode`：`normal | cas`
+- `summary`
+- `currentFile`
+- `degraded`
+- `degradeReason`
+
+### 2.3 `trackingMode`
+- `normal`：前端按“传输”语义展示
+- `cas`：前端按“处理”语义展示
+
+### 2.4 `currentFile`
+当前文件进度信息。
+
+典型字段：
+- `name`
+- `path`
+- `bytes`
+- `totalBytes`
+- `percentage`
+- `speed`
+- `status`
+
+约定：
+- `percentage` 允许为空，前端不得伪造百分比
+- `status` 目前主要为 `in_progress`
+
+## 3. `/api/tasks/{id}/active-transfer/completed`
+
+### 3.1 作用
+获取运行中已完成/已处理文件列表，支持分页。
+
+### 3.2 返回要点
+- `total`
+- `items[]`
+
+### 3.3 `items[].status`
+统一状态枚举：
+- `copied`
+- `cas_matched`
+- `skipped`
+- `failed`
+- `deleted`
+
+## 4. `/api/tasks/{id}/active-transfer/pending`
+
+### 4.1 作用
+获取运行中未完成/未处理文件列表，支持分页。
+
+### 4.2 返回要点
+- `total`
+- `items[]`
+
+### 4.3 `items[].status`
+统一状态枚举：
+- `pending`
+- `in_progress`
+t`
 
 ### 1.5 `progressLine`
 语义：

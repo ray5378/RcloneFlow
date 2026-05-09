@@ -15,6 +15,10 @@ type TaskOptions struct {
 	FilterFrom       []string `json:"filterFrom,omitempty"`       // --filter-from
 	FilesFrom        []string `json:"filesFrom,omitempty"`        // --files-from
 	FilesFromRaw     []string `json:"filesFromRaw,omitempty"`     // --files-from-raw
+	MinSize          string   `json:"minSize,omitempty"`          // --min-size
+	MaxSize          string   `json:"maxSize,omitempty"`          // --max-size
+	MinAge           string   `json:"minAge,omitempty"`           // --min-age
+	MaxAge           string   `json:"maxAge,omitempty"`           // --max-age
 	DeleteExcluded   bool     `json:"deleteExcluded,omitempty"`   // --delete-excluded
 	IgnoreCase       bool     `json:"ignoreCase,omitempty"`       // --ignore-case
 	IgnoreCaseSync   bool     `json:"ignoreCaseSync,omitempty"`   // --ignore-case-sync
@@ -138,6 +142,10 @@ func (o *TaskOptions) IsEmpty() bool {
 		o.FilterFrom == nil &&
 		o.FilesFrom == nil &&
 		o.FilesFromRaw == nil &&
+		o.MinSize == "" &&
+		o.MaxSize == "" &&
+		o.MinAge == "" &&
+		o.MaxAge == "" &&
 		!o.DeleteExcluded &&
 		!o.IgnoreCase &&
 		!o.IgnoreCaseSync &&
@@ -364,6 +372,10 @@ func MergeTaskOptions(user *TaskOptions) *TaskOptions {
 	merged.FilterFrom = user.FilterFrom
 	merged.FilesFrom = user.FilesFrom
 	merged.FilesFromRaw = user.FilesFromRaw
+	merged.MinSize = user.MinSize
+	merged.MaxSize = user.MaxSize
+	merged.MinAge = user.MinAge
+	merged.MaxAge = user.MaxAge
 	merged.Header = user.Header
 	merged.HeaderDownload = user.HeaderDownload
 	merged.HeaderUpload = user.HeaderUpload
