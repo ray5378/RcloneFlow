@@ -66,18 +66,29 @@
 
 ---
 
-## 6. 构建产物处理
+## 6. 构建产物与镜像发布处理
 
 当前项目中：
 - `web/` 是前端构建输出目录
 - 仓库只应保留可重建所需的源码与配置，不再把 `web/index.html` / `web/assets/*` 当作需要手工维护的受管源码
+- Docker 镜像发布由 GitHub Actions 自动完成，不再把“本地手动 build/push Docker”作为默认发布流程
 
-因此合并前应特别确认：
-- 若本轮前端源码改动影响了打包结果，应通过重新构建验证，而不是手工维护构建产物
+因此提交 / 发布前应特别确认：
+- 若本轮前端源码改动影响了打包结果，应先重新构建前端产物并验证，而不是手工维护构建产物
 - 是否把与本轮无关的旧构建产物噪音误带入主线
 - 本地构建加速缓存（如 `third_party/docker/`、`third_party/npm-cache/`、`third_party/go-mod-cache/`、`third_party/apk-cache/`）不应混入主线提交
 
-如果本地直接启动 Go 服务时缺少 `web/`，应先执行 `cd frontend && npm run build`，或改用 Docker 镜像启动。
+当前默认流程：
+1. 修改源码
+2. 执行最小必要验证（如 `npm test`、`npm run build`）
+3. 若前端源码有变更，重构前端产物以确认源码可重新打包
+4. 提交并 push 到 GitHub
+5. 由 GitHub Actions 自动构建并推送 Docker 镜像
+
+额外约束：
+- 默认不要在本地手动 `docker build` / `docker push` 来代替正式发布
+- 如果线上镜像是否更新存在疑问，优先核对 GitHub Actions 结果与仓库提交，而不是猜测本地镜像状态
+- 若本地直接启动 Go 服务时缺少 `web/`，应先执行 `cd frontend && npm run build`，或改用 Docker 镜像启动
 
 ---
 
