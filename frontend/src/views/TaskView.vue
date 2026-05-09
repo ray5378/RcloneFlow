@@ -142,7 +142,6 @@ const {
   tasksJumpPage,
   historyStatusFilter,
   jumpPage,
-  finalFilesJump,
   tasksPage,
   runsPage,
   currentModule,

@@ -5,7 +5,6 @@ export function useTaskViewPagingBridge(options: {
   tasksJumpPage: Ref<number | null>
   historyStatusFilter: Ref<string>
   jumpPage: Ref<number>
-  finalFilesJump: Ref<number | null>
   tasksPage: Ref<number>
   runsPage: Ref<number>
   currentModule: Ref<string>
@@ -15,7 +14,6 @@ export function useTaskViewPagingBridge(options: {
   const setTasksJumpPageValue = (value: number | null) => { options.tasksJumpPage.value = value }
   const setHistoryStatusFilter = (value: string) => { options.historyStatusFilter.value = value }
   const setJumpPageValue = (value: number) => { options.jumpPage.value = value }
-  const setFinalFilesJumpValue = (value: number | null) => { options.finalFilesJump.value = value }
 
   const prevTasksPage = () => { options.tasksPage.value-- }
   const nextTasksPage = () => { options.tasksPage.value++ }
@@ -28,7 +26,6 @@ export function useTaskViewPagingBridge(options: {
     setTasksJumpPageValue,
     setHistoryStatusFilter,
     setJumpPageValue,
-    setFinalFilesJumpValue,
     prevTasksPage,
     nextTasksPage,
     backToTasks,
