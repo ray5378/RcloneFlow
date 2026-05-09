@@ -1,8 +1,9 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { FileItem } from '../files'
 import { t } from '../../i18n'
 
-defineProps<{
+const props = defineProps<{
   visible: boolean
   runDetail: any
   getStatusClass: (status: string) => string
@@ -53,6 +54,11 @@ function onFinalFilesJumpInput(event: Event) {
 function countLine(template: string, count: number) {
   return template.replace('{count}', String(count))
 }
+
+const showingFinalFiles = computed(() => Array.isArray(props.finalFiles) && props.finalFiles.length > 0)
+const activeFilesPage = computed(() => Math.max(1, Number(showingFinalFiles.value ? props.finalFilesPage : props.runFilesPage) || 1))
+const activeTotalFilesPages = computed(() => Math.max(1, Number(showingFinalFiles.value ? props.totalFinalFilesPages : props.totalRunFilesPages) || 1))
+const activeIsFinalFiles = computed(() => showingFinalFiles.value)
 </script>
 
 <template>
@@ -65,31 +71,31 @@ function countLine(template: string, count: number) {
       <div class="modal-body">
         <div class="detail-item">
           <label>{{ t('modal.taskName') }}</label>
-          <span>{{ runDetail.taskName || '-' }}</span>
+          <span>{{ props.runDetail.taskName || '-' }}</span>
         </div>
         <div class="detail-item">
           <label>{{ t('modal.runMode') }}</label>
-          <span>{{ runDetail.taskMode || '-' }}</span>
+          <span>{{ props.runDetail.taskMode || '-' }}</span>
         </div>
         <div class="detail-item">
           <label>{{ t('modal.status') }}</label>
-          <span :class="['status', getStatusClass(runDetail.status)]">{{ getStatusText(runDetail.status) }}</span>
+          <span :class="['status', props.getStatusClass(props.runDetail.status)]">{{ props.getStatusText(props.runDetail.status) }}</span>
         </div>
         <div class="detail-item">
           <label>{{ t('modal.trigger') }}</label>
-          <span>{{ runDetail.trigger === 'schedule' ? t('modal.triggerSchedule') : (runDetail.trigger === 'webhook' ? t('modal.triggerWebhook') : t('modal.triggerManual')) }}</span>
+          <span>{{ props.runDetail.trigger === 'schedule' ? t('modal.triggerSchedule') : (props.runDetail.trigger === 'webhook' ? t('modal.triggerWebhook') : t('modal.triggerManual')) }}</span>
         </div>
         <div class="detail-item full-width">
           <label>{{ t('modal.sourcePath') }}</label>
-          <span>{{ runDetail.sourceRemote }}:{{ runDetail.sourcePath || '/' }}</span>
+          <span>{{ props.runDetail.sourceRemote }}:{{ props.runDetail.sourcePath || '/' }}</span>
         </div>
         <div class="detail-item full-width">
           <label>{{ t('modal.targetPath') }}</label>
-          <span>{{ runDetail.targetRemote }}:{{ runDetail.targetPath || '/' }}</span>
+          <span>{{ props.runDetail.targetRemote }}:{{ props.runDetail.targetPath || '/' }}</span>
         </div>
         <div class="detail-item full-width">
           <label>{{ t('modal.summary') }}</label>
-          <div class="summary-box" v-if="getFinalSummary(runDetail)">
+          <div class="summary-box" v-if="props.getFinalSummary(props.runDetail)">
             <div class="summary-title">{{ t('modal.summaryStats') }}</div>
             <div class="summary-grid">
               <div class="summary-cell clickable" @click="emit('set-final-filter', 'all')">
@@ -97,7 +103,7 @@ function countLine(template: string, count: number) {
                 <div class="summary-val">{{ finalCountAll }}</div>
               </div>
               <div class="summary-cell clickable" @click="emit('set-final-filter', 'success')">
-                <div class="summary-key">{{ getSuccessLabel(runDetail.taskMode) }}</div>
+                <div class="summary-key">{{ getSuccessLabel(props.runDetail.taskMode) }}</div>
                 <div class="summary-val">{{ finalCountSuccess }}</div>
               </div>
               <div class="summary-cell clickable" @click="emit('set-final-filter', 'failed')">
@@ -110,23 +116,23 @@ function countLine(template: string, count: number) {
               </div>
               <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.transferredBytes') }}</div>
-                <div class="summary-val act">{{ formatBytes(getFinalSummary(runDetail)?.transferredBytes || 0) }}</div>
+                <div class="summary-val act">{{ props.formatBytes(props.getFinalSummary(props.runDetail)?.transferredBytes || 0) }}</div>
               </div>
               <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.startedAt') }}</div>
-                <div class="summary-val">{{ formatTime(runDetail.startedAt) }}</div>
+                <div class="summary-val">{{ props.formatTime(props.runDetail.startedAt) }}</div>
               </div>
               <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.finishedAt') }}</div>
-                <div class="summary-val">{{ formatTime(runDetail.finishedAt) }}</div>
+                <div class="summary-val">{{ props.formatTime(props.runDetail.finishedAt) }}</div>
               </div>
               <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.duration') }}</div>
-                <div class="summary-val">{{ getFinalSummary(runDetail)?.durationText || '-' }}</div>
+                <div class="summary-val">{{ props.getFinalSummary(props.runDetail)?.durationText || '-' }}</div>
               </div>
               <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.avgSpeed') }}</div>
-                <div class="summary-val">{{ formatBps(getFinalSummary(runDetail)?.avgSpeedBps || 0) }}</div>
+                <div class="summary-val">{{ props.formatBps(props.getFinalSummary(props.runDetail)?.avgSpeedBps || 0) }}</div>
               </div>
             </div>
           </div>
@@ -139,11 +145,13 @@ function countLine(template: string, count: number) {
             <div class="files-toolbar">
               <span>{{ countLine(t('modal.countLine'), finalFilesTotal) }}</span>
               <div class="pager-inline">
-                <button class="ghost small" :disabled="finalFilesPage <= 1" @click="emit('prev-final-files-page')">{{ t('modal.prevPage') }}</button>
-                <span>{{ Math.max(1, Number(finalFilesPage) || 1) }}/{{ totalFinalFilesPages }}</span>
-                <button class="ghost small" :disabled="finalFilesPage >= totalFinalFilesPages" @click="emit('next-final-files-page')">{{ t('modal.nextPage') }}</button>
-                <input class="page-input jump-input" :value="finalFilesJump ?? ''" type="number" min="1" :max="totalFinalFilesPages" @input="onFinalFilesJumpInput" />
-                <button class="ghost small" @click="emit('jump-final-files-page')">{{ t('modal.jump') }}</button>
+                <button class="ghost small" :disabled="activeFilesPage <= 1" @click="emit(activeIsFinalFiles ? 'prev-final-files-page' : 'prev-files-page')">{{ t('modal.prevPage') }}</button>
+                <span>{{ activeFilesPage }}/{{ activeTotalFilesPages }}</span>
+                <button class="ghost small" :disabled="activeFilesPage >= activeTotalFilesPages" @click="emit(activeIsFinalFiles ? 'next-final-files-page' : 'next-files-page')">{{ t('modal.nextPage') }}</button>
+                <template v-if="activeIsFinalFiles">
+                  <input class="page-input jump-input" :value="finalFilesJump ?? ''" type="number" min="1" :max="activeTotalFilesPages" @input="onFinalFilesJumpInput" />
+                  <button class="ghost small" @click="emit('jump-final-files-page')">{{ t('modal.jump') }}</button>
+                </template>
               </div>
             </div>
             <div class="files-table large">
@@ -163,16 +171,11 @@ function countLine(template: string, count: number) {
                 </template>
               </div>
             </div>
-            <div class="files-pager" v-if="!finalFiles || !finalFiles.length">
-              <button class="ghost small" :disabled="runFilesPage <= 1" @click="emit('prev-files-page')">{{ t('modal.prevPage') }}</button>
-              <span>{{ Math.max(1, Number(runFilesPage) || 1) }}/{{ totalRunFilesPages }}</span>
-              <button class="ghost small" :disabled="runFilesPage >= totalRunFilesPages" @click="emit('next-files-page')">{{ t('modal.nextPage') }}</button>
-            </div>
           </div>
         </div>
-        <div v-if="runDetail.error" class="detail-item full-width">
+        <div v-if="props.runDetail.error" class="detail-item full-width">
           <label>{{ t('modal.error') }}</label>
-          <span class="error-text">{{ runDetail.error }}</span>
+          <span class="error-text">{{ props.runDetail.error }}</span>
         </div>
       </div>
     </div>
