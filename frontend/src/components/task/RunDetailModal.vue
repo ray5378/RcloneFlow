@@ -140,7 +140,7 @@ function countLine(template: string, count: number) {
               <span>{{ countLine(t('modal.countLine'), finalFilesTotal) }}</span>
               <div class="pager-inline">
                 <button class="ghost small" :disabled="finalFilesPage <= 1" @click="emit('prev-final-files-page')">{{ t('modal.prevPage') }}</button>
-                <span>{{ finalFilesPage }}/{{ totalFinalFilesPages }}</span>
+                <span>{{ Math.max(1, Number(finalFilesPage) || 1) }}/{{ totalFinalFilesPages }}</span>
                 <button class="ghost small" :disabled="finalFilesPage >= totalFinalFilesPages" @click="emit('next-final-files-page')">{{ t('modal.nextPage') }}</button>
                 <input class="page-input jump-input" :value="finalFilesJump ?? ''" type="number" min="1" :max="totalFinalFilesPages" @input="onFinalFilesJumpInput" />
                 <button class="ghost small" @click="emit('jump-final-files-page')">{{ t('modal.jump') }}</button>
@@ -165,7 +165,7 @@ function countLine(template: string, count: number) {
             </div>
             <div class="files-pager" v-if="!finalFiles || !finalFiles.length">
               <button class="ghost small" :disabled="runFilesPage <= 1" @click="emit('prev-files-page')">{{ t('modal.prevPage') }}</button>
-              <span>{{ runFilesPage }}/{{ totalRunFilesPages }}</span>
+              <span>{{ Math.max(1, Number(runFilesPage) || 1) }}/{{ totalRunFilesPages }}</span>
               <button class="ghost small" :disabled="runFilesPage >= totalRunFilesPages" @click="emit('next-files-page')">{{ t('modal.nextPage') }}</button>
             </div>
           </div>
