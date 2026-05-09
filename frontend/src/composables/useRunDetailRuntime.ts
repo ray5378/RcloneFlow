@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRunDetailState } from './useRunDetailState'
 import { useRunDetailFiles } from './useRunDetailFiles'
 import { useRunDetailComputed } from './useRunDetailComputed'
@@ -45,12 +45,14 @@ export function useRunDetailRuntime(options: {
     jumpFinalFilesPage,
   } = useRunDetailComputed({ runDetail, detailFiles: runFiles, currentFinalFilter })
 
+  const runFilesTotal = computed(() => visibleRunFiles.value.length)
+
   return {
     showDetailModal,
     runDetail,
     openRunDetailModal,
     closeRunDetailModal,
-    runFilesTotal: visibleRunFiles.value.length,
+    runFilesTotal,
     runFilesPage,
     openRunDetailFiles,
     pagedRunFiles,

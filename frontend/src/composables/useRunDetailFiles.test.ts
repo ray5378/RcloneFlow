@@ -8,10 +8,10 @@ describe('useRunDetailFiles', () => {
       .mockResolvedValueOnce({
         items: [
           { name: 'copied-a', status: 'success' },
-          { name: 'source-a', status: 'deleted' },
-          { name: 'failed-a', status: 'failed' },
-          { name: 'skipped-a', status: 'skipped' },
-          { name: 'copied-b', status: 'success' },
+          { name: 'source-a', status: 'Deleted', action: 'Deleted' },
+          { name: 'failed-a', status: 'Failed' },
+          { name: 'skipped-a', status: 'Skipped' },
+          { name: 'copied-b', status: 'Copied', action: 'Copied' },
         ],
         total: 5,
       })
@@ -61,6 +61,7 @@ describe('useRunDetailFiles', () => {
 
     expect(api.runFilesPage.value).toBe(1)
     expect(api.runFilesTotal.value).toBe(4)
+    expect(api.visibleRunFiles.value.length).toBe(2)
     expect(api.pagedRunFiles.value.map(it => it.name)).toEqual(['file-1'])
 
     api.goNextFilesPage()
