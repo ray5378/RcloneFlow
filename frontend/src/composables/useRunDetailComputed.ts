@@ -45,11 +45,20 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
     return parseFinalSummary(run)
   }
 
-  const finalFiles = computed(() => {
-    if (options?.detailFiles?.value && Array.isArray(options.detailFiles.value)) return options.detailFiles.value as any[]
+  const summaryFiles = computed(() => {
     if (!options?.runDetail) return [] as any[]
     const detail = options.runDetail.value as any
     return (getFinalSummary(detail)?.files || []) as any[]
+  })
+
+  const detailFiles = computed(() => {
+    if (!options?.detailFiles?.value || !Array.isArray(options.detailFiles.value)) return [] as any[]
+    return options.detailFiles.value as any[]
+  })
+
+  const finalFiles = computed(() => {
+    if (summaryFiles.value.length) return summaryFiles.value
+    return detailFiles.value
   })
 
   function getSummaryCounts(run: Run | null | undefined) {
@@ -102,11 +111,19 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
 
   const finalFilesJump = ref<number | null>(null)
 
+  function clampFinalFilesPage() {
+    const totalPages = totalFinalFilesPages.value
+    if (finalFilesPage.value > totalPages) finalFilesPage.value = totalPages
+    if (finalFilesPage.value < 1) finalFilesPage.value = 1
+  }
+
   watch(() => options?.runDetail?.value?.id, () => {
     currentFinalFilter.value = 'all'
     finalFilesPage.value = 1
     finalFilesJump.value = null
   }, { immediate: true })
+
+  watch([finalFilesTotal, finalFilesPageSize], clampFinalFilesPage, { immediate: true })
 
   function goPrevFinalFilesPage() {
     if (finalFilesPage.value > 1) finalFilesPage.value--
