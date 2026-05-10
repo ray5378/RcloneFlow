@@ -48,14 +48,20 @@ func (m *Manager) InitState(runID, taskID int64, mode TrackingMode, candidates [
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	st := &ActiveTransferState{
-		RunID:        runID,
-		TaskID:       taskID,
-		TrackingMode: mode,
-		Candidates:   map[string]TransferCandidateFile{},
-		Completed:    map[string]TransferCompletedFile{},
-		Pending:      map[string]TransferPendingFile{},
-		StartedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		RunID:             runID,
+		TaskID:            taskID,
+		TrackingMode:      mode,
+		Candidates:        map[string]TransferCandidateFile{},
+		CurrentFiles:      map[string]TransferCurrentFile{},
+		Completed:         map[string]TransferCompletedFile{},
+		Pending:           map[string]TransferPendingFile{},
+		PreflightPending:  true,
+		PreflightFinished: len(candidates) > 0,
+		StartedAt:         time.Now(),
+		UpdatedAt:         time.Now(),
+	}
+	if len(candidates) == 0 {
+		st.PreflightFinished = false
 	}
 	for _, c := range candidates {
 		key := normalizePath(c.Path)
@@ -73,6 +79,87 @@ func (m *Manager) InitState(runID, taskID int64, mode TrackingMode, candidates [
 	m.byTask[taskID] = st
 	m.persistSnapshotLocked(st)
 	return st
+}
+
+func (m *Manager) MergeCandidates(runID int64, candidates []TransferCandidateFile) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, ok := m.byRunID[runID]
+	if !ok || st == nil {
+		return
+	}
+	if st.Candidates == nil {
+		st.Candidates = map[string]TransferCandidateFile{}
+	}
+	if st.Pending == nil {
+		st.Pending = map[string]TransferPendingFile{}
+	}
+	for _, c := range candidates {
+		key := normalizePath(c.Path)
+		if key == "" {
+			continue
+		}
+		c.Path = key
+		if strings.TrimSpace(c.Name) == "" {
+			c.Name = baseName(key)
+		}
+		st.Candidates[key] = c
+		if cur, ok := st.CurrentFiles[key]; ok {
+			if c.Name != "" {
+				cur.Name = c.Name
+			}
+			st.CurrentFiles[key] = cur
+			if st.CurrentFile != nil && normalizePath(st.CurrentFile.Path) == key {
+				st.CurrentFile.Name = cur.Name
+			}
+			continue
+		}
+		if done, ok := st.Completed[key]; ok {
+			if c.Name != "" {
+				done.Name = c.Name
+			}
+			if c.SizeBytes > 0 || done.SizeBytes == 0 {
+				done.SizeBytes = c.SizeBytes
+			}
+			st.Completed[key] = done
+			continue
+		}
+		if p, ok := st.Pending[key]; ok {
+			if c.Name != "" {
+				p.Name = c.Name
+			}
+			if c.SizeBytes > 0 || p.SizeBytes == 0 {
+				p.SizeBytes = c.SizeBytes
+			}
+			st.Pending[key] = p
+			continue
+		}
+		st.Pending[key] = TransferPendingFile{Path: key, Name: c.Name, SizeBytes: c.SizeBytes, Status: FileStatusPending}
+	}
+	st.PreflightPending = false
+	st.PreflightFinished = true
+	st.UpdatedAt = time.Now()
+	m.persistSnapshotLocked(st)
+}
+
+func (m *Manager) SetPreflightResult(runID int64, err error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, ok := m.byRunID[runID]
+	if !ok || st == nil {
+		return
+	}
+	st.PreflightPending = false
+	st.PreflightFinished = err == nil
+	if err != nil {
+		st.Degraded = true
+		st.DegradeReason = err.Error()
+		if strings.TrimSpace(st.DegradeReason) == "" {
+			st.DegradeReason = "preflight failed"
+		}
+	}
+	st.UpdatedAt = time.Now()
+	m.persistSnapshotLocked(st)
 }
 
 func (m *Manager) GetByTaskID(taskID int64) (*ActiveTransferState, bool) {
@@ -112,7 +199,12 @@ func (m *Manager) UpdateCurrentFile(runID int64, path string, bytes, total, spee
 	if c, ok := st.Candidates[key]; ok && c.Name != "" {
 		name = c.Name
 	}
-	st.CurrentFile = &TransferCurrentFile{Path: key, Name: name, Bytes: bytes, TotalBytes: total, Speed: speed, Percentage: pct, Status: FileStatusInProgress}
+	cur := TransferCurrentFile{Path: key, Name: name, Bytes: bytes, TotalBytes: total, Speed: speed, Percentage: pct, Status: FileStatusInProgress}
+	st.CurrentFile = &cur
+	if st.CurrentFiles == nil {
+		st.CurrentFiles = map[string]TransferCurrentFile{}
+	}
+	st.CurrentFiles[key] = cur
 	if p, ok := st.Pending[key]; ok {
 		p.Status = FileStatusInProgress
 		st.Pending[key] = p
@@ -141,8 +233,16 @@ func (m *Manager) MarkCompleted(runID int64, path string, status FileStatus, mes
 	}
 	delete(st.Pending, key)
 	st.Completed[key] = TransferCompletedFile{Path: key, Name: name, SizeBytes: size, At: time.Now().Format(time.RFC3339), Status: status, Message: message}
+	if st.CurrentFiles != nil {
+		delete(st.CurrentFiles, key)
+	}
 	if st.CurrentFile != nil && normalizePath(st.CurrentFile.Path) == key {
 		st.CurrentFile = nil
+		for _, v := range st.CurrentFiles {
+			vv := v
+			st.CurrentFile = &vv
+			break
+		}
 	}
 	st.UpdatedAt = time.Now()
 	m.persistSnapshotLocked(st)
@@ -155,21 +255,28 @@ func (m *Manager) BuildSummary(taskID int64, bytes, total, speed, eta int64, per
 	if !ok {
 		return ActiveTransferOverviewResponse{}, false
 	}
+	currentFiles := make([]TransferCurrentFile, 0, len(st.CurrentFiles))
+	for _, v := range st.CurrentFiles {
+		currentFiles = append(currentFiles, v)
+	}
 	return ActiveTransferOverviewResponse{
 		TaskID:       st.TaskID,
 		RunID:        st.RunID,
 		TrackingMode: st.TrackingMode,
 		CurrentFile:  cloneCurrent(st.CurrentFile),
+		CurrentFiles: currentFiles,
 		Summary: ActiveTransferSummary{
-			TrackingMode:   st.TrackingMode,
-			CompletedCount: len(st.Completed),
-			PendingCount:   len(st.Pending),
-			TotalCount:     len(st.Candidates),
-			Bytes:          bytes,
-			TotalBytes:     total,
-			Speed:          speed,
-			Eta:            eta,
-			Percentage:     percentage,
+			TrackingMode:      st.TrackingMode,
+			CompletedCount:    len(st.Completed),
+			PendingCount:      len(st.Pending),
+			TotalCount:        len(st.Candidates),
+			PreflightPending:  st.PreflightPending,
+			PreflightFinished: st.PreflightFinished,
+			Bytes:             bytes,
+			TotalBytes:        total,
+			Speed:             speed,
+			Eta:               eta,
+			Percentage:        percentage,
 		},
 		Degraded:      st.Degraded,
 		DegradeReason: st.DegradeReason,

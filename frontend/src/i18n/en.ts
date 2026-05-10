@@ -275,6 +275,7 @@ export default {
     statusDeleted: 'Deleted',
     noCurrentFile: 'No current file progress yet',
     degraded: 'Too many files, only part of the list is shown',
+    preflightPending: 'Scanning the file list. Counts and pending items will fill in gradually.',
     empty: 'No active transfer details available',
     emptyList: 'No items',
     loadMore: 'Load more',

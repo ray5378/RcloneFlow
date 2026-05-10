@@ -11,6 +11,7 @@ const props = defineProps<{
   trackingMode: TrackingMode
   summary: ActiveTransferSummary | null
   currentFile: ActiveTransferCurrentFile | null | undefined
+  currentFiles?: ActiveTransferCurrentFile[]
   completedItems: ActiveTransferCompletedFile[]
   pendingItems: ActiveTransferPendingFile[]
   completedTotal?: number
@@ -40,12 +41,13 @@ const emit = defineEmits<{
       </div>
       <div class="modal-body">
         <div v-if="degraded" class="degraded">{{ t('activeTransfer.degraded') }}</div>
+        <div v-if="summary?.preflightPending" class="hint">{{ t('activeTransfer.preflightPending') }}</div>
         <div v-if="loading" class="state-box">{{ t('common.loading') }}</div>
         <div v-else-if="error" class="state-box error">{{ error }}</div>
-        <div v-else-if="!summary && !currentFile && !completedItems.length && !pendingItems.length" class="state-box">{{ t('activeTransfer.empty') }}</div>
+        <div v-else-if="!summary && !currentFile && !(currentFiles && currentFiles.length) && !completedItems.length && !pendingItems.length" class="state-box">{{ t('activeTransfer.empty') }}</div>
         <template v-else>
           <TransferSummaryBar :summary="summary" />
-          <TransferCurrentFileCard :current-file="currentFile" :tracking-mode="trackingMode" />
+          <TransferCurrentFileCard :current-file="currentFile" :current-files="currentFiles" :tracking-mode="trackingMode" />
           <div class="two-col">
             <TransferCompletedList :items="completedItems" :total="completedTotal" :tracking-mode="trackingMode" @load-more="emit('load-more-completed')" />
             <TransferPendingList :items="pendingItems" :total="pendingTotal" :tracking-mode="trackingMode" @load-more="emit('load-more-pending')" />
@@ -66,6 +68,7 @@ body.light .modal-content { background:#fff; }
 .close-btn { background:none; border:none; font-size:20px; cursor:pointer; }
 .two-col { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:18px; width:100%; align-items:start; }
 .degraded { padding:8px 10px; border-radius:8px; background:#f59e0b22; color:#f59e0b; font-size:12px; }
+.hint { padding:8px 10px; border-radius:8px; background:#3b82f622; color:#93c5fd; font-size:12px; }
 .state-box { padding:16px; border:1px dashed #444; border-radius:8px; color:#999; text-align:center; }
 .state-box.error { color:#ef4444; border-color:#ef444466; }
 @media (max-width: 768px) { .two-col { grid-template-columns:1fr; } }

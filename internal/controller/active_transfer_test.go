@@ -64,6 +64,9 @@ func TestActiveTransferController_OverviewAndLists(t *testing.T) {
 	if int(sum["completedCount"].(float64)) != 1 {
 		t.Fatalf("completedCount=%v", sum["completedCount"])
 	}
+	if got, _ := sum["preflightFinished"].(bool); !got {
+		t.Fatalf("preflightFinished=%v, want true", sum["preflightFinished"])
+	}
 
 	w = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/tasks/7/active-transfer/completed?offset=0&limit=10", nil)
@@ -90,6 +93,39 @@ func TestActiveTransferController_OverviewAndLists(t *testing.T) {
 	}
 }
 
+func TestActiveTransferController_OverviewShowsPendingPreflightFlag(t *testing.T) {
+	mgr := active_transfer.NewManager()
+	mgr.InitState(12, 8, active_transfer.TrackingModeNormal, nil)
+
+	summary := map[string]any{
+		"progress": map[string]any{
+			"bytes":      float64(0),
+			"totalBytes": float64(0),
+			"speed":      float64(0),
+			"eta":        float64(0),
+			"percentage": float64(0),
+		},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := NewActiveTransferController(mgr, service.NewRunService(&mockActiveTransferRunSvcDB{run: service.RunRecord{ID: 12, TaskID: 8, Status: "running", Summary: string(bs)}}))
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/tasks/8/active-transfer", nil)
+	ctrl.HandleOverview(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("overview status=%d", w.Code)
+	}
+	var overview map[string]any
+	_ = json.Unmarshal(w.Body.Bytes(), &overview)
+	sum, _ := overview["summary"].(map[string]any)
+	if got, _ := sum["preflightPending"].(bool); !got {
+		t.Fatalf("preflightPending=%v, want true", sum["preflightPending"])
+	}
+	if got, _ := sum["preflightFinished"].(bool); got {
+		t.Fatalf("preflightFinished=%v, want false", sum["preflightFinished"])
+	}
+}
+
 func TestActiveTransferController_RestoreFromSummarySnapshot(t *testing.T) {
 	mgr := active_transfer.NewManager()
 	pct := 32.5
@@ -99,6 +135,7 @@ func TestActiveTransferController_RestoreFromSummarySnapshot(t *testing.T) {
 		TrackingMode: active_transfer.TrackingModeCAS,
 		TotalCount:   2,
 		CurrentFile:  &active_transfer.TransferCurrentFile{Path: "a/file1.mkv", Name: "file1.mkv", Bytes: 12, TotalBytes: 36, Speed: 4, Percentage: &pct, Status: active_transfer.FileStatusInProgress},
+		CurrentFiles: []active_transfer.TransferCurrentFile{{Path: "a/file1.mkv", Name: "file1.mkv", Bytes: 12, TotalBytes: 36, Speed: 4, Percentage: &pct, Status: active_transfer.FileStatusInProgress}},
 		Completed: []active_transfer.TransferCompletedFile{
 			{Path: "a/file2.mkv", Name: "file2.mkv", SizeBytes: 456, At: "2026-05-09T14:00:00Z", Status: active_transfer.FileStatusCASMatched},
 		},

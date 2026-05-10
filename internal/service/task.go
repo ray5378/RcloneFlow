@@ -187,9 +187,8 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	// 解析任务选项
 	var opts *adapter.TaskOptions
 	if len(t.Options) > 0 {
-		var taskOpts adapter.TaskOptions
-		if err := json.Unmarshal(t.Options, &taskOpts); err == nil {
-			opts = &taskOpts
+		if taskOpts, err := adapter.ParseTaskOptionsCompat(t.Options); err == nil {
+			opts = taskOpts
 		}
 	}
 
@@ -290,7 +289,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 				rr.Summary["transferDefaults"] = ts
 			})
 		}
-		// 异步启动任务
+		// 异步启动任务：先立即初始化空状态并启动传输，候选文件后台补齐
 		if s.activeMgr != nil {
 			mode := active_transfer.TrackingModeNormal
 			if opts != nil && opts.OpenlistCasCompatible {
@@ -306,11 +305,15 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			}
 			src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
 			dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
-			if candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts); err == nil {
-				s.activeMgr.InitState(run.ID, taskID, mode, candidates)
-			} else {
-				s.activeMgr.InitState(run.ID, taskID, mode, nil)
-			}
+			s.activeMgr.InitState(run.ID, taskID, mode, nil)
+			go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
+				candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
+				if err != nil {
+					s.activeMgr.SetPreflightResult(runID, err)
+					return
+				}
+				s.activeMgr.MergeCandidates(runID, candidates)
+			}(run.ID, taskID, mode, cfg, src, dst, opts)
 		}
 		go func() {
 			_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
@@ -347,11 +350,15 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		}
 		src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
 		dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
-		if candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts); err == nil {
-			s.activeMgr.InitState(run.ID, taskID, mode, candidates)
-		} else {
-			s.activeMgr.InitState(run.ID, taskID, mode, nil)
-		}
+		s.activeMgr.InitState(run.ID, taskID, mode, nil)
+		go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
+			candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
+			if err != nil {
+				s.activeMgr.SetPreflightResult(runID, err)
+				return
+			}
+			s.activeMgr.MergeCandidates(runID, candidates)
+		}(run.ID, taskID, mode, cfg, src, dst, opts)
 	}
 	go func() {
 		_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)

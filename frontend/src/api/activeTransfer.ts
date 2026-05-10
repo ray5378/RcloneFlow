@@ -9,6 +9,8 @@ export interface ActiveTransferSummary {
   completedCount: number
   pendingCount: number
   totalCount: number
+  preflightPending?: boolean
+  preflightFinished?: boolean
   percentage: number
   bytes: number
   totalBytes: number
@@ -48,6 +50,7 @@ export interface ActiveTransferOverview {
   trackingMode: TrackingMode
   summary: ActiveTransferSummary
   currentFile?: ActiveTransferCurrentFile | null
+  currentFiles?: ActiveTransferCurrentFile[]
   degraded?: boolean
   degradeReason?: string
 }
@@ -63,10 +66,13 @@ export interface ActiveTransferSnapshot {
   trackingMode: TrackingMode
   totalCount: number
   currentFile?: ActiveTransferCurrentFile | null
+  currentFiles?: ActiveTransferCurrentFile[]
   completed?: ActiveTransferCompletedFile[]
   pending?: ActiveTransferPendingFile[]
   degraded?: boolean
   degradeReason?: string
+  preflightPending?: boolean
+  preflightFinished?: boolean
   startedAt?: string
   updatedAt?: string
 }

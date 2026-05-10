@@ -275,6 +275,7 @@ export default {
     statusDeleted: '已删除',
     noCurrentFile: '当前文件进度暂无数据',
     degraded: '文件过多，仅展示部分清单',
+    preflightPending: '正在扫描文件列表，数量和待传清单会逐步补齐',
     empty: '当前暂无可展示的传输明细',
     emptyList: '暂无条目',
     loadMore: '加载更多',

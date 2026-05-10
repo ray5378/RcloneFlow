@@ -11,6 +11,7 @@ export function useActiveTransferDetail() {
   const trackingMode = ref<TrackingMode>('normal')
   const summary = ref<ActiveTransferSummary | null>(null)
   const currentFile = ref<ActiveTransferCurrentFile | null>(null)
+  const currentFiles = ref<ActiveTransferCurrentFile[]>([])
   const completedItems = ref<ActiveTransferCompletedFile[]>([])
   const pendingItems = ref<ActiveTransferPendingFile[]>([])
   const completedTotal = ref(0)
@@ -31,6 +32,7 @@ export function useActiveTransferDetail() {
   function applySnapshot(snapshot: ActiveTransferSnapshot) {
     trackingMode.value = snapshot.trackingMode
     currentFile.value = snapshot.currentFile || null
+    currentFiles.value = snapshot.currentFiles || (snapshot.currentFile ? [snapshot.currentFile] : [])
     degraded.value = !!snapshot.degraded
     completedItems.value = snapshot.completed || []
     pendingItems.value = snapshot.pending || []
@@ -41,6 +43,8 @@ export function useActiveTransferDetail() {
       completedCount: (snapshot.completed || []).length,
       pendingCount: (snapshot.pending || []).length,
       totalCount: snapshot.totalCount || ((snapshot.completed || []).length + (snapshot.pending || []).length),
+      preflightPending: !!snapshot.preflightPending,
+      preflightFinished: !!snapshot.preflightFinished,
       percentage: (snapshot.totalCount || 0) > 0 ? (((snapshot.completed || []).length / (snapshot.totalCount || 1)) * 100) : 0,
       bytes: summary.value?.bytes || 0,
       totalBytes: summary.value?.totalBytes || 0,
@@ -65,6 +69,7 @@ export function useActiveTransferDetail() {
       trackingMode.value = overview.trackingMode
       summary.value = overview.summary
       currentFile.value = overview.currentFile || null
+      currentFiles.value = overview.currentFiles || (overview.currentFile ? [overview.currentFile] : [])
       degraded.value = !!overview.degraded
       completedItems.value = completed.items || []
       pendingItems.value = pending.items || []
@@ -75,6 +80,7 @@ export function useActiveTransferDetail() {
       if (msg === '当前没有运行中的任务' || msg === '当前没有可恢复的传输状态' || msg === 'No active run for this task' || msg === 'No restorable transfer state available') {
         summary.value = null
         currentFile.value = null
+        currentFiles.value = []
         completedItems.value = []
         pendingItems.value = []
         completedTotal.value = 0
@@ -106,6 +112,7 @@ export function useActiveTransferDetail() {
     runId.value = null
     summary.value = null
     currentFile.value = null
+    currentFiles.value = []
     completedItems.value = []
     pendingItems.value = []
     completedTotal.value = 0
@@ -126,8 +133,8 @@ export function useActiveTransferDetail() {
   const visibleCompletedItems = computed(() => completedItems.value.slice(0, completedOffset.value + PAGE_SIZE))
 
   const visiblePendingItems = computed(() => {
-    const cur = currentFile.value?.path || currentFile.value?.name
-    const items = cur ? pendingItems.value.filter(item => (item.path || item.name) !== cur) : pendingItems.value
+    const currentKeys = new Set((currentFiles.value || []).map(item => item.path || item.name).filter(Boolean))
+    const items = currentKeys.size ? pendingItems.value.filter(item => !currentKeys.has(item.path || item.name)) : pendingItems.value
     return items.slice(0, pendingOffset.value + PAGE_SIZE)
   })
 
@@ -169,6 +176,7 @@ export function useActiveTransferDetail() {
     activeTransferTrackingMode: trackingMode,
     activeTransferSummary: summary,
     activeTransferCurrentFile: currentFile,
+    activeTransferCurrentFiles: currentFiles,
     activeTransferCompletedItems: visibleCompletedItems,
     activeTransferPendingItems: visiblePendingItems,
     activeTransferCompletedTotal: completedTotal,
