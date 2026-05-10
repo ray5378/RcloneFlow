@@ -244,6 +244,7 @@ func DefaultStreamingTaskOptions() *TaskOptions {
 		ConnTimeout:                60,
 		ExpectContinueTimeout:      10,
 		ServerSideAcrossConfigs:    false,
+		UseJsonLog:                 true,
 	}
 }
 
@@ -296,6 +297,7 @@ func MergeTaskOptions(user *TaskOptions) *TaskOptions {
 
 	// 布尔值/字符串/复杂字段：只要用户显式设置，就覆盖默认值
 	merged.ServerSideAcrossConfigs = user.ServerSideAcrossConfigs
+	merged.OpenlistCasCompatible = user.OpenlistCasCompatible
 	if user.BwLimit != "" {
 		merged.BwLimit = user.BwLimit
 	}
@@ -408,7 +410,7 @@ func MergeTaskOptions(user *TaskOptions) *TaskOptions {
 	merged.Verbose = user.Verbose
 	merged.Quiet = user.Quiet
 	merged.HumanReadable = user.HumanReadable
-	merged.UseJsonLog = user.UseJsonLog
+	merged.UseJsonLog = true
 	merged.Interactive = user.Interactive
 	merged.DryRun = user.DryRun
 	merged.AutoConfirm = user.AutoConfirm

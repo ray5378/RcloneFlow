@@ -13,7 +13,9 @@ import (
 
 func BuildCandidateFiles(ctx context.Context, cfg, src, dst string, opts *adapter.TaskOptions) ([]TransferCandidateFile, error) {
 	cr := &adapter.CmdRunner{}
-	out, _, err := cr.Run(ctx, []string{"lsjson", src, "--config", cfg, "--files-only", "--recursive"}...)
+	lsArgs := []string{"lsjson", src, "--config", cfg, "--files-only", "--recursive"}
+	lsArgs = append(lsArgs, buildListFilterFlagsFromOptions(opts)...)
+	out, _, err := cr.Run(ctx, lsArgs...)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +55,7 @@ func BuildCandidateFiles(ctx context.Context, cfg, src, dst string, opts *adapte
 		if strings.TrimSpace(dst) != "" {
 			targets = append([]string{strings.TrimSpace(dst)}, targets...)
 		}
-		existingEntries = listExistingPathSet(ctx, cr, cfg, targets, matcher.ignoreCase, casCompatible)
+		existingEntries = listExistingPathSet(ctx, cr, cfg, targets, matcher.ignoreCase, casCompatible, opts)
 	}
 
 	items := make([]TransferCandidateFile, 0, len(arr))
@@ -80,7 +82,199 @@ func BuildCandidateFiles(ctx context.Context, cfg, src, dst string, opts *adapte
 			SizeBytes: size,
 		})
 	}
+	if shouldCheckExisting(opts, dst) {
+		if refined, ok := refineCandidatesByCheck(ctx, cr, cfg, src, dst, opts, items); ok {
+			return refined, nil
+		}
+	}
 	return items, nil
+}
+
+func refineCandidatesByCheck(ctx context.Context, cr *adapter.CmdRunner, cfg, src, dst string, opts *adapter.TaskOptions, items []TransferCandidateFile) ([]TransferCandidateFile, bool) {
+	args := []string{"check", src, dst, "--config", cfg, "--combined", "-", "--one-way"}
+	args = append(args, buildCheckFlagsFromOptions(opts)...)
+	out, errOut, err := cr.Run(ctx, args...)
+	casCompatible := opts != nil && opts.OpenlistCasCompatible
+	needed := parseCombinedNeedTransferPaths(out+"\n"+errOut, casCompatible)
+	if err != nil && len(needed) == 0 {
+		return nil, false
+	}
+	byPath := make(map[string]TransferCandidateFile, len(items))
+	for _, item := range items {
+		p := normalizePath(item.Path)
+		byPath[p] = item
+		if casCompatible && isCASPath(p) {
+			byPath[trimCASSuffix(p)] = item
+		}
+	}
+	refined := make([]TransferCandidateFile, 0, len(needed))
+	seen := map[string]struct{}{}
+	for _, p := range needed {
+		p = normalizePath(p)
+		if p == "" {
+			continue
+		}
+		item, ok := byPath[p]
+		if !ok {
+			continue
+		}
+		itemKey := normalizePath(item.Path)
+		if _, dup := seen[itemKey]; dup {
+			continue
+		}
+		seen[itemKey] = struct{}{}
+		refined = append(refined, item)
+	}
+	return refined, true
+}
+
+func buildListFilterFlagsFromOptions(opts *adapter.TaskOptions) []string {
+	if opts == nil {
+		return nil
+	}
+	args := []string{}
+	push := func(parts ...string) { args = append(args, parts...) }
+	for _, v := range opts.Include {
+		if s := strings.TrimSpace(v); s != "" {
+			push("--include", s)
+		}
+	}
+	for _, v := range opts.IncludeFrom {
+		if s := strings.TrimSpace(v); s != "" {
+			push("--include-from", s)
+		}
+	}
+	for _, v := range opts.Exclude {
+		if s := strings.TrimSpace(v); s != "" {
+			push("--exclude", s)
+		}
+	}
+	for _, v := range opts.ExcludeFrom {
+		if s := strings.TrimSpace(v); s != "" {
+			push("--exclude-from", s)
+		}
+	}
+	for _, v := range opts.Filter {
+		if s := strings.TrimSpace(v); s != "" {
+			push("--filter", s)
+		}
+	}
+	for _, v := range opts.FilterFrom {
+		if s := strings.TrimSpace(v); s != "" {
+			push("--filter-from", s)
+		}
+	}
+	for _, v := range opts.FilesFrom {
+		if s := strings.TrimSpace(v); s != "" {
+			push("--files-from", s)
+		}
+	}
+	for _, v := range opts.FilesFromRaw {
+		if s := strings.TrimSpace(v); s != "" {
+			push("--files-from-raw", s)
+		}
+	}
+	for _, v := range opts.ExcludeIfPresent {
+		if s := strings.TrimSpace(v); s != "" {
+			push("--exclude-if-present", s)
+		}
+	}
+	if s := strings.TrimSpace(opts.MinSize); s != "" {
+		push("--min-size", s)
+	}
+	if s := strings.TrimSpace(opts.MaxSize); s != "" {
+		push("--max-size", s)
+	}
+	if s := strings.TrimSpace(opts.MinAge); s != "" {
+		push("--min-age", s)
+	}
+	if s := strings.TrimSpace(opts.MaxAge); s != "" {
+		push("--max-age", s)
+	}
+	if opts.IgnoreCase {
+		push("--ignore-case")
+	}
+	if opts.IgnoreCaseSync {
+		push("--ignore-case-sync")
+	}
+	return args
+}
+
+func buildCheckFlagsFromOptions(opts *adapter.TaskOptions) []string {
+	args := buildListFilterFlagsFromOptions(opts)
+	if opts == nil {
+		return args
+	}
+	push := func(parts ...string) { args = append(args, parts...) }
+	if opts.Checksum {
+		push("--checksum")
+	}
+	if opts.SizeOnly {
+		push("--size-only")
+	}
+	if opts.IgnoreSize {
+		push("--ignore-size")
+	}
+	if opts.IgnoreTimes {
+		push("--ignore-times")
+	}
+	if opts.Update {
+		push("--update")
+	}
+	if opts.UseServerModtime {
+		push("--use-server-modtime")
+	}
+	if s := strings.TrimSpace(opts.ModifyWindow); s != "" {
+		push("--modify-window", s)
+	}
+	if opts.NoTraverse {
+		push("--no-traverse")
+	}
+	if opts.NoCheckDest {
+		push("--no-check-dest")
+	}
+	if s := strings.TrimSpace(opts.CompareDest); s != "" {
+		push("--compare-dest", s)
+	}
+	if s := strings.TrimSpace(opts.CopyDest); s != "" {
+		push("--copy-dest", s)
+	}
+	if opts.IgnoreChecksum {
+		push("--ignore-checksum")
+	}
+	if opts.ServerSideAcrossConfigs {
+		push("--server-side-across-configs")
+	}
+	return args
+}
+
+func parseCombinedNeedTransferPaths(out string, casCompatible bool) []string {
+	lines := strings.Split(out, "\n")
+	items := make([]string, 0, len(lines))
+	seen := map[string]struct{}{}
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if len(line) < 2 {
+			continue
+		}
+		prefix := line[0]
+		if prefix != '+' && prefix != '*' && prefix != '!' {
+			continue
+		}
+		path := normalizePath(strings.TrimSpace(line[1:]))
+		if path == "" {
+			continue
+		}
+		if casCompatible && isCASPath(path) {
+			path = trimCASSuffix(path)
+		}
+		if _, ok := seen[path]; ok {
+			continue
+		}
+		seen[path] = struct{}{}
+		items = append(items, path)
+	}
+	return items
 }
 
 type filterMatcher struct {
@@ -244,8 +438,10 @@ func shouldCheckExisting(opts *adapter.TaskOptions, dst string) bool {
 }
 
 type fileFact struct {
-	Size    int64
-	ModTime time.Time
+	Size      int64
+	ModTime   time.Time
+	CASAlias  bool
+	ExactPath string
 }
 
 func parseModifyWindowLoose(s string) time.Duration {
@@ -270,9 +466,10 @@ func withinModifyWindow(a, b time.Time, window time.Duration) bool {
 	return delta <= window
 }
 
-func listExistingPathSet(ctx context.Context, cr *adapter.CmdRunner, cfg string, targets []string, ignoreCase bool, casCompatible bool) map[string]fileFact {
+func listExistingPathSet(ctx context.Context, cr *adapter.CmdRunner, cfg string, targets []string, ignoreCase bool, casCompatible bool, opts *adapter.TaskOptions) map[string]fileFact {
 	set := map[string]fileFact{}
 	seen := map[string]struct{}{}
+	listFlags := buildListFilterFlagsFromOptions(opts)
 	for _, target := range targets {
 		target = strings.TrimSpace(target)
 		if target == "" {
@@ -282,7 +479,9 @@ func listExistingPathSet(ctx context.Context, cr *adapter.CmdRunner, cfg string,
 			continue
 		}
 		seen[target] = struct{}{}
-		out, _, err := cr.Run(ctx, []string{"lsjson", target, "--config", cfg, "--files-only", "--recursive"}...)
+		args := []string{"lsjson", target, "--config", cfg, "--files-only", "--recursive"}
+		args = append(args, listFlags...)
+		out, _, err := cr.Run(ctx, args...)
 		if err != nil {
 			continue
 		}
@@ -298,10 +497,12 @@ func listExistingPathSet(ctx context.Context, cr *adapter.CmdRunner, cfg string,
 			path = normalizePath(path)
 			if path != "" {
 				norm := normalizeRule(path, ignoreCase)
-				fact := fileFact{Size: anyInt64(it["Size"]), ModTime: anyTime(it["ModTime"])}
+				fact := fileFact{Size: anyInt64(it["Size"]), ModTime: anyTime(it["ModTime"]), ExactPath: norm}
 				set[norm] = fact
 				if casCompatible && isCASPath(norm) {
-					set[trimCASSuffix(norm)] = fact
+					alias := fact
+					alias.CASAlias = true
+					set[trimCASSuffix(norm)] = alias
 				}
 			}
 		}
@@ -318,6 +519,9 @@ func shouldSkipByExisting(path string, size int64, modTime time.Time, existing m
 		return false
 	}
 	if opts == nil {
+		return true
+	}
+	if opts.OpenlistCasCompatible && fact.CASAlias {
 		return true
 	}
 	modifyWindow := parseModifyWindowLoose(opts.ModifyWindow)

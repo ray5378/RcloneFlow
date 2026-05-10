@@ -2,7 +2,6 @@ package scheduler
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -81,9 +80,8 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 	// 解析任务选项
 	var opts *adapter.TaskOptions
 	if len(t.Options) > 0 {
-		var taskOpts adapter.TaskOptions
-		if err := json.Unmarshal(t.Options, &taskOpts); err == nil {
-			opts = &taskOpts
+		if taskOpts, err := adapter.ParseTaskOptionsCompat(t.Options); err == nil {
+			opts = taskOpts
 		}
 	}
 

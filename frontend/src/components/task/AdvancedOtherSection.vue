@@ -14,8 +14,6 @@ defineProps<{
     <div class="advanced-row inline"><input type="checkbox" :checked="options.interactive" @change="updateOption('interactive', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.interactive') }}</label></div>
     <div class="advanced-row inline"><input type="checkbox" :checked="options.checkFirst" @change="updateOption('checkFirst', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.checkFirst') }}</label></div>
     <div class="advanced-row inline"><input type="checkbox" :checked="options.serverSideAcrossConfigs" @change="updateOption('serverSideAcrossConfigs', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.serverSideAcrossConfigs') }}</label></div>
-    <div class="advanced-row inline"><input type="checkbox" :checked="options.useJsonLog" @change="updateOption('useJsonLog', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.useJsonLog') }}</label></div>
-    <div class="advanced-row hint-row">{{ t('advancedTask.useJsonLogHint') }}</div>
     <div class="advanced-row inline"><input type="checkbox" :checked="options.openlistCasCompatible" @change="updateOption('openlistCasCompatible', ($event.target as HTMLInputElement).checked)" /><label>{{ t('advancedTask.openlistCasCompatible') }}</label></div>
     <div class="advanced-row hint-row">{{ t('advancedTask.openlistCasCompatibleHint') }}</div>
     <div class="advanced-row">

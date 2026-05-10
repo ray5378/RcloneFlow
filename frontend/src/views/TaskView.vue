@@ -39,6 +39,7 @@ const {
   activeTransferTrackingMode,
   activeTransferSummary,
   activeTransferCurrentFile,
+  activeTransferCurrentFiles,
   activeTransferCompletedItems,
   activeTransferPendingItems,
   activeTransferCompletedTotal,
@@ -513,6 +514,7 @@ const {
     :tracking-mode="activeTransferTrackingMode"
     :summary="activeTransferSummary"
     :current-file="activeTransferCurrentFile"
+    :current-files="activeTransferCurrentFiles"
     :completed-items="activeTransferCompletedItems"
     :pending-items="activeTransferPendingItems"
     :completed-total="activeTransferCompletedTotal"
