@@ -308,6 +308,8 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
 			if candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts); err == nil {
 				s.activeMgr.InitState(run.ID, taskID, mode, candidates)
+			} else {
+				s.activeMgr.InitState(run.ID, taskID, mode, nil)
 			}
 		}
 		go func() {
@@ -347,6 +349,8 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
 		if candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts); err == nil {
 			s.activeMgr.InitState(run.ID, taskID, mode, candidates)
+		} else {
+			s.activeMgr.InitState(run.ID, taskID, mode, nil)
 		}
 	}
 	go func() {

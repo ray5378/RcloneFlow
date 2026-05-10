@@ -71,7 +71,19 @@ export function useActiveTransferDetail() {
       completedTotal.value = completed.total || 0
       pendingTotal.value = pending.total || 0
     } catch (e: any) {
-      error.value = e?.message || 'active transfer load failed'
+      const msg = String(e?.message || 'active transfer load failed')
+      if (msg === '当前没有运行中的任务' || msg === '当前没有可恢复的传输状态' || msg === 'No active run for this task' || msg === 'No restorable transfer state available') {
+        summary.value = null
+        currentFile.value = null
+        completedItems.value = []
+        pendingItems.value = []
+        completedTotal.value = 0
+        pendingTotal.value = 0
+        degraded.value = false
+        error.value = ''
+      } else {
+        error.value = msg
+      }
     } finally {
       if (!background) {
         loading.value = false

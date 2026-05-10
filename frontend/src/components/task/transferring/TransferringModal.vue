@@ -61,10 +61,11 @@ const emit = defineEmits<{
 .modal-content { width:min(96vw, 1280px); max-height:88vh; overflow:auto; background:var(--bg, #111); border-radius:12px; padding:16px; }
 body.light .modal-content { background:#fff; }
 .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+.modal-body { display:flex; flex-direction:column; gap:12px; width:100%; min-width:0; }
 .actions { display:flex; gap:8px; align-items:center; }
 .close-btn { background:none; border:none; font-size:20px; cursor:pointer; }
 .two-col { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:18px; width:100%; align-items:start; }
-.degraded { margin-bottom:10px; padding:8px 10px; border-radius:8px; background:#f59e0b22; color:#f59e0b; font-size:12px; }
+.degraded { padding:8px 10px; border-radius:8px; background:#f59e0b22; color:#f59e0b; font-size:12px; }
 .state-box { padding:16px; border:1px dashed #444; border-radius:8px; color:#999; text-align:center; }
 .state-box.error { color:#ef4444; border-color:#ef444466; }
 @media (max-width: 768px) { .two-col { grid-template-columns:1fr; } }
