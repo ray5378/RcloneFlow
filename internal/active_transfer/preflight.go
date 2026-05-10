@@ -232,13 +232,15 @@ func shouldCheckExisting(opts *adapter.TaskOptions, dst string) bool {
 	if strings.TrimSpace(dst) == "" {
 		return false
 	}
+	// rclone 默认就会检查目标端是否已存在，只有显式 no-check-dest 时才应跳过。
+	// 这里的候选文件/未传输列表应尽量贴近“实际会传哪些文件”，而不是把整个源目录都算进 pending。
 	if opts == nil {
-		return false
+		return true
 	}
 	if opts.NoCheckDest {
 		return false
 	}
-	return opts.IgnoreExisting || strings.TrimSpace(opts.CompareDest) != "" || strings.TrimSpace(opts.CopyDest) != ""
+	return true
 }
 
 type fileFact struct {

@@ -82,7 +82,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}
 	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
 	// 降低默认日志级别：从 -vv 改为 -v，显著减少日志行数和解析/写库开销
-	args := []string{cmdName, src, dst, "-v", "--stats", "1s", "--stats-one-line", "--config", cfg}
+	args := []string{cmdName, src, dst, "--stats", "1s", "--stats-one-line", "--config", cfg}
 	if casCompat != nil && casCompat.ExcludeFrom != "" {
 		args = append(args, "--exclude-from", casCompat.ExcludeFrom)
 	}
@@ -152,6 +152,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}
 	if useJSONLog {
 		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
+	} else {
+		args = append(args, "-v")
 	}
 	// 二次兜底：如 --buffer-size/--bwlimit 后是纯数字，自动补单位（M）；
 	// 同时将 --bwlimit 的分号分隔写法转为空格分隔，保证多时段正确识别
@@ -1036,6 +1038,55 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 			if v, ok := rec["eta"].(float64); ok {
 				prog["eta"] = v
 			}
+			if stats, ok := rec["stats"].(map[string]any); ok {
+				if v, ok := stats["bytes"].(float64); ok {
+					prog["bytes"] = v
+				}
+				if v, ok := stats["totalBytes"].(float64); ok {
+					prog["totalBytes"] = v
+				}
+				if v, ok := stats["speed"].(float64); ok {
+					prog["speed"] = v
+				}
+				if v, ok := stats["eta"].(float64); ok {
+					prog["eta"] = v
+				}
+				if tr, ok := stats["transferring"].([]any); ok && len(tr) > 0 {
+					if first, ok := tr[0].(map[string]any); ok {
+						name := strings.TrimSpace(anyString(first["name"]))
+						if name != "" {
+							cb := anyFloat64(first["bytes"])
+							tb := anyFloat64(first["size"])
+							sp := anyFloat64(first["speed"])
+							var pctPtr *float64
+							if v, ok := first["percentage"].(float64); ok {
+								pct := v
+								pctPtr = &pct
+							}
+							if r.activeMgr != nil {
+								r.activeMgr.OnFileProgress(runID, name, int64(cb), int64(tb), int64(sp), pctPtr)
+							}
+							_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+								if rr.Summary == nil {
+									rr.Summary = map[string]any{}
+								}
+								currentFile := map[string]any{
+									"name": name,
+									"path": name,
+									"bytes": cb,
+									"totalBytes": tb,
+									"speed": sp,
+									"status": "in_progress",
+								}
+								if pctPtr != nil {
+									currentFile["percentage"] = *pctPtr
+								}
+								rr.Summary["currentFile"] = currentFile
+							})
+						}
+					}
+				}
+			}
 			jsonLevel = strings.ToUpper(anyString(rec["level"]))
 			msg := strings.TrimSpace(anyString(rec["msg"]))
 			obj := strings.TrimSpace(anyString(rec["object"]))
@@ -1881,4 +1932,17 @@ func extractMsgFromLogLine(line string) string {
 func anyString(v any) string {
 	s, _ := v.(string)
 	return s
+}
+
+func anyFloat64(v any) float64 {
+	switch x := v.(type) {
+	case float64:
+		return x
+	case int64:
+		return float64(x)
+	case int:
+		return float64(x)
+	default:
+		return 0
+	}
 }

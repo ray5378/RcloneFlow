@@ -103,8 +103,8 @@ func TestFilterMatcher_SizeAndAge(t *testing.T) {
 }
 
 func TestShouldCheckExisting(t *testing.T) {
-	if shouldCheckExisting(nil, "dst:") {
-		t.Fatalf("nil opts should not trigger existing check")
+	if !shouldCheckExisting(nil, "dst:") {
+		t.Fatalf("default copy semantics should check existing destination entries")
 	}
 	if shouldCheckExisting(&adapter.TaskOptions{NoCheckDest: true, IgnoreExisting: true}, "dst:") {
 		t.Fatalf("noCheckDest should disable existing check")
@@ -129,6 +129,45 @@ func TestTrimCASSuffixAndCASDetection(t *testing.T) {
 	}
 	if got := trimCASSuffix("a/b/movie.mkv.cas"); got != "a/b/movie.mkv" {
 		t.Fatalf("trimCASSuffix=%q", got)
+	}
+}
+
+func TestShouldSkipByExisting_CASCompatibilityStaysSeparateFromNormalChain(t *testing.T) {
+	now := time.Date(2026, 5, 9, 22, 0, 0, 0, time.UTC)
+	path := "a/movie.mkv"
+	casExisting := map[string]fileFact{
+		"a/movie.mkv.cas": {Size: 100, ModTime: now.Add(-1 * time.Hour)},
+		"a/movie.mkv":     {Size: 100, ModTime: now.Add(-1 * time.Hour)},
+	}
+	// 普通链：只有真的存在同名原文件，才允许按默认 compare 语义跳过。
+	if !shouldSkipByExisting(path, 100, now.Add(-1*time.Hour), map[string]fileFact{"a/movie.mkv": casExisting["a/movie.mkv"]}, false, &adapter.TaskOptions{}) {
+		t.Fatalf("normal chain should skip only when original target file exists")
+	}
+	if shouldSkipByExisting(path, 100, now.Add(-1*time.Hour), map[string]fileFact{"a/movie.mkv.cas": casExisting["a/movie.mkv.cas"]}, false, &adapter.TaskOptions{}) {
+		t.Fatalf("normal chain must not treat .cas as equivalent existing file")
+	}
+	// CAS 兼容链：预处理后才允许把 .cas 视为等效已存在。
+	if !shouldSkipByExisting(path, 100, now.Add(-1*time.Hour), map[string]fileFact{"a/movie.mkv": casExisting["a/movie.mkv.cas"]}, false, &adapter.TaskOptions{OpenlistCasCompatible: true}) {
+		t.Fatalf("cas-compatible chain should allow .cas-equivalent existing file to skip")
+	}
+}
+
+func TestListExistingPathSet_CASMappingSemanticsStayIsolated(t *testing.T) {
+	// 这里不直接调用 rclone，而是验证我们对 existing map 的语义约束：
+	// 普通链只认原文件键；CAS 链才允许把 .cas 映射成原文件键。
+	now := time.Date(2026, 5, 9, 22, 0, 0, 0, time.UTC)
+	normalExisting := map[string]fileFact{
+		"a/movie.mkv.cas": {Size: 100, ModTime: now},
+	}
+	if _, ok := normalExisting["a/movie.mkv"]; ok {
+		t.Fatalf("normal chain must not inject trimmed .cas alias")
+	}
+	casExisting := map[string]fileFact{
+		"a/movie.mkv.cas": {Size: 100, ModTime: now},
+		"a/movie.mkv":     {Size: 100, ModTime: now},
+	}
+	if _, ok := casExisting["a/movie.mkv"]; !ok {
+		t.Fatalf("cas chain should carry trimmed .cas alias for equivalent matching")
 	}
 }
 

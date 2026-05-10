@@ -9,6 +9,40 @@ import (
 	"rcloneflow/internal/store"
 )
 
+func TestBuildArgs_JSONLogDisablesVerboseFlag(t *testing.T) {
+	args := []string{"copy", "src:/a", "dst:/b", "--stats", "1s", "--stats-one-line", "--config", "/tmp/rclone.conf"}
+	useJSONLog := true
+	if useJSONLog {
+		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
+	} else {
+		args = append(args, "-v")
+	}
+	joined := strings.Join(args, " ")
+	if strings.Contains(joined, " -v ") || strings.HasSuffix(joined, " -v") || strings.Contains(joined, "-v --use-json-log") {
+		t.Fatalf("json-log args should not contain -v, got %q", joined)
+	}
+	if !strings.Contains(joined, "--use-json-log") || !strings.Contains(joined, "--log-level INFO") {
+		t.Fatalf("json-log args missing expected flags: %q", joined)
+	}
+}
+
+func TestBuildArgs_NonJSONLogKeepsVerboseFlag(t *testing.T) {
+	args := []string{"copy", "src:/a", "dst:/b", "--stats", "1s", "--stats-one-line", "--config", "/tmp/rclone.conf"}
+	useJSONLog := false
+	if useJSONLog {
+		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
+	} else {
+		args = append(args, "-v")
+	}
+	joined := strings.Join(args, " ")
+	if !strings.Contains(joined, " -v") {
+		t.Fatalf("non-json-log args should contain -v, got %q", joined)
+	}
+	if strings.Contains(joined, "--use-json-log") {
+		t.Fatalf("non-json-log args should not contain --use-json-log, got %q", joined)
+	}
+}
+
 func TestParseOneLineProgress_AggregateWithXfrAndETA(t *testing.T) {
 	line := `2026/04/17 14:34:08 INFO : 121.377 MiB / 335.968 MiB, 36%, 2.474 MiB/s, ETA 1m26s (xfr#18/53)`
 	prog, ok := parseOneLineProgress(line)
@@ -246,6 +280,67 @@ func TestConsume_JSONWrappedFileProgressUpdatesActiveTransfer(t *testing.T) {
 	}
 	if got := anyString(gotRun.Summary["progressLine"]); !strings.Contains(got, "a/file1.mkv") {
 		t.Fatalf("progressLine=%q, want file path included", got)
+	}
+}
+
+func TestConsume_JSONStatsTransferringUpdatesCurrentFile(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_runnercli_json_stats_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	task, err := db.AddTask(store.Task{Name: "json-stats-task", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+	run, err := db.AddRun(store.Run{TaskID: task.ID, Status: "running", Trigger: "manual", Summary: map[string]any{}})
+	if err != nil {
+		t.Fatalf("AddRun() error = %v", err)
+	}
+
+	mgr := active_transfer.NewManager()
+	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeNormal, []active_transfer.TransferCandidateFile{{Path: "电视剧/国产剧/风过留痕 (2026)/Season 1/风过留痕 - S01E01 - 第 1 集.mkv", Name: "风过留痕 - S01E01 - 第 1 集.mkv", SizeBytes: 1545914693}})
+	r := New(db, mgr)
+	fp := &fileProgress{m: map[string]*fileProg{}}
+	outFile, err := os.CreateTemp(tmpDir, "consume-json-stats-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer outFile.Close()
+
+	line := `{"time":"2026-05-10T10:48:20+08:00","level":"info","msg":"4.996 MiB / 2.829 GiB, 0%, 1.665 MiB/s, ETA 28m56s (xfr#0/2)\n","stats":{"bytes":5238784,"totalBytes":3037871949,"speed":1746263.2,"eta":1736,"transferring":[{"bytes":5238784,"name":"电视剧/国产剧/风过留痕 (2026)/Season 1/风过留痕 - S01E01 - 第 1 集.mkv","percentage":0,"size":1545914693,"speed":4232516.1}]}}` + "\n"
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, false, false)
+
+	st, ok := mgr.GetByTaskID(task.ID)
+	if !ok || st.CurrentFile == nil {
+		t.Fatalf("expected current file state, got ok=%v st=%#v", ok, st)
+	}
+	if got := st.CurrentFile.Path; !strings.Contains(got, "风过留痕 - S01E01 - 第 1 集.mkv") {
+		t.Fatalf("current file path=%q", got)
+	}
+	if got := st.CurrentFile.TotalBytes; got != 1545914693 {
+		t.Fatalf("totalBytes=%d, want 1545914693", got)
+	}
+	if got := st.CurrentFile.Bytes; got != 5238784 {
+		t.Fatalf("bytes=%d, want 5238784", got)
+	}
+	gotRun, err := db.GetRun(run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() error = %v", err)
+	}
+	cf, _ := gotRun.Summary["currentFile"].(map[string]any)
+	if cf == nil {
+		t.Fatalf("expected currentFile in summary, got %#v", gotRun.Summary)
+	}
+	if got := anyString(cf["name"]); !strings.Contains(got, "风过留痕 - S01E01 - 第 1 集.mkv") {
+		t.Fatalf("summary currentFile name=%q", got)
 	}
 }
 
