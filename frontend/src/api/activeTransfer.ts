@@ -26,6 +26,7 @@ export interface ActiveTransferCurrentFile {
   percentage?: number
   speed?: number
   status: ActiveTransferFileStatus
+  order?: number
 }
 
 export interface ActiveTransferCompletedFile {
@@ -35,6 +36,7 @@ export interface ActiveTransferCompletedFile {
   at?: string
   status: ActiveTransferFileStatus
   message?: string
+  order?: number
 }
 
 export interface ActiveTransferPendingFile {
@@ -42,6 +44,7 @@ export interface ActiveTransferPendingFile {
   path?: string
   sizeBytes?: number
   status: ActiveTransferFileStatus
+  order?: number
 }
 
 export interface ActiveTransferOverview {

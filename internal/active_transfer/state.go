@@ -57,6 +57,8 @@ func (m *Manager) InitState(runID, taskID int64, mode TrackingMode, candidates [
 		Pending:           map[string]TransferPendingFile{},
 		PreflightPending:  true,
 		PreflightFinished: len(candidates) > 0,
+		NextOrder:         1,
+		NextCompletedOrder: 1,
 		StartedAt:         time.Now(),
 		UpdatedAt:         time.Now(),
 	}
@@ -72,8 +74,14 @@ func (m *Manager) InitState(runID, taskID int64, mode TrackingMode, candidates [
 		if strings.TrimSpace(c.Name) == "" {
 			c.Name = baseName(key)
 		}
+		if c.Order <= 0 {
+			c.Order = st.NextOrder
+			st.NextOrder++
+		} else if c.Order >= st.NextOrder {
+			st.NextOrder = c.Order + 1
+		}
 		st.Candidates[key] = c
-		st.Pending[key] = TransferPendingFile{Path: key, Name: c.Name, SizeBytes: c.SizeBytes, Status: FileStatusPending}
+		st.Pending[key] = TransferPendingFile{Path: key, Name: c.Name, SizeBytes: c.SizeBytes, Status: FileStatusPending, Order: c.Order}
 	}
 	m.byRunID[runID] = st
 	m.byTask[taskID] = st
@@ -103,10 +111,22 @@ func (m *Manager) MergeCandidates(runID int64, candidates []TransferCandidateFil
 		if strings.TrimSpace(c.Name) == "" {
 			c.Name = baseName(key)
 		}
+		if prev, ok := st.Candidates[key]; ok && prev.Order > 0 && c.Order <= 0 {
+			c.Order = prev.Order
+		}
+		if c.Order <= 0 {
+			c.Order = st.NextOrder
+			st.NextOrder++
+		} else if c.Order >= st.NextOrder {
+			st.NextOrder = c.Order + 1
+		}
 		st.Candidates[key] = c
 		if cur, ok := st.CurrentFiles[key]; ok {
 			if c.Name != "" {
 				cur.Name = c.Name
+			}
+			if c.Order > 0 {
+				cur.Order = c.Order
 			}
 			st.CurrentFiles[key] = cur
 			if st.CurrentFile != nil && normalizePath(st.CurrentFile.Path) == key {
@@ -131,10 +151,13 @@ func (m *Manager) MergeCandidates(runID int64, candidates []TransferCandidateFil
 			if c.SizeBytes > 0 || p.SizeBytes == 0 {
 				p.SizeBytes = c.SizeBytes
 			}
+			if c.Order > 0 {
+				p.Order = c.Order
+			}
 			st.Pending[key] = p
 			continue
 		}
-		st.Pending[key] = TransferPendingFile{Path: key, Name: c.Name, SizeBytes: c.SizeBytes, Status: FileStatusPending}
+		st.Pending[key] = TransferPendingFile{Path: key, Name: c.Name, SizeBytes: c.SizeBytes, Status: FileStatusPending, Order: c.Order}
 	}
 	st.PreflightPending = false
 	st.PreflightFinished = true
@@ -196,10 +219,14 @@ func (m *Manager) UpdateCurrentFile(runID int64, path string, bytes, total, spee
 	}
 	key := normalizePath(path)
 	name := baseName(key)
-	if c, ok := st.Candidates[key]; ok && c.Name != "" {
-		name = c.Name
+	order := 0
+	if c, ok := st.Candidates[key]; ok {
+		if c.Name != "" {
+			name = c.Name
+		}
+		order = c.Order
 	}
-	cur := TransferCurrentFile{Path: key, Name: name, Bytes: bytes, TotalBytes: total, Speed: speed, Percentage: pct, Status: FileStatusInProgress}
+	cur := TransferCurrentFile{Path: key, Name: name, Bytes: bytes, TotalBytes: total, Speed: speed, Percentage: pct, Status: FileStatusInProgress, Order: order}
 	st.CurrentFile = &cur
 	if st.CurrentFiles == nil {
 		st.CurrentFiles = map[string]TransferCurrentFile{}
@@ -207,9 +234,12 @@ func (m *Manager) UpdateCurrentFile(runID int64, path string, bytes, total, spee
 	st.CurrentFiles[key] = cur
 	if p, ok := st.Pending[key]; ok {
 		p.Status = FileStatusInProgress
+		if order > 0 {
+			p.Order = order
+		}
 		st.Pending[key] = p
 	} else {
-		st.Pending[key] = TransferPendingFile{Path: key, Name: name, Status: FileStatusInProgress}
+		st.Pending[key] = TransferPendingFile{Path: key, Name: name, Status: FileStatusInProgress, Order: order}
 	}
 	st.UpdatedAt = time.Now()
 	m.persistSnapshotLocked(st)
@@ -232,16 +262,36 @@ func (m *Manager) MarkCompleted(runID int64, path string, status FileStatus, mes
 		size = c.SizeBytes
 	}
 	delete(st.Pending, key)
-	st.Completed[key] = TransferCompletedFile{Path: key, Name: name, SizeBytes: size, At: time.Now().Format(time.RFC3339), Status: status, Message: message}
+	completedOrder := st.NextCompletedOrder
+	if completedOrder <= 0 {
+		completedOrder = 1
+	}
+	st.NextCompletedOrder = completedOrder + 1
+	st.Completed[key] = TransferCompletedFile{Path: key, Name: name, SizeBytes: size, At: time.Now().Format(time.RFC3339), Status: status, Message: message, Order: completedOrder}
 	if st.CurrentFiles != nil {
 		delete(st.CurrentFiles, key)
 	}
 	if st.CurrentFile != nil && normalizePath(st.CurrentFile.Path) == key {
 		st.CurrentFile = nil
-		for _, v := range st.CurrentFiles {
-			vv := v
+		if len(st.CurrentFiles) > 0 {
+			next := make([]TransferCurrentFile, 0, len(st.CurrentFiles))
+			for _, v := range st.CurrentFiles {
+				next = append(next, v)
+			}
+			sort.SliceStable(next, func(i, j int) bool {
+				if next[i].Order != next[j].Order {
+					if next[i].Order == 0 {
+						return false
+					}
+					if next[j].Order == 0 {
+						return true
+					}
+					return next[i].Order < next[j].Order
+				}
+				return next[i].Path < next[j].Path
+			})
+			vv := next[0]
 			st.CurrentFile = &vv
-			break
 		}
 	}
 	st.UpdatedAt = time.Now()
@@ -259,6 +309,18 @@ func (m *Manager) BuildSummary(taskID int64, bytes, total, speed, eta int64, per
 	for _, v := range st.CurrentFiles {
 		currentFiles = append(currentFiles, v)
 	}
+	sort.SliceStable(currentFiles, func(i, j int) bool {
+		if currentFiles[i].Order != currentFiles[j].Order {
+			if currentFiles[i].Order == 0 {
+				return false
+			}
+			if currentFiles[j].Order == 0 {
+				return true
+			}
+			return currentFiles[i].Order < currentFiles[j].Order
+		}
+		return currentFiles[i].Path < currentFiles[j].Path
+	})
 	return ActiveTransferOverviewResponse{
 		TaskID:       st.TaskID,
 		RunID:        st.RunID,
@@ -294,7 +356,15 @@ func (m *Manager) ListCompleted(taskID int64, offset, limit int) ActiveTransferL
 	for _, v := range st.Completed {
 		items = append(items, v)
 	}
-	sort.Slice(items, func(i, j int) bool { return items[i].At > items[j].At })
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Order != items[j].Order {
+			return items[i].Order > items[j].Order
+		}
+		if items[i].At != items[j].At {
+			return items[i].At > items[j].At
+		}
+		return items[i].Path < items[j].Path
+	})
 	return paginate(items, offset, limit)
 }
 
@@ -309,7 +379,21 @@ func (m *Manager) ListPending(taskID int64, offset, limit int) ActiveTransferLis
 	for _, v := range st.Pending {
 		items = append(items, v)
 	}
-	sort.Slice(items, func(i, j int) bool { return items[i].Path < items[j].Path })
+	sort.SliceStable(items, func(i, j int) bool {
+		if items[i].Status != items[j].Status {
+			return items[i].Status == FileStatusInProgress
+		}
+		if items[i].Order != items[j].Order {
+			if items[i].Order == 0 {
+				return false
+			}
+			if items[j].Order == 0 {
+				return true
+			}
+			return items[i].Order < items[j].Order
+		}
+		return items[i].Path < items[j].Path
+	})
 	return paginate(items, offset, limit)
 }
 

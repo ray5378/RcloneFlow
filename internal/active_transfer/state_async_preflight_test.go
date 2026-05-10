@@ -1,6 +1,9 @@
 package active_transfer
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestManager_MergeCandidates_BackfillsWithoutOverwritingRuntimeState(t *testing.T) {
 	mgr := NewManager()
@@ -68,6 +71,37 @@ func TestManager_SetPreflightResult_MarksDegradedOnError(t *testing.T) {
 	}
 	if state.DegradeReason != "boom" {
 		t.Fatalf("degradeReason=%q", state.DegradeReason)
+	}
+}
+
+func TestManager_ListOrdering_IsStableAndReadable(t *testing.T) {
+	mgr := NewManager()
+	mgr.InitState(30, 11, TrackingModeNormal, []TransferCandidateFile{
+		{Path: "c/file3.mkv", Name: "file3.mkv", Order: 3},
+		{Path: "a/file1.mkv", Name: "file1.mkv", Order: 1},
+		{Path: "b/file2.mkv", Name: "file2.mkv", Order: 2},
+	})
+
+	pct := 10.0
+	mgr.UpdateCurrentFile(30, "b/file2.mkv", 10, 100, 1, &pct)
+	mgr.MarkCompleted(30, "a/file1.mkv", FileStatusCopied, "")
+	time.Sleep(2 * time.Millisecond)
+	mgr.MarkCompleted(30, "b/file2.mkv", FileStatusCopied, "")
+
+	completed := mgr.ListCompleted(11, 0, 10).Items
+	if len(completed) != 2 {
+		t.Fatalf("completed len=%d, want 2", len(completed))
+	}
+	if completed[0].Path != "b/file2.mkv" || completed[1].Path != "a/file1.mkv" {
+		t.Fatalf("unexpected completed order: %#v", completed)
+	}
+
+	pending := mgr.ListPending(11, 0, 10).Items
+	if len(pending) != 1 {
+		t.Fatalf("pending len=%d, want 1", len(pending))
+	}
+	if pending[0].Path != "c/file3.mkv" {
+		t.Fatalf("unexpected pending order: %#v", pending)
 	}
 }
 
