@@ -6,6 +6,47 @@
 
 ---
 
+## 2026-05
+
+### JSON 日志运行中进度修复
+- 修复 JSON log 模式下运行中 `progress` 统计缺失问题
+- 恢复 `percentage` / `plannedFiles` / `completedFiles` 的实时回填
+- 正确处理 `xfr#0/N` 场景，避免已完成文件数被误判为非 0
+- 保持默认 `--stats-one-line` 主链不变，避免为了当前文件进度改成 `--progress` 带来额外风险
+
+### 历史完成态与传输明细修复
+- 修复历史完成态 `finalSummary` 无法消费 JSON 日志的问题
+- 历史 run 详情与任务历史卡片现在可从 JSON log 正确恢复：
+  - `counts`
+  - `files`
+  - 最终统计预览
+- `/api/runs/:id/files` 增加对 JSON 日志行的解析支持
+- 运行详情里的时间改为可读时间格式
+- 运行详情里的大小显示改为正常字节文案，`0` 不再显示为 `-`
+- JSON 日志里的 `size` 会透传到运行详情明细接口
+
+### move 任务明细去重
+- 修复 move 任务在运行详情里把 `Copied + Deleted` 重复当成两条成功记录的问题
+- 后端会将同一路径的 `Copied + Deleted` 合并为单条 `Moved`
+- 历史完成态 `finalSummary.files` 与 `/api/runs/:id/files` 都应用同一语义，避免前后端口径不一致
+
+### active transfer 启动体验优化
+- 将 active transfer preflight 改为异步，不再阻塞任务真正启动
+- 新流程为：
+  - 先初始化空状态
+  - 立即启动传输
+  - 后台补齐候选文件、待传列表、文件大小
+- 回填候选集时不会覆盖已开始传输的 current file，也不会覆盖已完成项
+- active transfer summary / snapshot 新增 preflight 状态字段，支持前端识别“正在扫描文件列表”阶段
+- 前端在 preflight 进行中新增轻量提示：数量和待传清单会逐步补齐
+
+### 验证与交付
+- 针对历史 JSON 日志解析、move 明细合并、active transfer 异步 preflight 补充了后端测试
+- 针对运行详情大小显示补充了前端格式化测试
+- 本阶段相关提交：
+  - `6725545` `fix: normalize run detail history display`
+  - `8e29223` `feat: make transfer preflight async`
+
 ## 2026-04
 
 ### 工程与文档体系
