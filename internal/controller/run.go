@@ -56,6 +56,66 @@ func classifyHistoricalLogRow(level, path, msg string) (map[string]any, string, 
 	}
 }
 
+func splitHistoricalLogSegments(line string) []string {
+	l := strings.TrimSpace(line)
+	if l == "" {
+		return nil
+	}
+	tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
+	idx := tsRe.FindAllStringIndex(l, -1)
+	if len(idx) <= 1 {
+		return []string{l}
+	}
+	segments := make([]string, 0, len(idx))
+	for i := 0; i < len(idx); i++ {
+		start := idx[i][0]
+		end := len(l)
+		if i+1 < len(idx) {
+			end = idx[i+1][0]
+		}
+		segments = append(segments, strings.TrimSpace(l[start:end]))
+	}
+	return segments
+}
+
+func parseHistoricalLogSegment(seg string) (at, level, path, msg string, ok bool) {
+	re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
+	if m := re.FindStringSubmatch(strings.TrimSpace(seg)); len(m) > 0 {
+		return strings.TrimSpace(m[1]), strings.ToUpper(strings.TrimSpace(m[2])), strings.TrimSpace(m[3]), strings.TrimSpace(m[4]), true
+	}
+	var rec map[string]any
+	if json.Unmarshal([]byte(strings.TrimSpace(seg)), &rec) == nil {
+		level = strings.ToUpper(strings.TrimSpace(fmt.Sprint(rec["level"])))
+		msg = strings.TrimSpace(fmt.Sprint(rec["msg"]))
+		path = strings.TrimSpace(fmt.Sprint(rec["object"]))
+		at = strings.TrimSpace(fmt.Sprint(rec["time"]))
+		if at == "" {
+			at = strings.TrimSpace(fmt.Sprint(rec["timestamp"]))
+		}
+		if msg != "" {
+			return at, level, path, msg, true
+		}
+	}
+	return "", "", "", "", false
+}
+
+func historicalSegmentSizeBytes(seg string) int64 {
+	var rec map[string]any
+	if json.Unmarshal([]byte(strings.TrimSpace(seg)), &rec) != nil {
+		return 0
+	}
+	switch v := rec["size"].(type) {
+	case float64:
+		return int64(v)
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	default:
+		return 0
+	}
+}
+
 func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[string]any {
 	logPath, ok := func() (string, bool) {
 		if sum != nil {
@@ -517,6 +577,7 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 		case map[string]any:
 			sum = v
 		}
+		sum = ensureHistoricalFinalSummary(r, sum)
 		out = append(out, buildLightRunObject(r, sum))
 	}
 	WriteJSON(w, 200, map[string]any{
@@ -552,6 +613,7 @@ func (c *RunController) HandleRunsByTask(w http.ResponseWriter, r *http.Request)
 		if run.Summary != "" {
 			_ = json.Unmarshal([]byte(run.Summary), &sum)
 		}
+		sum = ensureHistoricalFinalSummary(run, sum)
 		out = append(out, buildLightRunObject(run, sum))
 	}
 	WriteJSON(w, 200, out)
@@ -591,6 +653,7 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		case map[string]any:
 			sum = v
 		}
+		sum = ensureHistoricalFinalSummary(run, sum)
 		WriteJSON(w, 200, buildLightRunObject(run, sum))
 		return
 	}
@@ -728,10 +791,12 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var logPath string
+	moveMode := false
 	for _, run := range runs {
 		if run.ID != id {
 			continue
 		}
+		moveMode = strings.EqualFold(run.TaskMode, "move")
 		// Summary 里优先取 stderrFile
 		if s, ok := any(run.Summary).(string); ok && s != "" {
 			var m map[string]any
@@ -827,61 +892,54 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 		Message string `json:"message,omitempty"`
 	}
 	rows := make([]Row, 0, 200)
-	re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
-	tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
 	for _, ln := range lines {
-		l := strings.TrimSpace(ln)
-		if l == "" {
-			continue
-		}
-		segments := []string{}
-		idx := tsRe.FindAllStringIndex(l, -1)
-		if len(idx) > 1 {
-			for i := 0; i < len(idx); i++ {
-				start := idx[i][0]
-				end := len(l)
-				if i+1 < len(idx) {
-					end = idx[i+1][0]
-				}
-				segments = append(segments, strings.TrimSpace(l[start:end]))
-			}
-		} else {
-			segments = []string{l}
-		}
-		for _, seg := range segments {
-			m := re.FindStringSubmatch(seg)
-			if len(m) == 0 {
+		for _, seg := range splitHistoricalLogSegments(ln) {
+			at, level, path, msg, ok := parseHistoricalLogSegment(seg)
+			if !ok {
 				continue
 			}
-			at := strings.TrimSpace(m[1])
-			level := strings.ToUpper(strings.TrimSpace(m[2]))
-			path := strings.TrimSpace(m[3])
-			msg := strings.TrimSpace(m[4])
-			row := Row{Name: path, At: at, Size: 0, Message: msg}
-			low := strings.ToLower(msg)
-			if level == "ERROR" {
-				row.Status = "failed"
-				row.Action = "Error"
-			} else {
-				switch {
-				case strings.Contains(low, "copied"):
-					row.Status = "success"
-					row.Action = "Copied"
-				case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
-					row.Status = "success"
-					row.Action = "Deleted"
-				case strings.Contains(low, "skipped"):
-					row.Status = "skipped"
-					row.Action = "Skipped"
-				case strings.Contains(low, "renamed"):
-					row.Status = "success"
-					row.Action = "Renamed"
-				default:
-					continue
-				}
+			histRow, _, ok := classifyHistoricalLogRow(level, path, msg)
+			if !ok {
+				continue
+			}
+			row := Row{Name: path, At: at, Size: historicalSegmentSizeBytes(seg), Message: msg}
+			if v, ok := histRow["status"].(string); ok {
+				row.Status = v
+			}
+			if v, ok := histRow["action"].(string); ok {
+				row.Action = v
 			}
 			rows = append(rows, row)
 		}
+	}
+	if moveMode {
+		copied := map[string]Row{}
+		deleted := map[string]Row{}
+		others := make([]Row, 0, len(rows))
+		for _, row := range rows {
+			action := strings.ToLower(strings.TrimSpace(row.Action))
+			switch action {
+			case "copied":
+				copied[row.Name] = row
+			case "deleted":
+				deleted[row.Name] = row
+			default:
+				others = append(others, row)
+			}
+		}
+		merged := make([]Row, 0, len(rows))
+		for name, row := range copied {
+			if _, ok := deleted[name]; ok {
+				row.Action = "Moved"
+				delete(deleted, name)
+			}
+			merged = append(merged, row)
+		}
+		merged = append(merged, others...)
+		for _, row := range deleted {
+			merged = append(merged, row)
+		}
+		rows = merged
 	}
 	// 分页
 	total := len(rows)

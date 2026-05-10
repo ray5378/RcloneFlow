@@ -2,12 +2,17 @@ import { describe, it, expect } from 'vitest'
 import { formatBytes, formatBytesPerSec, formatDuration, formatEta } from './format'
 
 describe('formatBytes', () => {
-  it('should return - for zero', () => {
-    expect(formatBytes(0)).toBe('-')
+  it('should format zero bytes as readable text', () => {
+    expect(formatBytes(0)).toBe('0 B')
   })
 
   it('should return - for undefined', () => {
     expect(formatBytes(undefined as any)).toBe('-')
+  })
+
+  it('should return - for null/NaN', () => {
+    expect(formatBytes(null as any)).toBe('-')
+    expect(formatBytes(Number.NaN)).toBe('-')
   })
 
   it('should format bytes correctly', () => {
@@ -59,7 +64,6 @@ describe('formatDuration', () => {
   it('should format days correctly', () => {
     const start = '2024-01-01T00:00:00Z'
     const end = '2024-01-03T05:00:00Z'
-    // 2 days + 5 hours due to timezone differences
     expect(formatDuration(start, end)).toMatch(/天/)
   })
 })

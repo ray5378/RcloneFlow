@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { locale } from '../../i18n'
 import { formatBytes } from '../../utils/format'
 
 interface FileItem {
@@ -9,9 +11,28 @@ interface FileItem {
   sizeBytes?: number
 }
 
-defineProps<{
+const props = defineProps<{
   item: FileItem
 }>()
+
+const formattedAt = computed(() => {
+  const value = props.item.at
+  if (!value) return '-'
+  try {
+    return new Date(value).toLocaleString(locale.value === 'zh' ? 'zh-CN' : 'en-US', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit'
+    })
+  } catch {
+    return value || '-'
+  }
+})
+
+const formattedSize = computed(() => {
+  const value = props.item.sizeBytes
+  if (value === undefined || value === null || Number.isNaN(Number(value))) return '-'
+  return formatBytes(Number(value))
+})
 </script>
 
 <template>
@@ -20,8 +41,8 @@ defineProps<{
       {{ ((item.path || item.name || '').replace(/\\/g,'/').split('/').pop()) }}
     </span>
     <span class="status" :class="item.status">{{ item.status }}</span>
-    <span class="time">{{ item.at || '-' }}</span>
-    <span class="size">{{ item.sizeBytes ? formatBytes(item.sizeBytes) : '-' }}</span>
+    <span class="time">{{ formattedAt }}</span>
+    <span class="size">{{ formattedSize }}</span>
   </div>
 </template>
 

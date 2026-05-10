@@ -9,37 +9,15 @@ import (
 	"rcloneflow/internal/store"
 )
 
-func TestBuildArgs_JSONLogDisablesVerboseFlag(t *testing.T) {
+func TestBuildArgs_ForceJSONLog(t *testing.T) {
 	args := []string{"copy", "src:/a", "dst:/b", "--stats", "1s", "--stats-one-line", "--config", "/tmp/rclone.conf"}
-	useJSONLog := true
-	if useJSONLog {
-		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
-	} else {
-		args = append(args, "-v")
-	}
+	args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	joined := strings.Join(args, " ")
 	if strings.Contains(joined, " -v ") || strings.HasSuffix(joined, " -v") || strings.Contains(joined, "-v --use-json-log") {
-		t.Fatalf("json-log args should not contain -v, got %q", joined)
+		t.Fatalf("forced json-log args should not contain -v, got %q", joined)
 	}
-	if !strings.Contains(joined, "--use-json-log") || !strings.Contains(joined, "--log-level INFO") {
-		t.Fatalf("json-log args missing expected flags: %q", joined)
-	}
-}
-
-func TestBuildArgs_NonJSONLogKeepsVerboseFlag(t *testing.T) {
-	args := []string{"copy", "src:/a", "dst:/b", "--stats", "1s", "--stats-one-line", "--config", "/tmp/rclone.conf"}
-	useJSONLog := false
-	if useJSONLog {
-		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
-	} else {
-		args = append(args, "-v")
-	}
-	joined := strings.Join(args, " ")
-	if !strings.Contains(joined, " -v") {
-		t.Fatalf("non-json-log args should contain -v, got %q", joined)
-	}
-	if strings.Contains(joined, "--use-json-log") {
-		t.Fatalf("non-json-log args should not contain --use-json-log, got %q", joined)
+	if !strings.Contains(joined, "--use-json-log") || !strings.Contains(joined, "--log-level INFO") || !strings.Contains(joined, "--stats-log-level INFO") {
+		t.Fatalf("forced json-log args missing expected flags: %q", joined)
 	}
 }
 
@@ -158,6 +136,35 @@ func TestClassifyRunLogRow_CASNoticeCountsAsCopied(t *testing.T) {
 	}
 	if got := row["action"]; got != "CAS Matched" {
 		t.Fatalf("action=%v, want CAS Matched", got)
+	}
+}
+
+func TestBuildFinalSummaryFilesFromLog_JSONMoveMergesCopiedAndDeleted(t *testing.T) {
+	tmp, err := os.CreateTemp("", "rcloneflow-finalsummary-json-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmp.Name())
+	defer tmp.Close()
+	logText := "{\"level\":\"info\",\"msg\":\"Copied (new)\",\"object\":\"20260510/a.mp4\",\"time\":\"2026-05-10T14:49:03+08:00\",\"size\":123}\n" +
+		"{\"level\":\"info\",\"msg\":\"Deleted\",\"object\":\"20260510/a.mp4\",\"time\":\"2026-05-10T14:49:04+08:00\"}\n" +
+		"{\"level\":\"info\",\"msg\":\"Copied (new)\",\"object\":\"20260510/b.mp4\",\"time\":\"2026-05-10T14:49:05+08:00\"}\n"
+	if _, err := tmp.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	files, counts := buildFinalSummaryFilesFromLog(tmp.Name(), false, true)
+	if got := len(files); got != 2 {
+		t.Fatalf("len(files)=%d, want 2; files=%#v", got, files)
+	}
+	if got := counts["copied"]; got != 2 {
+		t.Fatalf("copied=%d, want 2; counts=%#v", got, counts)
+	}
+	if got := counts["deleted"]; got != 0 {
+		t.Fatalf("deleted=%d, want 0; counts=%#v", got, counts)
+	}
+	actions := []string{anyString(files[0]["action"]), anyString(files[1]["action"])}
+	if !(strings.Contains(strings.Join(actions, ","), "Moved") && strings.Contains(strings.Join(actions, ","), "Copied")) {
+		t.Fatalf("unexpected actions=%#v", actions)
 	}
 }
 
@@ -341,6 +348,26 @@ func TestConsume_JSONStatsTransferringUpdatesCurrentFile(t *testing.T) {
 	}
 	if got := anyString(cf["name"]); !strings.Contains(got, "风过留痕 - S01E01 - 第 1 集.mkv") {
 		t.Fatalf("summary currentFile name=%q", got)
+	}
+	cfs, _ := gotRun.Summary["currentFiles"].([]any)
+	if len(cfs) != 1 {
+		t.Fatalf("summary currentFiles len=%d, want 1; summary=%#v", len(cfs), gotRun.Summary)
+	}
+	prog, _ := gotRun.Summary["progress"].(map[string]any)
+	if prog == nil {
+		t.Fatalf("expected progress in summary, got %#v", gotRun.Summary)
+	}
+	if gotv, ok := prog["plannedFiles"].(float64); !ok || int(gotv) != 2 {
+		t.Fatalf("plannedFiles=%#v, want 2; progress=%#v", prog["plannedFiles"], prog)
+	}
+	if gotv, ok := prog["completedFiles"].(float64); !ok || int(gotv) != 0 {
+		t.Fatalf("completedFiles=%#v, want 0; progress=%#v", prog["completedFiles"], prog)
+	}
+	if got := int(prog["eta"].(float64)); got != 1736 {
+		t.Fatalf("eta=%d, want 1736; progress=%#v", got, prog)
+	}
+	if got := int(prog["percentage"].(float64)); got != 0 {
+		t.Fatalf("percentage=%d, want 0; progress=%#v", got, prog)
 	}
 }
 

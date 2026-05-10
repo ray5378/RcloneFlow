@@ -1,7 +1,7 @@
 import { t } from '../i18n'
 
 export function formatBytes(bytes: number): string {
-  if (bytes === 0 || bytes === undefined || bytes === null) return '-'
+  if (bytes === undefined || bytes === null || Number.isNaN(Number(bytes))) return '-'
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
   let unitIndex = 0
   let size = bytes

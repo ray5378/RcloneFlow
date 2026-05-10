@@ -138,23 +138,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			args = append(args, buildFlagsFromOptions(merged)...)
 		}
 	}
-	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
-	useJSONLog := strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1"
-	if !useJSONLog && effOpt != nil {
-		switch v := effOpt["useJsonLog"].(type) {
-		case bool:
-			useJSONLog = v
-		case string:
-			useJSONLog = strings.EqualFold(v, "true") || v == "1"
-		case float64:
-			useJSONLog = v != 0
-		}
-	}
-	if useJSONLog {
-		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
-	} else {
-		args = append(args, "-v")
-	}
+	// 强制启用 JSON 日志：作为系统默认行为，不再提供任务级开关。
+	args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	// 二次兜底：如 --buffer-size/--bwlimit 后是纯数字，自动补单位（M）；
 	// 同时将 --bwlimit 的分号分隔写法转为空格分隔，保证多时段正确识别
 	for i := 0; i < len(args)-1; i++ {
@@ -374,95 +359,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				files := []map[string]any{}
 				counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
 				if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
-					if b, e := os.ReadFile(p); e == nil {
-						lines := strings.Split(string(b), "\n")
-						// pre-scan file total sizes to populate sizeBytes in finalSummary.files
-						sizes := map[string]int64{}
-						for _, ln := range lines {
-							if m := fileLineRe.FindStringSubmatch(ln); len(m) > 0 {
-								name := strings.TrimSpace(m[1])
-								var tb float64
-								fmt.Sscanf(m[4], "%f", &tb)
-								total := int64(tb * unitToMul(m[5]))
-								if total > 0 {
-									sizes[name] = total
-								}
-							}
-						}
-
-						re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
-						tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
-						for _, ln := range lines {
-							l := strings.TrimSpace(ln)
-							if l == "" {
-								continue
-							}
-							segments := []string{}
-							idx := tsRe.FindAllStringIndex(l, -1)
-							if len(idx) > 1 {
-								for i := 0; i < len(idx); i++ {
-									startI := idx[i][0]
-									endI := len(l)
-									if i+1 < len(idx) {
-										endI = idx[i+1][0]
-									}
-									segments = append(segments, strings.TrimSpace(l[startI:endI]))
-								}
-							} else {
-								segments = []string{l}
-							}
-							for _, seg := range segments {
-								m := re.FindStringSubmatch(seg)
-								if len(m) == 0 {
-									continue
-								}
-								at := strings.TrimSpace(m[1])
-								level := strings.ToUpper(strings.TrimSpace(m[2]))
-								path := strings.TrimSpace(m[3])
-								msg := strings.TrimSpace(m[4])
-								row, bucket, ok := classifyRunLogRow(level, path, msg, sizes, isOpenlistCASCompatible(run))
-								if !ok {
-									continue
-								}
-								row["at"] = at
-								files = append(files, row)
-								counts[bucket]++
-								counts["total"]++
-							}
-						}
-					}
-				}
-				// 如果是 move 模式：将成对的 Copied+Deleted 合并为 Moved，并调整计数（失败态也应用）
-				if strings.ToLower(cmdName) == "move" {
-					copiedMap := map[string]map[string]any{}
-					deletedMap := map[string]map[string]any{}
-					for _, f := range files {
-						a := strings.ToLower(fmt.Sprint(f["action"]))
-						p := fmt.Sprint(f["path"])
-						if a == "copied" {
-							copiedMap[p] = f
-						}
-						if a == "deleted" {
-							deletedMap[p] = f
-						}
-					}
-					moved := []map[string]any{}
-					others := []map[string]any{}
-					for p, c := range copiedMap {
-						if _, ok := deletedMap[p]; ok {
-							moved = append(moved, map[string]any{"path": p, "at": c["at"], "status": "success", "action": "Moved", "sizeBytes": c["sizeBytes"]})
-							delete(deletedMap, p)
-						} else {
-							others = append(others, c)
-						}
-					}
-					for _, d := range deletedMap {
-						others = append(others, d)
-					}
-					files = append(moved, others...)
-					counts["copied"] = len(moved)
-					counts["deleted"] = 0
-					counts["total"] = counts["copied"] + counts["failed"] + counts["skipped"]
+					files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
 				}
 				// 异步补全文件大小，不阻塞状态更新
 				r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
@@ -597,83 +494,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			files := []map[string]any{}
 			counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
 			if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
-				if b, e := os.ReadFile(p); e == nil {
-					lines := strings.Split(string(b), "\n")
-					re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
-					tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
-					for _, ln := range lines {
-						l := strings.TrimSpace(ln)
-						if l == "" {
-							continue
-						}
-						segments := []string{}
-						idx := tsRe.FindAllStringIndex(l, -1)
-						if len(idx) > 1 {
-							for i := 0; i < len(idx); i++ {
-								startI := idx[i][0]
-								endI := len(l)
-								if i+1 < len(idx) {
-									endI = idx[i+1][0]
-								}
-								segments = append(segments, strings.TrimSpace(l[startI:endI]))
-							}
-						} else {
-							segments = []string{l}
-						}
-						for _, seg := range segments {
-							m := re.FindStringSubmatch(seg)
-							if len(m) == 0 {
-								continue
-							}
-							at := strings.TrimSpace(m[1])
-							level := strings.ToUpper(strings.TrimSpace(m[2]))
-							path := strings.TrimSpace(m[3])
-							msg := strings.TrimSpace(m[4])
-							row, bucket, ok := classifyRunLogRow(level, path, msg, map[string]int64{}, isOpenlistCASCompatible(run))
-							if !ok {
-								continue
-							}
-							row["at"] = at
-							files = append(files, row)
-							counts[bucket]++
-							counts["total"]++
-						}
-					}
-					// 如果是 move 模式：将成对的 Copied+Deleted 合并为 Moved，并调整计数
-					if strings.ToLower(cmdName) == "move" {
-						copiedMap := map[string]map[string]any{}
-						deletedMap := map[string]map[string]any{}
-						for _, f := range files {
-							a := strings.ToLower(fmt.Sprint(f["action"]))
-							p := fmt.Sprint(f["path"])
-							if a == "copied" {
-								copiedMap[p] = f
-							}
-							if a == "deleted" {
-								deletedMap[p] = f
-							}
-						}
-						moved := []map[string]any{}
-						others := []map[string]any{}
-						for p, c := range copiedMap {
-							if _, ok := deletedMap[p]; ok {
-								moved = append(moved, map[string]any{"path": p, "at": c["at"], "status": "success", "action": "Moved", "sizeBytes": 0})
-								delete(deletedMap, p)
-							} else {
-								others = append(others, c)
-							}
-						}
-						for p, d := range deletedMap {
-							_ = p
-							others = append(others, d)
-						}
-						files = append(moved, others...)
-						// 计数：将 copied 置为 moved 数，deleted 置 0（成功= copied）
-						counts["copied"] = len(moved)
-						counts["deleted"] = 0
-						counts["total"] = counts["copied"] + counts["failed"] + counts["skipped"]
-					}
-				}
+				files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
 			}
 			// 异步补全文件大小，不阻塞状态更新。
 			// finalSummary 只服务于历史详情 / 最终总结展示；
@@ -1052,38 +873,55 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					prog["eta"] = v
 				}
 				if tr, ok := stats["transferring"].([]any); ok && len(tr) > 0 {
-					if first, ok := tr[0].(map[string]any); ok {
-						name := strings.TrimSpace(anyString(first["name"]))
-						if name != "" {
-							cb := anyFloat64(first["bytes"])
-							tb := anyFloat64(first["size"])
-							sp := anyFloat64(first["speed"])
-							var pctPtr *float64
-							if v, ok := first["percentage"].(float64); ok {
-								pct := v
-								pctPtr = &pct
-							}
-							if r.activeMgr != nil {
-								r.activeMgr.OnFileProgress(runID, name, int64(cb), int64(tb), int64(sp), pctPtr)
-							}
+					currentFiles := make([]map[string]any, 0, len(tr))
+					for i, rawItem := range tr {
+						item, ok := rawItem.(map[string]any)
+						if !ok {
+							continue
+						}
+						name := strings.TrimSpace(anyString(item["name"]))
+						if name == "" {
+							continue
+						}
+						cb := anyFloat64(item["bytes"])
+						tb := anyFloat64(item["size"])
+						sp := anyFloat64(item["speed"])
+						var pctPtr *float64
+						if v, ok := item["percentage"].(float64); ok {
+							pct := v
+							pctPtr = &pct
+						}
+						if r.activeMgr != nil {
+							r.activeMgr.OnFileProgress(runID, name, int64(cb), int64(tb), int64(sp), pctPtr)
+						}
+						currentFile := map[string]any{
+							"name": name,
+							"path": name,
+							"bytes": cb,
+							"totalBytes": tb,
+							"speed": sp,
+							"status": "in_progress",
+						}
+						if pctPtr != nil {
+							currentFile["percentage"] = *pctPtr
+						}
+						currentFiles = append(currentFiles, currentFile)
+						if i == 0 {
 							_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 								if rr.Summary == nil {
 									rr.Summary = map[string]any{}
 								}
-								currentFile := map[string]any{
-									"name": name,
-									"path": name,
-									"bytes": cb,
-									"totalBytes": tb,
-									"speed": sp,
-									"status": "in_progress",
-								}
-								if pctPtr != nil {
-									currentFile["percentage"] = *pctPtr
-								}
 								rr.Summary["currentFile"] = currentFile
 							})
 						}
+					}
+					if len(currentFiles) > 0 {
+						_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+							if rr.Summary == nil {
+								rr.Summary = map[string]any{}
+							}
+							rr.Summary["currentFiles"] = currentFiles
+						})
 					}
 				}
 			}
@@ -1105,9 +943,53 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				}
 			}
 			if len(prog) > 0 {
+				if parsed, ok := parseOneLineProgress(parsedLine); ok {
+					if v, ok2 := parsed["completedFiles"]; ok2 {
+						prog["completedFiles"] = v
+					} else if _, ok2 := parsed["plannedFiles"]; ok2 {
+						prog["completedFiles"] = float64(0)
+					}
+					if v, ok2 := parsed["plannedFiles"]; ok2 {
+						prog["plannedFiles"] = v
+					}
+					if v, ok2 := parsed["eta"]; ok2 {
+						prog["eta"] = v
+					}
+					if v, ok2 := parsed["percentage"]; ok2 {
+						prog["percentage"] = v
+					}
+				}
 				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
+					}
+					if prev, ok := rr.Summary["progress"].(map[string]any); ok {
+						if pc, ok2 := prev["completedFiles"].(float64); ok2 {
+							if nc, ok3 := prog["completedFiles"].(float64); ok3 {
+								if nc < pc {
+									prog["completedFiles"] = pc
+								}
+							} else {
+								prog["completedFiles"] = pc
+							}
+						}
+						if pp, ok2 := prev["plannedFiles"].(float64); ok2 {
+							if np, ok3 := prog["plannedFiles"].(float64); ok3 {
+								if np < pp {
+									prog["plannedFiles"] = pp
+								}
+							} else {
+								prog["plannedFiles"] = pp
+							}
+						}
+					}
+					if fp != nil {
+						if lst := fp.copiedList(); len(lst) > 0 {
+							if nc, ok3 := prog["completedFiles"].(float64); !ok3 || float64(len(lst)) > nc {
+								prog["completedFiles"] = float64(len(lst))
+							}
+							rr.Summary["files"] = fp.snapshot(100)
+						}
 					}
 					rr.Summary["progress"] = prog
 					rr.Summary["progressLine"] = parsedLine
@@ -1117,6 +999,17 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					if sp, ok := prog["speed"].(float64); ok {
 						rr.Speed = fmt.Sprintf("%d B/s", int64(sp))
 					}
+				})
+				websocket.Broadcast("run_progress", map[string]any{
+					"run_id":         runID,
+					"bytes":          prog["bytes"],
+					"total":          prog["totalBytes"],
+					"speed":          prog["speed"],
+					"percent":        prog["percentage"],
+					"completedFiles": prog["completedFiles"],
+					"plannedFiles":   prog["plannedFiles"],
+					"totalCount":     prog["plannedFiles"],
+					"eta":            prog["eta"],
 				})
 				continue
 			}
@@ -1857,6 +1750,142 @@ func sanitizeRunLogLine(line string, openlistCASCompatible bool) string {
 		prefix = ts + " NOTICE"
 	}
 	return fmt.Sprintf("%s: %s: CAS compatible match after source cleanup (%s)", prefix, path, msg)
+}
+
+func splitRunLogSegments(line string) []string {
+	l := strings.TrimSpace(line)
+	if l == "" {
+		return nil
+	}
+	tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
+	idx := tsRe.FindAllStringIndex(l, -1)
+	if len(idx) <= 1 {
+		return []string{l}
+	}
+	segments := make([]string, 0, len(idx))
+	for i := 0; i < len(idx); i++ {
+		start := idx[i][0]
+		end := len(l)
+		if i+1 < len(idx) {
+			end = idx[i+1][0]
+		}
+		segments = append(segments, strings.TrimSpace(l[start:end]))
+	}
+	return segments
+}
+
+func parseRunLogSegment(seg string) (at, level, path, msg string, ok bool) {
+	re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
+	if m := re.FindStringSubmatch(strings.TrimSpace(seg)); len(m) > 0 {
+		return strings.TrimSpace(m[1]), strings.ToUpper(strings.TrimSpace(m[2])), strings.TrimSpace(m[3]), strings.TrimSpace(m[4]), true
+	}
+	var rec map[string]any
+	if json.Unmarshal([]byte(strings.TrimSpace(seg)), &rec) == nil {
+		level = strings.ToUpper(strings.TrimSpace(fmt.Sprint(rec["level"])))
+		msg = strings.TrimSpace(fmt.Sprint(rec["msg"]))
+		path = strings.TrimSpace(fmt.Sprint(rec["object"]))
+		at = strings.TrimSpace(fmt.Sprint(rec["time"]))
+		if at == "" {
+			at = strings.TrimSpace(fmt.Sprint(rec["timestamp"]))
+		}
+		if msg != "" {
+			return at, level, path, msg, true
+		}
+	}
+	return "", "", "", "", false
+}
+
+func mergeMoveRows(files []map[string]any) ([]map[string]any, map[string]int) {
+	copiedMap := map[string]map[string]any{}
+	deletedMap := map[string]map[string]any{}
+	others := []map[string]any{}
+	for _, f := range files {
+		a := strings.ToLower(fmt.Sprint(f["action"]))
+		p := fmt.Sprint(f["path"])
+		switch a {
+		case "copied":
+			copiedMap[p] = f
+		case "deleted":
+			deletedMap[p] = f
+		default:
+			others = append(others, f)
+		}
+	}
+	moved := []map[string]any{}
+	remainingCopied := []map[string]any{}
+	remainingDeleted := []map[string]any{}
+	for p, c := range copiedMap {
+		if _, ok := deletedMap[p]; ok {
+			moved = append(moved, map[string]any{"path": p, "at": c["at"], "status": "success", "action": "Moved", "sizeBytes": c["sizeBytes"]})
+			delete(deletedMap, p)
+		} else {
+			remainingCopied = append(remainingCopied, c)
+		}
+	}
+	for _, d := range deletedMap {
+		remainingDeleted = append(remainingDeleted, d)
+	}
+	merged := append([]map[string]any{}, moved...)
+	merged = append(merged, remainingCopied...)
+	merged = append(merged, others...)
+	merged = append(merged, remainingDeleted...)
+	counts := map[string]int{"copied": len(moved) + len(remainingCopied), "deleted": len(remainingDeleted), "failed": 0, "skipped": 0, "total": 0}
+	for _, f := range merged {
+		a := strings.ToLower(fmt.Sprint(f["action"]))
+		s := strings.ToLower(fmt.Sprint(f["status"]))
+		if a == "error" || s == "failed" {
+			counts["failed"]++
+		} else if s == "skipped" || a == "skipped" {
+			counts["skipped"]++
+		}
+	}
+	counts["total"] = counts["copied"] + counts["deleted"] + counts["failed"] + counts["skipped"]
+	return merged, counts
+}
+
+func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, moveMode bool) ([]map[string]any, map[string]int) {
+	files := []map[string]any{}
+	counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
+	if logPath == "" {
+		return files, counts
+	}
+	b, e := os.ReadFile(logPath)
+	if e != nil {
+		return files, counts
+	}
+	lines := strings.Split(string(b), "\n")
+	sizes := map[string]int64{}
+	for _, ln := range lines {
+		if m := fileLineRe.FindStringSubmatch(ln); len(m) > 0 {
+			name := strings.TrimSpace(m[1])
+			var tb float64
+			fmt.Sscanf(m[4], "%f", &tb)
+			total := int64(tb * unitToMul(m[5]))
+			if total > 0 {
+				sizes[name] = total
+			}
+		}
+	}
+	for _, ln := range lines {
+		for _, seg := range splitRunLogSegments(ln) {
+			at, level, path, msg, ok := parseRunLogSegment(seg)
+			if !ok {
+				continue
+			}
+			row, bucket, ok := classifyRunLogRow(level, path, msg, sizes, openlistCASCompatible)
+			if !ok {
+				continue
+			}
+			row["at"] = at
+			files = append(files, row)
+			counts[bucket]++
+			counts["total"]++
+		}
+	}
+	if moveMode {
+		return mergeMoveRows(files)
+	}
+	return files, counts
 }
 
 func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlistCASCompatible bool) (map[string]any, string, bool) {

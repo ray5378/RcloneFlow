@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"rcloneflow/internal/service"
@@ -436,8 +437,159 @@ func TestHandleRunsByTask_BackfillsHistoricalFinalSummaryFromCASLog(t *testing.T
 	if _, ok := fs["files"]; ok {
 		t.Fatalf("finalSummary.files should not be exposed in task history response")
 	}
-	if got := int(fs["totalCount"].(float64)); got != 0 {
-		t.Fatalf("totalCount=%d, want 0 from lightweight summary", got)
+	if got := int(fs["totalCount"].(float64)); got != 1 {
+		t.Fatalf("totalCount=%d, want 1 after CAS-log backfill", got)
+	}
+	if got := int(counts["copied"].(float64)); got != 1 {
+		t.Fatalf("copied=%d, want 1 after CAS-log backfill", got)
+	}
+}
+
+func TestHandleRunFiles_ParsesJSONLogRows(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-json-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "{\"level\":\"info\",\"msg\":\"Copied (new)\",\"object\":\"20260510/a.mp4\",\"time\":\"2026-05-10T14:49:03+08:00\"}\n" +
+		"{\"level\":\"error\",\"msg\":\"Failed to copy: boom\",\"object\":\"20260510/b.mp4\",\"time\":\"2026-05-10T14:49:04+08:00\"}\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{"stderrFile": tmpFile.Name()}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        9,
+		TaskID:    109,
+		Status:    "finished",
+		StartedAt: "2026-05-10T14:48:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/9/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 2 {
+		t.Fatalf("total=%d, want 2", got)
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("len(items)=%d, want 2", len(items))
+	}
+	first, _ := items[0].(map[string]any)
+	second, _ := items[1].(map[string]any)
+	if got := first["action"].(string); got != "Copied" {
+		t.Fatalf("first action=%q, want Copied", got)
+	}
+	if got := int(first["sizeBytes"].(float64)); got != 0 {
+		t.Fatalf("first sizeBytes=%d, want 0 when json log has no size", got)
+	}
+	if got := second["action"].(string); got != "Error" {
+		t.Fatalf("second action=%q, want Error", got)
+	}
+}
+
+func TestHandleRunFiles_ParsesJSONLogSizeBytes(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-json-size-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "{\"level\":\"info\",\"msg\":\"Copied (new)\",\"object\":\"20260510/a.mp4\",\"time\":\"2026-05-10T14:49:03+08:00\",\"size\":12345}\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{"stderrFile": tmpFile.Name()}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        11,
+		TaskID:    111,
+		Status:    "finished",
+		StartedAt: "2026-05-10T14:48:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/11/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("len(items)=%d, want 1", len(items))
+	}
+	first, _ := items[0].(map[string]any)
+	if got := int(first["sizeBytes"].(float64)); got != 12345 {
+		t.Fatalf("sizeBytes=%d, want 12345", got)
+	}
+}
+
+func TestHandleRunFiles_MergeMoveCopiedAndDeletedRows(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-json-move-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "{\"level\":\"info\",\"msg\":\"Copied (new)\",\"object\":\"20260510/a.mp4\",\"time\":\"2026-05-10T14:49:03+08:00\"}\n" +
+		"{\"level\":\"info\",\"msg\":\"Deleted\",\"object\":\"20260510/a.mp4\",\"time\":\"2026-05-10T14:49:04+08:00\"}\n" +
+		"{\"level\":\"info\",\"msg\":\"Copied (new)\",\"object\":\"20260510/b.mp4\",\"time\":\"2026-05-10T14:49:05+08:00\"}\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{"stderrFile": tmpFile.Name()}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        10,
+		TaskID:    110,
+		TaskMode:  "move",
+		Status:    "finished",
+		StartedAt: "2026-05-10T14:48:00+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/10/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 2 {
+		t.Fatalf("total=%d, want 2", got)
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("len(items)=%d, want 2", len(items))
+	}
+	actions := []string{}
+	for _, raw := range items {
+		it, _ := raw.(map[string]any)
+		actions = append(actions, it["action"].(string))
+	}
+	joined := strings.Join(actions, ",")
+	if !strings.Contains(joined, "Moved") || !strings.Contains(joined, "Copied") {
+		t.Fatalf("unexpected actions=%v", actions)
+	}
+	if strings.Contains(joined, "Deleted") {
+		t.Fatalf("unexpected deleted action remains in merged list: %v", actions)
 	}
 }
 
