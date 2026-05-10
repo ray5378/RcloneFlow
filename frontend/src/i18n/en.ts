@@ -379,6 +379,8 @@ export default {
     interactive: 'Interactive mode',
     checkFirst: 'Check first',
     serverSideAcrossConfigs: 'Server-side across configs',
+    useJsonLog: 'Enable JSON log',
+    useJsonLogHint: 'Enable rclone JSON logging for this task so the backend can extract file-level transfer progress; compatibility may vary on some remotes or versions.',
     openlistCasCompatible: 'OpenList-CAS compatibility',
     openlistCasCompatibleHint: 'Applies only to the destination side: treat a same-name .cas on the target as an equivalent already-existing form of the original file; .cas files on the source side still follow normal logic.',
     checkersCount: 'Checkers',

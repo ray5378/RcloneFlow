@@ -379,6 +379,8 @@ export default {
     interactive: '交互模式',
     checkFirst: '检查前先检查',
     serverSideAcrossConfigs: '服务器端跨配置',
+    useJsonLog: '启用 JSON 日志',
+    useJsonLogHint: '为当前任务启用 rclone JSON 日志，便于后端提取文件级传输进度；某些远端/版本可能兼容性较差。',
     openlistCasCompatible: 'openlist-cas 兼容',
     openlistCasCompatibleHint: '仅对目标目录端生效：将目标端同名 .cas 视为原文件的等效已存在形态；源目录中的 .cas 仍按普通文件处理。',
     checkersCount: '检查器数',
