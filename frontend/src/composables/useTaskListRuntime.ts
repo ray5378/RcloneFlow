@@ -38,6 +38,7 @@ export function useTaskListRuntime(options: {
     toggleSchedule,
     deleteSchedule,
     clearAllRunsWithConfirm,
+    scheduleToggledTaskId,
   } = useTaskListActions({
     openMenuId: options.openMenuId,
     historyFilterTaskId: options.historyFilterTaskId,
@@ -89,6 +90,7 @@ export function useTaskListRuntime(options: {
     clearAllRunsWithConfirm,
     runningTaskId,
     stoppedTaskId,
+    scheduleToggledTaskId,
     stopTaskAny,
     runTask,
     goToAddTask,

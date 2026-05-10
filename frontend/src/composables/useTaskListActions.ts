@@ -1,4 +1,4 @@
-import { computed, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import type { Schedule } from '../types'
 import { t } from '../i18n'
 
@@ -42,10 +42,18 @@ export function useTaskListActions(options: UseTaskListActionsOptions) {
     })
   }
 
+  const scheduleToggledTaskId = ref<number | null>(null)
+
   async function toggleSchedule(taskId: number) {
     const schedule = getScheduleByTaskId(taskId)
     if (!schedule) return
     await options.scheduleApi.update(schedule.id, !schedule.enabled)
+    scheduleToggledTaskId.value = taskId
+    setTimeout(() => {
+      if (scheduleToggledTaskId.value === taskId) {
+        scheduleToggledTaskId.value = null
+      }
+    }, 1000)
     await options.loadData()
   }
 
@@ -71,5 +79,6 @@ export function useTaskListActions(options: UseTaskListActionsOptions) {
     toggleSchedule,
     deleteSchedule,
     clearAllRunsWithConfirm,
+    scheduleToggledTaskId,
   }
 }

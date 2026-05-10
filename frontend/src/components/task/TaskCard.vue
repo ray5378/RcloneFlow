@@ -38,6 +38,7 @@ const props = defineProps<{
   progress?: Progress | null
   runningTaskId?: number | null
   stoppedTaskId?: number | null
+  scheduleToggledTaskId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -85,6 +86,10 @@ function isRunning(): boolean {
 function isStopped(): boolean {
   return props.stoppedTaskId === props.task.id
 }
+
+function isScheduleToggled(): boolean {
+  return props.scheduleToggledTaskId === props.task.id
+}
 </script>
 
 <template>
@@ -108,10 +113,10 @@ function isStopped(): boolean {
       <div class="item-actions list-item-actions list-item-actions-right">
         <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 {{ t('taskCard.history') }}</button>
         <button class="ghost small" @click.stop="emit('openTransferDetail', task.id!)">📦 {{ t('activeTransfer.title') }}</button>
-        <button class="ghost small" :class="{ 'danger-text': isStopped() }" @click.stop="emit('stop', task.id!)">
+        <button class="ghost small" :class="{ 'btn-stopped': isStopped() }" @click.stop="emit('stop', task.id!)">
           {{ isStopped() ? `⏹ ${t('taskCard.stopped')}` : `⏹ ${t('taskCard.stopTransfer')}` }}
         </button>
-        <button v-if="schedule" class="ghost small" @click.stop="emit('toggleSchedule', task)">
+        <button v-if="schedule" class="ghost small" :class="{ 'btn-schedule-toggled': isScheduleToggled() }" @click.stop="emit('toggleSchedule', task)">
           {{ schedule.enabled ? `⏸ ${t('taskCard.disableSchedule')}` : `▶ ${t('taskCard.enableSchedule')}` }}
         </button>
         <button class="ghost small" :class="{ 'btn-running': isRunning() }" :disabled="isRunning()" @click.stop="emit('run', task)">
@@ -168,4 +173,6 @@ body.light .task-paths { background: #f5f5f5; }
 .progress-bar-container { height: 4px; background: #333; border-radius: 2px; margin-top: 8px; overflow: hidden; }
 .progress-bar { height: 100%; background: var(--accent, #4f46e5); transition: width 0.3s; }
 .btn-running { color: #22c55e !important; }
+.btn-stopped { background: #b91c1c !important; border-color: #b91c1c !important; color: #fff !important; }
+.btn-schedule-toggled { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; }
 </style>

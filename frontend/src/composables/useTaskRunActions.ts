@@ -23,7 +23,7 @@ export function useTaskRunActions(options: UseTaskRunActionsOptions) {
         if (stoppedTaskId.value === taskId) {
           stoppedTaskId.value = null
         }
-      }, 10000)
+      }, 1000)
       await Promise.all([
         options.loadData(),
         options.loadActiveRuns?.() ?? Promise.resolve(),
@@ -65,7 +65,7 @@ export function useTaskRunActions(options: UseTaskRunActionsOptions) {
         if (runningTaskId.value === taskId) {
           runningTaskId.value = null
         }
-      }, 5000)
+      }, 1000)
       return result
     } catch (e) {
       runningTaskId.value = null

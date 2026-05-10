@@ -20,10 +20,8 @@ const emit = defineEmits<{
     <div class="title">{{ getTrackingLabels(props.trackingMode).pending }} <span v-if="props.total != null">({{ items.length }}/{{ props.total }})</span></div>
     <div v-if="items.length" class="list">
       <div v-for="item in items" :key="item.path || item.name" class="row">
-        <div class="main">
-          <span class="name">{{ item.path || item.name }}</span>
-          <span class="size">{{ formatBytes(item.sizeBytes || 0) }}</span>
-        </div>
+        <span class="name" :title="item.path || item.name">{{ item.path || item.name }}</span>
+        <span class="size">{{ formatBytes(item.sizeBytes || 0) }}</span>
         <span class="tag">{{ getTransferStatusLabel(item.status) }}</span>
       </div>
       <div v-if="(props.total || 0) > items.length" class="more-wrap">
@@ -37,13 +35,12 @@ const emit = defineEmits<{
 <style scoped>
 .list-box { margin-bottom: 12px; }
 .title { font-size: 12px; color:#999; margin-bottom: 6px; }
-.list { border:1px solid #333; border-radius:8px; padding:8px; max-height:220px; overflow:auto; }
+.list { border:1px solid #333; border-radius:8px; padding:8px; max-height:320px; overflow:auto; }
 body.light .list { border-color:#ddd; }
-.row { display:flex; justify-content:space-between; gap:12px; padding:6px 0; font-size:13px; align-items:flex-start; }
-.main { display:flex; flex-direction:column; gap:2px; min-width:0; flex:1; }
-.name { word-break:break-all; }
-.size { font-size:12px; color:#999; }
-.tag { color:#999; white-space:nowrap; }
+.row { display:grid; grid-template-columns:minmax(0, 1fr) 110px 96px; gap:12px; padding:6px 0; font-size:13px; align-items:center; }
+.name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.size { font-size:12px; color:#999; white-space:nowrap; text-align:right; }
+.tag { color:#999; white-space:nowrap; text-align:right; }
 .more-wrap { padding-top:8px; display:flex; justify-content:center; }
 .empty { font-size:12px; color:#999; }
 </style>

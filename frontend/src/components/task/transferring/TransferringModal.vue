@@ -30,7 +30,7 @@ const emit = defineEmits<{
 
 <template>
   <div v-if="visible" class="modal-overlay" @click.self="emit('close')">
-    <div class="modal-content" style="max-width:820px">
+    <div class="modal-content" style="max-width:1280px">
       <div class="modal-header">
         <h3>{{ t('activeTransfer.title') }}</h3>
         <div class="actions">
@@ -58,12 +58,12 @@ const emit = defineEmits<{
 
 <style scoped>
 .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; z-index:1000; }
-.modal-content { width:min(92vw, 820px); max-height:88vh; overflow:auto; background:var(--bg, #111); border-radius:12px; padding:16px; }
+.modal-content { width:min(96vw, 1280px); max-height:88vh; overflow:auto; background:var(--bg, #111); border-radius:12px; padding:16px; }
 body.light .modal-content { background:#fff; }
 .modal-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
 .actions { display:flex; gap:8px; align-items:center; }
 .close-btn { background:none; border:none; font-size:20px; cursor:pointer; }
-.two-col { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.two-col { display:grid; grid-template-columns:minmax(0, 1fr) minmax(0, 1fr); gap:18px; }
 .degraded { margin-bottom:10px; padding:8px 10px; border-radius:8px; background:#f59e0b22; color:#f59e0b; font-size:12px; }
 .state-box { padding:16px; border:1px dashed #444; border-radius:8px; color:#999; text-align:center; }
 .state-box.error { color:#ef4444; border-color:#ef444466; }

@@ -336,6 +336,7 @@ const {
   clearAllRunsWithConfirm,
   runningTaskId,
   stoppedTaskId,
+  scheduleToggledTaskId,
   stopTaskAny,
   runTask,
   goToAddTask,
@@ -375,6 +376,7 @@ const {
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
     :stopped-task-id="stoppedTaskId"
+    :schedule-toggled-task-id="scheduleToggledTaskId"
     :tasks-total="tasksTotal"
     :tasks-page-size="tasksPageSize"
     :tasks-page="tasksPage"

@@ -11,6 +11,7 @@ defineProps<{
   getTaskCardProgressByTask: (taskId: number) => any
   runningTaskId: number | null
   stoppedTaskId: number | null
+  scheduleToggledTaskId: number | null
   tasksTotal: number
   tasksPageSize: number
   tasksPage: number
@@ -50,6 +51,7 @@ const emit = defineEmits<{
         :progress="getTaskCardProgressByTask(task.id)"
         :running-task-id="runningTaskId"
         :stopped-task-id="stoppedTaskId"
+        :schedule-toggled-task-id="scheduleToggledTaskId"
         @run="emit('run', task.id)"
         @edit="emit('edit', task)"
         @delete="emit('delete', task.id)"

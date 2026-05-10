@@ -10,6 +10,7 @@ defineProps<{
   getTaskCardProgressByTask: (task: any) => any
   runningTaskId: number | null
   stoppedTaskId: number | null
+  scheduleToggledTaskId: number | null
   tasksTotal: number
   tasksPageSize: number
   tasksPage: number
@@ -59,6 +60,7 @@ defineProps<{
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
     :stopped-task-id="stoppedTaskId"
+    :schedule-toggled-task-id="scheduleToggledTaskId"
     :tasks-total="tasksTotal"
     :tasks-page-size="tasksPageSize"
     :tasks-page="tasksPage"
