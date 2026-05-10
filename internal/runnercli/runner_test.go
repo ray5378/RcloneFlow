@@ -195,6 +195,60 @@ func TestConsume_CASNoticeIncrementsCompletedFiles(t *testing.T) {
 	}
 }
 
+func TestConsume_JSONWrappedFileProgressUpdatesActiveTransfer(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_runnercli_json_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	task, err := db.AddTask(store.Task{Name: "json-progress-task", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+	run, err := db.AddRun(store.Run{TaskID: task.ID, Status: "running", Trigger: "manual", Summary: map[string]any{}})
+	if err != nil {
+		t.Fatalf("AddRun() error = %v", err)
+	}
+
+	mgr := active_transfer.NewManager()
+	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeNormal, []active_transfer.TransferCandidateFile{{Path: "a/file1.mkv", Name: "file1.mkv", SizeBytes: 100}})
+	r := New(db, mgr)
+	fp := &fileProgress{m: map[string]*fileProg{}}
+	outFile, err := os.CreateTemp(tmpDir, "consume-json-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer outFile.Close()
+
+	line := `{"level":"info","msg":"12.000 MiB / 36.000 MiB, 33%, 4.000 MiB/s, ETA 6s (xfr#0/1)","object":"a/file1.mkv"}` + "\n"
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, false, false)
+
+	st, ok := mgr.GetByTaskID(task.ID)
+	if !ok || st.CurrentFile == nil {
+		t.Fatalf("expected current file state, got ok=%v st=%#v", ok, st)
+	}
+	if got := st.CurrentFile.Path; got != "a/file1.mkv" {
+		t.Fatalf("current file path=%q, want a/file1.mkv", got)
+	}
+	if got := st.CurrentFile.TotalBytes; got <= st.CurrentFile.Bytes {
+		t.Fatalf("unexpected current file progress: %#v", st.CurrentFile)
+	}
+	gotRun, err := db.GetRun(run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() error = %v", err)
+	}
+	if got := anyString(gotRun.Summary["progressLine"]); !strings.Contains(got, "a/file1.mkv") {
+		t.Fatalf("progressLine=%q, want file path included", got)
+	}
+}
+
 func TestConsume_MoveDeletedDoesNotMarkActiveTransferDeleted(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "rcloneflow_runnercli_move_*")
 	if err != nil {

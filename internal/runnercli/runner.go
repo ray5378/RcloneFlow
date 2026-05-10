@@ -86,10 +86,6 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	if casCompat != nil && casCompat.ExcludeFrom != "" {
 		args = append(args, "--exclude-from", casCompat.ExcludeFrom)
 	}
-	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
-	if strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1" {
-		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
-	}
 	// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)，并对 WebDAV 目标注入稳态默认（未显式配置时）
 	var effOpt map[string]any
 	if run.Summary != nil {
@@ -141,6 +137,21 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			effOpt = merged
 			args = append(args, buildFlagsFromOptions(merged)...)
 		}
+	}
+	// 可选：启用 JSON 日志（某些后端可能不兼容，默认关闭）
+	useJSONLog := strings.EqualFold(os.Getenv("RCLONE_USE_JSON_LOG"), "true") || os.Getenv("RCLONE_USE_JSON_LOG") == "1"
+	if !useJSONLog && effOpt != nil {
+		switch v := effOpt["useJsonLog"].(type) {
+		case bool:
+			useJSONLog = v
+		case string:
+			useJSONLog = strings.EqualFold(v, "true") || v == "1"
+		case float64:
+			useJSONLog = v != 0
+		}
+	}
+	if useJSONLog {
+		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	}
 	// 二次兜底：如 --buffer-size/--bwlimit 后是纯数字，自动补单位（M）；
 	// 同时将 --bwlimit 的分号分隔写法转为空格分隔，保证多时段正确识别
@@ -1007,10 +1018,9 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
 	for s.Scan() {
 		line := s.Text()
-		if len(line) > 0 {
-			_, _ = out.WriteString(sanitizeRunLogLine(line, openlistCASCompatible) + "\n")
-		}
-		// 1) JSON 行（极少数情况下）
+		parsedLine := line
+		jsonLevel := ""
+		// 1) JSON 行：既尝试直接提取 machine-readable progress，也把 msg/object 解包给现有文本解析链复用。
 		var rec map[string]any
 		if json.Unmarshal([]byte(line), &rec) == nil {
 			prog := map[string]any{}
@@ -1026,13 +1036,30 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 			if v, ok := rec["eta"].(float64); ok {
 				prog["eta"] = v
 			}
+			jsonLevel = strings.ToUpper(anyString(rec["level"]))
+			msg := strings.TrimSpace(anyString(rec["msg"]))
+			obj := strings.TrimSpace(anyString(rec["object"]))
+			if msg != "" {
+				prefix := strings.TrimSpace(jsonLevel)
+				if prefix == "" {
+					prefix = "INFO"
+				}
+				switch {
+				case obj != "" && !strings.Contains(msg, obj):
+					parsedLine = fmt.Sprintf("%s : %s: %s", prefix, obj, msg)
+				case jsonLevel != "":
+					parsedLine = fmt.Sprintf("%s : %s", prefix, msg)
+				default:
+					parsedLine = msg
+				}
+			}
 			if len(prog) > 0 {
 				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
 					}
 					rr.Summary["progress"] = prog
-					rr.Summary["progressLine"] = line
+					rr.Summary["progressLine"] = parsedLine
 					if b, ok := prog["bytes"].(float64); ok {
 						rr.BytesTransferred = int64(b)
 					}
@@ -1043,6 +1070,10 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				continue
 			}
 		}
+		if len(line) > 0 {
+			_, _ = out.WriteString(sanitizeRunLogLine(line, openlistCASCompatible) + "\n")
+		}
+		line = parsedLine
 		// 2) statsRe 文本解析（优先于 parseOneLineProgress）
 		if m := statsRe.FindStringSubmatch(line); len(m) > 0 {
 			cur := parseUnit(m[1])
@@ -1188,6 +1219,12 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					}
 					marked = true
 				}
+				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+					if rr.Summary == nil {
+						rr.Summary = map[string]any{}
+					}
+					rr.Summary["progressLine"] = line
+				})
 				if marked {
 					_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 						if rr.Summary == nil {
