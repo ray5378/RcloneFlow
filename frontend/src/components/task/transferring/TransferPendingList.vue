@@ -33,9 +33,9 @@ const emit = defineEmits<{
 </template>
 
 <style scoped>
-.list-box { margin-bottom: 12px; }
+.list-box { margin-bottom: 12px; width:100%; min-width:0; }
 .title { font-size: 12px; color:#999; margin-bottom: 6px; }
-.list { border:1px solid #333; border-radius:8px; padding:8px; max-height:320px; overflow:auto; }
+.list { width:100%; box-sizing:border-box; border:1px solid #333; border-radius:8px; padding:8px; max-height:320px; overflow:auto; }
 body.light .list { border-color:#ddd; }
 .row { display:grid; grid-template-columns:minmax(0, 1fr) 110px 96px; gap:12px; padding:6px 0; font-size:13px; align-items:center; }
 .name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
