@@ -15,6 +15,7 @@ import (
 	"rcloneflow/internal/scheduler"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
+	"rcloneflow/internal/websocket"
 
 	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
@@ -73,6 +74,11 @@ func Run(cfg *config.Config) error {
 			for k, v := range active_transfer.SnapshotEnvelope(snap) {
 				rr.Summary[k] = v
 			}
+		})
+		websocket.Broadcast("active_transfer_snapshot", map[string]any{
+			"run_id":   runID,
+			"task_id":  snap.TaskID,
+			"snapshot": snap,
 		})
 	})
 	taskSvc := service.NewTaskService(db, rc, activeMgr)

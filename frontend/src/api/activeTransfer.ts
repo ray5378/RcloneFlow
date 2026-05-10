@@ -57,6 +57,20 @@ export interface ActiveTransferListResponse<T> {
   items: T[]
 }
 
+export interface ActiveTransferSnapshot {
+  runId: number
+  taskId: number
+  trackingMode: TrackingMode
+  totalCount: number
+  currentFile?: ActiveTransferCurrentFile | null
+  completed?: ActiveTransferCompletedFile[]
+  pending?: ActiveTransferPendingFile[]
+  degraded?: boolean
+  degradeReason?: string
+  startedAt?: string
+  updatedAt?: string
+}
+
 function mapActiveTransferError(err: any): never {
   const msg = String(err?.message || '')
   if (msg.includes('active run not found')) {
