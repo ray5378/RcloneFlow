@@ -549,7 +549,7 @@ func (db *DB) ListActiveRuns() ([]Run, error) {
 	rows, err := db.db.Query(`
 		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
-		FROM runs WHERE status = 'running' ORDER BY id DESC`)
+		FROM runs WHERE status IN ('running', 'finalizing') ORDER BY id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -563,7 +563,7 @@ func (db *DB) ClearAllRunningStatus() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	_, err := db.db.Exec(`UPDATE runs SET status = 'stopped', finished_at = datetime('now') WHERE status = 'running'`)
+	_, err := db.db.Exec(`UPDATE runs SET status = 'stopped', finished_at = datetime('now') WHERE status IN ('running', 'finalizing')`)
 	return err
 }
 
@@ -635,7 +635,7 @@ func (db *DB) GetActiveRunByTaskID(taskID int64) (Run, error) {
 	err := db.db.QueryRow(`
 		SELECT id, task_id, status, trigger, summary, error, created_at, updated_at,
 		       task_name, task_mode, source_remote, source_path, target_remote, target_path, finished_at, bytes_transferred, speed
-		FROM runs WHERE task_id = ? AND status = 'running'
+		FROM runs WHERE task_id = ? AND status IN ('running', 'finalizing')
 		ORDER BY created_at DESC LIMIT 1`, taskID).Scan(
 		&r.ID, &r.TaskID, &r.Status, &r.Trigger, &summaryJSON, &r.Error, &r.CreatedAt, &r.UpdatedAt,
 		&taskName, &taskMode, &sourceRemote, &sourcePath, &targetRemote, &targetPath,
