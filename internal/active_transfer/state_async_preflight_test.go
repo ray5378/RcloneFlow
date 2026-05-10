@@ -74,6 +74,40 @@ func TestManager_SetPreflightResult_MarksDegradedOnError(t *testing.T) {
 	}
 }
 
+func TestManager_BackfillsSizesForCurrentAndCompleted(t *testing.T) {
+	mgr := NewManager()
+	mgr.InitState(31, 12, TrackingModeNormal, nil)
+
+	pct := 25.0
+	mgr.UpdateCurrentFile(31, "dir/a.mp4", 25, 0, 5, &pct)
+	state, ok := mgr.GetByRunID(31)
+	if !ok || state == nil {
+		t.Fatalf("expected state")
+	}
+	if got := state.CurrentFiles["dir/a.mp4"].TotalBytes; got != 0 {
+		t.Fatalf("initial current total=%d, want 0", got)
+	}
+
+	mgr.MergeCandidates(31, []TransferCandidateFile{{Path: "dir/a.mp4", Name: "A.mp4", SizeBytes: 100}, {Path: "dir/b.mp4", Name: "B.mp4", SizeBytes: 200}})
+	state, _ = mgr.GetByRunID(31)
+	if got := state.CurrentFiles["dir/a.mp4"].TotalBytes; got != 100 {
+		t.Fatalf("backfilled current total=%d, want 100", got)
+	}
+	if state.CurrentFile == nil || state.CurrentFile.TotalBytes != 100 {
+		t.Fatalf("current file total bytes not backfilled: %#v", state.CurrentFile)
+	}
+
+	mgr.UpdateCurrentFile(31, "dir/b.mp4", 50, 0, 6, &pct)
+	mgr.MarkCompleted(31, "dir/b.mp4", FileStatusCopied, "")
+	state, _ = mgr.GetByRunID(31)
+	if got := state.Completed["dir/b.mp4"].SizeBytes; got != 200 {
+		t.Fatalf("completed size=%d, want 200", got)
+	}
+	if got := state.Completed["dir/a.mp4"].SizeBytes; got != 0 {
+		_ = got
+	}
+}
+
 func TestManager_ListOrdering_IsStableAndReadable(t *testing.T) {
 	mgr := NewManager()
 	mgr.InitState(30, 11, TrackingModeNormal, []TransferCandidateFile{

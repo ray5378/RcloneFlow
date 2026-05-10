@@ -128,9 +128,18 @@ func (m *Manager) MergeCandidates(runID int64, candidates []TransferCandidateFil
 			if c.Order > 0 {
 				cur.Order = c.Order
 			}
+			if c.SizeBytes > 0 && cur.TotalBytes == 0 {
+				cur.TotalBytes = c.SizeBytes
+			}
 			st.CurrentFiles[key] = cur
 			if st.CurrentFile != nil && normalizePath(st.CurrentFile.Path) == key {
 				st.CurrentFile.Name = cur.Name
+				if c.Order > 0 {
+					st.CurrentFile.Order = c.Order
+				}
+				if c.SizeBytes > 0 && st.CurrentFile.TotalBytes == 0 {
+					st.CurrentFile.TotalBytes = c.SizeBytes
+				}
 			}
 			continue
 		}
@@ -220,11 +229,20 @@ func (m *Manager) UpdateCurrentFile(runID int64, path string, bytes, total, spee
 	key := normalizePath(path)
 	name := baseName(key)
 	order := 0
+	candidateSize := int64(0)
 	if c, ok := st.Candidates[key]; ok {
 		if c.Name != "" {
 			name = c.Name
 		}
 		order = c.Order
+		candidateSize = c.SizeBytes
+	}
+	if total <= 0 {
+		if prev, ok := st.CurrentFiles[key]; ok && prev.TotalBytes > 0 {
+			total = prev.TotalBytes
+		} else if candidateSize > 0 {
+			total = candidateSize
+		}
 	}
 	cur := TransferCurrentFile{Path: key, Name: name, Bytes: bytes, TotalBytes: total, Speed: speed, Percentage: pct, Status: FileStatusInProgress, Order: order}
 	st.CurrentFile = &cur
@@ -260,6 +278,15 @@ func (m *Manager) MarkCompleted(runID int64, path string, status FileStatus, mes
 			name = c.Name
 		}
 		size = c.SizeBytes
+	}
+	if size == 0 {
+		if cur, ok := st.CurrentFiles[key]; ok {
+			if cur.TotalBytes > 0 {
+				size = cur.TotalBytes
+			} else if cur.Bytes > 0 {
+				size = cur.Bytes
+			}
+		}
 	}
 	delete(st.Pending, key)
 	completedOrder := st.NextCompletedOrder
