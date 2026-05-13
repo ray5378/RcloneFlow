@@ -2050,6 +2050,7 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 			}
 		}
 	}
+	casMatchedPaths := map[string]struct{}{}
 	for _, ln := range lines {
 		for _, seg := range splitRunLogSegments(ln) {
 			at, level, path, msg, ok := parseRunLogSegment(seg)
@@ -2061,15 +2062,43 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 				continue
 			}
 			row["at"] = at
+			if bucket == "copied" && strings.EqualFold(anyString(row["action"]), "CAS Matched") {
+				casMatchedPaths[strings.TrimSpace(anyString(row["path"]))] = struct{}{}
+			}
 			files = append(files, row)
-			counts[bucket]++
-			counts["total"]++
 		}
 	}
-	if moveMode {
-		return mergeMoveRows(files)
+	filtered := make([]map[string]any, 0, len(files))
+	for _, row := range files {
+		action := strings.ToLower(strings.TrimSpace(anyString(row["action"])))
+		status := strings.ToLower(strings.TrimSpace(anyString(row["status"])))
+		path := strings.TrimSpace(anyString(row["path"]))
+		msg := strings.TrimSpace(anyString(row["message"]))
+		if action == "error" {
+			if isAttemptObjectNotFoundSummary(path, msg) || isRunObjectNotFoundSummary(path, msg) {
+				continue
+			}
+			if _, ok := casMatchedPaths[path]; ok && isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
+				continue
+			}
+		}
+		filtered = append(filtered, row)
+		switch {
+		case action == "error" || status == "failed":
+			counts["failed"]++
+		case status == "success" && (action == "copied" || action == "cas matched"):
+			counts["copied"]++
+		case action == "deleted":
+			counts["deleted"]++
+		case status == "skipped" || action == "skipped":
+			counts["skipped"]++
+		}
 	}
-	return files, counts
+	counts["total"] = counts["copied"] + counts["deleted"] + counts["failed"] + counts["skipped"]
+	if moveMode {
+		return mergeMoveRows(filtered)
+	}
+	return filtered, counts
 }
 
 func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlistCASCompatible bool) (map[string]any, string, bool) {
@@ -2113,7 +2142,20 @@ func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlist
 }
 
 func isAttemptObjectNotFoundSummary(path, msg string) bool {
-	if strings.TrimSpace(path) != "Attempt 1/3 failed with 5 errors and" && !strings.HasPrefix(strings.TrimSpace(path), "Attempt ") {
+	pathTrim := strings.TrimSpace(path)
+	msgTrim := strings.TrimSpace(msg)
+	lowMsg := strings.ToLower(msgTrim)
+	if strings.HasPrefix(pathTrim, "Attempt ") && strings.Contains(lowMsg, "object not found") {
+		return true
+	}
+	if strings.HasPrefix(msgTrim, "Attempt ") && strings.Contains(lowMsg, "object not found") {
+		return true
+	}
+	return false
+}
+
+func isRunObjectNotFoundSummary(path, msg string) bool {
+	if !strings.EqualFold(strings.TrimSpace(path), "Failed to copy with 2 errors") && !strings.HasPrefix(strings.TrimSpace(path), "Failed to copy with ") {
 		return false
 	}
 	low := strings.ToLower(strings.TrimSpace(msg))

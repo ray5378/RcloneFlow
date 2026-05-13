@@ -242,6 +242,40 @@ func TestAnalyzeCASAttemptLogSegment_AllCASMatched_NoRealFailures(t *testing.T) 
 	}
 }
 
+func TestBuildFinalSummaryFilesFromLog_AllCASMatchedSuppressesObjectNotFoundFailures(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_finalsummary_allcas_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	logPath := filepath.Join(tmpDir, "1526.log")
+	content := strings.Join([]string{
+		`{"time":"2026-05-13T15:27:58.58768172+08:00","level":"error","msg":"Failed to copy: object not found","object":"电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E01 - 第 1 集.mkv"}`,
+		`NOTICE : 电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E01 - 第 1 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)`,
+		`{"time":"2026-05-13T15:30:01.348575953+08:00","level":"error","msg":"Failed to copy: object not found","object":"电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E02 - 第 2 集.mkv"}`,
+		`NOTICE : 电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E02 - 第 2 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)`,
+		`{"time":"2026-05-13T15:30:01.348816288+08:00","level":"error","msg":"Attempt 1/1 failed with 2 errors and: object not found"}`,
+		`ERROR : Attempt 1/1 failed with 2 errors and: object not found`,
+		`{"time":"2026-05-13T15:30:01.363364561+08:00","level":"notice","msg":"Failed to copy with 2 errors: last error was: object not found"}`,
+		`ERROR : Failed to copy with 2 errors: last error was: object not found`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(logPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	files, counts := buildFinalSummaryFilesFromLog(logPath, true, false)
+	if got := counts["copied"]; got != 2 {
+		t.Fatalf("copied=%d, want 2; counts=%v files=%v", got, counts, files)
+	}
+	if got := counts["failed"]; got != 0 {
+		t.Fatalf("failed=%d, want 0; counts=%v files=%v", got, counts, files)
+	}
+	if got := counts["total"]; got != 2 {
+		t.Fatalf("total=%d, want 2; counts=%v files=%v", got, counts, files)
+	}
+}
+
 func TestAnalyzeCASAttemptLogSegment_RealFailureRemains(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "rcloneflow_cas_attempt_realfail_*")
 	if err != nil {
