@@ -538,7 +538,7 @@ export default {
     preparing: '准备中',
     transferred: '已传',
     speed: '速度',
-    etaDone: '预计完成于',
+    etaDone: '预计还需',
     totalCount: '总数量',
     completedCount: '已传输',
     pctMismatch: '百分比异常',
