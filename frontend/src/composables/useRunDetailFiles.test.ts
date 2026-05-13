@@ -72,4 +72,66 @@ describe('useRunDetailFiles', () => {
     expect(api.runFilesTotal.value).toBe(0)
     expect(api.pagedRunFiles.value).toEqual([])
   })
+
+  it('loads multiple pages, updates run detail via open, and clamps page on filter change', async () => {
+    const getFiles = vi.fn()
+      .mockResolvedValueOnce({
+        items: Array.from({ length: 100 }, (_, i) => ({ name: `success-${i + 1}`, status: 'success' })),
+        total: 150,
+      })
+      .mockResolvedValueOnce({
+        items: Array.from({ length: 50 }, (_, i) => ({ name: `failed-${i + 1}`, status: 'failed' })),
+        total: 150,
+      })
+    const runDetail = ref<any>({ id: 0, taskMode: 'copy' })
+    const currentFinalFilter = ref<'all' | 'success' | 'failed' | 'other'>('all')
+
+    const api = useRunDetailFiles({
+      runDetail,
+      currentFinalFilter,
+      runApi: { getFiles },
+    })
+
+    api.runFilesPageSize.value = 25
+    api.openRunDetailFiles({ id: 77, taskMode: 'copy' })
+    await Promise.resolve()
+    await Promise.resolve()
+    await nextTick()
+
+    expect(runDetail.value.id).toBe(77)
+    expect(getFiles).toHaveBeenNthCalledWith(1, 77, 0, 100)
+    expect(getFiles).toHaveBeenNthCalledWith(2, 77, 100, 100)
+    expect(api.runFiles.value).toHaveLength(150)
+    expect(api.runFilesTotal.value).toBe(150)
+    expect(api.totalRunFilesPages.value).toBe(6)
+
+    api.runFilesPage.value = 6
+    currentFinalFilter.value = 'failed'
+    await nextTick()
+    expect(api.runFilesPage.value).toBe(1)
+    expect(api.totalRunFilesPages.value).toBe(2)
+
+    api.goPrevFilesPage()
+    expect(api.runFilesPage.value).toBe(1)
+    api.goPrevFilesPage()
+    expect(api.runFilesPage.value).toBe(1)
+    api.goNextFilesPage()
+    expect(api.runFilesPage.value).toBe(2)
+    api.goNextFilesPage()
+    expect(api.runFilesPage.value).toBe(2)
+  })
+
+  it('returns early without id and swallows reload errors', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const getFiles = vi.fn().mockRejectedValueOnce(new Error('boom'))
+    const runDetail = ref<any>({})
+    const api = useRunDetailFiles({ runDetail, runApi: { getFiles } })
+
+    await api.reloadRunFiles()
+    expect(getFiles).not.toHaveBeenCalled()
+
+    runDetail.value = { id: 1 }
+    await api.reloadRunFiles()
+    expect(errorSpy).toHaveBeenCalled()
+  })
 })

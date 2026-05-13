@@ -57,7 +57,8 @@ export function parseRcloneCommand(cmd: string): ParsedRcloneCommand {
 }
 
 function parseRemotePath(value: string) {
-  const parts = value.split(':')
+  const cleaned = stripQuotes(value) || value
+  const parts = cleaned.split(':')
   if (parts.length < 2) throw new Error(t('runtime.commandInvalidPath').replace('{value}', value))
   return { remote: parts[0], path: parts.slice(1).join(':') || '' }
 }
