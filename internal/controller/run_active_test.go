@@ -593,6 +593,104 @@ func TestHandleRunFiles_MergeMoveCopiedAndDeletedRows(t *testing.T) {
 	}
 }
 
+func TestHandleRunFiles_CASHistorySuppressesObjectNotFoundNoise(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-cas-history-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : 电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E06 - 第 6 集.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : 电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E07 - 第 7 集.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n" +
+		"2026/05/13 15:48:31 ERROR : Failed to copy with 2 errors: last error was: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : 电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E06 - 第 6 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n" +
+		"2026/05/13 15:49:07 NOTICE : 电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E07 - 第 7 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{
+		"stderrFile": tmpFile.Name(),
+		"transferDefaults": map[string]any{"openlistCasCompatible": true},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        12,
+		TaskID:    112,
+		Status:    "finished",
+		StartedAt: "2026-05-13T15:43:32+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/12/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 2 {
+		t.Fatalf("total=%d, want 2", got)
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("len(items)=%d, want 2", len(items))
+	}
+	for _, raw := range items {
+		it, _ := raw.(map[string]any)
+		if got := it["status"].(string); got != "success" {
+			t.Fatalf("status=%q, want success", got)
+		}
+		if got := it["action"].(string); got != "CAS Matched" {
+			t.Fatalf("action=%q, want CAS Matched", got)
+		}
+		msg := strings.ToLower(it["message"].(string))
+		if !strings.Contains(msg, "cas compatible match after source cleanup") {
+			t.Fatalf("unexpected message=%q", it["message"])
+		}
+	}
+}
+
+func TestHandleRunFiles_NonCASHistoryKeepsObjectNotFoundFailures(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-noncas-history-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : a/file1.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{"stderrFile": tmpFile.Name()}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        13,
+		TaskID:    113,
+		Status:    "failed",
+		StartedAt: "2026-05-13T15:43:32+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/13/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 2 {
+		t.Fatalf("total=%d, want 2", got)
+	}
+}
+
 func TestHandleActiveRuns_FlagsProgressMismatch(t *testing.T) {
 	summary := map[string]any{
 		"progress": map[string]any{

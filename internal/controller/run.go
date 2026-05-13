@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	stdiostrconv "strconv"
 	"strings"
@@ -114,6 +115,92 @@ func historicalSegmentSizeBytes(seg string) int64 {
 	default:
 		return 0
 	}
+}
+
+func isCASCompatibleRunSummary(sum map[string]any) bool {
+	if sum == nil {
+		return false
+	}
+	if td, ok := sum["transferDefaults"].(map[string]any); ok && td != nil {
+		switch v := td["openlistCasCompatible"].(type) {
+		case bool:
+			return v
+		case string:
+			return strings.EqualFold(strings.TrimSpace(v), "true")
+		}
+	}
+	if mode, ok := sum["trackingMode"].(string); ok && strings.EqualFold(strings.TrimSpace(mode), "cas") {
+		return true
+	}
+	if at, ok := sum["activeTransfer"].(map[string]any); ok && at != nil {
+		if mode, ok := at["trackingMode"].(string); ok && strings.EqualFold(strings.TrimSpace(mode), "cas") {
+			return true
+		}
+	}
+	return false
+}
+
+func isCASObjectNotFoundFailureRow(path, msg string) bool {
+	path = strings.TrimSpace(path)
+	msg = strings.ToLower(strings.TrimSpace(msg))
+	if path == "" || msg == "" {
+		return false
+	}
+	return strings.Contains(msg, "failed to copy") && strings.Contains(msg, "object not found")
+}
+
+func isCASAttemptObjectNotFoundSummaryRow(path, msg string) bool {
+	path = strings.TrimSpace(path)
+	msg = strings.ToLower(strings.TrimSpace(msg))
+	if msg == "" {
+		return false
+	}
+	return strings.HasPrefix(msg, "attempt ") && strings.Contains(msg, "object not found") && (path == "" || path == "<nil>" || strings.HasPrefix(strings.ToLower(path), "attempt "))
+}
+
+func isCASRunObjectNotFoundSummaryRow(path, msg string) bool {
+	path = strings.TrimSpace(path)
+	msg = strings.ToLower(strings.TrimSpace(msg))
+	if path == "" && msg == "" {
+		return false
+	}
+	return strings.HasPrefix(strings.ToLower(path), "failed to copy with ") && strings.Contains(msg, "last error was: object not found")
+}
+
+func filterCASHistoricalDetailRows(rows []map[string]any) []map[string]any {
+	if len(rows) == 0 {
+		return rows
+	}
+	casMatched := map[string]struct{}{}
+	for _, row := range rows {
+		action := strings.ToLower(strings.TrimSpace(fmt.Sprint(row["action"])))
+		msg := strings.ToLower(strings.TrimSpace(fmt.Sprint(row["message"])))
+		path := strings.TrimSpace(fmt.Sprint(row["path"]))
+		if action == "cas matched" || strings.Contains(msg, "cas compatible match after source cleanup") {
+			if path != "" {
+				casMatched[path] = struct{}{}
+			}
+		}
+	}
+	filtered := make([]map[string]any, 0, len(rows))
+	for _, row := range rows {
+		path := strings.TrimSpace(fmt.Sprint(row["path"]))
+		msg := strings.TrimSpace(fmt.Sprint(row["message"]))
+		action := strings.ToLower(strings.TrimSpace(fmt.Sprint(row["action"])))
+		if isCASAttemptObjectNotFoundSummaryRow(path, msg) {
+			continue
+		}
+		if isCASRunObjectNotFoundSummaryRow(path, msg) {
+			continue
+		}
+		if action == "error" {
+			if _, ok := casMatched[path]; ok && isCASObjectNotFoundFailureRow(path, msg) {
+				continue
+			}
+		}
+		filtered = append(filtered, row)
+	}
+	return filtered
 }
 
 func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[string]any {
@@ -792,6 +879,7 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	var logPath string
 	moveMode := false
+	openlistCASCompatible := false
 	for _, run := range runs {
 		if run.ID != id {
 			continue
@@ -801,13 +889,17 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 		if s, ok := any(run.Summary).(string); ok && s != "" {
 			var m map[string]any
 			if json.Unmarshal([]byte(s), &m) == nil {
+				openlistCASCompatible = isCASCompatibleRunSummary(m)
 				if p, ok := m["stderrFile"].(string); ok && p != "" {
 					logPath = p
 				}
 			}
 		}
-		if logPath == "" {
+		if logPath == "" || !openlistCASCompatible {
 			if m, ok := any(run.Summary).(map[string]any); ok {
+				if !openlistCASCompatible {
+					openlistCASCompatible = isCASCompatibleRunSummary(m)
+				}
 				if p, ok := m["stderrFile"].(string); ok && p != "" {
 					logPath = p
 				}
@@ -891,7 +983,7 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 		Size    int64  `json:"sizeBytes"`
 		Message string `json:"message,omitempty"`
 	}
-	rows := make([]Row, 0, 200)
+	rowMaps := make([]map[string]any, 0, 200)
 	for _, ln := range lines {
 		for _, seg := range splitHistoricalLogSegments(ln) {
 			at, level, path, msg, ok := parseHistoricalLogSegment(seg)
@@ -902,15 +994,35 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 			if !ok {
 				continue
 			}
-			row := Row{Name: path, At: at, Size: historicalSegmentSizeBytes(seg), Message: msg}
+			rowMap := map[string]any{
+				"path":     path,
+				"name":     path,
+				"at":       at,
+				"sizeBytes": historicalSegmentSizeBytes(seg),
+				"message":  msg,
+			}
 			if v, ok := histRow["status"].(string); ok {
-				row.Status = v
+				rowMap["status"] = v
 			}
 			if v, ok := histRow["action"].(string); ok {
-				row.Action = v
+				rowMap["action"] = v
 			}
-			rows = append(rows, row)
+			rowMaps = append(rowMaps, rowMap)
 		}
+	}
+	if openlistCASCompatible {
+		rowMaps = filterCASHistoricalDetailRows(rowMaps)
+	}
+	rows := make([]Row, 0, len(rowMaps))
+	for _, rowMap := range rowMaps {
+		rows = append(rows, Row{
+			Name:    strings.TrimSpace(fmt.Sprint(rowMap["name"])),
+			Status:  strings.TrimSpace(fmt.Sprint(rowMap["status"])),
+			Action:  strings.TrimSpace(fmt.Sprint(rowMap["action"])),
+			At:      strings.TrimSpace(fmt.Sprint(rowMap["at"])),
+			Size:    anyToInt64(rowMap["sizeBytes"]),
+			Message: strings.TrimSpace(fmt.Sprint(rowMap["message"])),
+		})
 	}
 	if moveMode {
 		copied := map[string]Row{}
@@ -939,6 +1051,12 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 		for _, row := range deleted {
 			merged = append(merged, row)
 		}
+		sort.SliceStable(merged, func(i, j int) bool {
+			if merged[i].At != merged[j].At {
+				return merged[i].At < merged[j].At
+			}
+			return merged[i].Name < merged[j].Name
+		})
 		rows = merged
 	}
 	// 分页
@@ -962,6 +1080,24 @@ func abs64(x int64) int64 {
 		return -x
 	}
 	return x
+}
+
+func anyToInt64(v any) int64 {
+	switch x := v.(type) {
+	case int64:
+		return x
+	case int:
+		return int64(x)
+	case float64:
+		return int64(x)
+	case float32:
+		return int64(x)
+	case json.Number:
+		if n, err := x.Int64(); err == nil {
+			return n
+		}
+	}
+	return 0
 }
 
 // humanDuration renders seconds to X小时Y分Z秒（省略 0 单位）
