@@ -46,7 +46,13 @@ function mergeNonDecreasingSummary(prev: ActiveTransferSummary | null, next: Act
   if (!next) return prev
   if (!prev) return next
   const nextTotalBytes = Math.max(Number(prev.totalBytes || 0), Number(next.totalBytes || 0))
-  const nextTotalCount = Math.max(Number(prev.totalCount || 0), Number(next.totalCount || 0))
+  const nextPlannedFiles = Math.max(Number(prev.plannedFiles || 0), Number(next.plannedFiles || 0))
+  const nextLogicalTotalCount = Math.max(
+    Number(prev.logicalTotalCount || prev.totalCount || 0),
+    Number(next.logicalTotalCount || next.totalCount || 0),
+    nextPlannedFiles,
+  )
+  const nextTotalCount = nextLogicalTotalCount
   const nextCompletedCount = Math.max(Number(prev.completedCount || 0), Number(next.completedCount || 0))
   let nextPercentage = Number(next.percentage || 0)
   if (nextTotalBytes > 0) {
@@ -58,6 +64,8 @@ function mergeNonDecreasingSummary(prev: ActiveTransferSummary | null, next: Act
   return {
     ...prev,
     ...next,
+    plannedFiles: nextPlannedFiles,
+    logicalTotalCount: nextLogicalTotalCount,
     completedCount: nextCompletedCount,
     pendingCount: Math.max(0, nextTotalCount - nextCompletedCount),
     totalCount: nextTotalCount,
@@ -117,18 +125,27 @@ export function useActiveTransferDetail() {
       pendingJumpPage.value = pendingTotalPages.value
     }
 
+    const stableTotalCount = Math.max(
+      Number(summary.value?.logicalTotalCount || summary.value?.totalCount || 0),
+      Number(snapshot.totalCount || 0),
+      completed.length + pending.length,
+    )
     summary.value = mergeNonDecreasingSummary(summary.value, {
       trackingMode: snapshot.trackingMode,
       completedCount: completed.length,
-      pendingCount: pending.length,
-      totalCount: snapshot.totalCount || (completed.length + pending.length),
+      pendingCount: Math.max(0, stableTotalCount - completed.length),
+      plannedFiles: Number(summary.value?.plannedFiles || 0),
+      logicalTotalCount: stableTotalCount,
+      totalCount: stableTotalCount,
       preflightPending: !!snapshot.preflightPending,
       preflightFinished: !!snapshot.preflightFinished,
-      percentage: (snapshot.totalCount || 0) > 0 ? ((completed.length / (snapshot.totalCount || 1)) * 100) : 0,
-      bytes: summary.value?.bytes || 0,
-      totalBytes: summary.value?.totalBytes || 0,
-      speed: summary.value?.speed || 0,
-      eta: summary.value?.eta,
+      percentage: Number(summary.value?.percentage || 0),
+      bytes: Number(summary.value?.bytes || 0),
+      totalBytes: Number(summary.value?.totalBytes || 0),
+      speed: Number(summary.value?.speed || 0),
+      eta: Number(summary.value?.eta || 0),
+      phase: summary.value?.phase,
+      lastUpdatedAt: summary.value?.lastUpdatedAt,
     })
   }
 
@@ -268,13 +285,24 @@ export function useActiveTransferDetail() {
 
   const offRunProgress = onWsMessage('run_progress', (data) => {
     if (shouldHandleRunMessage(data?.run_id)) {
+      const prev = summary.value
+      const incomingPlannedFiles = Number(data?.plannedFiles || 0)
+      const incomingLogicalTotalCount = Number(data?.logicalTotalCount || data?.totalCount || incomingPlannedFiles || prev?.logicalTotalCount || prev?.totalCount || 0)
+      const nextCompletedCount = Math.max(Number(prev?.completedCount || 0), Number(data?.completedFiles || 0))
       summary.value = mergeNonDecreasingSummary(summary.value, summary.value ? {
         ...summary.value,
-        bytes: Number(data?.bytes || summary.value.bytes || 0),
-        totalBytes: Number(data?.total || summary.value.totalBytes || 0),
-        speed: Number(data?.speed || summary.value.speed || 0),
-        percentage: Number(data?.percent || summary.value.percentage || 0),
-        eta: Number(data?.eta || summary.value.eta || 0),
+        bytes: Number(data?.bytes || prev?.bytes || 0),
+        totalBytes: Number(data?.total || prev?.totalBytes || 0),
+        speed: Number(data?.speed || prev?.speed || 0),
+        percentage: Number(data?.percent || prev?.percentage || 0),
+        eta: Number(data?.eta || prev?.eta || 0),
+        plannedFiles: Math.max(Number(prev?.plannedFiles || 0), incomingPlannedFiles),
+        logicalTotalCount: incomingLogicalTotalCount,
+        totalCount: incomingLogicalTotalCount,
+        completedCount: nextCompletedCount,
+        pendingCount: Math.max(0, incomingLogicalTotalCount - nextCompletedCount),
+        phase: typeof data?.phase === 'string' ? data.phase : prev?.phase,
+        lastUpdatedAt: typeof data?.lastUpdatedAt === 'string' ? data.lastUpdatedAt : prev?.lastUpdatedAt,
       } : summary.value)
     }
   })

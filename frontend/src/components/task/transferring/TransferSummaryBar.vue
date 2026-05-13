@@ -16,7 +16,10 @@ const progressText = computed(() => {
     speed: props.summary.speed,
     eta: props.summary.eta,
     completedFiles: props.summary.completedCount,
+    plannedFiles: props.summary.plannedFiles,
+    logicalTotalCount: props.summary.logicalTotalCount,
     totalCount: props.summary.totalCount,
+    phase: props.summary.phase,
   })
 })
 </script>

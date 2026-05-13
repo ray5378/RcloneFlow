@@ -9,6 +9,8 @@ export interface ActiveTransferSummary {
   completedCount: number
   pendingCount: number
   totalCount: number
+  plannedFiles?: number
+  logicalTotalCount?: number
   preflightPending?: boolean
   preflightFinished?: boolean
   percentage: number
@@ -16,6 +18,8 @@ export interface ActiveTransferSummary {
   totalBytes: number
   speed: number
   eta?: number
+  phase?: string
+  lastUpdatedAt?: string
 }
 
 export interface ActiveTransferCurrentFile {
