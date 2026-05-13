@@ -27,6 +27,7 @@ export function useTaskListRuntime(options: {
     delete: (id: number) => Promise<boolean>
     run: (taskId: number) => Promise<any>
     kill: (taskId: number) => Promise<void>
+    reorder?: (order: number[]) => Promise<boolean>
   }
   scheduleApi: {
     delete: (id: number) => Promise<void>
@@ -83,6 +84,11 @@ export function useTaskListRuntime(options: {
     restoreTaskPathBrowse: options.restoreTaskPathBrowse,
   })
 
+  async function reorderTasks(order: number[]) {
+    if (!options.taskApi.reorder) return false
+    return await options.taskApi.reorder(order)
+  }
+
   return {
     deleteTask,
     toggleSchedule,
@@ -95,5 +101,6 @@ export function useTaskListRuntime(options: {
     runTask,
     goToAddTask,
     editTask,
+    reorderTasks,
   }
 }

@@ -6,6 +6,7 @@ import SingletonConfigModal from './SingletonConfigModal.vue'
 defineProps<{
   taskSearch: string
   filteredTasks: any[]
+  allTasks: any[]
   getScheduleByTaskId: (taskId: number) => any
   getTaskCardProgressByTask: (task: any) => any
   runningTaskId: number | null
@@ -22,6 +23,7 @@ defineProps<{
   editTask: (task: any) => void
   deleteTask: (task: any) => void
   toggleSchedule: (task: any) => void
+  reorderTasks: (order: number[]) => Promise<void> | void
   viewTaskHistory: (task: any) => void
   stopTaskAny: (task: any) => void
   setWebhook: (task: any) => void
@@ -56,6 +58,7 @@ defineProps<{
   <TaskListSection
     :search="taskSearch"
     :filtered-tasks="filteredTasks"
+    :all-tasks="allTasks"
     :get-schedule-by-task-id="getScheduleByTaskId"
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
@@ -72,6 +75,7 @@ defineProps<{
     @edit="editTask"
     @delete="deleteTask"
     @toggle-schedule="toggleSchedule"
+    @reorder="reorderTasks"
     @view-history="viewTaskHistory"
     @stop="stopTaskAny"
     @set-webhook="setWebhook"

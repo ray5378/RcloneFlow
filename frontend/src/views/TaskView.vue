@@ -13,6 +13,7 @@ import TransferringModal from '../components/task/transferring/TransferringModal
 import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatEta } from '../utils/format'
+import { t } from '../i18n'
 import { useRunningHintRuntime } from '../composables/useRunningHintRuntime'
 import { useTaskHistoryRuntime } from '../composables/useTaskHistoryRuntime'
 import { useTaskViewRuntime } from '../composables/useTaskViewRuntime'
@@ -103,6 +104,7 @@ const {
   taskSearch,
   tasksTotal,
   currentTasksPages,
+  filteredTasksRaw,
   filteredTasks,
   jumpToTasksPage,
 } = useTaskListView(tasks)
@@ -352,6 +354,7 @@ const {
   runTask,
   goToAddTask,
   editTask,
+  reorderTasks,
 } = useTaskListRuntime({
   openMenuId,
   historyFilterTaskId,
@@ -373,6 +376,21 @@ const {
   scheduleApi,
 })
 
+async function saveTaskOrder(order: number[]) {
+  const snapshot = [...tasks.value]
+  const index = new Map(snapshot.map(task => [task.id, task]))
+  tasks.value = order.map(id => index.get(id)).filter(Boolean) as any
+  const ok = await reorderTasks(order)
+  if (!ok) {
+    tasks.value = snapshot
+    await loadData()
+    showToast(t('taskUI.sortSaveFailed'), 'error')
+    return
+  }
+  await loadData()
+  showToast(t('taskUI.sortSaveSuccess'), 'success')
+}
+
 </script>
 
 
@@ -383,6 +401,7 @@ const {
     v-if="currentModule === 'tasks'"
     :task-search="taskSearch"
     :filtered-tasks="filteredTasks"
+    :all-tasks="filteredTasksRaw"
     :get-schedule-by-task-id="getScheduleByTaskId"
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
@@ -399,6 +418,7 @@ const {
     :edit-task="editTask"
     :delete-task="deleteTask"
     :toggle-schedule="toggleSchedule"
+    :reorder-tasks="saveTaskOrder"
     :view-task-history="viewTaskHistory"
     :stop-task-any="stopTaskAny"
     :set-webhook="setWebhook"

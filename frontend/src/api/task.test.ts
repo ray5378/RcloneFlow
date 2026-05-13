@@ -5,6 +5,7 @@ import {
   updateTask,
   runTask,
   deleteTask,
+  reorderTasks,
 } from './task'
 
 // Mock the client module
@@ -13,9 +14,10 @@ vi.mock('./client', () => ({
   post: vi.fn(),
   put: vi.fn(),
   del: vi.fn(),
+  patch: vi.fn(),
 }))
 
-import { get, post, put, del } from './client'
+import { get, post, put, del, patch } from './client'
 
 describe('task API', () => {
   beforeEach(() => {
@@ -93,6 +95,16 @@ describe('task API', () => {
       const result = await runTask(1)
 
       expect(result).toEqual(mockResponse)
+    })
+  })
+
+  describe('reorderTasks', () => {
+    it('should call patch with task order payload', async () => {
+      ;(patch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined)
+
+      await reorderTasks([3, 1, 2])
+
+      expect(patch).toHaveBeenCalledWith('/api/tasks', { order: [3, 1, 2] })
     })
   })
 

@@ -279,6 +279,85 @@ func TestTaskService_RunTask_StoresOpenlistCASCompatibleInEffectiveOptions(t *te
 	}
 }
 
+func TestTaskService_ReorderTasks_AppendsMissingIDsInExistingOrder(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	first, err := svc.CreateTask(store.Task{Name: "task-a", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/1"})
+	if err != nil {
+		t.Fatalf("CreateTask(first) error = %v", err)
+	}
+	second, err := svc.CreateTask(store.Task{Name: "task-b", Mode: "copy", SourceRemote: "src", SourcePath: "/b", TargetRemote: "dst", TargetPath: "/2"})
+	if err != nil {
+		t.Fatalf("CreateTask(second) error = %v", err)
+	}
+	third, err := svc.CreateTask(store.Task{Name: "task-c", Mode: "copy", SourceRemote: "src", SourcePath: "/c", TargetRemote: "dst", TargetPath: "/3"})
+	if err != nil {
+		t.Fatalf("CreateTask(third) error = %v", err)
+	}
+	fourth, err := svc.CreateTask(store.Task{Name: "task-d", Mode: "copy", SourceRemote: "src", SourcePath: "/d", TargetRemote: "dst", TargetPath: "/4"})
+	if err != nil {
+		t.Fatalf("CreateTask(fourth) error = %v", err)
+	}
+
+	if err := svc.ReorderTasks([]int64{third.ID, first.ID}); err != nil {
+		t.Fatalf("ReorderTasks() error = %v", err)
+	}
+
+	tasks, err := db.ListTasks()
+	if err != nil {
+		t.Fatalf("ListTasks() error = %v", err)
+	}
+	got := []int64{tasks[0].ID, tasks[1].ID, tasks[2].ID, tasks[3].ID}
+	want := []int64{third.ID, first.ID, second.ID, fourth.ID}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("unexpected order after partial reorder: got %v want %v", got, want)
+		}
+	}
+}
+
+func TestTaskService_ReorderTasks_RejectsUnknownOrDuplicateIDs(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	first, err := svc.CreateTask(store.Task{Name: "task-1", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/1"})
+	if err != nil {
+		t.Fatalf("CreateTask(first) error = %v", err)
+	}
+	second, err := svc.CreateTask(store.Task{Name: "task-2", Mode: "copy", SourceRemote: "src", SourcePath: "/b", TargetRemote: "dst", TargetPath: "/2"})
+	if err != nil {
+		t.Fatalf("CreateTask(second) error = %v", err)
+	}
+
+	if err := svc.ReorderTasks([]int64{first.ID, 999999}); err != ErrTaskNotFound {
+		t.Fatalf("expected ErrTaskNotFound for unknown id, got %v", err)
+	}
+	if err := svc.ReorderTasks([]int64{second.ID, second.ID}); err != ErrTaskNotFound {
+		t.Fatalf("expected ErrTaskNotFound for duplicate id, got %v", err)
+	}
+}
+
 func TestTaskService_RunTask_SilentlySkipsWhenSameTaskAlreadyRunning(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
 	if err != nil {

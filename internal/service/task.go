@@ -98,6 +98,40 @@ func (s *TaskService) ensureTaskNameUnique(name string, excludeID int64) error {
 	return nil
 }
 
+func (s *TaskService) ReorderTasks(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	existing, err := s.db.ListTasks()
+	if err != nil {
+		return err
+	}
+
+	seen := make(map[int64]struct{}, len(ids))
+	existingSet := make(map[int64]struct{}, len(existing))
+	fullOrder := make([]int64, 0, len(existing))
+	for _, task := range existing {
+		existingSet[task.ID] = struct{}{}
+	}
+	for _, id := range ids {
+		if _, ok := existingSet[id]; !ok {
+			return ErrTaskNotFound
+		}
+		if _, dup := seen[id]; dup {
+			return ErrTaskNotFound
+		}
+		seen[id] = struct{}{}
+		fullOrder = append(fullOrder, id)
+	}
+	for _, task := range existing {
+		if _, ok := seen[task.ID]; ok {
+			continue
+		}
+		fullOrder = append(fullOrder, task.ID)
+	}
+	return s.db.ReorderTasks(fullOrder)
+}
+
 // UpdateTaskOptions 仅更新任务的 Options 字段（用于“传输选项”任务级覆盖）
 func (s *TaskService) UpdateTaskOptions(id int64, opts map[string]any) error {
 	// 读出任务，合并 Options 再回写（保留已有键，覆盖提交的键）

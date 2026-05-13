@@ -27,9 +27,13 @@ func TestOpen(t *testing.T) {
 }
 
 func TestOpenCreatesDir(t *testing.T) {
-	// 临时目录不存在
-	tmpDir := filepath.Join(os.TempDir(), "rcloneflow_test_create", "subdir")
-	defer os.RemoveAll(filepath.Dir(tmpDir))
+	baseDir, err := os.MkdirTemp("", "rcloneflow_test_create_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(baseDir)
+
+	tmpDir := filepath.Join(baseDir, "subdir")
 
 	// 应该自动创建目录
 	db, err := Open(tmpDir)
@@ -124,6 +128,168 @@ func TestTaskOperations(t *testing.T) {
 
 	if len(tasks) != 0 {
 		t.Errorf("expected 0 tasks after delete, got %d", len(tasks))
+	}
+}
+
+func TestReorderTasksPersistsOrder(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	first, err := db.AddTask(Task{Name: "task-1", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/1"})
+	if err != nil {
+		t.Fatalf("AddTask(first) error = %v", err)
+	}
+	second, err := db.AddTask(Task{Name: "task-2", Mode: "copy", SourceRemote: "src", SourcePath: "/b", TargetRemote: "dst", TargetPath: "/2"})
+	if err != nil {
+		t.Fatalf("AddTask(second) error = %v", err)
+	}
+	third, err := db.AddTask(Task{Name: "task-3", Mode: "copy", SourceRemote: "src", SourcePath: "/c", TargetRemote: "dst", TargetPath: "/3"})
+	if err != nil {
+		t.Fatalf("AddTask(third) error = %v", err)
+	}
+
+	if err := db.ReorderTasks([]int64{second.ID, third.ID, first.ID}); err != nil {
+		t.Fatalf("ReorderTasks() error = %v", err)
+	}
+
+	tasks, err := db.ListTasks()
+	if err != nil {
+		t.Fatalf("ListTasks() error = %v", err)
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(tasks))
+	}
+
+	gotIDs := []int64{tasks[0].ID, tasks[1].ID, tasks[2].ID}
+	wantIDs := []int64{second.ID, third.ID, first.ID}
+	for i := range wantIDs {
+		if gotIDs[i] != wantIDs[i] {
+			t.Fatalf("unexpected order after reorder: got %v want %v", gotIDs, wantIDs)
+		}
+		if tasks[i].SortIndex != int64(i+1) {
+			t.Fatalf("unexpected sort index at pos %d: got %d want %d", i, tasks[i].SortIndex, i+1)
+		}
+	}
+}
+
+func TestListTasks_NormalizesMissingSortIndexes(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	first, err := db.AddTask(Task{Name: "task-a", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/1"})
+	if err != nil {
+		t.Fatalf("AddTask(first) error = %v", err)
+	}
+	second, err := db.AddTask(Task{Name: "task-b", Mode: "copy", SourceRemote: "src", SourcePath: "/b", TargetRemote: "dst", TargetPath: "/2"})
+	if err != nil {
+		t.Fatalf("AddTask(second) error = %v", err)
+	}
+	third, err := db.AddTask(Task{Name: "task-c", Mode: "copy", SourceRemote: "src", SourcePath: "/c", TargetRemote: "dst", TargetPath: "/3"})
+	if err != nil {
+		t.Fatalf("AddTask(third) error = %v", err)
+	}
+
+	if _, err := db.db.Exec(`UPDATE tasks SET sort_index = 0 WHERE id IN (?, ?)`, first.ID, third.ID); err != nil {
+		t.Fatalf("force invalid sort_index error = %v", err)
+	}
+
+	tasks, err := db.ListTasks()
+	if err != nil {
+		t.Fatalf("ListTasks() error = %v", err)
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(tasks))
+	}
+
+	gotIDs := []int64{tasks[0].ID, tasks[1].ID, tasks[2].ID}
+	wantIDs := []int64{second.ID, first.ID, third.ID}
+	for i := range wantIDs {
+		if gotIDs[i] != wantIDs[i] {
+			t.Fatalf("unexpected normalized order: got %v want %v", gotIDs, wantIDs)
+		}
+		if tasks[i].SortIndex != int64(i+1) {
+			t.Fatalf("unexpected normalized sort index at pos %d: got %d want %d", i, tasks[i].SortIndex, i+1)
+		}
+	}
+
+	firstReloaded, ok := db.GetTask(first.ID)
+	if !ok {
+		t.Fatalf("expected first task to still exist")
+	}
+	thirdReloaded, ok := db.GetTask(third.ID)
+	if !ok {
+		t.Fatalf("expected third task to still exist")
+	}
+	if firstReloaded.SortIndex <= 0 || thirdReloaded.SortIndex <= 0 {
+		t.Fatalf("expected normalized sort indexes persisted, got first=%d third=%d", firstReloaded.SortIndex, thirdReloaded.SortIndex)
+	}
+}
+
+func TestListTasks_NormalizesDuplicateSortIndexes(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	first, err := db.AddTask(Task{Name: "dup-task-a", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/1"})
+	if err != nil {
+		t.Fatalf("AddTask(first) error = %v", err)
+	}
+	second, err := db.AddTask(Task{Name: "dup-task-b", Mode: "copy", SourceRemote: "src", SourcePath: "/b", TargetRemote: "dst", TargetPath: "/2"})
+	if err != nil {
+		t.Fatalf("AddTask(second) error = %v", err)
+	}
+	third, err := db.AddTask(Task{Name: "dup-task-c", Mode: "copy", SourceRemote: "src", SourcePath: "/c", TargetRemote: "dst", TargetPath: "/3"})
+	if err != nil {
+		t.Fatalf("AddTask(third) error = %v", err)
+	}
+
+	if _, err := db.db.Exec(`UPDATE tasks SET sort_index = 1 WHERE id IN (?, ?)`, first.ID, second.ID); err != nil {
+		t.Fatalf("force duplicate sort_index error = %v", err)
+	}
+
+	tasks, err := db.ListTasks()
+	if err != nil {
+		t.Fatalf("ListTasks() error = %v", err)
+	}
+	if len(tasks) != 3 {
+		t.Fatalf("expected 3 tasks, got %d", len(tasks))
+	}
+
+	gotIDs := []int64{tasks[0].ID, tasks[1].ID, tasks[2].ID}
+	wantIDs := []int64{second.ID, first.ID, third.ID}
+	for i := range wantIDs {
+		if gotIDs[i] != wantIDs[i] {
+			t.Fatalf("unexpected normalized duplicate order: got %v want %v", gotIDs, wantIDs)
+		}
+		if tasks[i].SortIndex != int64(i+1) {
+			t.Fatalf("unexpected normalized sort index at pos %d: got %d want %d", i, tasks[i].SortIndex, i+1)
+		}
 	}
 }
 

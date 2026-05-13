@@ -39,6 +39,11 @@ const props = defineProps<{
   runningTaskId?: number | null
   stoppedTaskId?: number | null
   scheduleToggledTaskId?: number | null
+  dragEnabled?: boolean
+  dragging?: boolean
+  dragOver?: boolean
+  savingOrder?: boolean
+  sortingMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -51,6 +56,8 @@ const emit = defineEmits<{
   setWebhook: [task: Task]
   setSingleton: [task: Task]
   openTransferDetail: [taskId: number]
+  dragHandleDown: [taskId: number]
+  dragHandleUp: []
 }>()
 
 function getLiveProgress(): Progress | null {
@@ -93,11 +100,21 @@ function isScheduleToggled(): boolean {
 </script>
 
 <template>
-  <div class="task-card" :class="{ active: !!progress }" @click="emit('viewHistory', task.id!)">
+  <div class="task-card" :class="{ active: !!progress, 'drag-armed': !!dragEnabled, dragging: !!dragging, 'drag-over': !!dragOver, 'saving-order': !!savingOrder, 'sorting-mode': !!sortingMode }" @click="emit('viewHistory', task.id!)">
     <div class="task-main list-item-primary-group">
       <div class="name list-item-name">
+        <button
+          v-if="sortingMode"
+          class="drag-handle"
+          type="button"
+          :title="t('taskUI.dragHandleHint')"
+          @pointerdown.stop="emit('dragHandleDown', task.id!)"
+          @pointerup.stop="emit('dragHandleUp')"
+          @pointercancel.stop="emit('dragHandleUp')"
+        >⋮⋮</button>
         <strong>{{ task.name }}</strong>
         <span class="mode-tag list-item-tag">{{ task.mode }}</span>
+        <span v-if="sortingMode" class="sort-inline-hint list-item-tertiary-text">{{ t('taskUI.longPressToDrag') }}</span>
       </div>
 
       <div class="schedule-info">
@@ -110,7 +127,7 @@ function isScheduleToggled(): boolean {
         <span v-else class="no-schedule list-item-tertiary-text">{{ t('taskCard.unset') }}</span>
       </div>
 
-      <div class="item-actions list-item-actions list-item-actions-right">
+      <div v-if="!sortingMode" class="item-actions list-item-actions list-item-actions-right">
         <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 {{ t('taskCard.history') }}</button>
         <button class="ghost small" @click.stop="emit('openTransferDetail', task.id!)">📦 {{ t('activeTransfer.title') }}</button>
         <button class="ghost small" :class="{ 'btn-stopped': isStopped() }" @click.stop="emit('stop', task.id!)">
@@ -126,6 +143,9 @@ function isScheduleToggled(): boolean {
         <button class="ghost small" @click.stop="emit('setSingleton', task)">🔒 {{ t('taskCard.singleton') }}</button>
         <button class="ghost small" @click.stop="emit('edit', task)">✏️ {{ t('taskCard.edit') }}</button>
         <button class="ghost small danger-text" @click.stop="emit('delete', task)">🗑️ {{ t('taskCard.delete') }}</button>
+      </div>
+      <div v-else class="sort-mode-meta list-item-secondary-text">
+        {{ schedule ? formatSpec(schedule.spec || '') : t('taskCard.unset') }}
       </div>
     </div>
 
@@ -155,12 +175,40 @@ function isScheduleToggled(): boolean {
 @import './listItemActions.css';
 @import './listItemSpacing.css';
 
-.task-card { padding: 14px 18px; }
+.task-card { padding: 14px 18px; touch-action: pan-y; user-select: none; }
 .task-card:hover { background: transparent; border-left-color: rgba(99, 102, 241, 0.55); }
 body.light .task-card:hover { background: transparent; border-left-color: rgba(25, 118, 210, 0.38); }
 .task-card.active { border-left: 3px solid var(--accent, #4f46e5); }
+.task-card.drag-armed { border-left-color: rgba(99, 102, 241, 0.75); }
+.task-card.dragging { opacity: 0.72; border-left-color: #4f46e5; box-shadow: 0 10px 24px rgba(79, 70, 229, 0.22); }
+.task-card.drag-over { outline: 1px dashed rgba(99, 102, 241, 0.7); outline-offset: 2px; }
+.task-card.saving-order { pointer-events: none; }
+.task-card.sorting-mode { border-left-color: rgba(99, 102, 241, 0.32); }
 .task-main { display: flex; flex-wrap: wrap; align-items: center; }
 .name { gap: 8px; }
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #a5b4fc;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: -1px;
+  cursor: grab;
+}
+.drag-handle:active { cursor: grabbing; }
+.sort-inline-hint {
+  font-size: 11px;
+  color: #a78bfa;
+}
+body.light .drag-handle { color: #4f46e5; }
+body.light .sort-inline-hint { color: #6366f1; }
+.sort-mode-meta { font-size: 12px; color: #a5b4fc; }
+body.light .sort-mode-meta { color: #6366f1; }
 .schedule-info { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .schedule-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; }
 .schedule-badge.enabled { background: #22c55e33; color: #22c55e; }

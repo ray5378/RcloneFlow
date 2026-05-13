@@ -52,6 +52,15 @@ export async function runTask(taskId: number): Promise<RunTaskResult> {
   return post<RunTaskResult>(`/api/tasks/${taskId}/run`, {})
 }
 
+export interface ReorderTasksPayload {
+  order: number[]
+}
+
+/** 保存任务排序 */
+export async function reorderTasks(order: number[]): Promise<void> {
+  return patch('/api/tasks', { order } satisfies ReorderTasksPayload)
+}
+
 /** 删除任务 */
 export async function deleteTask(taskId: number): Promise<void> {
   return del(`/api/tasks/${taskId}`)

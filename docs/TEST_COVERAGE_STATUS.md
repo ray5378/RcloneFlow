@@ -1,6 +1,6 @@
 # Test Coverage Status
 
-Last updated: 2026-05-13 (controller task.go batch)
+Last updated: 2026-05-14 (task sort_index self-heal batch)
 
 ## Purpose
 
@@ -19,6 +19,8 @@ It is intentionally pragmatic rather than exhaustive.
 2. Any future code commit must first pass the relevant tests before commit.
 3. Any future code commit for this work must include the updated `docs/TEST_COVERAGE_STATUS.md` in the same commit.
 4. Validation should be recorded here in a concise form whenever a coverage batch lands.
+5. New or changed code should not be treated as merge-ready unless its coverage reaches the required gate for new code; test work should target the changed logic and risk surface, not just inflate overall coverage.
+6. Default gate recommendation for this repo: `new code line coverage >= 80%`, `new code branch coverage >= 70%`; if the current toolchain only reports line coverage reliably, at minimum enforce `new code line coverage >= 80%`.
 
 ---
 
@@ -29,6 +31,8 @@ For this repo, coverage/test work should follow this rule:
 - do the work
 - run the relevant tests
 - re-measure the relevant coverage numbers
+- confirm the new/changed code coverage reaches the merge gate when such a gate exists
+- use the current diff/changed-lines scope as the default definition of “new code”; if only file/function-level evidence is available, state that approximation explicitly
 - update this document once as part of the same work batch, recording both what was added and the refreshed coverage figures
 - only commit after those tests pass
 - include this updated document in the same commit as the code changes
@@ -37,12 +41,13 @@ This applies to future coverage pushes unless the user explicitly says otherwise
 
 ## Latest validated state
 
-Validated before push:
+Validated for this batch:
 
-- `go test ./...` ✅
-- `cd frontend && npm test` ✅
+- `go test ./internal/store ./internal/service ./internal/controller` ✅
+- `go test ./internal/store -coverprofile=/tmp/rcloneflow-store.out` ✅
+- `go test ./... -coverprofile=/tmp/rcloneflow-all.out` ✅
 
-Latest pushed commit for this coverage pass:
+Latest pushed commit for the previous coverage pass:
 
 - `08068d1`
 - `test: expand frontend and service coverage`
@@ -55,6 +60,8 @@ Approximate coverage checkpoints during this pass:
 - later around `42.1%`
 - earlier service-focused checkpoint around `42.6%`
 - latest freshly re-measured overall checkpoint after recent controller additions: `41.3%`
+- latest freshly re-measured overall checkpoint after task reorder persistence batch: `48.5%`
+- latest freshly re-measured overall checkpoint after task `sort_index` self-heal batch: `49.0%`
 
 ### Controller package
 
@@ -65,6 +72,11 @@ Approximate coverage checkpoints during this pass:
 - later freshly re-measured checkpoint after kill-related coverage batch: `46.6%`
 - later freshly re-measured checkpoint after `HandleGlobalStats` coverage batch: `47.9%`
 - latest freshly re-measured `internal/controller` checkpoint after `settings.go` coverage batch: `51.7%`
+- latest freshly re-measured `internal/controller` checkpoint after task reorder persistence batch: `51.7%`
+
+### Store package
+
+- latest freshly re-measured `internal/store` checkpoint after task `sort_index` self-heal batch: `47.1%`
 
 ### Frontend
 
@@ -162,6 +174,17 @@ Added:
 - `internal/service/cleanup_schedule_test.go`
 - `internal/service/run_lifecycle_test.go`
 - `internal/service/task_options_runtime_test.go`
+- `internal/store/store_test.go`
+  - added `TestReorderTasksPersistsOrder`
+  - verifies `ReorderTasks(ids)` rewrites `sort_index` and `ListTasks()` returns the persisted order on reread
+  - added `TestListTasks_NormalizesMissingSortIndexes`
+  - verifies tasks with missing/invalid `sort_index` are automatically normalized on `ListTasks()` and the repaired sort values persist
+  - added `TestListTasks_NormalizesDuplicateSortIndexes`
+  - verifies duplicate `sort_index` values are normalized back to a stable continuous order on `ListTasks()`
+  - tightened `TestOpenCreatesDir` to use a unique temp dir, avoiding cross-run SQLite path collisions during coverage runs
+- `internal/controller/task_controller_test.go`
+  - added `PATCH reorder persists order`
+  - verifies `PATCH /api/tasks` with `{ order: [...] }` reaches persistence and the stored order is reflected by a fresh `ListTasks()` read
 
 These covered major service-level behavior in:
 
@@ -290,6 +313,10 @@ Completed in the latest controller batch:
   - later `go test ./internal/controller -coverprofile=...` after kill-related batch => about `46.6%`
   - later `go test ./internal/controller -coverprofile=...` after `HandleGlobalStats` batch => about `47.9%`
   - latest `go test ./internal/controller -coverprofile=...` after `settings.go` batch => about `51.7%`
+  - latest `go test ./internal/controller -coverprofile=/tmp/rcloneflow-controller.out` after task reorder persistence batch => `51.7%`
+  - latest `go test ./... -coverprofile=/tmp/rcloneflow-all.out` after task reorder persistence batch => `48.5%`
+  - latest `go test ./internal/store -coverprofile=/tmp/rcloneflow-store.out` after task `sort_index` self-heal batch => `47.1%`
+  - latest `go test ./... -coverprofile=/tmp/rcloneflow-all.out` after task `sort_index` self-heal batch => `49.0%`
 - notable latest `run.go` function checkpoints from that re-measurement:
   - `HandleRuns` about `96.4%`
   - `HandleRunsByTask` about `100.0%`

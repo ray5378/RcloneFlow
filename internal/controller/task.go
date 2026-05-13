@@ -83,12 +83,35 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, 200, nil)
 
 	case http.MethodPatch:
-		// PATCH /api/tasks { id, options }
+		// PATCH /api/tasks { id, options } or { order: [id...] }
+		var raw map[string]json.RawMessage
+		if err := DecodeRequest(r, &raw); err != nil {
+			WriteJSON(w, 400, map[string]any{"error": "invalid body"})
+			return
+		}
+		if rawOrder, ok := raw["order"]; ok {
+			var ids []int64
+			if err := json.Unmarshal(rawOrder, &ids); err != nil || len(ids) == 0 {
+				WriteJSON(w, 400, map[string]any{"error": "invalid order"})
+				return
+			}
+			if err := c.taskSvc.ReorderTasks(ids); err != nil {
+				if errors.Is(err, service.ErrTaskNotFound) {
+					WriteJSON(w, 404, map[string]any{"error": err.Error()})
+					return
+				}
+				WriteJSON(w, 500, map[string]any{"error": err.Error()})
+				return
+			}
+			WriteJSON(w, 200, map[string]any{"ok": true})
+			return
+		}
 		var req struct {
 			ID      int64          `json:"id"`
 			Options map[string]any `json:"options"`
 		}
-		if err := DecodeRequest(r, &req); err != nil {
+		payload, _ := json.Marshal(raw)
+		if err := json.Unmarshal(payload, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": "invalid body"})
 			return
 		}

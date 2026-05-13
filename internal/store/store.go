@@ -29,6 +29,7 @@ type Task struct {
 	TargetRemote string          `json:"targetRemote"`
 	TargetPath   string          `json:"targetPath"`
 	Options      json.RawMessage `json:"options,omitempty"`
+	SortIndex    int64           `json:"sortIndex"`
 	CreatedAt    time.Time       `json:"createdAt"`
 }
 
@@ -242,6 +243,20 @@ func (db *DB) migrate() error {
 				CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_name_unique ON tasks(name COLLATE NOCASE);
 			`,
 		},
+		{
+			version: 4,
+			sql: `
+				ALTER TABLE tasks ADD COLUMN sort_index INTEGER NOT NULL DEFAULT 0;
+				UPDATE tasks
+				SET sort_index = (
+					SELECT COUNT(*)
+					FROM tasks AS t2
+					WHERE t2.id > tasks.id
+				) + 1
+				WHERE sort_index = 0;
+				CREATE INDEX IF NOT EXISTS idx_tasks_sort_index ON tasks(sort_index, id DESC);
+			`,
+		},
 	}
 
 	// 获取当前版本
@@ -273,13 +288,68 @@ func (db *DB) Close() error {
 
 // ===== Tasks =====
 
+func (db *DB) normalizeTaskSortIndexesLocked() error {
+	rows, err := db.db.Query(`
+		SELECT id, sort_index
+		FROM tasks
+		ORDER BY CASE WHEN sort_index <= 0 THEN 1 ELSE 0 END ASC,
+			CASE WHEN sort_index > 0 THEN sort_index END ASC,
+			CASE WHEN sort_index > 0 THEN id END DESC,
+			CASE WHEN sort_index <= 0 THEN id END ASC`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	var ids []int64
+	needsFix := false
+	for rows.Next() {
+		var id int64
+		var sortIndex int64
+		if err := rows.Scan(&id, &sortIndex); err != nil {
+			return err
+		}
+		ids = append(ids, id)
+		if sortIndex <= 0 || sortIndex != int64(len(ids)) {
+			needsFix = true
+		}
+	}
+	if !needsFix {
+		return nil
+	}
+
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(`UPDATE tasks SET sort_index=? WHERE id=?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for i, id := range ids {
+		if _, err := stmt.Exec(i+1, id); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
+}
+
 func (db *DB) ListTasks() ([]Task, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
+	if err := db.normalizeTaskSortIndexesLocked(); err != nil {
+		return nil, err
+	}
+
 	rows, err := db.db.Query(`
-		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at 
-		FROM tasks ORDER BY id DESC`)
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, sort_index, created_at
+		FROM tasks ORDER BY sort_index ASC, id DESC`)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +359,7 @@ func (db *DB) ListTasks() ([]Task, error) {
 	for rows.Next() {
 		var t Task
 		var options sql.NullString
-		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.CreatedAt)
+		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.SortIndex, &t.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -305,10 +375,14 @@ func (db *DB) AddTask(t Task) (Task, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
+	var nextSortIndex int64
+	if err := db.db.QueryRow(`SELECT COALESCE(MAX(sort_index), 0) + 1 FROM tasks`).Scan(&nextSortIndex); err != nil {
+		return Task{}, err
+	}
 	result, err := db.db.Exec(`
-		INSERT INTO tasks (name, mode, source_remote, source_path, target_remote, target_path, options) 
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options)
+		INSERT INTO tasks (name, mode, source_remote, source_path, target_remote, target_path, options, sort_index)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options, nextSortIndex)
 	if err != nil {
 		return Task{}, err
 	}
@@ -319,6 +393,7 @@ func (db *DB) AddTask(t Task) (Task, error) {
 	}
 
 	t.ID = id
+	t.SortIndex = nextSortIndex
 	t.CreatedAt = time.Now()
 	return t, nil
 }
@@ -330,9 +405,9 @@ func (db *DB) GetTask(id int64) (Task, bool) {
 	var t Task
 	var options sql.NullString
 	err := db.db.QueryRow(`
-		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at 
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, sort_index, created_at
 		FROM tasks WHERE id = ?`, id).Scan(
-		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.CreatedAt)
+		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.SortIndex, &t.CreatedAt)
 	if err != nil {
 		return Task{}, false
 	}
@@ -362,9 +437,37 @@ func (db *DB) UpdateTask(id int64, t Task) error {
 	defer db.mu.Unlock()
 
 	_, err := db.db.Exec(`
-		UPDATE tasks SET name=?, mode=?, source_remote=?, source_path=?, target_remote=?, target_path=?, options=?
-		WHERE id=?`, t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options, id)
+		UPDATE tasks SET name=?, mode=?, source_remote=?, source_path=?, target_remote=?, target_path=?, options=?, sort_index=?
+		WHERE id=?`, t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options, t.SortIndex, id)
 	return err
+}
+
+func (db *DB) ReorderTasks(ids []int64) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	stmt, err := tx.Prepare(`UPDATE tasks SET sort_index=? WHERE id=?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for i, id := range ids {
+		if _, err := stmt.Exec(i+1, id); err != nil {
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (db *DB) DeleteTask(id int64) error {

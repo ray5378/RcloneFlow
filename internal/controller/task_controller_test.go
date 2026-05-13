@@ -194,6 +194,107 @@ func TestTaskController_HandleTasks_CRUDAndPatch(t *testing.T) {
 			t.Fatalf("unexpected merged options: %#v", opts)
 		}
 	})
+
+	t.Run("PATCH reorder persists order", func(t *testing.T) {
+		db := newTaskControllerTestDB(t)
+		ctrl := newTaskControllerForDB(db, &taskControllerRunSvcMock{})
+
+		first, err := db.AddTask(store.Task{
+			Name:         "task-order-1",
+			Mode:         "copy",
+			SourceRemote: "src",
+			SourcePath:   "/from-1",
+			TargetRemote: "dst",
+			TargetPath:   "/to-1",
+		})
+		if err != nil {
+			t.Fatalf("AddTask(first) error = %v", err)
+		}
+		second, err := db.AddTask(store.Task{
+			Name:         "task-order-2",
+			Mode:         "copy",
+			SourceRemote: "src",
+			SourcePath:   "/from-2",
+			TargetRemote: "dst",
+			TargetPath:   "/to-2",
+		})
+		if err != nil {
+			t.Fatalf("AddTask(second) error = %v", err)
+		}
+		third, err := db.AddTask(store.Task{
+			Name:         "task-order-3",
+			Mode:         "copy",
+			SourceRemote: "src",
+			SourcePath:   "/from-3",
+			TargetRemote: "dst",
+			TargetPath:   "/to-3",
+		})
+		if err != nil {
+			t.Fatalf("AddTask(third) error = %v", err)
+		}
+
+		body := []byte(`{"order":[` + jsonNumber(third.ID) + `,` + jsonNumber(first.ID) + `,` + jsonNumber(second.ID) + `]}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/tasks", bytes.NewReader(body))
+		rec := httptest.NewRecorder()
+		ctrl.HandleTasks(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status=%d, want 200 body=%s", rec.Code, rec.Body.String())
+		}
+
+		tasks, err := db.ListTasks()
+		if err != nil {
+			t.Fatalf("ListTasks() error = %v", err)
+		}
+		gotIDs := []int64{tasks[0].ID, tasks[1].ID, tasks[2].ID}
+		wantIDs := []int64{third.ID, first.ID, second.ID}
+		for i := range wantIDs {
+			if gotIDs[i] != wantIDs[i] {
+				t.Fatalf("unexpected persisted order: got %v want %v", gotIDs, wantIDs)
+			}
+		}
+	})
+
+	t.Run("PATCH reorder appends missing ids", func(t *testing.T) {
+		db := newTaskControllerTestDB(t)
+		ctrl := newTaskControllerForDB(db, &taskControllerRunSvcMock{})
+
+		first, err := db.AddTask(store.Task{Name: "task-partial-1", Mode: "copy", SourceRemote: "src", SourcePath: "/from-1", TargetRemote: "dst", TargetPath: "/to-1"})
+		if err != nil {
+			t.Fatalf("AddTask(first) error = %v", err)
+		}
+		second, err := db.AddTask(store.Task{Name: "task-partial-2", Mode: "copy", SourceRemote: "src", SourcePath: "/from-2", TargetRemote: "dst", TargetPath: "/to-2"})
+		if err != nil {
+			t.Fatalf("AddTask(second) error = %v", err)
+		}
+		third, err := db.AddTask(store.Task{Name: "task-partial-3", Mode: "copy", SourceRemote: "src", SourcePath: "/from-3", TargetRemote: "dst", TargetPath: "/to-3"})
+		if err != nil {
+			t.Fatalf("AddTask(third) error = %v", err)
+		}
+		fourth, err := db.AddTask(store.Task{Name: "task-partial-4", Mode: "copy", SourceRemote: "src", SourcePath: "/from-4", TargetRemote: "dst", TargetPath: "/to-4"})
+		if err != nil {
+			t.Fatalf("AddTask(fourth) error = %v", err)
+		}
+
+		body := []byte(`{"order":[` + jsonNumber(third.ID) + `,` + jsonNumber(first.ID) + `]}`)
+		req := httptest.NewRequest(http.MethodPatch, "/api/tasks", bytes.NewReader(body))
+		rec := httptest.NewRecorder()
+		ctrl.HandleTasks(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("status=%d, want 200 body=%s", rec.Code, rec.Body.String())
+		}
+
+		tasks, err := db.ListTasks()
+		if err != nil {
+			t.Fatalf("ListTasks() error = %v", err)
+		}
+		gotIDs := []int64{tasks[0].ID, tasks[1].ID, tasks[2].ID, tasks[3].ID}
+		wantIDs := []int64{third.ID, first.ID, second.ID, fourth.ID}
+		for i := range wantIDs {
+			if gotIDs[i] != wantIDs[i] {
+				t.Fatalf("unexpected partial reorder result: got %v want %v", gotIDs, wantIDs)
+			}
+		}
+	})
 }
 
 func TestTaskController_HandleTasks_ErrorBranches(t *testing.T) {
