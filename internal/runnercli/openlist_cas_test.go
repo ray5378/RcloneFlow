@@ -22,19 +22,19 @@ func TestIsCASCompatibleNotFound(t *testing.T) {
 	}
 }
 
-func TestClassifyRunLogRow_CASCompatibleNotFoundBecomesSuccess(t *testing.T) {
+func TestClassifyRunLogRow_CASCompatibleNotFoundBecomesFailedUntilConfirmed(t *testing.T) {
 	row, bucket, ok := classifyRunLogRow("ERROR", "dir/movie.mkv", "object not found", map[string]int64{"dir/movie.mkv": 123}, true)
 	if !ok {
 		t.Fatalf("expected row to be classified")
 	}
-	if bucket != "copied" {
-		t.Fatalf("bucket=%q, want copied", bucket)
+	if bucket != "failed" {
+		t.Fatalf("bucket=%q, want failed", bucket)
 	}
-	if got := row["status"]; got != "success" {
-		t.Fatalf("status=%v, want success", got)
+	if got := row["status"]; got != "failed" {
+		t.Fatalf("status=%v, want failed", got)
 	}
-	if got := row["action"]; got != "CAS Matched" {
-		t.Fatalf("action=%v, want CAS Matched", got)
+	if got := row["action"]; got != "Error" {
+		t.Fatalf("action=%v, want Error", got)
 	}
 	if got := row["sizeBytes"]; got != int64(123) {
 		t.Fatalf("sizeBytes=%v, want 123", got)
@@ -57,8 +57,8 @@ func TestClassifyRunLogRow_NormalErrorStillFails(t *testing.T) {
 func TestSanitizeRunLogLine_CASCompatibleNotFound(t *testing.T) {
 	line := `2026/05/01 11:04:20 ERROR : dir/movie.mkv: Failed to copy: object not found`
 	got := sanitizeRunLogLine(line, true)
-	if !strings.Contains(got, `NOTICE: dir/movie.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)`) {
-		t.Fatalf("unexpected sanitized line: %q", got)
+	if got != line {
+		t.Fatalf("expected line unchanged before CAS confirmation, got %q", got)
 	}
 }
 

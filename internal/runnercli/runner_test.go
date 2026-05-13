@@ -208,6 +208,8 @@ func TestConsume_CASNoticeIncrementsCompletedFiles(t *testing.T) {
 	}
 
 	r := New(db)
+	r.casVerifier = func(cfg, dst, rel string) (bool, error) { return true, nil }
+	r.casVerifyDelays = nil
 	fp := &fileProgress{m: map[string]*fileProg{}}
 	outFile, err := os.CreateTemp(tmpDir, "consume-log-*.log")
 	if err != nil {
@@ -216,7 +218,7 @@ func TestConsume_CASNoticeIncrementsCompletedFiles(t *testing.T) {
 	defer outFile.Close()
 
 	line := "2026/05/01 14:01:20 NOTICE: 电视剧/国产剧/人间惊鸿客 (2026)/Season 1/人间惊鸿客 - S01E18 - 第 18 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
-	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true, false)
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true, false, "/tmp/rclone.conf", "dst:/b")
 
 	gotRun, err := db.GetRun(run.ID)
 	if err != nil {
@@ -269,7 +271,7 @@ func TestConsume_JSONWrappedFileProgressUpdatesActiveTransfer(t *testing.T) {
 	defer outFile.Close()
 
 	line := `{"level":"info","msg":"12.000 MiB / 36.000 MiB, 33%, 4.000 MiB/s, ETA 6s (xfr#0/1)","object":"a/file1.mkv"}` + "\n"
-	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, false, false)
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, false, false, "/tmp/rclone.conf", "dst:/b")
 
 	st, ok := mgr.GetByTaskID(task.ID)
 	if !ok || st.CurrentFile == nil {
@@ -315,6 +317,9 @@ func TestConsume_JSONErrorObjectNotFoundMarksCASMatchedInActiveTransfer(t *testi
 	mgr := active_transfer.NewManager()
 	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeCAS, []active_transfer.TransferCandidateFile{{Path: "a/file1.mkv", Name: "file1.mkv", SizeBytes: 100}})
 	r := New(db, mgr)
+	called := 0
+	r.casVerifier = func(cfg, dst, rel string) (bool, error) { called++; return true, nil }
+	r.casVerifyDelays = nil
 	fp := &fileProgress{m: map[string]*fileProg{}}
 	outFile, err := os.CreateTemp(tmpDir, "consume-json-error-log-*.log")
 	if err != nil {
@@ -323,7 +328,7 @@ func TestConsume_JSONErrorObjectNotFoundMarksCASMatchedInActiveTransfer(t *testi
 	defer outFile.Close()
 
 	line := `{"time":"2026-05-13T10:08:29.48904232+08:00","level":"error","msg":"Failed to copy: object not found","object":"a/file1.mkv","objectType":"*smb.Object","source":"slog/logger.go:256"}` + "\n"
-	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true, false)
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true, false, "/tmp/rclone.conf", "dst:/b")
 
 	completed := mgr.ListCompleted(task.ID, 0, 10)
 	if completed.Total != 1 {
@@ -346,6 +351,70 @@ func TestConsume_JSONErrorObjectNotFoundMarksCASMatchedInActiveTransfer(t *testi
 	}
 	if gotv, ok := prog["completedFiles"].(float64); !ok || int(gotv) != 1 {
 		t.Fatalf("completedFiles=%#v, want 1; progress=%#v", prog["completedFiles"], prog)
+	}
+	if called == 0 {
+		t.Fatalf("expected casVerifier to be called")
+	}
+}
+
+func TestConsume_JSONErrorObjectNotFoundWithoutCASStaysFailed(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_runnercli_json_error_failed_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	task, err := db.AddTask(store.Task{Name: "json-error-failed-task", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+	run, err := db.AddRun(store.Run{TaskID: task.ID, Status: "running", Trigger: "manual", Summary: map[string]any{"progress": map[string]any{"completedFiles": float64(0)}}})
+	if err != nil {
+		t.Fatalf("AddRun() error = %v", err)
+	}
+
+	mgr := active_transfer.NewManager()
+	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeCAS, []active_transfer.TransferCandidateFile{{Path: "a/file1.mkv", Name: "file1.mkv", SizeBytes: 100}})
+	r := New(db, mgr)
+	r.casVerifier = func(cfg, dst, rel string) (bool, error) { return false, nil }
+	r.casVerifyDelays = nil
+	fp := &fileProgress{m: map[string]*fileProg{}}
+	outFile, err := os.CreateTemp(tmpDir, "consume-json-error-failed-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer outFile.Close()
+
+	line := `{"time":"2026-05-13T10:08:29.48904232+08:00","level":"error","msg":"Failed to copy: object not found","object":"a/file1.mkv","objectType":"*smb.Object","source":"slog/logger.go:256"}` + "\n"
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true, false, "/tmp/rclone.conf", "dst:/b")
+
+	completed := mgr.ListCompleted(task.ID, 0, 10)
+	if completed.Total != 1 {
+		t.Fatalf("completed total=%d, want 1", completed.Total)
+	}
+	if got := completed.Items[0].Status; got != active_transfer.FileStatusFailed {
+		t.Fatalf("completed status=%q, want %q", got, active_transfer.FileStatusFailed)
+	}
+	pending := mgr.ListPending(task.ID, 0, 10)
+	if pending.Total != 0 {
+		t.Fatalf("pending total=%d, want 0", pending.Total)
+	}
+	gotRun, err := db.GetRun(run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() error = %v", err)
+	}
+	prog, _ := gotRun.Summary["progress"].(map[string]any)
+	if prog == nil {
+		t.Fatalf("expected progress map, got %#v", gotRun.Summary)
+	}
+	if gotv, ok := prog["completedFiles"].(float64); !ok || int(gotv) != 0 {
+		t.Fatalf("completedFiles=%#v, want 0; progress=%#v", prog["completedFiles"], prog)
 	}
 }
 
@@ -382,7 +451,7 @@ func TestConsume_JSONStatsTransferringUpdatesCurrentFile(t *testing.T) {
 	defer outFile.Close()
 
 	line := `{"time":"2026-05-10T10:48:20+08:00","level":"info","msg":"4.996 MiB / 2.829 GiB, 0%, 1.665 MiB/s, ETA 28m56s (xfr#0/2)\n","stats":{"bytes":5238784,"totalBytes":3037871949,"speed":1746263.2,"eta":1736,"transferring":[{"bytes":5238784,"name":"电视剧/国产剧/风过留痕 (2026)/Season 1/风过留痕 - S01E01 - 第 1 集.mkv","percentage":0,"size":1545914693,"speed":4232516.1}]}}` + "\n"
-	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, false, false)
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, false, false, "/tmp/rclone.conf", "dst:/b")
 
 	st, ok := mgr.GetByTaskID(task.ID)
 	if !ok || st.CurrentFile == nil {
@@ -463,7 +532,7 @@ func TestConsume_MoveDeletedDoesNotMarkActiveTransferDeleted(t *testing.T) {
 	defer outFile.Close()
 
 	line := "2026/05/10 00:20:00 INFO : a.mp4: Deleted\n"
-	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, false, true)
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, false, true, "/tmp/rclone.conf", "dst:/b")
 
 	completed := mgr.ListCompleted(task.ID, 0, 10)
 	if completed.Total != 0 {

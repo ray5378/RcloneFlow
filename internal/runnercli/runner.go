@@ -30,10 +30,12 @@ import (
 
 // Runner manages CLI transfers with progress/logs and stop control.
 type Runner struct {
-	mu        sync.Mutex
-	procs     map[int64]*exec.Cmd
-	db        *store.DB
-	activeMgr *active_transfer.Manager
+	mu              sync.Mutex
+	procs           map[int64]*exec.Cmd
+	db              *store.DB
+	activeMgr       *active_transfer.Manager
+	casVerifier     func(cfg, dst, rel string) (bool, error)
+	casVerifyDelays []time.Duration
 }
 
 func New(db *store.DB, activeMgr ...*active_transfer.Manager) *Runner {
@@ -41,7 +43,13 @@ func New(db *store.DB, activeMgr ...*active_transfer.Manager) *Runner {
 	if len(activeMgr) > 0 {
 		mgr = activeMgr[0]
 	}
-	return &Runner{procs: map[int64]*exec.Cmd{}, db: db, activeMgr: mgr}
+	return &Runner{
+		procs:           map[int64]*exec.Cmd{},
+		db:              db,
+		activeMgr:       mgr,
+		casVerifier:     defaultCASFileExists,
+		casVerifyDelays: []time.Duration{0, 2 * time.Second, 3 * time.Second, 5 * time.Second, 8 * time.Second},
+	}
 }
 
 func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcPath, dstRemote, dstPath string) error {
@@ -290,8 +298,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	fileStats := &fileProgress{m: map[string]*fileProg{}}
 	// 仅解析 stderr（rclone 进度通常在 stderr），stdout 只写文件，减少重复解析/写库
 	casMode := isOpenlistCASCompatible(run)
-	go r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move")
-	go r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move")
+	go r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst)
+	go r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst)
 	go func() {
 		defer func() {
 			if casCompat != nil && casCompat.ExcludeFrom != "" {
@@ -835,7 +843,7 @@ var fileLineRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*(\d+(?:\.\d+)?)\s
 var fileCopiedRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*Copied\s*\(new\)`)
 var fileCASMatchedRe = regexp.MustCompile(`(?i)(?:INFO|NOTICE)\s*:\s*([^:]+):\s*CAS compatible match after source cleanup\b`)
 
-func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress, openlistCASCompatible bool, isMove bool) {
+func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress, openlistCASCompatible bool, isMove bool, cfg string, dst string) {
 	wantParse := parseStats
 	s := bufio.NewScanner(rd)
 	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
@@ -843,6 +851,8 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 		line := s.Text()
 		parsedLine := line
 		jsonLevel := ""
+		jsonMsg := ""
+		jsonObj := ""
 		// 1) JSON 行：既尝试直接提取 machine-readable progress，也把 msg/object 解包给现有文本解析链复用。
 		var rec map[string]any
 		if json.Unmarshal([]byte(line), &rec) == nil {
@@ -928,6 +938,8 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 			jsonLevel = strings.ToUpper(anyString(rec["level"]))
 			msg := strings.TrimSpace(anyString(rec["msg"]))
 			obj := strings.TrimSpace(anyString(rec["object"]))
+			jsonMsg = msg
+			jsonObj = obj
 			if msg != "" {
 				prefix := strings.TrimSpace(jsonLevel)
 				if prefix == "" {
@@ -1212,11 +1224,41 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 			if !marked {
 				path := strings.TrimSpace(extractPathFromLogLine(line))
 				msg := strings.TrimSpace(extractMsgFromLogLine(line))
+				if path == "" {
+					path = strings.TrimSpace(jsonObj)
+				}
+				if msg == "" {
+					msg = strings.TrimSpace(jsonMsg)
+				}
 				if r.activeMgr != nil && isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
-					fp.update(path, -1, -1, -1, 100)
-					fp.markCopied(path)
-					r.activeMgr.OnFileCASMatched(runID, path)
-					marked = true
+					if r.confirmCASMatch(cfg, dst, path) {
+						fp.update(path, -1, -1, -1, 100)
+						fp.markCopied(path)
+						r.activeMgr.OnFileCASMatched(runID, path)
+						_, _ = out.WriteString(fmt.Sprintf("NOTICE : %s: CAS compatible match after source cleanup (%s)\n", path, msg))
+						marked = true
+						_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+							if rr.Summary == nil {
+								rr.Summary = map[string]any{}
+							}
+							prog, _ := rr.Summary["progress"].(map[string]any)
+							if prog == nil {
+								prog = map[string]any{}
+							}
+							if lst := fp.copiedList(); len(lst) > 0 {
+								prog["completedFiles"] = float64(len(lst))
+								rr.Summary["files"] = fp.snapshot(100)
+							}
+							rr.Summary["progress"] = prog
+						})
+						continue
+					} else {
+						if r.activeMgr != nil {
+							r.activeMgr.OnFileFailed(runID, path, msg)
+						}
+						_, _ = out.WriteString(fmt.Sprintf("ERROR : %s: %s\n", path, msg))
+						continue
+					}
 				}
 				if !marked {
 					if row, _, ok := classifyRunLogRow("INFO", path, msg, map[string]int64{}, openlistCASCompatible); ok && r.activeMgr != nil {
@@ -1740,26 +1782,60 @@ func isCASCompatibleNotFound(path, msg string, openlistCASCompatible bool) bool 
 	return true
 }
 
+func defaultCASFileExists(cfg, dst, rel string) (bool, error) {
+	casRel := strings.TrimPrefix(strings.ReplaceAll(rel, "\\", "/"), "/") + ".cas"
+	if strings.TrimSpace(casRel) == ".cas" {
+		return false, nil
+	}
+	cr := &adapter.CmdRunner{}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	out, _, err := cr.Run(ctx, []string{"lsjson", joinRemotePath(dst, casRel), "--config", cfg, "--files-only"}...)
+	if err != nil {
+		return false, nil
+	}
+	var arr []map[string]any
+	if err := json.Unmarshal([]byte(out), &arr); err != nil {
+		return false, err
+	}
+	for _, it := range arr {
+		p, _ := it["Path"].(string)
+		if p == "" {
+			p, _ = it["path"].(string)
+		}
+		p = strings.TrimSpace(strings.ReplaceAll(p, "\\", "/"))
+		if p == "" {
+			continue
+		}
+		if p == casRel || strings.HasSuffix(p, "/"+casRel) || strings.HasSuffix(p, "/"+filepath.Base(casRel)) || p == filepath.Base(casRel) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r *Runner) confirmCASMatch(cfg, dst, rel string) bool {
+	if r == nil || r.casVerifier == nil {
+		return false
+	}
+	delays := r.casVerifyDelays
+	if len(delays) == 0 {
+		delays = []time.Duration{0}
+	}
+	for _, d := range delays {
+		if d > 0 {
+			time.Sleep(d)
+		}
+		ok, err := r.casVerifier(cfg, dst, rel)
+		if err == nil && ok {
+			return true
+		}
+	}
+	return false
+}
+
 func sanitizeRunLogLine(line string, openlistCASCompatible bool) string {
-	if !openlistCASCompatible {
-		return line
-	}
-	m := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`).FindStringSubmatch(strings.TrimSpace(line))
-	if len(m) == 0 {
-		return line
-	}
-	ts := strings.TrimSpace(m[1])
-	level := strings.ToUpper(strings.TrimSpace(m[2]))
-	path := strings.TrimSpace(m[3])
-	msg := strings.TrimSpace(m[4])
-	if level != "ERROR" || !isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
-		return line
-	}
-	prefix := "NOTICE"
-	if ts != "" {
-		prefix = ts + " NOTICE"
-	}
-	return fmt.Sprintf("%s: %s: CAS compatible match after source cleanup (%s)", prefix, path, msg)
+	return line
 }
 
 func splitRunLogSegments(line string) []string {
@@ -1907,12 +1983,6 @@ func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlist
 	low := strings.ToLower(strings.TrimSpace(msg))
 	upperLevel := strings.ToUpper(strings.TrimSpace(level))
 	if upperLevel == "ERROR" {
-		if isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
-			row["status"] = "success"
-			row["action"] = "CAS Matched"
-			row["message"] = msg
-			return row, "copied", true
-		}
 		row["status"] = "failed"
 		row["action"] = "Error"
 		row["message"] = msg
