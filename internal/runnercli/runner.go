@@ -36,6 +36,7 @@ type Runner struct {
 	activeMgr       *active_transfer.Manager
 	casVerifier     func(cfg, dst, rel string) (bool, error)
 	casVerifyDelays []time.Duration
+	casExcludeMu    sync.Mutex
 }
 
 func New(db *store.DB, activeMgr ...*active_transfer.Manager) *Runner {
@@ -298,8 +299,12 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	fileStats := &fileProgress{m: map[string]*fileProg{}}
 	// 仅解析 stderr（rclone 进度通常在 stderr），stdout 只写文件，减少重复解析/写库
 	casMode := isOpenlistCASCompatible(run)
-	go r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst)
-	go r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst)
+	excludeFrom := ""
+	if casCompat != nil {
+		excludeFrom = casCompat.ExcludeFrom
+	}
+	go r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
+	go r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
 	go func() {
 		defer func() {
 			if casCompat != nil && casCompat.ExcludeFrom != "" {
@@ -843,7 +848,7 @@ var fileLineRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*(\d+(?:\.\d+)?)\s
 var fileCopiedRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*Copied\s*\(new\)`)
 var fileCASMatchedRe = regexp.MustCompile(`(?i)(?:INFO|NOTICE)\s*:\s*([^:]+):\s*CAS compatible match after source cleanup\b`)
 
-func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress, openlistCASCompatible bool, isMove bool, cfg string, dst string) {
+func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress, openlistCASCompatible bool, isMove bool, cfg string, dst string, excludeFrom string) {
 	wantParse := parseStats
 	s := bufio.NewScanner(rd)
 	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
@@ -1235,6 +1240,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						fp.update(path, -1, -1, -1, 100)
 						fp.markCopied(path)
 						r.activeMgr.OnFileCASMatched(runID, path)
+						r.appendCASExclude(excludeFrom, path)
 						_, _ = out.WriteString(fmt.Sprintf("NOTICE : %s: CAS compatible match after source cleanup (%s)\n", path, msg))
 						marked = true
 						_ = r.db.UpdateRun(runID, func(rr *store.Run) {
@@ -1261,6 +1267,9 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					}
 				}
 				if !marked {
+					if isAttemptObjectNotFoundSummary(path, msg) {
+						continue
+					}
 					if row, _, ok := classifyRunLogRow("INFO", path, msg, map[string]int64{}, openlistCASCompatible); ok && r.activeMgr != nil {
 						path := strings.TrimSpace(anyString(row["path"]))
 						action := strings.ToLower(strings.TrimSpace(anyString(row["action"])))
@@ -1982,6 +1991,9 @@ func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlist
 	}
 	low := strings.ToLower(strings.TrimSpace(msg))
 	upperLevel := strings.ToUpper(strings.TrimSpace(level))
+	if isAttemptObjectNotFoundSummary(path, msg) {
+		return nil, "", false
+	}
 	if upperLevel == "ERROR" {
 		row["status"] = "failed"
 		row["action"] = "Error"
@@ -2009,6 +2021,28 @@ func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlist
 	default:
 		return nil, "", false
 	}
+}
+
+func isAttemptObjectNotFoundSummary(path, msg string) bool {
+	if strings.TrimSpace(path) != "Attempt 1/3 failed with 5 errors and" && !strings.HasPrefix(strings.TrimSpace(path), "Attempt ") {
+		return false
+	}
+	low := strings.ToLower(strings.TrimSpace(msg))
+	return strings.Contains(low, "object not found")
+}
+
+func (r *Runner) appendCASExclude(excludeFrom, rel string) {
+	if r == nil || strings.TrimSpace(excludeFrom) == "" || strings.TrimSpace(rel) == "" {
+		return
+	}
+	r.casExcludeMu.Lock()
+	defer r.casExcludeMu.Unlock()
+	f, err := os.OpenFile(excludeFrom, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+	_, _ = f.WriteString(strings.TrimSpace(rel) + "\n")
 }
 
 func joinRemotePath(base, rel string) string {

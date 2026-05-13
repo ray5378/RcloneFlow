@@ -54,6 +54,12 @@ func TestClassifyRunLogRow_NormalErrorStillFails(t *testing.T) {
 	}
 }
 
+func TestClassifyRunLogRow_AttemptObjectNotFoundSummaryIgnored(t *testing.T) {
+	if row, bucket, ok := classifyRunLogRow("ERROR", "Attempt 1/3 failed with 5 errors and", "object not found", nil, true); ok || row != nil || bucket != "" {
+		t.Fatalf("expected attempt summary to be ignored, got row=%v bucket=%q ok=%v", row, bucket, ok)
+	}
+}
+
 func TestSanitizeRunLogLine_CASCompatibleNotFound(t *testing.T) {
 	line := `2026/05/01 11:04:20 ERROR : dir/movie.mkv: Failed to copy: object not found`
 	got := sanitizeRunLogLine(line, true)
