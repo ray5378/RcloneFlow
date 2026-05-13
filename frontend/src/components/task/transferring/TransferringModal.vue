@@ -16,6 +16,12 @@ const props = defineProps<{
   pendingItems: ActiveTransferPendingFile[]
   completedTotal?: number
   pendingTotal?: number
+  completedPage: number
+  pendingPage: number
+  completedJumpPage: number | null
+  pendingJumpPage: number | null
+  completedTotalPages: number
+  pendingTotalPages: number
   degraded?: boolean
   loading?: boolean
   error?: string
@@ -24,8 +30,14 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'refresh'): void
-  (e: 'load-more-completed'): void
-  (e: 'load-more-pending'): void
+  (e: 'prev-completed-page'): void
+  (e: 'next-completed-page'): void
+  (e: 'jump-completed-page'): void
+  (e: 'update:completed-jump-page', value: number | null): void
+  (e: 'prev-pending-page'): void
+  (e: 'next-pending-page'): void
+  (e: 'jump-pending-page'): void
+  (e: 'update:pending-jump-page', value: number | null): void
 }>()
 </script>
 
@@ -49,8 +61,30 @@ const emit = defineEmits<{
           <TransferSummaryBar :summary="summary" />
           <TransferCurrentFileCard :current-file="currentFile" :current-files="currentFiles" :tracking-mode="trackingMode" />
           <div class="two-col">
-            <TransferCompletedList :items="completedItems" :total="completedTotal" :tracking-mode="trackingMode" @load-more="emit('load-more-completed')" />
-            <TransferPendingList :items="pendingItems" :total="pendingTotal" :tracking-mode="trackingMode" @load-more="emit('load-more-pending')" />
+            <TransferCompletedList
+              :items="completedItems"
+              :total="completedTotal"
+              :page="completedPage"
+              :total-pages="completedTotalPages"
+              :jump-page="completedJumpPage"
+              :tracking-mode="trackingMode"
+              @prev-page="emit('prev-completed-page')"
+              @next-page="emit('next-completed-page')"
+              @jump-page="emit('jump-completed-page')"
+              @update:jump-page="emit('update:completed-jump-page', $event)"
+            />
+            <TransferPendingList
+              :items="pendingItems"
+              :total="pendingTotal"
+              :page="pendingPage"
+              :total-pages="pendingTotalPages"
+              :jump-page="pendingJumpPage"
+              :tracking-mode="trackingMode"
+              @prev-page="emit('prev-pending-page')"
+              @next-page="emit('next-pending-page')"
+              @jump-page="emit('jump-pending-page')"
+              @update:jump-page="emit('update:pending-jump-page', $event)"
+            />
           </div>
         </template>
       </div>

@@ -2,7 +2,7 @@ import { computed, onUnmounted, ref } from 'vue'
 import { getActiveTransfer, getActiveTransferCompleted, getActiveTransferPending, type ActiveTransferCompletedFile, type ActiveTransferCurrentFile, type ActiveTransferPendingFile, type ActiveTransferSnapshot, type ActiveTransferSummary, type TrackingMode } from '../api/activeTransfer'
 import { onWsMessage } from './useWebSocket'
 
-const PAGE_SIZE = 100
+const PAGE_SIZE = 10
 
 function sortCurrentFiles(items: ActiveTransferCurrentFile[]) {
   return [...items].sort((a, b) => {
@@ -78,11 +78,16 @@ export function useActiveTransferDetail() {
   const pendingItems = ref<ActiveTransferPendingFile[]>([])
   const completedTotal = ref(0)
   const pendingTotal = ref(0)
-  const completedOffset = ref(0)
-  const pendingOffset = ref(0)
+  const completedPage = ref(1)
+  const pendingPage = ref(1)
+  const completedJumpPage = ref<number | null>(1)
+  const pendingJumpPage = ref<number | null>(1)
   const degraded = ref(false)
   const loading = ref(false)
   const error = ref('')
+
+  const completedTotalPages = computed(() => Math.max(1, Math.ceil(Math.max(completedTotal.value, 0) / PAGE_SIZE)))
+  const pendingTotalPages = computed(() => Math.max(1, Math.ceil(Math.max(pendingTotal.value, 0) / PAGE_SIZE)))
 
   function shouldHandleRunMessage(incomingRunId: any, incomingTaskId?: any) {
     return visible.value && (
@@ -96,10 +101,6 @@ export function useActiveTransferDetail() {
     currentFile.value = snapshot.currentFile || null
     currentFiles.value = sortCurrentFiles(snapshot.currentFiles || (snapshot.currentFile ? [snapshot.currentFile] : []))
     degraded.value = !!snapshot.degraded
-    completedItems.value = sortCompletedItems(snapshot.completed || [])
-    pendingItems.value = sortPendingItems(snapshot.pending || [])
-    completedTotal.value = (snapshot.completed || []).length
-    pendingTotal.value = (snapshot.pending || []).length
     summary.value = mergeNonDecreasingSummary(summary.value, {
       trackingMode: snapshot.trackingMode,
       completedCount: (snapshot.completed || []).length,
@@ -117,15 +118,13 @@ export function useActiveTransferDetail() {
 
   async function refresh(background = false) {
     if (!taskId.value) return
-    if (!background) {
-      loading.value = true
-    }
+    if (!background) loading.value = true
     error.value = ''
     try {
       const [overview, completed, pending] = await Promise.all([
         getActiveTransfer(taskId.value),
-        getActiveTransferCompleted(taskId.value, 0, Math.max(completedOffset.value + PAGE_SIZE, PAGE_SIZE)),
-        getActiveTransferPending(taskId.value, 0, Math.max(pendingOffset.value + PAGE_SIZE, PAGE_SIZE)),
+        getActiveTransferCompleted(taskId.value, Math.max(0, (completedPage.value - 1) * PAGE_SIZE), PAGE_SIZE),
+        getActiveTransferPending(taskId.value, Math.max(0, (pendingPage.value - 1) * PAGE_SIZE), PAGE_SIZE),
       ])
       runId.value = overview.runId
       trackingMode.value = overview.trackingMode
@@ -137,6 +136,14 @@ export function useActiveTransferDetail() {
       pendingItems.value = sortPendingItems(pending.items || [])
       completedTotal.value = completed.total || 0
       pendingTotal.value = pending.total || 0
+      if (completedPage.value > completedTotalPages.value) {
+        completedPage.value = completedTotalPages.value
+        completedJumpPage.value = completedTotalPages.value
+      }
+      if (pendingPage.value > pendingTotalPages.value) {
+        pendingPage.value = pendingTotalPages.value
+        pendingJumpPage.value = pendingTotalPages.value
+      }
     } catch (e: any) {
       const msg = String(e?.message || 'active transfer load failed')
       if (msg === '当前没有运行中的任务' || msg === '当前没有可恢复的传输状态' || msg === 'No active run for this task' || msg === 'No restorable transfer state available') {
@@ -153,17 +160,17 @@ export function useActiveTransferDetail() {
         error.value = msg
       }
     } finally {
-      if (!background) {
-        loading.value = false
-      }
+      if (!background) loading.value = false
     }
   }
 
   function open(nextTaskId: number) {
     taskId.value = nextTaskId
     runId.value = null
-    completedOffset.value = 0
-    pendingOffset.value = 0
+    completedPage.value = 1
+    pendingPage.value = 1
+    completedJumpPage.value = 1
+    pendingJumpPage.value = 1
     visible.value = true
     void refresh(false)
   }
@@ -179,25 +186,61 @@ export function useActiveTransferDetail() {
     pendingItems.value = []
     completedTotal.value = 0
     pendingTotal.value = 0
-    completedOffset.value = 0
-    pendingOffset.value = 0
+    completedPage.value = 1
+    pendingPage.value = 1
+    completedJumpPage.value = 1
+    pendingJumpPage.value = 1
     degraded.value = false
   }
 
-  async function loadMoreCompleted() {
-    completedOffset.value = Math.min(completedOffset.value + PAGE_SIZE, Math.max(completedTotal.value - PAGE_SIZE, 0))
+  function prevCompletedPage() {
+    if (completedPage.value <= 1) return
+    completedPage.value -= 1
+    completedJumpPage.value = completedPage.value
+    void refresh(true)
   }
 
-  async function loadMorePending() {
-    pendingOffset.value = Math.min(pendingOffset.value + PAGE_SIZE, Math.max(pendingTotal.value - PAGE_SIZE, 0))
+  function nextCompletedPage() {
+    if (completedPage.value >= completedTotalPages.value) return
+    completedPage.value += 1
+    completedJumpPage.value = completedPage.value
+    void refresh(true)
   }
 
-  const visibleCompletedItems = computed(() => completedItems.value.slice(0, completedOffset.value + PAGE_SIZE))
+  function jumpCompletedPage() {
+    const page = Math.min(Math.max(1, Number(completedJumpPage.value || 1)), completedTotalPages.value)
+    if (page === completedPage.value) return
+    completedPage.value = page
+    completedJumpPage.value = page
+    void refresh(true)
+  }
 
+  function prevPendingPage() {
+    if (pendingPage.value <= 1) return
+    pendingPage.value -= 1
+    pendingJumpPage.value = pendingPage.value
+    void refresh(true)
+  }
+
+  function nextPendingPage() {
+    if (pendingPage.value >= pendingTotalPages.value) return
+    pendingPage.value += 1
+    pendingJumpPage.value = pendingPage.value
+    void refresh(true)
+  }
+
+  function jumpPendingPage() {
+    const page = Math.min(Math.max(1, Number(pendingJumpPage.value || 1)), pendingTotalPages.value)
+    if (page === pendingPage.value) return
+    pendingPage.value = page
+    pendingJumpPage.value = page
+    void refresh(true)
+  }
+
+  const visibleCompletedItems = computed(() => completedItems.value)
   const visiblePendingItems = computed(() => {
     const currentKeys = new Set((currentFiles.value || []).map(item => item.path || item.name).filter(Boolean))
-    const items = currentKeys.size ? pendingItems.value.filter(item => !currentKeys.has(item.path || item.name)) : pendingItems.value
-    return items.slice(0, pendingOffset.value + PAGE_SIZE)
+    return currentKeys.size ? pendingItems.value.filter(item => !currentKeys.has(item.path || item.name)) : pendingItems.value
   })
 
   const offActiveTransferSnapshot = onWsMessage('active_transfer_snapshot', (data) => {
@@ -243,13 +286,23 @@ export function useActiveTransferDetail() {
     activeTransferPendingItems: visiblePendingItems,
     activeTransferCompletedTotal: completedTotal,
     activeTransferPendingTotal: pendingTotal,
+    activeTransferCompletedPage: completedPage,
+    activeTransferPendingPage: pendingPage,
+    activeTransferCompletedJumpPage: completedJumpPage,
+    activeTransferPendingJumpPage: pendingJumpPage,
+    activeTransferCompletedTotalPages: completedTotalPages,
+    activeTransferPendingTotalPages: pendingTotalPages,
     activeTransferDegraded: degraded,
     activeTransferLoading: loading,
     activeTransferError: error,
     openActiveTransfer: open,
     closeActiveTransfer: close,
     refreshActiveTransfer: refresh,
-    loadMoreActiveTransferCompleted: loadMoreCompleted,
-    loadMoreActiveTransferPending: loadMorePending,
+    prevActiveTransferCompletedPage: prevCompletedPage,
+    nextActiveTransferCompletedPage: nextCompletedPage,
+    jumpActiveTransferCompletedPage: jumpCompletedPage,
+    prevActiveTransferPendingPage: prevPendingPage,
+    nextActiveTransferPendingPage: nextPendingPage,
+    jumpActiveTransferPendingPage: jumpPendingPage,
   }
 }

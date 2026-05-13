@@ -44,14 +44,24 @@ const {
   activeTransferPendingItems,
   activeTransferCompletedTotal,
   activeTransferPendingTotal,
+  activeTransferCompletedPage,
+  activeTransferPendingPage,
+  activeTransferCompletedJumpPage,
+  activeTransferPendingJumpPage,
+  activeTransferCompletedTotalPages,
+  activeTransferPendingTotalPages,
   activeTransferDegraded,
   activeTransferLoading,
   activeTransferError,
   openActiveTransfer,
   closeActiveTransfer,
   refreshActiveTransfer,
-  loadMoreActiveTransferCompleted,
-  loadMoreActiveTransferPending,
+  prevActiveTransferCompletedPage,
+  nextActiveTransferCompletedPage,
+  jumpActiveTransferCompletedPage,
+  prevActiveTransferPendingPage,
+  nextActiveTransferPendingPage,
+  jumpActiveTransferPendingPage,
 } = useActiveTransferDetail()
 
 // 全局错误提示统一走 toast；不在各子块里各自弹。
@@ -519,13 +529,25 @@ const {
     :pending-items="activeTransferPendingItems"
     :completed-total="activeTransferCompletedTotal"
     :pending-total="activeTransferPendingTotal"
+    :completed-page="activeTransferCompletedPage"
+    :pending-page="activeTransferPendingPage"
+    :completed-jump-page="activeTransferCompletedJumpPage"
+    :pending-jump-page="activeTransferPendingJumpPage"
+    :completed-total-pages="activeTransferCompletedTotalPages"
+    :pending-total-pages="activeTransferPendingTotalPages"
     :degraded="activeTransferDegraded"
     :loading="activeTransferLoading"
     :error="activeTransferError"
     @close="closeActiveTransfer"
     @refresh="refreshActiveTransfer"
-    @load-more-completed="loadMoreActiveTransferCompleted"
-    @load-more-pending="loadMoreActiveTransferPending"
+    @prev-completed-page="prevActiveTransferCompletedPage"
+    @next-completed-page="nextActiveTransferCompletedPage"
+    @jump-completed-page="jumpActiveTransferCompletedPage"
+    @update:completed-jump-page="activeTransferCompletedJumpPage = $event"
+    @prev-pending-page="prevActiveTransferPendingPage"
+    @next-pending-page="nextActiveTransferPendingPage"
+    @jump-pending-page="jumpActiveTransferPendingPage"
+    @update:pending-jump-page="activeTransferPendingJumpPage = $event"
   />
 
   <!-- 全局实时数据弹窗 -->
