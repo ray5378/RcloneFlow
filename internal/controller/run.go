@@ -150,12 +150,22 @@ func isCASObjectNotFoundFailureRow(path, msg string) bool {
 }
 
 func isCASAttemptObjectNotFoundSummaryRow(path, msg string) bool {
-	path = strings.TrimSpace(path)
+	path = strings.ToLower(strings.TrimSpace(path))
 	msg = strings.ToLower(strings.TrimSpace(msg))
-	if msg == "" {
+	combined := strings.TrimSpace(path + " " + msg)
+	if combined == "" || !strings.Contains(combined, "object not found") {
 		return false
 	}
-	return strings.HasPrefix(msg, "attempt ") && strings.Contains(msg, "object not found") && (path == "" || path == "<nil>" || strings.HasPrefix(strings.ToLower(path), "attempt "))
+	if strings.HasPrefix(msg, "attempt ") {
+		return true
+	}
+	if strings.HasPrefix(path, "attempt ") {
+		return true
+	}
+	if path == "<nil>" && strings.Contains(msg, "attempt ") {
+		return true
+	}
+	return false
 }
 
 func isCASRunObjectNotFoundSummaryRow(path, msg string) bool {
