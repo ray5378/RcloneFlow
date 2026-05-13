@@ -101,14 +101,30 @@ export function useActiveTransferDetail() {
     currentFile.value = snapshot.currentFile || null
     currentFiles.value = sortCurrentFiles(snapshot.currentFiles || (snapshot.currentFile ? [snapshot.currentFile] : []))
     degraded.value = !!snapshot.degraded
+
+    const completed = sortCompletedItems(snapshot.completed || [])
+    const pending = sortPendingItems(snapshot.pending || [])
+    completedItems.value = completed
+    pendingItems.value = pending
+    completedTotal.value = completed.length
+    pendingTotal.value = pending.length
+    if (completedPage.value > completedTotalPages.value) {
+      completedPage.value = completedTotalPages.value
+      completedJumpPage.value = completedTotalPages.value
+    }
+    if (pendingPage.value > pendingTotalPages.value) {
+      pendingPage.value = pendingTotalPages.value
+      pendingJumpPage.value = pendingTotalPages.value
+    }
+
     summary.value = mergeNonDecreasingSummary(summary.value, {
       trackingMode: snapshot.trackingMode,
-      completedCount: (snapshot.completed || []).length,
-      pendingCount: (snapshot.pending || []).length,
-      totalCount: snapshot.totalCount || ((snapshot.completed || []).length + (snapshot.pending || []).length),
+      completedCount: completed.length,
+      pendingCount: pending.length,
+      totalCount: snapshot.totalCount || (completed.length + pending.length),
       preflightPending: !!snapshot.preflightPending,
       preflightFinished: !!snapshot.preflightFinished,
-      percentage: (snapshot.totalCount || 0) > 0 ? (((snapshot.completed || []).length / (snapshot.totalCount || 1)) * 100) : 0,
+      percentage: (snapshot.totalCount || 0) > 0 ? ((completed.length / (snapshot.totalCount || 1)) * 100) : 0,
       bytes: summary.value?.bytes || 0,
       totalBytes: summary.value?.totalBytes || 0,
       speed: summary.value?.speed || 0,
