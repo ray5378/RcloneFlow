@@ -214,6 +214,67 @@ func TestApplyPostActions_CopyDoesNothing(t *testing.T) {
 	}
 }
 
+func TestAnalyzeCASAttemptLogSegment_AllCASMatched_NoRealFailures(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_cas_attempt_allcas_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	logPath := filepath.Join(tmpDir, "attempt.log")
+	content := strings.Join([]string{
+		`{"time":"2026-05-13T14:37:37+08:00","level":"error","msg":"Failed to copy: object not found","object":"a/file1.mkv"}`,
+		`NOTICE : a/file1.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)`,
+		`{"time":"2026-05-13T14:39:41+08:00","level":"error","msg":"Failed to copy: object not found","object":"a/file2.mkv"}`,
+		`NOTICE : a/file2.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)`,
+		`{"time":"2026-05-13T14:41:53+08:00","level":"error","msg":"Attempt 1/3 failed with 2 errors and: object not found"}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(logPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	got := analyzeCASAttemptLogSegment(logPath, 0, true)
+	if len(got.CASMatchedPaths) != 2 {
+		t.Fatalf("CASMatchedPaths=%v, want 2 items", got.CASMatchedPaths)
+	}
+	if len(got.RealFailures) != 0 {
+		t.Fatalf("RealFailures=%v, want empty", got.RealFailures)
+	}
+}
+
+func TestAnalyzeCASAttemptLogSegment_RealFailureRemains(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_cas_attempt_realfail_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	logPath := filepath.Join(tmpDir, "attempt.log")
+	content := strings.Join([]string{
+		`{"time":"2026-05-13T14:37:37+08:00","level":"error","msg":"Failed to copy: object not found","object":"a/file1.mkv"}`,
+		`NOTICE : a/file1.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)`,
+		`{"time":"2026-05-13T14:43:23+08:00","level":"error","msg":"Failed to copy: unchunked simple update failed: Method Not Allowed: 405 Method Not Allowed","object":"a/file1.mkv"}`,
+		`{"time":"2026-05-13T14:44:00+08:00","level":"error","msg":"Failed to copy: permission denied","object":"a/file2.mkv"}`,
+	}, "\n") + "\n"
+	if err := os.WriteFile(logPath, []byte(content), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	got := analyzeCASAttemptLogSegment(logPath, 0, true)
+	if len(got.CASMatchedPaths) != 1 {
+		t.Fatalf("CASMatchedPaths=%v, want 1 item", got.CASMatchedPaths)
+	}
+	if len(got.RealFailures) != 2 {
+		t.Fatalf("RealFailures=%v, want 2 items", got.RealFailures)
+	}
+	if _, ok := got.RealFailures["a/file1.mkv"]; !ok {
+		t.Fatalf("expected file1 real failure to remain, got %v", got.RealFailures)
+	}
+	if _, ok := got.RealFailures["a/file2.mkv"]; !ok {
+		t.Fatalf("expected file2 real failure to remain, got %v", got.RealFailures)
+	}
+}
+
 func TestBuildOpenlistCASCompatPlanFromPaths_SyncNestedDirectories(t *testing.T) {
 	plan := buildOpenlistCASCompatPlanFromPaths(
 		[]string{"top/sub/a.mp4", "top/sub/keep.txt"},

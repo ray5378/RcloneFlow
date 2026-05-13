@@ -1,10 +1,13 @@
 package runnercli
 
 import (
+	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"rcloneflow/internal/active_transfer"
 	"rcloneflow/internal/store"
@@ -405,6 +408,135 @@ func TestConsume_JSONErrorObjectNotFoundAppendsRuntimeExclude(t *testing.T) {
 	}
 }
 
+func TestStart_CASManagedRetries_AllCASMatchedFinishesWithoutRestart(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	if err := os.WriteFile(filepath.Join(tmpDir, "rclone.conf"), []byte("[src]\ntype = local\n[dst]\ntype = local\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(rclone.conf) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmpDir, "logs"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(logs) error = %v", err)
+	}
+
+	fakeBin, callLog := writeFakeStartRclone(t, tmpDir, "allcas")
+	oldBin, oldCfg, oldData := os.Getenv("RCLONE_BIN"), os.Getenv("RCLONE_CONFIG"), os.Getenv("APP_DATA_DIR")
+	_ = os.Setenv("RCLONE_BIN", fakeBin)
+	_ = os.Setenv("RCLONE_CONFIG", filepath.Join(tmpDir, "rclone.conf"))
+	_ = os.Setenv("APP_DATA_DIR", tmpDir)
+	defer func() {
+		resetEnv("RCLONE_BIN", oldBin)
+		resetEnv("RCLONE_CONFIG", oldCfg)
+		resetEnv("APP_DATA_DIR", oldData)
+	}()
+
+	task, err := db.AddTask(store.Task{Name: "cas-managed-allcas", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+	run, err := db.AddRun(store.Run{TaskID: task.ID, Status: "running", Trigger: "manual", TaskName: task.Name, Summary: map[string]any{"effectiveOptions": map[string]any{"openlistCasCompatible": true, "retries": float64(3)}}})
+	if err != nil {
+		t.Fatalf("AddRun() error = %v", err)
+	}
+
+	r := New(db)
+	r.casVerifier = func(cfg, dst, rel string) (bool, error) { return true, nil }
+	r.casVerifyDelays = nil
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := r.Start(ctx, run, "copy", "src", "/a", "dst", "/b"); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	waitForRunTerminalState(t, db, run.ID, 10*time.Second)
+
+	gotRun, err := db.GetRun(run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() error = %v", err)
+	}
+	if gotRun.Status != "finished" {
+		logText := ""
+		if p, _ := gotRun.Summary["stderrFile"].(string); p != "" {
+			if b, err := os.ReadFile(p); err == nil {
+				logText = string(b)
+			}
+		}
+		t.Fatalf("run status=%q, want finished; error=%q summary=%#v calls=%v log=%s", gotRun.Status, gotRun.Error, gotRun.Summary, readCallLogLines(t, callLog), logText)
+	}
+	calls := readCallLogLines(t, callLog)
+	copyRuns := countCopyRuns(calls)
+	if copyRuns != 1 {
+		t.Fatalf("copy runs=%d, want 1; calls=%v", copyRuns, calls)
+	}
+	if !containsCallArg(calls, "--retries 1") {
+		t.Fatalf("expected cas-managed retries to force --retries 1, calls=%v", calls)
+	}
+}
+
+func TestStart_CASManagedRetries_RealFailureRestartsNextAttempt(t *testing.T) {
+	tmpDir := t.TempDir()
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	if err := os.WriteFile(filepath.Join(tmpDir, "rclone.conf"), []byte("[src]\ntype = local\n[dst]\ntype = local\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile(rclone.conf) error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(tmpDir, "logs"), 0o755); err != nil {
+		t.Fatalf("MkdirAll(logs) error = %v", err)
+	}
+
+	fakeBin, callLog := writeFakeStartRclone(t, tmpDir, "realfail")
+	oldBin, oldCfg, oldData := os.Getenv("RCLONE_BIN"), os.Getenv("RCLONE_CONFIG"), os.Getenv("APP_DATA_DIR")
+	_ = os.Setenv("RCLONE_BIN", fakeBin)
+	_ = os.Setenv("RCLONE_CONFIG", filepath.Join(tmpDir, "rclone.conf"))
+	_ = os.Setenv("APP_DATA_DIR", tmpDir)
+	defer func() {
+		resetEnv("RCLONE_BIN", oldBin)
+		resetEnv("RCLONE_CONFIG", oldCfg)
+		resetEnv("APP_DATA_DIR", oldData)
+	}()
+
+	task, err := db.AddTask(store.Task{Name: "cas-managed-realfail", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+	run, err := db.AddRun(store.Run{TaskID: task.ID, Status: "running", Trigger: "manual", TaskName: task.Name, Summary: map[string]any{"effectiveOptions": map[string]any{"openlistCasCompatible": true, "retries": float64(3)}}})
+	if err != nil {
+		t.Fatalf("AddRun() error = %v", err)
+	}
+
+	r := New(db)
+	r.casVerifier = func(cfg, dst, rel string) (bool, error) { return true, nil }
+	r.casVerifyDelays = nil
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := r.Start(ctx, run, "copy", "src", "/a", "dst", "/b"); err != nil {
+		t.Fatalf("Start() error = %v", err)
+	}
+	waitForRunTerminalState(t, db, run.ID, 10*time.Second)
+
+	gotRun, err := db.GetRun(run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() error = %v", err)
+	}
+	if gotRun.Status != "finished" {
+		t.Fatalf("run status=%q, want finished after retry; error=%q summary=%#v calls=%v", gotRun.Status, gotRun.Error, gotRun.Summary, readCallLogLines(t, callLog))
+	}
+	calls := readCallLogLines(t, callLog)
+	copyRuns := countCopyRuns(calls)
+	if copyRuns != 2 {
+		t.Fatalf("copy runs=%d, want 2; calls=%v", copyRuns, calls)
+	}
+}
+
 func TestConsume_JSONErrorObjectNotFoundWithoutCASStaysFailed(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "rcloneflow_runnercli_json_error_failed_*")
 	if err != nil {
@@ -590,4 +722,129 @@ func TestConsume_MoveDeletedDoesNotMarkActiveTransferDeleted(t *testing.T) {
 	if pending.Total != 1 {
 		t.Fatalf("pending total=%d, want 1", pending.Total)
 	}
+}
+
+func writeFakeStartRclone(t *testing.T, dir, scenario string) (binPath, callLog string) {
+	t.Helper()
+	callLog = filepath.Join(dir, "fake-rclone-calls.log")
+	stateFile := filepath.Join(dir, "fake-rclone-state")
+	binPath = filepath.Join(dir, "rclone")
+	script := fmt.Sprintf(`#!/bin/sh
+set -eu
+printf '%%s\n' "$*" >> %q
+cmd="$1"
+shift || true
+case "$cmd" in
+  config)
+    echo '{}'
+    exit 0
+    ;;
+  lsf)
+    exit 0
+    ;;
+  size)
+    echo '{"bytes":0,"count":0}'
+    exit 0
+    ;;
+  lsjson)
+    target=""
+    for arg in "$@"; do
+      case "$arg" in
+        --*) ;;
+        *) target="$arg"; break ;;
+      esac
+    done
+    case "$target" in
+      src:*)
+        echo '[{"Path":"电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E01 - 第 1 集.mkv"}]'
+        ;;
+      dst:*)
+        echo '[{"Path":"电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E01 - 第 1 集.mkv.cas"}]'
+        ;;
+      *)
+        echo '[]'
+        ;;
+    esac
+    exit 0
+    ;;
+  copy)
+    n=1
+    if [ -f %q ]; then n=$(cat %q); n=$((n+1)); fi
+    printf '%%s' "$n" > %q
+    if [ "$n" -eq 1 ]; then
+      printf '%%s\n' '{"time":"2026-05-13T14:37:37+08:00","level":"error","msg":"Failed to copy: object not found","object":"电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E01 - 第 1 集.mkv"}'
+      if [ %q = 'realfail' ]; then
+        printf '%%s\n' '{"time":"2026-05-13T14:43:23+08:00","level":"error","msg":"Failed to copy: unchunked simple update failed: Method Not Allowed: 405 Method Not Allowed","object":"电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E01 - 第 1 集.mkv"}'
+      else
+        printf '%%s\n' '{"time":"2026-05-13T14:41:53+08:00","level":"error","msg":"Attempt 1/3 failed with 1 errors and: object not found"}'
+      fi
+      exit 1
+    fi
+    printf '%%s\n' '{"time":"2026-05-13T14:50:00+08:00","level":"info","msg":"Copied (new)","object":"电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E01 - 第 1 集.mkv"}'
+    exit 0
+    ;;
+  *)
+    exit 0
+    ;;
+esac
+`, callLog, stateFile, stateFile, stateFile, scenario)
+	if err := os.WriteFile(binPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("WriteFile(fake rclone) error = %v", err)
+	}
+	return binPath, callLog
+}
+
+func resetEnv(key, val string) {
+	if val == "" {
+		_ = os.Unsetenv(key)
+		return
+	}
+	_ = os.Setenv(key, val)
+}
+
+func waitForRunTerminalState(t *testing.T, db *store.DB, runID int64, timeout time.Duration) store.Run {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		run, err := db.GetRun(runID)
+		if err == nil && (run.Status == "finished" || run.Status == "failed") {
+			return run
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	run, _ := db.GetRun(runID)
+	t.Fatalf("run %d did not reach terminal state before timeout; last=%+v", runID, run)
+	return store.Run{}
+}
+
+func readCallLogLines(t *testing.T, path string) []string {
+	t.Helper()
+	b, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile(callLog) error = %v", err)
+	}
+	text := strings.TrimSpace(string(b))
+	if text == "" {
+		return nil
+	}
+	return strings.Split(text, "\n")
+}
+
+func countCopyRuns(lines []string) int {
+	n := 0
+	for _, line := range lines {
+		if strings.HasPrefix(strings.TrimSpace(line), "copy ") {
+			n++
+		}
+	}
+	return n
+}
+
+func containsCallArg(lines []string, want string) bool {
+	for _, line := range lines {
+		if strings.Contains(line, want) {
+			return true
+		}
+	}
+	return false
 }

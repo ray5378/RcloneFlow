@@ -147,6 +147,17 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			args = append(args, buildFlagsFromOptions(merged)...)
 		}
 	}
+	casManagedRetries := false
+	maxCASAttempts := 1
+	if casCompat != nil {
+		casManagedRetries = true
+		maxCASAttempts = configuredRetryCount(effOpt)
+		if maxCASAttempts < 1 {
+			maxCASAttempts = 1
+		}
+		args = forceFlagValue(args, "--retries", "1")
+		args = forceFlagValue(args, "--low-level-retries", "1")
+	}
 	// 强制启用 JSON 日志：作为系统默认行为，不再提供任务级开关。
 	args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	// 二次兜底：如 --buffer-size/--bwlimit 后是纯数字，自动补单位（M）；
@@ -303,20 +314,95 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	if casCompat != nil {
 		excludeFrom = casCompat.ExcludeFrom
 	}
-	go r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
-	go r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
+	var consumeWG sync.WaitGroup
+	consumeWG.Add(2)
+	go func() {
+		defer consumeWG.Done()
+		r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
+	}()
+	go func() {
+		defer consumeWG.Done()
+		r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
+	}()
 	go func() {
 		defer func() {
 			if casCompat != nil && casCompat.ExcludeFrom != "" {
 				_ = os.Remove(casCompat.ExcludeFrom)
 			}
 		}()
-		err := cmd.Wait()
-		outW.Close()
-		errW.Close()
-		stderrFile.Close()
-		if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) {
-			_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+		attemptLogOffset, _ := stderrFile.Seek(0, io.SeekCurrent)
+		attempt := 1
+		for {
+			err := cmd.Wait()
+			outW.Close()
+			errW.Close()
+			consumeWG.Wait()
+			stderrFile.Close()
+			if err == nil && (cmd.ProcessState == nil || cmd.ProcessState.Success()) {
+				break
+			}
+			if casManagedRetries && attempt <= maxCASAttempts {
+				analysis := analyzeCASAttemptLogSegment(stderrPath, attemptLogOffset, casMode)
+				if len(analysis.RealFailures) == 0 && len(analysis.CASMatchedPaths) > 0 {
+					if fileStats != nil {
+						for path := range analysis.CASMatchedPaths {
+							fileStats.update(path, -1, -1, -1, 100)
+							fileStats.markCopied(path)
+							if r.activeMgr != nil {
+								r.activeMgr.OnFileCASMatched(run.ID, path)
+							}
+						}
+					}
+					_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+						if rr.Summary == nil {
+							rr.Summary = map[string]any{}
+						}
+						prog, _ := rr.Summary["progress"].(map[string]any)
+						if prog == nil {
+							prog = map[string]any{}
+						}
+						if fileStats != nil {
+							if lst := fileStats.copiedList(); len(lst) > 0 {
+								prog["completedFiles"] = float64(len(lst))
+								rr.Summary["files"] = fileStats.snapshot(100)
+							}
+						}
+						rr.Summary["progress"] = prog
+					})
+					err = nil
+					break
+				}
+				if len(analysis.RealFailures) > 0 && attempt < maxCASAttempts {
+					attempt++
+					outR, outW = io.Pipe()
+					errR, errW = io.Pipe()
+					stderrFile, _ = os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+					attemptLogOffset, _ = stderrFile.Seek(0, io.SeekCurrent)
+					cmd = runner.CmdContext(ctx, args...)
+					cmd.Stdout = outW
+					cmd.Stderr = errW
+					if startErr := cmd.Start(); startErr != nil {
+						err = startErr
+						break
+					}
+					r.mu.Lock()
+					r.procs[run.ID] = cmd
+					r.mu.Unlock()
+					consumeWG = sync.WaitGroup{}
+					consumeWG.Add(2)
+					go func() {
+						defer consumeWG.Done()
+						r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
+					}()
+					go func() {
+						defer consumeWG.Done()
+						r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
+					}()
+					continue
+				}
+			}
+			if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) {
+				_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
 				rr.Status = "failed"
 				if rr.Summary == nil {
 					rr.Summary = map[string]any{}
@@ -391,6 +477,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			delete(r.procs, run.ID)
 			r.mu.Unlock()
 			return
+			}
 		}
 		if casCompat != nil {
 			if postErr := casCompat.ApplyPostActions(cfg, src, dst, originalCmdName); postErr != nil {
@@ -1235,11 +1322,13 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				if msg == "" {
 					msg = strings.TrimSpace(jsonMsg)
 				}
-				if r.activeMgr != nil && isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
+				if isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
 					if r.confirmCASMatch(cfg, dst, path) {
 						fp.update(path, -1, -1, -1, 100)
 						fp.markCopied(path)
-						r.activeMgr.OnFileCASMatched(runID, path)
+						if r.activeMgr != nil {
+							r.activeMgr.OnFileCASMatched(runID, path)
+						}
 						r.appendCASExclude(excludeFrom, path)
 						_, _ = out.WriteString(fmt.Sprintf("NOTICE : %s: CAS compatible match after source cleanup (%s)\n", path, msg))
 						marked = true
@@ -2029,6 +2118,100 @@ func isAttemptObjectNotFoundSummary(path, msg string) bool {
 	}
 	low := strings.ToLower(strings.TrimSpace(msg))
 	return strings.Contains(low, "object not found")
+}
+
+type casAttemptAnalysis struct {
+	CASMatchedPaths map[string]struct{}
+	RealFailures    map[string]string
+}
+
+func analyzeCASAttemptLogSegment(path string, startOffset int64, openlistCASCompatible bool) casAttemptAnalysis {
+	res := casAttemptAnalysis{CASMatchedPaths: map[string]struct{}{}, RealFailures: map[string]string{}}
+	f, err := os.Open(path)
+	if err != nil {
+		return res
+	}
+	defer f.Close()
+	if startOffset > 0 {
+		if _, err := f.Seek(startOffset, io.SeekStart); err != nil {
+			return res
+		}
+	}
+	s := bufio.NewScanner(f)
+	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
+	for s.Scan() {
+		line := strings.TrimSpace(s.Text())
+		if line == "" {
+			continue
+		}
+		if m := fileCASMatchedRe.FindStringSubmatch(line); len(m) > 0 {
+			res.CASMatchedPaths[strings.TrimSpace(m[1])] = struct{}{}
+			delete(res.RealFailures, strings.TrimSpace(m[1]))
+			continue
+		}
+		var rec map[string]any
+		if json.Unmarshal([]byte(line), &rec) == nil {
+			level := strings.ToUpper(strings.TrimSpace(anyString(rec["level"])))
+			msg := strings.TrimSpace(anyString(rec["msg"]))
+			obj := strings.TrimSpace(anyString(rec["object"]))
+			if level == "ERROR" {
+				if isCASCompatibleNotFound(obj, msg, openlistCASCompatible) {
+					continue
+				}
+				if obj != "" {
+					res.RealFailures[obj] = msg
+				}
+			}
+			continue
+		}
+		at, level, p, msg, ok := parseRunLogSegment(line)
+		_ = at
+		if !ok {
+			continue
+		}
+		if isAttemptObjectNotFoundSummary(p, msg) {
+			continue
+		}
+		if strings.EqualFold(level, "ERROR") {
+			if isCASCompatibleNotFound(p, msg, openlistCASCompatible) {
+				continue
+			}
+			if strings.TrimSpace(p) != "" {
+				res.RealFailures[p] = msg
+			}
+		}
+	}
+	return res
+}
+
+func configuredRetryCount(opt map[string]any) int {
+	if opt != nil {
+		switch v := opt["retries"].(type) {
+		case int:
+			if v > 0 {
+				return v
+			}
+		case int64:
+			if v > 0 {
+				return int(v)
+			}
+		case float64:
+			if v > 0 {
+				return int(v)
+			}
+		}
+	}
+	return 1
+}
+
+func forceFlagValue(args []string, flag, value string) []string {
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == flag {
+			args[i+1] = value
+			return args
+		}
+	}
+	return append(args, flag, value)
 }
 
 func (r *Runner) appendCASExclude(excludeFrom, rel string) {
