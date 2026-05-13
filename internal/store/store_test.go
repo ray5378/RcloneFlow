@@ -539,6 +539,73 @@ func TestMigrationCreatesVersionTable(t *testing.T) {
 	}
 }
 
+func TestOpen_RepairsMissingSortIndexColumnWhenSchemaVersionAlreadyRecorded(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+
+	_, err = db.db.Exec(`
+		DROP INDEX IF EXISTS idx_tasks_sort_index;
+		CREATE TABLE tasks_old AS
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at
+		FROM tasks;
+		DROP TABLE tasks;
+		CREATE TABLE tasks (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			mode TEXT NOT NULL,
+			source_remote TEXT NOT NULL,
+			source_path TEXT NOT NULL,
+			target_remote TEXT NOT NULL,
+			target_path TEXT NOT NULL,
+			options TEXT,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		);
+		INSERT INTO tasks (id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at)
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at
+		FROM tasks_old;
+		DROP TABLE tasks_old;
+		DELETE FROM schema_migrations;
+		INSERT INTO schema_migrations (version) VALUES (4);
+	`)
+	if err != nil {
+		db.Close()
+		t.Fatalf("prepare broken schema error = %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+
+	reopened, err := Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() after broken schema error = %v", err)
+	}
+	defer reopened.Close()
+
+	tasks, err := reopened.ListTasks()
+	if err != nil {
+		t.Fatalf("ListTasks() after repair error = %v", err)
+	}
+	if len(tasks) != 0 {
+		t.Fatalf("expected empty tasks after repair prep, got %d", len(tasks))
+	}
+
+	created, err := reopened.AddTask(Task{Name: "repaired-task", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("AddTask() after repair error = %v", err)
+	}
+	if created.SortIndex <= 0 {
+		t.Fatalf("expected repaired schema to assign sort index, got %d", created.SortIndex)
+	}
+}
+
 func TestTaskNameUniqueIndex(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "rcloneflow_test_*")
 	if err != nil {

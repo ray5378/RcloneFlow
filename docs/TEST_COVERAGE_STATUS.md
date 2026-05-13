@@ -1,6 +1,6 @@
 # Test Coverage Status
 
-Last updated: 2026-05-14 (task sort_index self-heal batch)
+Last updated: 2026-05-14 (legacy sort_index schema repair batch)
 
 ## Purpose
 
@@ -62,6 +62,7 @@ Approximate coverage checkpoints during this pass:
 - latest freshly re-measured overall checkpoint after recent controller additions: `41.3%`
 - latest freshly re-measured overall checkpoint after task reorder persistence batch: `48.5%`
 - latest freshly re-measured overall checkpoint after task `sort_index` self-heal batch: `49.0%`
+- latest freshly re-measured overall checkpoint after legacy `sort_index` schema repair batch: `49.1%`
 
 ### Controller package
 
@@ -77,6 +78,7 @@ Approximate coverage checkpoints during this pass:
 ### Store package
 
 - latest freshly re-measured `internal/store` checkpoint after task `sort_index` self-heal batch: `47.1%`
+- latest freshly re-measured `internal/store` checkpoint after legacy `sort_index` schema repair batch: `49.2%`
 
 ### Frontend
 
@@ -182,6 +184,8 @@ Added:
   - added `TestListTasks_NormalizesDuplicateSortIndexes`
   - verifies duplicate `sort_index` values are normalized back to a stable continuous order on `ListTasks()`
   - tightened `TestOpenCreatesDir` to use a unique temp dir, avoiding cross-run SQLite path collisions during coverage runs
+  - added `TestOpen_RepairsMissingSortIndexColumnWhenSchemaVersionAlreadyRecorded`
+  - verifies `Open()` repairs legacy databases where `schema_migrations` already records v4 but `tasks.sort_index` is still missing
 - `internal/controller/task_controller_test.go`
   - added `PATCH reorder persists order`
   - verifies `PATCH /api/tasks` with `{ order: [...] }` reaches persistence and the stored order is reflected by a fresh `ListTasks()` read

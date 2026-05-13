@@ -279,6 +279,56 @@ func (db *DB) migrate() error {
 		}
 	}
 
+	if err := db.ensureTaskSortIndexColumn(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *DB) ensureTaskSortIndexColumn() error {
+	rows, err := db.db.Query(`PRAGMA table_info(tasks)`)
+	if err != nil {
+		return fmt.Errorf("检查 tasks 表结构失败: %w", err)
+	}
+	defer rows.Close()
+
+	var hasSortIndex bool
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var dfltValue sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &dfltValue, &pk); err != nil {
+			return fmt.Errorf("读取 tasks 表结构失败: %w", err)
+		}
+		if name == "sort_index" {
+			hasSortIndex = true
+			break
+		}
+	}
+	if hasSortIndex {
+		return nil
+	}
+
+	if _, err := db.db.Exec(`ALTER TABLE tasks ADD COLUMN sort_index INTEGER NOT NULL DEFAULT 0`); err != nil {
+		return fmt.Errorf("补建 tasks.sort_index 失败: %w", err)
+	}
+	if _, err := db.db.Exec(`
+		UPDATE tasks
+		SET sort_index = (
+			SELECT COUNT(*)
+			FROM tasks AS t2
+			WHERE t2.id > tasks.id
+		) + 1
+		WHERE sort_index = 0`); err != nil {
+		return fmt.Errorf("回填 tasks.sort_index 失败: %w", err)
+	}
+	if _, err := db.db.Exec(`CREATE INDEX IF NOT EXISTS idx_tasks_sort_index ON tasks(sort_index, id DESC)`); err != nil {
+		return fmt.Errorf("创建 tasks.sort_index 索引失败: %w", err)
+	}
 	return nil
 }
 
