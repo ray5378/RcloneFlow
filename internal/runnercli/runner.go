@@ -1210,19 +1210,29 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				}
 			}
 			if !marked {
-				if row, _, ok := classifyRunLogRow("INFO", strings.TrimSpace(extractPathFromLogLine(line)), strings.TrimSpace(extractMsgFromLogLine(line)), map[string]int64{}, openlistCASCompatible); ok && r.activeMgr != nil {
-					path := strings.TrimSpace(anyString(row["path"]))
-					action := strings.ToLower(strings.TrimSpace(anyString(row["action"])))
-					msg := strings.TrimSpace(anyString(row["message"]))
-					switch action {
-					case "deleted":
-						if !isMove {
-							r.activeMgr.OnFileDeleted(runID, path)
+				path := strings.TrimSpace(extractPathFromLogLine(line))
+				msg := strings.TrimSpace(extractMsgFromLogLine(line))
+				if r.activeMgr != nil && isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
+					fp.update(path, -1, -1, -1, 100)
+					fp.markCopied(path)
+					r.activeMgr.OnFileCASMatched(runID, path)
+					marked = true
+				}
+				if !marked {
+					if row, _, ok := classifyRunLogRow("INFO", path, msg, map[string]int64{}, openlistCASCompatible); ok && r.activeMgr != nil {
+						path := strings.TrimSpace(anyString(row["path"]))
+						action := strings.ToLower(strings.TrimSpace(anyString(row["action"])))
+						msg := strings.TrimSpace(anyString(row["message"]))
+						switch action {
+						case "deleted":
+							if !isMove {
+								r.activeMgr.OnFileDeleted(runID, path)
+							}
+						case "skipped":
+							r.activeMgr.OnFileSkipped(runID, path, msg)
+						case "error":
+							r.activeMgr.OnFileFailed(runID, path, msg)
 						}
-					case "skipped":
-						r.activeMgr.OnFileSkipped(runID, path, msg)
-					case "error":
-						r.activeMgr.OnFileFailed(runID, path, msg)
 					}
 				}
 			}

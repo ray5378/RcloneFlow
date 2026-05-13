@@ -290,6 +290,65 @@ func TestConsume_JSONWrappedFileProgressUpdatesActiveTransfer(t *testing.T) {
 	}
 }
 
+func TestConsume_JSONErrorObjectNotFoundMarksCASMatchedInActiveTransfer(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_runnercli_json_error_*")
+	if err != nil {
+		t.Fatalf("MkdirTemp() error = %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("store.Open() error = %v", err)
+	}
+	defer db.Close()
+
+	task, err := db.AddTask(store.Task{Name: "json-error-cas-task", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("AddTask() error = %v", err)
+	}
+	run, err := db.AddRun(store.Run{TaskID: task.ID, Status: "running", Trigger: "manual", Summary: map[string]any{"progress": map[string]any{"completedFiles": float64(0)}}})
+	if err != nil {
+		t.Fatalf("AddRun() error = %v", err)
+	}
+
+	mgr := active_transfer.NewManager()
+	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeCAS, []active_transfer.TransferCandidateFile{{Path: "a/file1.mkv", Name: "file1.mkv", SizeBytes: 100}})
+	r := New(db, mgr)
+	fp := &fileProgress{m: map[string]*fileProg{}}
+	outFile, err := os.CreateTemp(tmpDir, "consume-json-error-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer outFile.Close()
+
+	line := `{"time":"2026-05-13T10:08:29.48904232+08:00","level":"error","msg":"Failed to copy: object not found","object":"a/file1.mkv","objectType":"*smb.Object","source":"slog/logger.go:256"}` + "\n"
+	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true, false)
+
+	completed := mgr.ListCompleted(task.ID, 0, 10)
+	if completed.Total != 1 {
+		t.Fatalf("completed total=%d, want 1", completed.Total)
+	}
+	if got := completed.Items[0].Status; got != active_transfer.FileStatusCASMatched {
+		t.Fatalf("completed status=%q, want %q", got, active_transfer.FileStatusCASMatched)
+	}
+	pending := mgr.ListPending(task.ID, 0, 10)
+	if pending.Total != 0 {
+		t.Fatalf("pending total=%d, want 0", pending.Total)
+	}
+	gotRun, err := db.GetRun(run.ID)
+	if err != nil {
+		t.Fatalf("GetRun() error = %v", err)
+	}
+	prog, _ := gotRun.Summary["progress"].(map[string]any)
+	if prog == nil {
+		t.Fatalf("expected progress map, got %#v", gotRun.Summary)
+	}
+	if gotv, ok := prog["completedFiles"].(float64); !ok || int(gotv) != 1 {
+		t.Fatalf("completedFiles=%#v, want 1; progress=%#v", prog["completedFiles"], prog)
+	}
+}
+
 func TestConsume_JSONStatsTransferringUpdatesCurrentFile(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "rcloneflow_runnercli_json_stats_*")
 	if err != nil {
