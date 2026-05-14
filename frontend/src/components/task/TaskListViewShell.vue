@@ -27,7 +27,7 @@ defineProps<{
   stopTaskAny: (task: any) => void
   setWebhook: (task: any) => void
   setSingletonMode: (task: any) => void
-  saveTaskSortOrders: (orders: Record<number, number>) => Promise<boolean>
+  saveTaskSortOrders: (orders: Record<number, number>, priorityTaskId?: number) => Promise<boolean>
   openTransferDetail: (taskId: number) => void
   prevTasksPage: () => void
   nextTasksPage: () => void

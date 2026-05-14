@@ -20,7 +20,7 @@ const props = defineProps<{
   currentTasksPages: number
   tasksJumpPage: number | null
   savingSort?: boolean
-  saveTaskSortOrders: (orders: Record<number, number>) => Promise<boolean>
+  saveTaskSortOrders: (orders: Record<number, number>, priorityTaskId?: number) => Promise<boolean>
 }>()
 
 const emit = defineEmits<{
@@ -44,6 +44,8 @@ const emit = defineEmits<{
 const sorting = ref(false)
 const sortInputs = ref<Record<number, number | null>>({})
 const savingNow = ref(false)
+const hasPendingChanges = ref(false)
+const lastPriorityTaskId = ref<number | null>(null)
 
 function buildSortMap(tasks: any[]) {
   const map: Record<number, number | null> = {}
@@ -56,11 +58,15 @@ function buildSortMap(tasks: any[]) {
 function startSort() {
   sorting.value = true
   sortInputs.value = { ...buildSortMap(props.allTasks) }
+  hasPendingChanges.value = false
+  lastPriorityTaskId.value = null
 }
 
 function cancelSort() {
   sorting.value = false
   sortInputs.value = {}
+  hasPendingChanges.value = false
+  lastPriorityTaskId.value = null
 }
 
 function onSortInput(taskId: number, event: Event) {
@@ -81,10 +87,19 @@ function onSortInput(taskId: number, event: Event) {
   }
 }
 
-function buildResolvedSortMap(tasks: any[]) {
+function buildResolvedSortMap(tasks: any[], priorityTaskId?: number) {
   const used = new Map<number, number>()
+  const taskList = [...tasks]
 
-  tasks.forEach((task, index) => {
+  if (priorityTaskId !== undefined) {
+    taskList.sort((a, b) => {
+      if (a.id === priorityTaskId) return -1
+      if (b.id === priorityTaskId) return 1
+      return 0
+    })
+  }
+
+  taskList.forEach((task, index) => {
     const requested = sortInputs.value[task.id]
     if (requested === null || requested === undefined || !Number.isFinite(requested)) return
     let current = requested
@@ -92,7 +107,7 @@ function buildResolvedSortMap(tasks: any[]) {
     used.set(current, task.id)
   })
 
-  tasks.forEach((task, index) => {
+  taskList.forEach((task, index) => {
     if (hasTask(used, task.id)) return
     let current = typeof task.sortOrder === 'number' && Number.isFinite(task.sortOrder) ? task.sortOrder : index + 1
     while (used.has(current)) current += 1
@@ -129,23 +144,30 @@ const previewTasks = computed(() => {
     .sort((a, b) => (a.__previewSortOrder - b.__previewSortOrder) || (a.id - b.id))
 })
 
-async function commitSort(taskId: number) {
-  if (savingNow.value || props.savingSort) return
+const saveDisabled = computed(() => !hasPendingChanges.value || savingNow.value || !!props.savingSort)
+
+function applyPreviewSort(taskId: number) {
   const current = sortInputs.value[taskId]
   if (current === null || current === undefined || !Number.isFinite(current)) return
 
-  const finalMap = buildResolvedSortMap([...props.allTasks])
-  const orders: Record<number, number> = {}
+  const finalMap = buildResolvedSortMap([...props.allTasks], taskId)
   finalMap.forEach((sortOrder, id) => {
-    orders[id] = sortOrder
+    sortInputs.value[id] = sortOrder
   })
+  lastPriorityTaskId.value = taskId
+  hasPendingChanges.value = true
+}
 
-  Object.entries(orders).forEach(([id, sortOrder]) => {
-    sortInputs.value[Number(id)] = sortOrder
+async function saveSort() {
+  if (saveDisabled.value) return
+  const orders: Record<number, number> = {}
+  Object.entries(sortInputs.value).forEach(([id, sortOrder]) => {
+    if (sortOrder === null || sortOrder === undefined || !Number.isFinite(sortOrder)) return
+    orders[Number(id)] = sortOrder
   })
 
   savingNow.value = true
-  const ok = await props.saveTaskSortOrders(orders)
+  const ok = await props.saveTaskSortOrders(orders, lastPriorityTaskId.value ?? undefined)
   savingNow.value = false
   if (ok) {
     cancelSort()
@@ -155,6 +177,7 @@ async function commitSort(taskId: number) {
 watch(() => props.allTasks, (tasks) => {
   if (!sorting.value) return
   if (savingNow.value) return
+  if (hasPendingChanges.value) return
   sortInputs.value = { ...buildSortMap(tasks) }
 }, { deep: true })
 </script>
@@ -168,6 +191,7 @@ watch(() => props.allTasks, (tasks) => {
       @update:search="emit('update:search', $event)"
       @add="emit('add')"
       @toggle-sort="startSort"
+      @save-sort="saveSort"
       @cancel-sort="cancelSort"
     />
 
@@ -186,7 +210,7 @@ watch(() => props.allTasks, (tasks) => {
         :sorting="sorting"
         :sort-value="sortInputs[task.id] ?? null"
         @sort-input="onSortInput(task.id, $event)"
-        @sort-enter="commitSort(task.id)"
+        @sort-enter="applyPreviewSort(task.id)"
         @run="emit('run', task.id)"
         @edit="emit('edit', task)"
         @delete="emit('delete', task.id)"

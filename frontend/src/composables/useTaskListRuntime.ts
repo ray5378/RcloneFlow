@@ -28,7 +28,7 @@ export function useTaskListRuntime(options: {
     delete: (id: number) => Promise<boolean>
     run: (taskId: number) => Promise<any>
     kill: (taskId: number) => Promise<void>
-    updateSortOrders: (orders: Record<number, number>) => Promise<boolean>
+    updateSortOrders: (orders: Record<number, number>, priorityTaskId?: number) => Promise<boolean>
   }
   scheduleApi: {
     delete: (id: number) => Promise<void>
@@ -85,8 +85,8 @@ export function useTaskListRuntime(options: {
     restoreTaskPathBrowse: options.restoreTaskPathBrowse,
   })
 
-  async function saveTaskSortOrders(orders: Record<number, number>) {
-    const ok = await options.taskApi.updateSortOrders(orders)
+  async function saveTaskSortOrders(orders: Record<number, number>, priorityTaskId?: number) {
+    const ok = await options.taskApi.updateSortOrders(orders, priorityTaskId)
     if (!ok) return false
     await options.loadData()
     options.showToast(t('runtime.taskSortSave'), 'success')

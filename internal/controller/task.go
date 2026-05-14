@@ -84,16 +84,17 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPatch:
 		var req struct {
-			ID      int64           `json:"id"`
-			Options map[string]any  `json:"options"`
-			Orders  map[int64]int64 `json:"orders"`
+			ID             int64           `json:"id"`
+			Options        map[string]any  `json:"options"`
+			Orders         map[int64]int64 `json:"orders"`
+			PriorityTaskID int64           `json:"priorityTaskId"`
 		}
 		if err := DecodeRequest(r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": "invalid body"})
 			return
 		}
 		if len(req.Orders) > 0 {
-			if err := c.taskSvc.UpdateTaskSortOrders(req.Orders); err != nil {
+			if err := c.taskSvc.UpdateTaskSortOrders(req.Orders, req.PriorityTaskID); err != nil {
 				if errors.Is(err, service.ErrTaskNotFound) {
 					WriteJSON(w, 404, map[string]any{"error": err.Error()})
 					return

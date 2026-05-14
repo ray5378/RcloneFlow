@@ -41,8 +41,8 @@ export async function updateTaskOptions(taskId: number, options: Record<string, 
 }
 
 /** 批量保存任务排序 */
-export async function updateTaskSortOrders(orders: Record<number, number>): Promise<void> {
-  return patch('/api/tasks', { orders })
+export async function updateTaskSortOrders(orders: Record<number, number>, priorityTaskId?: number): Promise<void> {
+  return patch('/api/tasks', { orders, priorityTaskId })
 }
 
 export interface RunTaskResult {

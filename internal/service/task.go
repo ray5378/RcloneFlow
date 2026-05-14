@@ -98,7 +98,7 @@ func (s *TaskService) ensureTaskNameUnique(name string, excludeID int64) error {
 	return nil
 }
 
-func (s *TaskService) UpdateTaskSortOrders(orders map[int64]int64) error {
+func (s *TaskService) UpdateTaskSortOrders(orders map[int64]int64, priorityTaskID int64) error {
 	tasks, err := s.db.ListTasks()
 	if err != nil {
 		return err
@@ -110,7 +110,29 @@ func (s *TaskService) UpdateTaskSortOrders(orders map[int64]int64) error {
 		byID[task.ID] = task
 	}
 
-	for taskID, requested := range orders {
+	if priorityTaskID != 0 {
+		if _, ok := byID[priorityTaskID]; !ok {
+			return ErrTaskNotFound
+		}
+	}
+
+	orderedIDs := make([]int64, 0, len(orders))
+	if priorityTaskID != 0 {
+		if _, ok := orders[priorityTaskID]; ok {
+			orderedIDs = append(orderedIDs, priorityTaskID)
+		}
+	}
+	for _, task := range tasks {
+		if task.ID == priorityTaskID {
+			continue
+		}
+		if _, ok := orders[task.ID]; ok {
+			orderedIDs = append(orderedIDs, task.ID)
+		}
+	}
+
+	for _, taskID := range orderedIDs {
+		requested := orders[taskID]
 		if _, ok := byID[taskID]; !ok {
 			return ErrTaskNotFound
 		}
@@ -141,9 +163,29 @@ func (s *TaskService) UpdateTaskSortOrders(orders map[int64]int64) error {
 		}
 	}
 
-	updates := make(map[int64]int64, len(used))
+	finalIDs := make([]int64, 0, len(used))
+	for _, taskID := range used {
+		finalIDs = append(finalIDs, taskID)
+	}
+
+	updates := make(map[int64]int64, len(finalIDs))
+	type pair struct {
+		sortOrder int64
+		taskID    int64
+		}
+	pairs := make([]pair, 0, len(used))
 	for sortOrder, taskID := range used {
-		updates[taskID] = sortOrder
+		pairs = append(pairs, pair{sortOrder: sortOrder, taskID: taskID})
+	}
+	for i := 0; i < len(pairs); i++ {
+		for j := i + 1; j < len(pairs); j++ {
+			if pairs[j].sortOrder < pairs[i].sortOrder {
+				pairs[i], pairs[j] = pairs[j], pairs[i]
+			}
+		}
+	}
+	for index, item := range pairs {
+		updates[item.taskID] = int64(index + 1)
 	}
 
 	return s.db.UpdateTaskSortOrders(updates)
