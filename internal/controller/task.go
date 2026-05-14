@@ -207,25 +207,26 @@ func (c *TaskController) buildActiveRunItems() ([]map[string]any, error) {
 				}
 			}
 		}
-		totalCount := float64(0)
+		plannedFiles := float64(0)
 		if v, ok := progress["plannedFiles"].(float64); ok {
-			totalCount = v
+			plannedFiles = v
 		}
+		logicalTotalCount := plannedFiles
 		casCompatible := false
 		if summary != nil {
 			if opts, ok := summary["effectiveOptions"].(map[string]any); ok {
 				casCompatible, _ = opts["openlistCasCompatible"].(bool)
 			}
 		}
-		if totalCount <= 0 && summary != nil && !casCompatible {
+		if logicalTotalCount <= 0 && summary != nil && !casCompatible {
 			if pf, ok := summary["preflight"].(map[string]any); ok {
 				if v, ok2 := pf["totalCount"].(float64); ok2 {
-					totalCount = v
+					logicalTotalCount = v
 				}
 			}
 		}
-		if totalCount > 0 && completedFiles > totalCount {
-			completedFiles = totalCount
+		if logicalTotalCount > 0 && completedFiles > logicalTotalCount {
+			completedFiles = logicalTotalCount
 		}
 		phase := "transferring"
 		if total == 0 && bytes == 0 {
@@ -247,22 +248,24 @@ func (c *TaskController) buildActiveRunItems() ([]map[string]any, error) {
 			}
 		}
 		stable := map[string]any{
-			"bytes":          bytes,
-			"totalBytes":     total,
-			"speed":          speed,
-			"eta":            eta,
-			"percentage":     pct,
-			"phase":          phase,
-			"lastUpdatedAt":  time.Now().Format(time.RFC3339),
-			"completedFiles": completedFiles,
-			"totalCount":     totalCount,
+			"bytes":             bytes,
+			"totalBytes":        total,
+			"speed":             speed,
+			"eta":               eta,
+			"percentage":        pct,
+			"phase":             phase,
+			"lastUpdatedAt":     time.Now().Format(time.RFC3339),
+			"completedFiles":    completedFiles,
+			"plannedFiles":      plannedFiles,
+			"logicalTotalCount": logicalTotalCount,
+			"totalCount":        logicalTotalCount,
 		}
 		calcPct := 0.0
 		if total > 0 {
 			calcPct = float64(bytes) / float64(total) * 100
 		}
 		pctMismatch := total > 0 && math.Abs(calcPct-pct) > 1.5
-		countMismatch := totalCount > 0 && completedFiles > totalCount
+		countMismatch := logicalTotalCount > 0 && completedFiles > logicalTotalCount
 		etaMismatch := eta > 0 && speed > 0 && total > bytes && math.Abs((float64(total-bytes)/float64(speed))-eta) > 300
 		progressMismatch := pctMismatch || countMismatch || etaMismatch
 		progressCheck := map[string]any{
