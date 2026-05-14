@@ -1,4 +1,4 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 import type { Task } from '../types'
 
 export function useTaskListView(tasks: Ref<Task[]>) {
@@ -25,6 +25,23 @@ export function useTaskListView(tasks: Ref<Task[]>) {
     const start = (tasksPage.value - 1) * tasksPageSize
     const end = start + tasksPageSize
     return filteredTasksRaw.value.slice(start, end)
+  })
+
+  watch(taskSearch, () => {
+    tasksPage.value = 1
+    tasksJumpPage.value = 1
+  })
+
+  watch(currentTasksPages, (pages) => {
+    if (tasksPage.value > pages) {
+      tasksPage.value = pages
+    }
+    if ((tasksJumpPage.value || 1) > pages) {
+      tasksJumpPage.value = pages
+    }
+    if ((tasksJumpPage.value || 1) < 1) {
+      tasksJumpPage.value = 1
+    }
   })
 
   function jumpToTasksPage() {
