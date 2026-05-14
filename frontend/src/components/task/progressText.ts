@@ -14,10 +14,21 @@ export interface TaskProgressLike {
   phase?: string
 }
 
+export function getResolvedTotalCount(progress?: TaskProgressLike | null) {
+  const p = progress || null
+  if (!p) return 0
+  return Math.max(
+    Number((p as any).logicalTotalCount || 0),
+    Number(p.totalCount || 0),
+    Number((p as any).plannedFiles || 0),
+    Number((p as any).completedFiles || 0),
+  )
+}
+
 export function getUnifiedProgressText(progress?: TaskProgressLike | null) {
   const p = progress || null
   if (!p) return '-'
-  const totalTextValue = Number((p as any).logicalTotalCount || p.totalCount || p.plannedFiles || 0)
+  const totalTextValue = getResolvedTotalCount(p)
   const totalText = totalTextValue > 0 ? ` · ${t('runtime.totalCount')} ${totalTextValue}` : ''
   if (p.phase === 'preparing') {
     return `${t('runtime.preparing')} · ${t('runtime.transferred')} ${formatBytes(p.bytes || 0)}${totalText} · ${t('runtime.speed')} ${formatBytesPerSec(p.speed || 0)}`

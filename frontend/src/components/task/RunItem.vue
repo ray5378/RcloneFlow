@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatBytes } from '../../utils/format'
-import { getUnifiedProgressText } from './progressText'
+import { getResolvedTotalCount, getUnifiedProgressText } from './progressText'
 import { t } from '../../i18n'
 
 interface Progress {
@@ -51,7 +51,11 @@ const normalizedSummary = computed(() => {
   const raw = props.summary as any
   return raw?.finalSummary && typeof raw.finalSummary === 'object' ? raw.finalSummary : raw
 })
-const summaryTotal = computed(() => normalizedSummary.value?.counts?.total ?? 0)
+const summaryTotal = computed(() => {
+  const summaryCount = Number(normalizedSummary.value?.counts?.total ?? 0)
+  if (summaryCount > 0) return summaryCount
+  return getResolvedTotalCount(props.progress)
+})
 const summarySuccess = computed(() => {
   const counts = normalizedSummary.value?.counts || {}
   return props.run.taskMode === 'move'
