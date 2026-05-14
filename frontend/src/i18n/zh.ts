@@ -570,7 +570,6 @@ export default {
     prevPage: '上一页',
     nextPage: '下一页',
     jump: '跳转',
-    totalTasks: '共 {total} 个任务',
     commandEmpty: '命令为空',
     commandMissingSrcDst: '缺少源/目标',
     commandInvalidPath: '路径格式错误：{value}',

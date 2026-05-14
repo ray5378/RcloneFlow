@@ -139,10 +139,18 @@ const previewTasks = computed(() => {
 
   const tasks = [...props.allTasks]
   const finalMap = buildResolvedSortMap(tasks)
+  const keyword = props.search.trim().toLowerCase()
 
   return tasks
     .map(task => ({ ...task, __previewSortOrder: finalMap.get(task.id) ?? task.sortOrder ?? task.id }))
     .sort((a, b) => (a.__previewSortOrder - b.__previewSortOrder) || (a.id - b.id))
+    .filter(task => {
+      if (!keyword) return true
+      return String(task.name || '').toLowerCase().includes(keyword)
+        || String(task.sourceRemote || '').toLowerCase().includes(keyword)
+        || String(task.targetRemote || '').toLowerCase().includes(keyword)
+        || String(task.mode || '').toLowerCase().includes(keyword)
+    })
 })
 
 const saveDisabled = computed(() => !hasPendingChanges.value || savingNow.value || !!props.savingSort)
@@ -263,7 +271,6 @@ function handleLastPage() {
       :page="tasksPage"
       :total-pages="currentTasksPages"
       :jump-page="tasksJumpPage"
-      :total-items="tasksTotal"
       @first="handleFirstPage"
       @prev="handlePrevPage"
       @next="handleNextPage"

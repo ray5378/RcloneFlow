@@ -6,7 +6,6 @@ const props = defineProps<{
   page: number
   totalPages: number
   jumpPage: number | null
-  totalItems: number
 }>()
 
 const emit = defineEmits<{
@@ -25,10 +24,6 @@ function onJumpInput(event: Event) {
 
 function pageText(page: number, total: number) {
   return t('runtime.pageXofY').replace('{page}', String(page)).replace('{total}', String(total))
-}
-
-function totalText(totalItems: number) {
-  return t('taskUI.totalTasks').replace('{total}', String(totalItems))
 }
 
 const pageItems = computed<(number | string)[]>(() => {
@@ -55,12 +50,6 @@ const pageItems = computed<(number | string)[]>(() => {
 
 <template>
   <div class="pagination">
-    <div class="page-summary">
-      <span>{{ pageText(page, totalPages) }}</span>
-      <span class="summary-divider">·</span>
-      <span>{{ totalText(totalItems) }}</span>
-    </div>
-
     <div class="page-nav">
       <button class="page-btn edge-btn" :disabled="page <= 1" @click="emit('first')">«</button>
 
@@ -90,20 +79,20 @@ const pageItems = computed<(number | string)[]>(() => {
       </button>
 
       <button class="page-btn edge-btn" :disabled="page >= totalPages" @click="emit('last')">»</button>
-    </div>
 
-    <div class="page-jump">
-      <span class="jump-label">#</span>
-      <input
-        type="number"
-        class="page-input"
-        :value="jumpPage ?? ''"
-        min="1"
-        :max="totalPages"
-        @input="onJumpInput"
-        @keyup.enter="emit('jump')"
-      />
-      <button class="page-btn jump-btn" @click="emit('jump')">{{ t('runtime.jump') }}</button>
+      <div class="page-jump">
+        <span class="jump-label">#</span>
+        <input
+          type="number"
+          class="page-input"
+          :value="jumpPage ?? ''"
+          min="1"
+          :max="totalPages"
+          @input="onJumpInput"
+          @keyup.enter="emit('jump')"
+        />
+        <button class="page-btn jump-btn" @click="emit('jump')">{{ t('runtime.jump') }}</button>
+      </div>
     </div>
   </div>
 </template>
@@ -112,28 +101,16 @@ const pageItems = computed<(number | string)[]>(() => {
 .pagination {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 12px;
   flex-wrap: wrap;
   padding-top: 10px;
 }
 
-.page-summary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--muted, #999);
-  white-space: nowrap;
-}
-
-.summary-divider {
-  opacity: 0.55;
-}
-
 .page-nav {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   flex-wrap: wrap;
 }
@@ -238,18 +215,12 @@ body.light .page-input {
 }
 
 @media (max-width: 768px) {
-  .pagination {
-    justify-content: center;
-  }
-
-  .page-nav {
-    justify-content: center;
-  }
-
-  .page-summary,
+  .page-nav,
   .page-jump {
-    width: 100%;
     justify-content: center;
+  }
+
+  .page-jump {
     flex-wrap: wrap;
   }
 

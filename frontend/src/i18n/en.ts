@@ -570,7 +570,6 @@ export default {
     prevPage: 'Previous',
     nextPage: 'Next',
     jump: 'Jump',
-    totalTasks: '{total} tasks',
     commandEmpty: 'Command is empty',
     commandMissingSrcDst: 'Missing source/target',
     commandInvalidPath: 'Invalid path format: {value}',

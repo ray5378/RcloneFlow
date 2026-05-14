@@ -386,7 +386,7 @@ const {
     v-if="currentModule === 'tasks'"
     :task-search="taskSearch"
     :filtered-tasks="filteredTasks"
-    :all-tasks="filteredTasksRaw"
+    :all-tasks="tasks"
     :get-schedule-by-task-id="getScheduleByTaskId"
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
