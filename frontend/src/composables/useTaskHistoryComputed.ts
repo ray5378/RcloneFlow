@@ -30,7 +30,7 @@ export function useTaskHistoryComputed(options: UseTaskHistoryComputedOptions) {
     if (options.historyStatusFilter.value === 'hasTransfer') {
       return source.filter(r => {
         const sum = getCachedFinalSummary(r)
-        return sum && (sum.totalCount > 1 || sum.transferredBytes > 0)
+        return sum && (sum.totalCount > 0 || sum.transferredBytes > 0)
       })
     }
     if (options.historyStatusFilter.value !== 'all') {
