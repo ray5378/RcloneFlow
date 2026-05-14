@@ -72,6 +72,8 @@ export interface ActiveTransferSnapshot {
   taskId: number
   trackingMode: TrackingMode
   totalCount: number
+  completedCount?: number
+  pendingCount?: number
   currentFile?: ActiveTransferCurrentFile | null
   currentFiles?: ActiveTransferCurrentFile[]
   completed?: ActiveTransferCompletedFile[]

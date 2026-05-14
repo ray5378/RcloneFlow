@@ -10,25 +10,45 @@ export function useTaskViewRefreshLifecycle(options: {
   setupRealtimeSync?: () => void
   stuckMs: number
 }) {
+  const ACTIVE_POLL_FAST_MS = 3000
+  const ACTIVE_POLL_IDLE_MS = 12000
+
   let lastRenderedSignature = ''
   let stuckTimer: number | null = null
   let activePollTimer: number | null = null
 
   function stopActivePollLoop() {
     if (activePollTimer) {
-      clearInterval(activePollTimer)
+      clearTimeout(activePollTimer)
       activePollTimer = null
     }
   }
 
-  function startActivePollLoop() {
+  function getActivePollDelay() {
+    const activeCount = Array.isArray(options.activeRuns.value) ? options.activeRuns.value.length : 0
+    return activeCount > 0 ? ACTIVE_POLL_FAST_MS : ACTIVE_POLL_IDLE_MS
+  }
+
+  function scheduleNextActivePoll(delay?: number) {
     stopActivePollLoop()
     if (options.currentModule && options.currentModule.value !== 'tasks') return
-    activePollTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        options.loadActiveRuns().catch(console.error)
+    const nextDelay = typeof delay === 'number' ? delay : getActivePollDelay()
+    activePollTimer = window.setTimeout(async () => {
+      activePollTimer = null
+      try {
+        if (document.visibilityState === 'visible') {
+          await options.loadActiveRuns()
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        scheduleNextActivePoll()
       }
-    }, 3000)
+    }, nextDelay)
+  }
+
+  function restartActivePollLoop(delay?: number) {
+    scheduleNextActivePoll(delay)
   }
 
   if (options.currentModule) {
@@ -41,12 +61,17 @@ export function useTaskViewRefreshLifecycle(options: {
         setTimeout(() => {
           options.loadActiveRuns().catch(console.error)
         }, 300)
-        startActivePollLoop()
+        restartActivePollLoop(1500)
       } else {
         stopActivePollLoop()
       }
     })
   }
+
+  watch(() => (options.activeRuns.value || []).length, () => {
+    if (options.currentModule && options.currentModule.value !== 'tasks') return
+    restartActivePollLoop()
+  })
 
   onMounted(() => {
     Promise.all([
@@ -55,7 +80,7 @@ export function useTaskViewRefreshLifecycle(options: {
     ]).catch(console.error)
     options.setupRealtimeSync?.()
 
-    startActivePollLoop()
+    restartActivePollLoop(1500)
 
     stuckTimer = window.setInterval(() => {
       try {
@@ -97,10 +122,7 @@ export function useTaskViewRefreshLifecycle(options: {
       clearInterval(stuckTimer)
       stuckTimer = null
     }
-    if (activePollTimer) {
-      clearInterval(activePollTimer)
-      activePollTimer = null
-    }
+    stopActivePollLoop()
   })
 
   return {}

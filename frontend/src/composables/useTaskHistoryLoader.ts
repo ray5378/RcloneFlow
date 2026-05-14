@@ -13,31 +13,85 @@ interface UseTaskHistoryLoaderOptions {
 }
 
 export function useTaskHistoryLoader(options: UseTaskHistoryLoaderOptions) {
+  const HISTORY_POLL_FAST_MS = 3000
+  const HISTORY_POLL_IDLE_MS = 15000
+
   let historyRefreshTimer: number | null = null
+
+  function stableStringify(value: any) {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return ''
+    }
+  }
+
+  function reconcileRuns(current: Run[], incoming: Run[]) {
+    const prev = Array.isArray(current) ? current : []
+    const next = Array.isArray(incoming) ? incoming : []
+    const prevById = new Map<number, Run>()
+    for (const run of prev) {
+      if (typeof run?.id === 'number') prevById.set(run.id, run)
+    }
+
+    let changed = prev.length !== next.length
+    const merged = next.map((run, idx) => {
+      const prevRun = typeof run?.id === 'number' ? prevById.get(run.id) : undefined
+      if (!prevRun) {
+        changed = true
+        return run
+      }
+      const reused = stableStringify(prevRun) === stableStringify(run) ? prevRun : run
+      if (!changed && prev[idx] !== reused) changed = true
+      return reused
+    })
+
+    return changed ? merged : prev
+  }
 
   async function refreshTaskHistoryRuns() {
     if (options.historyFilterTaskId.value === null) return
     const data = await options.runApi.getRunsByTask(options.historyFilterTaskId.value)
     if (data && Array.isArray(data)) {
-      options.taskRuns.value = data
+      const merged = reconcileRuns(options.taskRuns.value || [], data)
+      if (merged !== options.taskRuns.value) {
+        options.taskRuns.value = merged
+      }
     }
   }
 
   function stopHistoryRefreshLoop() {
     if (historyRefreshTimer) {
-      clearInterval(historyRefreshTimer)
+      clearTimeout(historyRefreshTimer)
       historyRefreshTimer = null
     }
   }
 
-  function startHistoryRefreshLoop() {
+  function getHistoryPollDelay() {
+    const hasRunning = (options.taskRuns.value || []).some(run => String(run?.status || '').toLowerCase() === 'running')
+    return hasRunning ? HISTORY_POLL_FAST_MS : HISTORY_POLL_IDLE_MS
+  }
+
+  function scheduleNextHistoryRefresh(delay?: number) {
     stopHistoryRefreshLoop()
     if (options.currentModule.value !== 'history' || options.historyFilterTaskId.value === null) return
-    historyRefreshTimer = window.setInterval(() => {
-      if (document.visibilityState === 'visible') {
-        refreshTaskHistoryRuns().catch(console.error)
+    const nextDelay = typeof delay === 'number' ? delay : getHistoryPollDelay()
+    historyRefreshTimer = window.setTimeout(async () => {
+      historyRefreshTimer = null
+      try {
+        if (document.visibilityState === 'visible') {
+          await refreshTaskHistoryRuns()
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        scheduleNextHistoryRefresh()
       }
-    }, 3000)
+    }, nextDelay)
+  }
+
+  function startHistoryRefreshLoop(delay?: number) {
+    scheduleNextHistoryRefresh(delay)
   }
 
   function viewTaskHistory(taskId: number) {
@@ -46,21 +100,26 @@ export function useTaskHistoryLoader(options: UseTaskHistoryLoaderOptions) {
     options.historyFilterTaskId.value = taskId
     options.currentModule.value = 'history'
     refreshTaskHistoryRuns().catch(console.error)
-    startHistoryRefreshLoop()
+    startHistoryRefreshLoop(1500)
   }
 
   watch([options.currentModule, options.historyFilterTaskId], ([module, taskId]) => {
     if (module === 'history' && taskId !== null) {
       refreshTaskHistoryRuns().catch(console.error)
-      startHistoryRefreshLoop()
+      startHistoryRefreshLoop(1500)
       return
     }
     stopHistoryRefreshLoop()
   })
 
+  watch(() => (options.taskRuns.value || []).some(run => String(run?.status || '').toLowerCase() === 'running'), () => {
+    if (options.currentModule.value !== 'history' || options.historyFilterTaskId.value === null) return
+    startHistoryRefreshLoop()
+  })
+
   onMounted(() => {
     if (options.currentModule.value === 'history' && options.historyFilterTaskId.value !== null) {
-      startHistoryRefreshLoop()
+      startHistoryRefreshLoop(1500)
     }
   })
 

@@ -14,8 +14,9 @@ export interface RunFileRow {
   message?: string
 }
 
-export async function getRunFiles(runId: number, offset=0, limit=50): Promise<{ total: number; items: RunFileRow[] }> {
-  return get<{ total:number; items: RunFileRow[] }>(`/api/runs/${runId}/files?offset=${offset}&limit=${limit}`)
+export async function getRunFiles(runId: number, offset=0, limit=50, filter='all'): Promise<{ total: number; items: RunFileRow[] }> {
+  const q = new URLSearchParams({ offset: String(offset), limit: String(limit), filter })
+  return get<{ total:number; items: RunFileRow[] }>(`/api/runs/${runId}/files?${q.toString()}`)
 }
 
 /** 获取所有运行记录（分页） */

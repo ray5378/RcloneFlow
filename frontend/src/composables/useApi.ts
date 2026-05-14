@@ -60,8 +60,8 @@ export const runApi = {
   async get(id: number) {
     try { return await api.getRun(id) } catch (err) { handleError(err, { module: 'Run', operation: t('runtime.runGet') }); return null }
   },
-  async getFiles(id: number, offset: number, limit: number) {
-    try { return await api.getRunFiles(id, offset, limit) } catch (err) { handleError(err, { module: 'Run', operation: t('runtime.runFiles') }); return { files: [], total: 0 } }
+  async getFiles(id: number, offset: number, limit: number, filter = 'all') {
+    try { return await api.getRunFiles(id, offset, limit, filter) } catch (err) { handleError(err, { module: 'Run', operation: t('runtime.runFiles') }); return { items: [], total: 0 } }
   },
   async delete(id: number) {
     try { await api.clearRun(id); return true } catch (err) { handleError(err, { module: 'Run', operation: t('runtime.runDelete') }); return false }

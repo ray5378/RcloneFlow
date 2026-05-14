@@ -8,7 +8,7 @@ interface UseRunDetailFilesOptions {
   runDetail: Ref<any>
   currentFinalFilter?: Ref<FinalFilterType>
   runApi: {
-    getFiles: (runId: number, offset: number, limit: number) => Promise<{ items?: any[]; total?: number }>
+    getFiles: (runId: number, offset: number, limit: number, filter?: FinalFilterType) => Promise<{ items?: any[]; total?: number }>
   }
 }
 
@@ -39,21 +39,13 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
   async function reloadRunFiles() {
     try {
       if (!options.runDetail.value?.id) return
-      const pageSize = Math.min(1000, Math.max(100, runFilesPageSize.value * 4))
-      const allItems: any[] = []
-      let offset = 0
-      let total = 0
-      while (true) {
-        const res = await options.runApi.getFiles(options.runDetail.value.id, offset, pageSize)
-        const items = res.items || []
-        total = res.total || total || 0
-        allItems.push(...items)
-        if (items.length < pageSize) break
-        if (total > 0 && allItems.length >= total) break
-        offset += pageSize
-      }
-      runFiles.value = allItems
-      runFilesTotal.value = total || allItems.length
+      const page = runFilesPage.value || 1
+      const pageSize = runFilesPageSize.value || 1
+      const filter = options.currentFinalFilter?.value || 'all'
+      const offset = (page - 1) * pageSize
+      const res = await options.runApi.getFiles(options.runDetail.value.id, offset, pageSize, filter)
+      runFiles.value = res.items || []
+      runFilesTotal.value = res.total || 0
     } catch (e) {
       console.error(e)
     }
@@ -65,40 +57,35 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
     void reloadRunFiles()
   }
 
-  const moveFilteredRunFiles = computed<RunFileRow[]>(() => {
-    const items = Array.isArray(runFiles.value) ? (runFiles.value as RunFileRow[]) : []
-    if (options.runDetail.value?.taskMode === 'move') {
-      return items.filter(it => getRunFileKind(it) !== 'deleted')
-    }
-    return items
-  })
-
   const visibleRunFiles = computed<RunFileRow[]>(() => {
-    const items = moveFilteredRunFiles.value
-    const filter = options.currentFinalFilter?.value || 'all'
-    if (filter === 'success') return items.filter(it => getRunFileKind(it) === 'success')
-    if (filter === 'failed') return items.filter(it => getRunFileKind(it) === 'failed')
-    if (filter === 'other') return items.filter(it => getRunFileKind(it) === 'skipped')
-    return items
+    return Array.isArray(runFiles.value) ? (runFiles.value as RunFileRow[]) : []
   })
 
-  const pagedRunFiles = computed(() => {
-    const page = runFilesPage.value || 1
-    const pageSize = runFilesPageSize.value || 1
-    const start = (page - 1) * pageSize
-    return visibleRunFiles.value.slice(start, start + pageSize)
-  })
-  const totalRunFilesPages = computed(() => Math.max(1, Math.ceil((visibleRunFiles.value.length || 0) / runFilesPageSize.value)))
+  const pagedRunFiles = computed(() => visibleRunFiles.value)
+  const totalRunFilesPages = computed(() => Math.max(1, Math.ceil((runFilesTotal.value || 0) / runFilesPageSize.value)))
 
   watch(() => options.currentFinalFilter?.value, () => {
     runFilesPage.value = 1
+    void reloadRunFiles()
   })
 
-  watch([visibleRunFiles, runFilesPageSize], () => {
+  watch(() => options.runDetail.value?.id, () => {
+    resetRunFiles()
+    void reloadRunFiles()
+  })
+
+  watch([runFilesPage, runFilesPageSize], () => {
     const totalPages = totalRunFilesPages.value
-    if (runFilesPage.value > totalPages) runFilesPage.value = totalPages
-    if (runFilesPage.value < 1) runFilesPage.value = 1
-  }, { immediate: true })
+    if (runFilesPage.value > totalPages) {
+      runFilesPage.value = totalPages
+      return
+    }
+    if (runFilesPage.value < 1) {
+      runFilesPage.value = 1
+      return
+    }
+    void reloadRunFiles()
+  })
 
   function goPrevFilesPage() {
     if (runFilesPage.value > 1) {

@@ -114,8 +114,8 @@ export function useActiveTransferDetail() {
     const pending = sortPendingItems(snapshot.pending || [])
     completedItems.value = completed
     pendingItems.value = pending
-    completedTotal.value = completed.length
-    pendingTotal.value = pending.length
+    completedTotal.value = Number(snapshot.completedCount || completed.length || 0)
+    pendingTotal.value = Number(snapshot.pendingCount || pending.length || 0)
     if (completedPage.value > completedTotalPages.value) {
       completedPage.value = completedTotalPages.value
       completedJumpPage.value = completedTotalPages.value
@@ -132,8 +132,8 @@ export function useActiveTransferDetail() {
     )
     summary.value = mergeNonDecreasingSummary(summary.value, {
       trackingMode: snapshot.trackingMode,
-      completedCount: completed.length,
-      pendingCount: Math.max(0, stableTotalCount - completed.length),
+      completedCount: Number(snapshot.completedCount || completed.length || 0),
+      pendingCount: Number(snapshot.pendingCount || Math.max(0, stableTotalCount - completed.length)),
       plannedFiles: Number(summary.value?.plannedFiles || 0),
       logicalTotalCount: stableTotalCount,
       totalCount: stableTotalCount,

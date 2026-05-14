@@ -9,15 +9,31 @@ import (
 
 type PersistFunc func(runID int64, snap ActiveTransferSnapshot)
 
+const (
+	degradeCandidateThreshold = 2000
+	retainedCompletedLimit    = 200
+	retainedPendingLimit      = 200
+)
+
 type Manager struct {
 	mu      sync.RWMutex
 	byRunID map[int64]*ActiveTransferState
 	byTask  map[int64]*ActiveTransferState
 	persist PersistFunc
+
+	persistThrottle time.Duration
+	pendingPersist  map[int64]ActiveTransferSnapshot
+	persistTimers   map[int64]*time.Timer
 }
 
 func NewManager() *Manager {
-	return &Manager{byRunID: map[int64]*ActiveTransferState{}, byTask: map[int64]*ActiveTransferState{}}
+	return &Manager{
+		byRunID:          map[int64]*ActiveTransferState{},
+		byTask:           map[int64]*ActiveTransferState{},
+		persistThrottle:  250 * time.Millisecond,
+		pendingPersist:   map[int64]ActiveTransferSnapshot{},
+		persistTimers:    map[int64]*time.Timer{},
+	}
 }
 
 func (m *Manager) SetPersistFunc(fn PersistFunc) {
@@ -26,12 +42,66 @@ func (m *Manager) SetPersistFunc(fn PersistFunc) {
 	m.persist = fn
 }
 
+func (m *Manager) SetPersistThrottle(d time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.persistThrottle = d
+}
+
+func (m *Manager) emitPersist(runID int64, snap ActiveTransferSnapshot) {
+	m.mu.RLock()
+	persist := m.persist
+	m.mu.RUnlock()
+	if persist == nil {
+		return
+	}
+	go persist(runID, snap)
+}
+
+func (m *Manager) flushPendingPersist(runID int64) {
+	m.mu.Lock()
+	snap, ok := m.pendingPersist[runID]
+	if !ok {
+		delete(m.persistTimers, runID)
+		m.mu.Unlock()
+		return
+	}
+	delete(m.pendingPersist, runID)
+	delete(m.persistTimers, runID)
+	m.mu.Unlock()
+	m.emitPersist(runID, snap)
+}
+
 func (m *Manager) persistSnapshotLocked(st *ActiveTransferState) {
+	m.persistSnapshotLockedMode(st, false)
+}
+
+func (m *Manager) persistSnapshotLockedImmediate(st *ActiveTransferState) {
+	m.persistSnapshotLockedMode(st, true)
+}
+
+func (m *Manager) persistSnapshotLockedMode(st *ActiveTransferState, immediate bool) {
 	if m == nil || st == nil || m.persist == nil {
 		return
 	}
 	snap := st.Snapshot()
-	go m.persist(st.RunID, snap)
+	runID := st.RunID
+	if immediate || m.persistThrottle <= 0 {
+		if timer, ok := m.persistTimers[runID]; ok {
+			timer.Stop()
+			delete(m.persistTimers, runID)
+		}
+		delete(m.pendingPersist, runID)
+		go m.persist(runID, snap)
+		return
+	}
+	m.pendingPersist[runID] = snap
+	if _, exists := m.persistTimers[runID]; exists {
+		return
+	}
+	m.persistTimers[runID] = time.AfterFunc(m.persistThrottle, func() {
+		m.flushPendingPersist(runID)
+	})
 }
 
 func (m *Manager) RestoreState(st *ActiveTransferState) {
@@ -48,19 +118,26 @@ func (m *Manager) InitState(runID, taskID int64, mode TrackingMode, candidates [
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	st := &ActiveTransferState{
-		RunID:             runID,
-		TaskID:            taskID,
-		TrackingMode:      mode,
-		Candidates:        map[string]TransferCandidateFile{},
-		CurrentFiles:      map[string]TransferCurrentFile{},
-		Completed:         map[string]TransferCompletedFile{},
-		Pending:           map[string]TransferPendingFile{},
-		PreflightPending:  true,
-		PreflightFinished: len(candidates) > 0,
-		NextOrder:         1,
+		RunID:              runID,
+		TaskID:             taskID,
+		TrackingMode:       mode,
+		Candidates:         map[string]TransferCandidateFile{},
+		CurrentFiles:       map[string]TransferCurrentFile{},
+		Completed:          map[string]TransferCompletedFile{},
+		Pending:            map[string]TransferPendingFile{},
+		TotalCount:         len(candidates),
+		CompletedCount:     0,
+		PendingCount:       len(candidates),
+		PreflightPending:   true,
+		PreflightFinished:  len(candidates) > 0,
+		NextOrder:          1,
 		NextCompletedOrder: 1,
-		StartedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
+		StartedAt:          time.Now(),
+		UpdatedAt:          time.Now(),
+	}
+	if len(candidates) > degradeCandidateThreshold {
+		st.Degraded = true
+		st.DegradeReason = "large transfer set; retaining only recent completed/pending items in memory"
 	}
 	if len(candidates) == 0 {
 		st.PreflightFinished = false
@@ -82,10 +159,11 @@ func (m *Manager) InitState(runID, taskID int64, mode TrackingMode, candidates [
 		}
 		st.Candidates[key] = c
 		st.Pending[key] = TransferPendingFile{Path: key, Name: c.Name, SizeBytes: c.SizeBytes, Status: FileStatusPending, Order: c.Order}
+		trimPendingRetainedLocked(st)
 	}
 	m.byRunID[runID] = st
 	m.byTask[taskID] = st
-	m.persistSnapshotLocked(st)
+	m.persistSnapshotLockedImmediate(st)
 	return st
 }
 
@@ -119,6 +197,16 @@ func (m *Manager) MergeCandidates(runID int64, candidates []TransferCandidateFil
 			st.NextOrder++
 		} else if c.Order >= st.NextOrder {
 			st.NextOrder = c.Order + 1
+		}
+		if _, existed := st.Candidates[key]; !existed {
+			st.TotalCount++
+			st.PendingCount++
+			if st.TotalCount > degradeCandidateThreshold {
+				st.Degraded = true
+				if strings.TrimSpace(st.DegradeReason) == "" {
+					st.DegradeReason = "large transfer set; retaining only recent completed/pending items in memory"
+				}
+			}
 		}
 		st.Candidates[key] = c
 		if cur, ok := st.CurrentFiles[key]; ok {
@@ -167,11 +255,12 @@ func (m *Manager) MergeCandidates(runID int64, candidates []TransferCandidateFil
 			continue
 		}
 		st.Pending[key] = TransferPendingFile{Path: key, Name: c.Name, SizeBytes: c.SizeBytes, Status: FileStatusPending, Order: c.Order}
+		trimPendingRetainedLocked(st)
 	}
 	st.PreflightPending = false
 	st.PreflightFinished = true
 	st.UpdatedAt = time.Now()
-	m.persistSnapshotLocked(st)
+	m.persistSnapshotLockedImmediate(st)
 }
 
 func (m *Manager) SetPreflightResult(runID int64, err error) {
@@ -191,7 +280,7 @@ func (m *Manager) SetPreflightResult(runID int64, err error) {
 		}
 	}
 	st.UpdatedAt = time.Now()
-	m.persistSnapshotLocked(st)
+	m.persistSnapshotLockedImmediate(st)
 }
 
 func (m *Manager) GetByTaskID(taskID int64) (*ActiveTransferState, bool) {
@@ -215,6 +304,11 @@ func (m *Manager) RemoveState(runID int64) {
 	if !ok {
 		return
 	}
+	if timer, ok := m.persistTimers[runID]; ok {
+		timer.Stop()
+		delete(m.persistTimers, runID)
+	}
+	delete(m.pendingPersist, runID)
 	delete(m.byRunID, runID)
 	delete(m.byTask, st.TaskID)
 }
@@ -258,6 +352,7 @@ func (m *Manager) UpdateCurrentFile(runID int64, path string, bytes, total, spee
 		st.Pending[key] = p
 	} else {
 		st.Pending[key] = TransferPendingFile{Path: key, Name: name, Status: FileStatusInProgress, Order: order}
+		trimPendingRetainedLocked(st)
 	}
 	st.UpdatedAt = time.Now()
 	m.persistSnapshotLocked(st)
@@ -288,13 +383,20 @@ func (m *Manager) MarkCompleted(runID int64, path string, status FileStatus, mes
 			}
 		}
 	}
-	delete(st.Pending, key)
+	if _, existed := st.Pending[key]; existed {
+		delete(st.Pending, key)
+	}
+	if st.PendingCount > 0 {
+		st.PendingCount--
+	}
+	st.CompletedCount++
 	completedOrder := st.NextCompletedOrder
 	if completedOrder <= 0 {
 		completedOrder = 1
 	}
 	st.NextCompletedOrder = completedOrder + 1
 	st.Completed[key] = TransferCompletedFile{Path: key, Name: name, SizeBytes: size, At: time.Now().Format(time.RFC3339), Status: status, Message: message, Order: completedOrder}
+	trimCompletedRetainedLocked(st)
 	if st.CurrentFiles != nil {
 		delete(st.CurrentFiles, key)
 	}
@@ -322,7 +424,7 @@ func (m *Manager) MarkCompleted(runID int64, path string, status FileStatus, mes
 		}
 	}
 	st.UpdatedAt = time.Now()
-	m.persistSnapshotLocked(st)
+	m.persistSnapshotLockedImmediate(st)
 }
 
 func (m *Manager) BuildSummary(taskID int64, bytes, total, speed, eta int64, percentage float64) (ActiveTransferOverviewResponse, bool) {
@@ -356,9 +458,9 @@ func (m *Manager) BuildSummary(taskID int64, bytes, total, speed, eta int64, per
 		CurrentFiles: currentFiles,
 		Summary: ActiveTransferSummary{
 			TrackingMode:      st.TrackingMode,
-			CompletedCount:    len(st.Completed),
-			PendingCount:      len(st.Pending),
-			TotalCount:        len(st.Candidates),
+			CompletedCount:    st.CompletedCount,
+			PendingCount:      st.PendingCount,
+			TotalCount:        st.TotalCount,
 			PreflightPending:  st.PreflightPending,
 			PreflightFinished: st.PreflightFinished,
 			Bytes:             bytes,
@@ -392,7 +494,9 @@ func (m *Manager) ListCompleted(taskID int64, offset, limit int) ActiveTransferL
 		}
 		return items[i].Path < items[j].Path
 	})
-	return paginate(items, offset, limit)
+	resp := paginate(items, offset, limit)
+	resp.Total = st.CompletedCount
+	return resp
 }
 
 func (m *Manager) ListPending(taskID int64, offset, limit int) ActiveTransferListResponse[TransferPendingFile] {
@@ -421,7 +525,59 @@ func (m *Manager) ListPending(taskID int64, offset, limit int) ActiveTransferLis
 		}
 		return items[i].Path < items[j].Path
 	})
-	return paginate(items, offset, limit)
+	resp := paginate(items, offset, limit)
+	resp.Total = st.PendingCount
+	return resp
+}
+
+func trimCompletedRetainedLocked(st *ActiveTransferState) {
+	if st == nil || !st.Degraded || len(st.Completed) <= retainedCompletedLimit {
+		return
+	}
+	for len(st.Completed) > retainedCompletedLimit {
+		var oldestKey string
+		var oldestOrder int
+		first := true
+		for key, item := range st.Completed {
+			if first || item.Order < oldestOrder {
+				oldestKey = key
+				oldestOrder = item.Order
+				first = false
+			}
+		}
+		if oldestKey == "" {
+			return
+		}
+		delete(st.Completed, oldestKey)
+	}
+}
+
+func trimPendingRetainedLocked(st *ActiveTransferState) {
+	if st == nil || !st.Degraded || len(st.Pending) <= retainedPendingLimit {
+		return
+	}
+	type candidate struct {
+		key   string
+		order int
+	}
+	removable := make([]candidate, 0, len(st.Pending))
+	for key, item := range st.Pending {
+		if item.Status == FileStatusInProgress {
+			continue
+		}
+		removable = append(removable, candidate{key: key, order: item.Order})
+	}
+	sort.SliceStable(removable, func(i, j int) bool {
+		if removable[i].order == removable[j].order {
+			return removable[i].key > removable[j].key
+		}
+		return removable[i].order > removable[j].order
+	})
+	for len(st.Pending) > retainedPendingLimit && len(removable) > 0 {
+		victim := removable[0]
+		removable = removable[1:]
+		delete(st.Pending, victim.key)
+	}
 }
 
 func cloneCurrent(v *TransferCurrentFile) *TransferCurrentFile {

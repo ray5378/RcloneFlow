@@ -33,10 +33,23 @@ type Message struct {
 func NewHub() *Hub {
 	return &Hub{
 		clients:    make(map[*Client]bool),
-		broadcast: make(chan []byte, 256),
+		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 	}
+}
+
+func (h *Hub) removeClient(client *Client) {
+	if client == nil {
+		return
+	}
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if _, ok := h.clients[client]; !ok {
+		return
+	}
+	delete(h.clients, client)
+	close(client.send)
 }
 
 // Run starts the hub's main loop
@@ -48,23 +61,21 @@ func (h *Hub) Run() {
 			h.clients[client] = true
 			h.mu.Unlock()
 		case client := <-h.unregister:
-			h.mu.Lock()
-			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
-				close(client.send)
-			}
-			h.mu.Unlock()
+			h.removeClient(client)
 		case message := <-h.broadcast:
+			var staleClients []*Client
 			h.mu.RLock()
 			for client := range h.clients {
 				select {
 				case client.send <- message:
 				default:
-					close(client.send)
-					delete(h.clients, client)
+					staleClients = append(staleClients, client)
 				}
 			}
 			h.mu.RUnlock()
+			for _, client := range staleClients {
+				h.removeClient(client)
+			}
 		}
 	}
 }

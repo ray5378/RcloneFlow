@@ -871,6 +871,10 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 	offset := 0
 	limit := 50
+	filter := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("filter")))
+	if filter == "" {
+		filter = "all"
+	}
 	if v := r.URL.Query().Get("offset"); v != "" {
 		if n, e := strconv.Atoi(v); e == nil && n >= 0 {
 			offset = n
@@ -1068,6 +1072,29 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 			return merged[i].Name < merged[j].Name
 		})
 		rows = merged
+	}
+	if filter != "all" {
+		filtered := make([]Row, 0, len(rows))
+		for _, row := range rows {
+			kind := strings.ToLower(strings.TrimSpace(row.Status))
+			switch filter {
+			case "success":
+				if kind == "success" {
+					filtered = append(filtered, row)
+				}
+			case "failed":
+				if kind == "failed" {
+					filtered = append(filtered, row)
+				}
+			case "other":
+				if kind == "skipped" {
+					filtered = append(filtered, row)
+				}
+			default:
+				filtered = append(filtered, row)
+			}
+		}
+		rows = filtered
 	}
 	// 分页
 	total := len(rows)

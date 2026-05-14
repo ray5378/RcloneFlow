@@ -1,4 +1,4 @@
-import { type Ref } from 'vue'
+import { onUnmounted, type Ref } from 'vue'
 import { useWebSocket, onWsMessage } from './useWebSocket'
 import * as api from '../api'
 import type { Run, Schedule, Task } from '../types'
@@ -23,10 +23,114 @@ interface UseTaskViewDataSyncOptions {
   jobApi: { list: () => Promise<any[]> }
 }
 
+const TASKS_SNAPSHOT_KEY = 'lastTasksSnapshot'
+const TASKS_SNAPSHOT_VERSION = 2
+const TASKS_SNAPSHOT_WRITE_DELAY_MS = 1200
+
 export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   let loadSeq = 0
   let activeRunsReloadTimer: number | null = null
   let dataReloadTimer: number | null = null
+  let tasksSnapshotWriteTimer: number | null = null
+  let realtimeInitialized = false
+  let cleanupRealtime: (() => void) | null = null
+
+  function stableStringify(value: any) {
+    try {
+      return JSON.stringify(value)
+    } catch {
+      return ''
+    }
+  }
+
+  function isSameShape(a: any, b: any) {
+    return stableStringify(a) === stableStringify(b)
+  }
+
+  function getActiveRunKey(item: any) {
+    return String(item?.runRecord?.id ?? item?.runId ?? item?.id ?? item?.runRecord?.taskId ?? item?.taskId ?? item?.taskID ?? item?.task_id ?? '')
+  }
+
+  function reconcileListByKey<T>(current: T[], incoming: T[], getKey: (item: T) => string, isSame: (a: T, b: T) => boolean) {
+    const prev = Array.isArray(current) ? current : []
+    const next = Array.isArray(incoming) ? incoming : []
+    const prevByKey = new Map<string, T>()
+    for (const item of prev) {
+      const key = getKey(item)
+      if (key) prevByKey.set(key, item)
+    }
+
+    let changed = prev.length !== next.length
+    const merged = next.map((item, idx) => {
+      const key = getKey(item)
+      const prevItem = key ? prevByKey.get(key) : undefined
+      if (!prevItem) {
+        changed = true
+        return item
+      }
+      const reused = isSame(prevItem, item) ? prevItem : item
+      if (!changed && prev[idx] !== reused) changed = true
+      return reused
+    })
+
+    return changed ? merged : prev
+  }
+
+  function replaceActiveRuns(nextList: any[]) {
+    const merged = reconcileListByKey<any>(
+      options.activeRuns.value || [],
+      nextList || [],
+      getActiveRunKey,
+      isSameShape,
+    )
+    if (merged !== options.activeRuns.value) {
+      options.activeRuns.value = merged
+    }
+  }
+
+  function compactTaskSnapshot(tasks: Task[]) {
+    return (tasks || []).map((task: any) => ({
+      id: Number(task?.id || 0),
+      name: String(task?.name || ''),
+      sourcePath: String(task?.sourcePath || task?.src || ''),
+      destPath: String(task?.destPath || task?.dst || ''),
+      scheduleId: task?.scheduleId ?? null,
+      cron: task?.cron ?? null,
+      autoRun: !!task?.autoRun,
+      enabled: task?.enabled !== false,
+      command: task?.command ?? task?.cmd ?? '',
+      updatedAt: task?.updatedAt ?? task?.updated_at ?? null,
+      sortIndex: task?.sortIndex ?? task?.sort_index ?? null,
+    }))
+  }
+
+  function scheduleTasksSnapshotWrite() {
+    if (tasksSnapshotWriteTimer) return
+    tasksSnapshotWriteTimer = window.setTimeout(() => {
+      tasksSnapshotWriteTimer = null
+      try {
+        const payload = {
+          version: TASKS_SNAPSHOT_VERSION,
+          savedAt: new Date().toISOString(),
+          tasks: compactTaskSnapshot(options.tasks.value || []),
+        }
+        localStorage.setItem(TASKS_SNAPSHOT_KEY, JSON.stringify(payload))
+      } catch {}
+    }, TASKS_SNAPSHOT_WRITE_DELAY_MS)
+  }
+
+  function restoreTasksSnapshot(): Task[] | null {
+    try {
+      const raw = localStorage.getItem(TASKS_SNAPSHOT_KEY)
+      if (!raw) return null
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed as Task[]
+      if (parsed && Number(parsed.version) >= 2 && Array.isArray(parsed.tasks)) {
+        return parsed.tasks as Task[]
+      }
+    } catch {}
+    return null
+  }
 
   async function loadData() {
     const seq = ++loadSeq
@@ -36,7 +140,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
         if (seq !== loadSeq || !boot) return
         if (Array.isArray(boot.tasks)) options.tasks.value = boot.tasks
         if (Array.isArray(boot.activeRuns)) {
-          options.activeRuns.value = boot.activeRuns
+          replaceActiveRuns(boot.activeRuns)
         }
       }
 
@@ -52,16 +156,12 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
         options.runs.value = runResult.runs
         options.runsTotal.value = typeof runResult.total === 'number' ? runResult.total : (runResult.runs?.length || 0)
       }
-      try {
-        localStorage.setItem('lastTasksSnapshot', JSON.stringify(options.tasks.value || []))
-      } catch {}
+      scheduleTasksSnapshotWrite()
     } catch (e) {
       console.error(e)
       if (!options.tasks.value || options.tasks.value.length === 0) {
-        try {
-          const snap = JSON.parse(localStorage.getItem('lastTasksSnapshot') || '[]')
-          if (Array.isArray(snap)) options.tasks.value = snap
-        } catch {}
+        const snap = restoreTasksSnapshot()
+        if (Array.isArray(snap)) options.tasks.value = snap
       }
     }
   }
@@ -100,14 +200,12 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
           }
           options.lastNonDecreasingTotalsByTask.value[tid] = nextTotals
         }
-        it.progress = raw
-        return it
+        return {
+          ...it,
+          progress: raw,
+        }
       })
-      if (list.length === 0) {
-        options.activeRuns.value = []
-        return
-      }
-      options.activeRuns.value = list
+      replaceActiveRuns(list)
     } catch (e) {
       console.error(e)
     }
@@ -144,6 +242,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   }
 
   function setupRealtimeSync() {
+    if (realtimeInitialized) return
+    realtimeInitialized = true
+
     const wsClient = useWebSocket({
       onMessage: (msg) => {
         if (msg.type === 'run_status' && msg.data) {
@@ -238,13 +339,44 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     })
     wsClient.connect()
 
-    onWsMessage('run_status', () => {
+    const offRunStatus = onWsMessage('run_status', () => {
       Promise.all([
         loadActiveRuns().catch(console.error),
         loadData().catch(console.error),
       ]).catch(console.error)
     })
+
+    cleanupRealtime = () => {
+      offRunStatus()
+      wsClient.cleanup()
+      cleanupRealtime = null
+      realtimeInitialized = false
+    }
   }
+
+  onUnmounted(() => {
+    if (activeRunsReloadTimer) {
+      clearTimeout(activeRunsReloadTimer)
+      activeRunsReloadTimer = null
+    }
+    if (dataReloadTimer) {
+      clearTimeout(dataReloadTimer)
+      dataReloadTimer = null
+    }
+    if (tasksSnapshotWriteTimer) {
+      clearTimeout(tasksSnapshotWriteTimer)
+      tasksSnapshotWriteTimer = null
+      try {
+        const payload = {
+          version: TASKS_SNAPSHOT_VERSION,
+          savedAt: new Date().toISOString(),
+          tasks: compactTaskSnapshot(options.tasks.value || []),
+        }
+        localStorage.setItem(TASKS_SNAPSHOT_KEY, JSON.stringify(payload))
+      } catch {}
+    }
+    cleanupRealtime?.()
+  })
 
   return {
     loadData,

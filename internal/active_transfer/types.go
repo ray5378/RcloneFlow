@@ -84,6 +84,9 @@ type ActiveTransferState struct {
 	CurrentFiles  map[string]TransferCurrentFile
 	Completed     map[string]TransferCompletedFile
 	Pending       map[string]TransferPendingFile
+	TotalCount    int
+	CompletedCount int
+	PendingCount   int
 	Degraded           bool
 	DegradeReason      string
 	PreflightPending   bool
@@ -111,20 +114,22 @@ type ActiveTransferListResponse[T any] struct {
 }
 
 type ActiveTransferSnapshot struct {
-	RunID         int64                    `json:"runId"`
-	TaskID        int64                    `json:"taskId"`
-	TrackingMode  TrackingMode             `json:"trackingMode"`
-	TotalCount    int                      `json:"totalCount"`
-	CurrentFile   *TransferCurrentFile     `json:"currentFile,omitempty"`
-	CurrentFiles  []TransferCurrentFile    `json:"currentFiles,omitempty"`
-	Completed     []TransferCompletedFile  `json:"completed,omitempty"`
-	Pending       []TransferPendingFile    `json:"pending,omitempty"`
-	Degraded          bool                     `json:"degraded,omitempty"`
-	DegradeReason     string                   `json:"degradeReason,omitempty"`
-	PreflightPending  bool                     `json:"preflightPending,omitempty"`
-	PreflightFinished bool                     `json:"preflightFinished,omitempty"`
-	StartedAt         string                   `json:"startedAt,omitempty"`
-	UpdatedAt         string                   `json:"updatedAt,omitempty"`
+	RunID           int64                   `json:"runId"`
+	TaskID          int64                   `json:"taskId"`
+	TrackingMode    TrackingMode            `json:"trackingMode"`
+	TotalCount      int                     `json:"totalCount"`
+	CompletedCount  int                     `json:"completedCount,omitempty"`
+	PendingCount    int                     `json:"pendingCount,omitempty"`
+	CurrentFile     *TransferCurrentFile    `json:"currentFile,omitempty"`
+	CurrentFiles    []TransferCurrentFile   `json:"currentFiles,omitempty"`
+	Completed       []TransferCompletedFile `json:"completed,omitempty"`
+	Pending         []TransferPendingFile   `json:"pending,omitempty"`
+	Degraded        bool                    `json:"degraded,omitempty"`
+	DegradeReason   string                  `json:"degradeReason,omitempty"`
+	PreflightPending  bool                  `json:"preflightPending,omitempty"`
+	PreflightFinished bool                  `json:"preflightFinished,omitempty"`
+	StartedAt       string                  `json:"startedAt,omitempty"`
+	UpdatedAt       string                  `json:"updatedAt,omitempty"`
 }
 
 func (s *ActiveTransferState) Snapshot() ActiveTransferSnapshot {
@@ -180,20 +185,22 @@ func (s *ActiveTransferState) Snapshot() ActiveTransferSnapshot {
 		return currentFiles[i].Path < currentFiles[j].Path
 	})
 	return ActiveTransferSnapshot{
-		RunID:         s.RunID,
-		TaskID:        s.TaskID,
-		TrackingMode:  s.TrackingMode,
-		TotalCount:    len(s.Candidates),
-		CurrentFile:   cloneCurrent(s.CurrentFile),
-		CurrentFiles:  currentFiles,
-		Completed:     completed,
-		Pending:       pending,
-		Degraded:          s.Degraded,
-		DegradeReason:     s.DegradeReason,
-		PreflightPending:  s.PreflightPending,
+		RunID:            s.RunID,
+		TaskID:           s.TaskID,
+		TrackingMode:     s.TrackingMode,
+		TotalCount:       s.TotalCount,
+		CompletedCount:   s.CompletedCount,
+		PendingCount:     s.PendingCount,
+		CurrentFile:      cloneCurrent(s.CurrentFile),
+		CurrentFiles:     currentFiles,
+		Completed:        completed,
+		Pending:          pending,
+		Degraded:         s.Degraded,
+		DegradeReason:    s.DegradeReason,
+		PreflightPending: s.PreflightPending,
 		PreflightFinished: s.PreflightFinished,
-		StartedAt:         s.StartedAt.Format(time.RFC3339),
-		UpdatedAt:         s.UpdatedAt.Format(time.RFC3339),
+		StartedAt:        s.StartedAt.Format(time.RFC3339),
+		UpdatedAt:        s.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
@@ -207,6 +214,9 @@ func RestoreStateFromSnapshot(snap ActiveTransferSnapshot) *ActiveTransferState 
 		Pending:       map[string]TransferPendingFile{},
 		CurrentFile:   cloneCurrent(snap.CurrentFile),
 		CurrentFiles:  map[string]TransferCurrentFile{},
+		TotalCount:    snap.TotalCount,
+		CompletedCount: snap.CompletedCount,
+		PendingCount:   snap.PendingCount,
 		Degraded:          snap.Degraded,
 		DegradeReason:     snap.DegradeReason,
 		PreflightPending:  snap.PreflightPending,
@@ -253,9 +263,34 @@ func RestoreStateFromSnapshot(snap ActiveTransferSnapshot) *ActiveTransferState 
 	}
 	st.NextOrder = maxOrder + 1
 	st.NextCompletedOrder = maxCompletedOrder + 1
+	if st.TotalCount <= 0 {
+		st.TotalCount = snap.TotalCount
+	}
+	if st.CompletedCount <= 0 {
+		st.CompletedCount = len(st.Completed)
+	}
+	if st.PendingCount <= 0 {
+		if st.TotalCount > 0 {
+			st.PendingCount = max(0, st.TotalCount-st.CompletedCount)
+		} else {
+			st.PendingCount = len(st.Pending)
+		}
+	}
 	for len(st.Candidates) < snap.TotalCount {
 		ghost := "__ghost__/" + time.Now().Format("150405.000000000")
 		st.Candidates[ghost] = TransferCandidateFile{Path: ghost, Name: ghost}
+	}
+	if st.TotalCount <= 0 {
+		st.TotalCount = len(st.Candidates)
+	}
+	if st.CompletedCount <= 0 {
+		st.CompletedCount = len(st.Completed)
+	}
+	if st.PendingCount <= 0 {
+		st.PendingCount = st.TotalCount - st.CompletedCount
+		if st.PendingCount < 0 {
+			st.PendingCount = len(st.Pending)
+		}
 	}
 	if t, err := time.Parse(time.RFC3339, snap.StartedAt); err == nil {
 		st.StartedAt = t
