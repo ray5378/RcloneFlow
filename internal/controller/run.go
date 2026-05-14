@@ -171,10 +171,17 @@ func isCASAttemptObjectNotFoundSummaryRow(path, msg string) bool {
 func isCASRunObjectNotFoundSummaryRow(path, msg string) bool {
 	path = strings.TrimSpace(path)
 	msg = strings.ToLower(strings.TrimSpace(msg))
+	lowPath := strings.ToLower(path)
 	if path == "" && msg == "" {
 		return false
 	}
-	return strings.HasPrefix(strings.ToLower(path), "failed to copy with ") && strings.Contains(msg, "last error was: object not found")
+	if strings.HasPrefix(lowPath, "failed to copy with ") && strings.Contains(msg, "last error was: object not found") {
+		return true
+	}
+	if lowPath == "failed to copy" && msg == "object not found" {
+		return true
+	}
+	return false
 }
 
 func filterCASHistoricalDetailRows(rows []map[string]any) []map[string]any {

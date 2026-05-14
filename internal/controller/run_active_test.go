@@ -605,6 +605,7 @@ func TestHandleRunFiles_CASHistorySuppressesObjectNotFoundNoise(t *testing.T) {
 		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n" +
 		"2026/05/13 15:48:30 ERROR : Attempt 1/1 failed with 2 errors and: object not found\n" +
 		"2026/05/13 15:48:31 ERROR : Failed to copy with 2 errors: last error was: object not found\n" +
+		"2026/05/13 15:48:32 ERROR : Failed to copy: object not found\n" +
 		"2026/05/13 15:49:07 NOTICE : 电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E06 - 第 6 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n" +
 		"2026/05/13 15:49:07 NOTICE : 电视剧/国产剧/罪无可逃 (2026)/Season 1/罪无可逃 - S01E07 - 第 7 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
 	if _, err := tmpFile.WriteString(logText); err != nil {
