@@ -26,6 +26,9 @@ export const taskApi = {
   },
   async updateOptions(id: number, options: Record<string, any>) {
     try { await api.updateTaskOptions(id, options); return true } catch (err) { handleError(err, { module: 'Task', operation: t('runtime.taskUpdateOptions') }); return false }
+  },
+  async updateSortOrders(orders: Record<number, number>) {
+    try { await api.updateTaskSortOrders(orders); return true } catch (err) { handleError(err, { module: 'Task', operation: t('runtime.taskSortSave') }); return false }
   }
 }
 

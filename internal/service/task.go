@@ -294,6 +294,55 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	return nil
 }
 
+func (s *TaskService) UpdateTaskSortOrders(orders map[int64]int64) error {
+	tasks, err := s.db.ListTasks()
+	if err != nil {
+		return err
+	}
+	byID := make(map[int64]store.Task, len(tasks))
+	used := make(map[int64]int64, len(orders))
+	for _, task := range tasks {
+		byID[task.ID] = task
+	}
+
+	for taskID, requested := range orders {
+		if _, ok := byID[taskID]; !ok {
+			return ErrTaskNotFound
+		}
+		current := requested
+		for {
+			if _, exists := used[current]; !exists {
+				used[current] = taskID
+				break
+			}
+			current++
+		}
+	}
+
+	for _, task := range tasks {
+		if _, ok := orders[task.ID]; ok {
+			continue
+		}
+		current := task.SortOrder
+		if current == 0 {
+			current = task.ID
+		}
+		for {
+			if _, exists := used[current]; !exists {
+				used[current] = task.ID
+				break
+			}
+			current++
+		}
+	}
+
+	finalOrders := make(map[int64]int64, len(used))
+	for sortOrder, taskID := range used {
+		finalOrders[taskID] = sortOrder
+	}
+	return s.db.UpdateTaskSortOrders(finalOrders)
+}
+
 // GetTask 获取单个任务
 func (s *TaskService) GetTask(id int64) (store.Task, bool) {
 	return s.db.GetTask(id)

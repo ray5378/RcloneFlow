@@ -6,6 +6,7 @@ export interface Task {
   sourcePath: string
   targetRemote: string
   targetPath: string
+  sortOrder?: number
   options?: TaskOptions
   createdAt: string
 }

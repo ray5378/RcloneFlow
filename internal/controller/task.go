@@ -83,12 +83,48 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, 200, nil)
 
 	case http.MethodPatch:
-		// PATCH /api/tasks { id, options }
+		// PATCH /api/tasks { id, options } 或 { orders }
+		var raw map[string]json.RawMessage
+		if err := DecodeRequest(r, &raw); err != nil {
+			WriteJSON(w, 400, map[string]any{"error": "invalid body"})
+			return
+		}
+
+		if ordersRaw, ok := raw["orders"]; ok {
+			var req struct {
+				Orders map[string]int64 `json:"orders"`
+			}
+			if err := json.Unmarshal([]byte(`{"orders":`+string(ordersRaw)+`}`), &req); err != nil {
+				WriteJSON(w, 400, map[string]any{"error": "invalid orders"})
+				return
+			}
+			orders := make(map[int64]int64, len(req.Orders))
+			for key, value := range req.Orders {
+				id, err := strconv.ParseInt(key, 10, 64)
+				if err != nil {
+					WriteJSON(w, 400, map[string]any{"error": "invalid task id in orders"})
+					return
+				}
+				orders[id] = value
+			}
+			if len(orders) == 0 {
+				WriteJSON(w, 400, map[string]any{"error": "missing orders"})
+				return
+			}
+			if err := c.taskSvc.UpdateTaskSortOrders(orders); err != nil {
+				WriteJSON(w, 500, map[string]any{"error": err.Error()})
+				return
+			}
+			WriteJSON(w, 200, map[string]any{"ok": true})
+			return
+		}
+
 		var req struct {
 			ID      int64          `json:"id"`
 			Options map[string]any `json:"options"`
 		}
-		if err := DecodeRequest(r, &req); err != nil {
+		body, _ := json.Marshal(raw)
+		if err := json.Unmarshal(body, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": "invalid body"})
 			return
 		}

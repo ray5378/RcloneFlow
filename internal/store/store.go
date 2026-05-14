@@ -28,6 +28,7 @@ type Task struct {
 	SourcePath   string          `json:"sourcePath"`
 	TargetRemote string          `json:"targetRemote"`
 	TargetPath   string          `json:"targetPath"`
+	SortOrder    int64           `json:"sortOrder"`
 	Options      json.RawMessage `json:"options,omitempty"`
 	CreatedAt    time.Time       `json:"createdAt"`
 }
@@ -242,6 +243,14 @@ func (db *DB) migrate() error {
 				CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_name_unique ON tasks(name COLLATE NOCASE);
 			`,
 		},
+		{
+			version: 4,
+			sql: `
+				ALTER TABLE tasks ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;
+				UPDATE tasks SET sort_order = id WHERE sort_order = 0;
+				CREATE INDEX IF NOT EXISTS idx_tasks_sort_order ON tasks(sort_order, id);
+			`,
+		},
 	}
 
 	// 获取当前版本
@@ -278,8 +287,8 @@ func (db *DB) ListTasks() ([]Task, error) {
 	defer db.mu.Unlock()
 
 	rows, err := db.db.Query(`
-		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at 
-		FROM tasks ORDER BY id DESC`)
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, sort_order, options, created_at 
+		FROM tasks ORDER BY sort_order ASC, id ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -289,7 +298,7 @@ func (db *DB) ListTasks() ([]Task, error) {
 	for rows.Next() {
 		var t Task
 		var options sql.NullString
-		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.CreatedAt)
+		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.SortOrder, &options, &t.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
@@ -305,10 +314,14 @@ func (db *DB) AddTask(t Task) (Task, error) {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
+	if t.SortOrder == 0 {
+		_ = db.db.QueryRow(`SELECT COALESCE(MAX(sort_order), 0) + 1 FROM tasks`).Scan(&t.SortOrder)
+	}
+
 	result, err := db.db.Exec(`
-		INSERT INTO tasks (name, mode, source_remote, source_path, target_remote, target_path, options) 
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options)
+		INSERT INTO tasks (name, mode, source_remote, source_path, target_remote, target_path, sort_order, options) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.SortOrder, t.Options)
 	if err != nil {
 		return Task{}, err
 	}
@@ -330,9 +343,9 @@ func (db *DB) GetTask(id int64) (Task, bool) {
 	var t Task
 	var options sql.NullString
 	err := db.db.QueryRow(`
-		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, created_at 
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, sort_order, options, created_at 
 		FROM tasks WHERE id = ?`, id).Scan(
-		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.CreatedAt)
+		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &t.SortOrder, &options, &t.CreatedAt)
 	if err != nil {
 		return Task{}, false
 	}
@@ -362,9 +375,38 @@ func (db *DB) UpdateTask(id int64, t Task) error {
 	defer db.mu.Unlock()
 
 	_, err := db.db.Exec(`
-		UPDATE tasks SET name=?, mode=?, source_remote=?, source_path=?, target_remote=?, target_path=?, options=?
-		WHERE id=?`, t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options, id)
+		UPDATE tasks SET name=?, mode=?, source_remote=?, source_path=?, target_remote=?, target_path=?, sort_order=?, options=?
+		WHERE id=?`, t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.SortOrder, t.Options, id)
 	return err
+}
+
+func (db *DB) UpdateTaskSortOrders(updates map[int64]int64) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	tx, err := db.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	stmt, err := tx.Prepare(`UPDATE tasks SET sort_order = ? WHERE id = ?`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for id, sortOrder := range updates {
+		if _, err = stmt.Exec(sortOrder, id); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
 
 func (db *DB) DeleteTask(id int64) error {
@@ -947,4 +989,3 @@ func (db *DB) ListUsers() ([]User, error) {
 	}
 	return users, nil
 }
-

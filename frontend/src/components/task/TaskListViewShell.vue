@@ -6,6 +6,7 @@ import SingletonConfigModal from './SingletonConfigModal.vue'
 defineProps<{
   taskSearch: string
   filteredTasks: any[]
+  allTasks: any[]
   getScheduleByTaskId: (taskId: number) => any
   getTaskCardProgressByTask: (task: any) => any
   runningTaskId: number | null
@@ -29,6 +30,7 @@ defineProps<{
   nextTasksPage: () => void
   setTasksJumpPageValue: (value: number | null) => void
   jumpToTasksPage: () => void
+  saveTaskSortOrders: (orders: Record<number, number>) => void
   showWebhookModal: boolean
   webhookForm: any
   setWebhookTriggerId: (value: string) => void
@@ -54,6 +56,7 @@ defineProps<{
   <TaskListSection
     :search="taskSearch"
     :filtered-tasks="filteredTasks"
+    :all-tasks="allTasks"
     :get-schedule-by-task-id="getScheduleByTaskId"
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
@@ -77,6 +80,7 @@ defineProps<{
     @next-page="nextTasksPage"
     @update:jump-page="setTasksJumpPageValue"
     @jump-page="jumpToTasksPage"
+    @save-sort="saveTaskSortOrders"
   />
 
   <WebhookConfigModal

@@ -38,6 +38,8 @@ const props = defineProps<{
   progress?: Progress | null
   runningTaskId?: number | null
   stoppedTaskId?: number | null
+  sorting?: boolean
+  sortValue?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -49,6 +51,7 @@ const emit = defineEmits<{
   stop: [taskId: number]
   setWebhook: [task: Task]
   setSingleton: [task: Task]
+  sortInput: [event: Event]
 }>()
 
 function getLiveProgress(): Progress | null {
@@ -90,6 +93,12 @@ function isStopped(): boolean {
   <div class="task-card" :class="{ active: !!progress }" @click="emit('viewHistory', task.id!)">
     <div class="task-main list-item-primary-group">
       <div class="name list-item-name">
+        <template v-if="sorting">
+          <label class="sort-input-wrap">
+            <span class="sort-input-label">{{ t('taskUI.sortNumber') }}</span>
+            <input class="sort-input" type="number" inputmode="numeric" step="1" :value="sortValue ?? ''" @click.stop @input="emit('sortInput', $event)" />
+          </label>
+        </template>
         <strong>{{ task.name }}</strong>
         <span class="mode-tag list-item-tag">{{ task.mode }}</span>
       </div>
@@ -104,7 +113,7 @@ function isStopped(): boolean {
         <span v-else class="no-schedule list-item-tertiary-text">{{ t('taskCard.unset') }}</span>
       </div>
 
-      <div class="item-actions list-item-actions list-item-actions-right">
+      <div v-if="!sorting" class="item-actions list-item-actions list-item-actions-right">
         <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 {{ t('taskCard.history') }}</button>
         <button class="ghost small" :class="{ 'danger-text': isStopped() }" @click.stop="emit('stop', task.id!)">
           {{ isStopped() ? `⏹ ${t('taskCard.stopped')}` : `⏹ ${t('taskCard.stopTransfer')}` }}
@@ -154,6 +163,10 @@ body.light .task-card:hover { background: transparent; border-left-color: rgba(2
 .task-card.active { border-left: 3px solid var(--accent, #4f46e5); }
 .task-main { display: flex; flex-wrap: wrap; align-items: center; }
 .name { gap: 8px; }
+.sort-input-wrap { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; }
+.sort-input-label { font-size: 12px; color: #999; }
+.sort-input { width: 84px; padding: 4px 8px; border-radius: 6px; border: 1px solid #444; background: #111; color: #fff; }
+body.light .sort-input { background: #fff; color: #222; border-color: #ccc; }
 .schedule-info { display: flex; align-items: center; gap: 6px; font-size: 12px; }
 .schedule-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; }
 .schedule-badge.enabled { background: #22c55e33; color: #22c55e; }
