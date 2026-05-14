@@ -178,7 +178,7 @@ function save() {
 
         <div class="modal-actions">
           <button class="ghost" @click="emit('close')">{{ t('common.cancel') }}</button>
-          <button class="primary" :disabled="saving" @click="save">{{ saving ? t('common.saving') : t('common.confirm') }}</button>
+          <button class="primary" :disabled="saving" @click="save">{{ saving ? t('common.saving') : t('common.save') }}</button>
         </div>
       </div>
     </div>

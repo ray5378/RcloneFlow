@@ -55,7 +55,7 @@ export function useScheduleConfigModal(options: {
         await options.scheduleApi.update(oldSchedule.id, false)
       }
       await options.loadData()
-      options.showToast(t('schedule.saved'), 'success')
+      options.showToast(t('schedule.saveSuccess'), 'success')
       scheduleConfigVisible.value = false
     } finally {
       scheduleConfigSaving.value = false
