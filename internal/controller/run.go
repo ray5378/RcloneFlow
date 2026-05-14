@@ -1321,13 +1321,7 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 			plannedFiles = v
 		}
 		logicalTotalCount := plannedFiles
-		casCompatible := false
-		if summary != nil {
-			if opts, ok := summary["effectiveOptions"].(map[string]any); ok {
-				casCompatible, _ = opts["openlistCasCompatible"].(bool)
-			}
-		}
-		if logicalTotalCount <= 0 && summary != nil && !casCompatible {
+		if logicalTotalCount <= 0 && summary != nil {
 			if pf, ok := summary["preflight"].(map[string]any); ok {
 				if v, ok2 := pf["totalCount"].(float64); ok2 {
 					logicalTotalCount = v
