@@ -50,6 +50,7 @@ export function useTaskFormOrchestrator(options: {
     currentModule: options.currentModule,
     normalizeTaskOptions: options.normalizeTaskOptions,
     loadData: options.loadData,
+    showToast: options.showToast,
     taskApi: options.taskApi,
   })
 

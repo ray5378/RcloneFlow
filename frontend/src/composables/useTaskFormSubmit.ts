@@ -20,6 +20,7 @@ interface UseTaskFormSubmitOptions {
   currentModule: Ref<'history' | 'add' | 'tasks'>
   normalizeTaskOptions: (raw: TaskFormOptions | undefined | null) => TaskFormOptions
   loadData: () => Promise<void>
+  showToast: (message: string, type?: 'info' | 'success' | 'error') => void
   taskApi: {
     create: (task: TaskPayload) => Promise<Task>
     update: (id: number, task: TaskPayload) => Promise<unknown>
@@ -68,9 +69,13 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
     return { kind: 'create' as const, task }
   }
 
-  async function completeTaskFormSubmit() {
+  async function completeTaskFormSubmit(kind: 'create' | 'update') {
     options.editingTask.value = null
     await options.loadData()
+    options.showToast(
+      kind === 'create' ? t('runtime.taskCreateSuccess') : t('runtime.taskUpdateSuccess'),
+      'success',
+    )
     options.currentModule.value = 'tasks'
     options.creatingState.value = 'done'
   }
@@ -82,8 +87,8 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
   async function executeTaskFormSubmit() {
     options.creatingState.value = 'loading'
     try {
-      await submitTaskForm()
-      await completeTaskFormSubmit()
+      const result = await submitTaskForm()
+      await completeTaskFormSubmit(result.kind)
       return ''
     } catch (e) {
       resetTaskFormSubmitState()
