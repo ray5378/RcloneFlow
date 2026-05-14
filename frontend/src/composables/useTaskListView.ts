@@ -3,7 +3,7 @@ import type { Task } from '../types'
 
 export function useTaskListView(tasks: Ref<Task[]>) {
   const tasksPage = ref(1)
-  const tasksPageSize = 20
+  const tasksPageSize = 10
   const tasksJumpPage = ref(1)
   const taskSearch = ref('')
 
