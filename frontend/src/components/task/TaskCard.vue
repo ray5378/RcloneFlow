@@ -1,45 +1,15 @@
 <script setup lang="ts">
-import { getUnifiedProgressText } from './progressText'
+import { getUnifiedProgressText, type TaskProgressLike } from './progressText'
+import { formatScheduleSpec } from './scheduleOptions'
 import { t } from '../../i18n'
-
-interface Progress {
-  percentage?: number
-  bytes?: number
-  totalBytes?: number
-  speed?: number
-  eta?: number
-  completedFiles?: number
-  totalCount?: number
-  phase?: string
-}
-
-interface Schedule {
-  enabled?: boolean
-  spec?: string
-}
-
-interface Task {
-  id?: number
-  name: string
-  mode: string
-  sourceRemote: string
-  sourcePath: string
-  targetRemote: string
-  targetPath: string
-  singleton?: boolean
-  schedule?: string
-  scheduleEnabled?: boolean
-  sortOrder?: number
-}
+import type { ActiveRun, Schedule, Task } from '../../types'
 
 const props = defineProps<{
   task: Task
   schedule?: Schedule | null
-  activeRun?: ActiveRun | null
-  progress?: Progress | null
+  progress?: TaskProgressLike | null
   runningTaskId?: number | null
   stoppedTaskId?: number | null
-  scheduleToggledTaskId?: number | null
   sorting?: boolean
   sortValue?: number | null
 }>()
@@ -48,7 +18,7 @@ const emit = defineEmits<{
   run: [task: Task]
   edit: [task: Task]
   delete: [task: Task]
-  toggleSchedule: [task: Task]
+  openScheduleConfig: [task: Task]
   viewHistory: [taskId: number]
   stop: [taskId: number]
   setWebhook: [task: Task]
@@ -58,7 +28,7 @@ const emit = defineEmits<{
   sortEnter: [event: KeyboardEvent]
 }>()
 
-function getLiveProgress(): Progress | null {
+function getLiveProgress(): TaskProgressLike | null {
   return props.progress || null
 }
 
@@ -72,18 +42,6 @@ function getProgressText(): string {
   return getUnifiedProgressText(getLiveProgress())
 }
 
-function formatSpec(spec: string): string {
-  if (!spec) return '-'
-  const parts = spec.split('|')
-  if (parts.length !== 5) return spec
-  const [min, hour, day, month, week] = parts
-  const weekMap = [t('runtime.sunday'), t('runtime.monday'), t('runtime.tuesday'), t('runtime.wednesday'), t('runtime.thursday'), t('runtime.friday'), t('runtime.saturday')]
-  const weekDay = weekMap[parseInt(week) % 7] || ''
-  const monthStr = month !== '*' ? `${month}${t('schedule.monthSuffix')}` : ''
-  const dayStr = day !== '*' ? `${day}` : ''
-  return `${hour}:${min} ${weekDay} ${monthStr}${dayStr}`.trim()
-}
-
 function isRunning(): boolean {
   return props.runningTaskId === props.task.id
 }
@@ -92,9 +50,6 @@ function isStopped(): boolean {
   return props.stoppedTaskId === props.task.id
 }
 
-function isScheduleToggled(): boolean {
-  return props.scheduleToggledTaskId === props.task.id
-}
 </script>
 
 <template>
@@ -114,7 +69,7 @@ function isScheduleToggled(): boolean {
           <span :class="['schedule-badge', schedule.enabled ? 'enabled' : 'disabled']">
             {{ schedule.enabled ? t('taskCard.enabled') : t('taskCard.disabled') }}
           </span>
-          <span class="schedule-rule list-item-secondary-text">{{ formatSpec(schedule.spec || '') }}</span>
+          <span class="schedule-rule list-item-secondary-text">{{ formatScheduleSpec(schedule.spec || '') }}</span>
         </template>
         <span v-else class="no-schedule list-item-tertiary-text">{{ t('taskCard.unset') }}</span>
       </div>
@@ -125,8 +80,8 @@ function isScheduleToggled(): boolean {
         <button class="ghost small" :class="{ 'btn-stopped': isStopped() }" @click.stop="emit('stop', task.id!)">
           {{ isStopped() ? `⏹ ${t('taskCard.stopped')}` : `⏹ ${t('taskCard.stopTransfer')}` }}
         </button>
-        <button v-if="schedule" class="ghost small" :class="{ 'btn-schedule-toggled': isScheduleToggled() }" @click.stop="emit('toggleSchedule', task)">
-          {{ schedule.enabled ? `⏸ ${t('taskCard.disableSchedule')}` : `▶ ${t('taskCard.enableSchedule')}` }}
+        <button class="ghost small" @click.stop="emit('openScheduleConfig', task)">
+          ⏰ {{ t('taskCard.scheduleConfig') }}
         </button>
         <button class="ghost small" :class="{ 'btn-running': isRunning() }" :disabled="isRunning()" @click.stop="emit('run', task)">
           {{ isRunning() ? t('taskCard.runSuccess') : `▶ ${t('taskCard.manualRun')}` }}
@@ -187,5 +142,4 @@ body.light .task-paths { background: #f5f5f5; }
 .progress-bar { height: 100%; background: var(--accent, #4f46e5); transition: width 0.3s; }
 .btn-running { color: #22c55e !important; }
 .btn-stopped { background: #b91c1c !important; border-color: #b91c1c !important; color: #fff !important; }
-.btn-schedule-toggled { background: #2563eb !important; border-color: #2563eb !important; color: #fff !important; }
 </style>

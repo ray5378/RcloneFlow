@@ -1,9 +1,10 @@
 <script setup lang="ts">
+import type { TaskFormOptions, UpdateTaskOption } from './types'
 import { t } from '../../i18n'
 
 defineProps<{
-  options: any
-  updateOption: (key: string, value: any) => void
+  options: TaskFormOptions
+  updateOption: UpdateTaskOption
 }>()
 </script>
 

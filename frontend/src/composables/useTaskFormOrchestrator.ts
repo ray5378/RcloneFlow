@@ -1,21 +1,40 @@
-import { ref } from 'vue'
+import { ref, type Ref } from 'vue'
+import type { CreateForm, ParsedRcloneCommand, TaskFormOptions, TaskMode } from '../components/task/types'
+import type { Task } from '../types'
 import { useTaskFormSubmit } from './useTaskFormSubmit'
 import { useTaskFormPrepare } from './useTaskFormPrepare'
 import { useTaskFormFlow } from './useTaskFormFlow'
 import { useTaskFormEntrySubmit } from './useTaskFormEntrySubmit'
 
 export function useTaskFormOrchestrator(options: {
-  createForm: any
-  editingTask: any
-  currentModule: any
-  normalizeTaskOptions: (raw: Record<string, any> | undefined | null) => Record<string, any>
-  getScheduleByTaskId: (taskId: number) => any
+  createForm: Ref<CreateForm>
+  editingTask: Ref<Task | null>
+  currentModule: Ref<'history' | 'add' | 'tasks'>
+  normalizeTaskOptions: (raw: TaskFormOptions | undefined | null) => TaskFormOptions
   loadData: () => Promise<void>
-  taskApi: any
-  scheduleApi: any
-  commandMode: any
-  commandText: any
-  parseRcloneCommand: (cmd: string) => any
+  taskApi: {
+    create: (task: {
+      name: string
+      mode: TaskMode
+      sourceRemote: string
+      sourcePath: string
+      targetRemote: string
+      targetPath: string
+      options: TaskFormOptions
+    }) => Promise<Task>
+    update: (id: number, task: {
+      name: string
+      mode: TaskMode
+      sourceRemote: string
+      sourcePath: string
+      targetRemote: string
+      targetPath: string
+      options: TaskFormOptions
+    }) => Promise<unknown>
+  }
+  commandMode: Ref<boolean>
+  commandText: Ref<string>
+  parseRcloneCommand: (cmd: string) => ParsedRcloneCommand
   showToast: (message: string, type?: 'info' | 'success' | 'error') => void
 }) {
   const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
@@ -30,10 +49,8 @@ export function useTaskFormOrchestrator(options: {
     creatingState,
     currentModule: options.currentModule,
     normalizeTaskOptions: options.normalizeTaskOptions,
-    getScheduleByTaskId: options.getScheduleByTaskId,
     loadData: options.loadData,
     taskApi: options.taskApi,
-    scheduleApi: options.scheduleApi,
   })
 
   const { validateTaskFormBeforeSubmit } = useTaskFormPrepare({

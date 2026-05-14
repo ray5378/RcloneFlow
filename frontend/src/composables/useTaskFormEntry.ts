@@ -10,8 +10,7 @@ interface UseTaskFormEntryOptions {
   }
   resetTaskFormForCreate: () => void
   resetTaskPathBrowse: () => void
-  getScheduleByTaskId: (taskId: number) => any
-  fillTaskFormForEdit: (task: Task, scheduleSpec?: string) => any
+  fillTaskFormForEdit: (task: Task) => void
   restoreTaskPathBrowse: (task: Task) => Promise<void>
 }
 
@@ -29,10 +28,9 @@ export function useTaskFormEntry(options: UseTaskFormEntryOptions) {
     goToTaskFormModule()
   }
 
-  function editTask(task: Task) {
-    const schedule = options.getScheduleByTaskId(task.id)
-    options.fillTaskFormForEdit(task, schedule?.spec)
-    options.restoreTaskPathBrowse(task)
+  async function editTask(task: Task) {
+    options.fillTaskFormForEdit(task)
+    await options.restoreTaskPathBrowse(task)
     goToTaskFormModule()
   }
 

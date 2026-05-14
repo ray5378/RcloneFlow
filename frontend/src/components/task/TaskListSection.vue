@@ -3,17 +3,20 @@ import { computed, nextTick, ref, watch } from 'vue'
 import TaskCard from './TaskCard.vue'
 import TaskListHeader from './TaskListHeader.vue'
 import TaskListPagination from './TaskListPagination.vue'
+import type { Schedule, Task } from '../../types'
+import type { TaskProgressLike } from './progressText'
 import { t } from '../../i18n'
+
+type SortableTask = Task & { __previewSortOrder?: number }
 
 const props = defineProps<{
   search: string
-  filteredTasks: any[]
-  allTasks: any[]
-  getScheduleByTaskId: (taskId: number) => any
-  getTaskCardProgressByTask: (taskId: number) => any
+  filteredTasks: Task[]
+  allTasks: Task[]
+  getScheduleByTaskId: (taskId: number) => Schedule | null | undefined
+  getTaskCardProgressByTask: (taskId: number) => TaskProgressLike | null
   runningTaskId: number | null
   stoppedTaskId: number | null
-  scheduleToggledTaskId: number | null
   tasksTotal: number
   tasksPageSize: number
   tasksPage: number
@@ -27,13 +30,13 @@ const emit = defineEmits<{
   (e: 'update:search', value: string): void
   (e: 'add'): void
   (e: 'run', taskId: number): void
-  (e: 'edit', task: any): void
+  (e: 'edit', task: Task): void
   (e: 'delete', taskId: number): void
-  (e: 'toggle-schedule', taskId: number): void
+  (e: 'open-schedule-config', task: Task): void
   (e: 'view-history', taskId: number): void
   (e: 'stop', taskId: number): void
-  (e: 'set-webhook', task: any): void
-  (e: 'set-singleton', task: any): void
+  (e: 'set-webhook', task: Task): void
+  (e: 'set-singleton', task: Task): void
   (e: 'open-transfer-detail', taskId: number): void
   (e: 'prev-page'): void
   (e: 'next-page'): void
@@ -48,7 +51,7 @@ const hasPendingChanges = ref(false)
 const lastPriorityTaskId = ref<number | null>(null)
 const listTopRef = ref<HTMLElement | null>(null)
 
-function buildSortMap(tasks: any[]) {
+function buildSortMap(tasks: Task[]) {
   const map: Record<number, number | null> = {}
   tasks.forEach((task, index) => {
     map[task.id] = typeof task.sortOrder === 'number' && Number.isFinite(task.sortOrder) ? task.sortOrder : index + 1
@@ -88,7 +91,7 @@ function onSortInput(taskId: number, event: Event) {
   }
 }
 
-function buildResolvedSortMap(tasks: any[], priorityTaskId?: number) {
+function buildResolvedSortMap(tasks: Task[], priorityTaskId?: number) {
   const used = new Map<number, number>()
   const taskList = [...tasks]
 
@@ -134,7 +137,7 @@ function hasTask(used: Map<number, number>, taskId: number) {
   return false
 }
 
-const previewTasks = computed(() => {
+const previewTasks = computed<SortableTask[]>(() => {
   if (!sorting.value) return props.filteredTasks
 
   const tasks = [...props.allTasks]
@@ -248,7 +251,6 @@ function handleLastPage() {
         :progress="getTaskCardProgressByTask(task.id)"
         :running-task-id="runningTaskId"
         :stopped-task-id="stoppedTaskId"
-        :schedule-toggled-task-id="scheduleToggledTaskId"
         :sorting="sorting"
         :sort-value="sortInputs[task.id] ?? null"
         @sort-input="onSortInput(task.id, $event)"
@@ -256,7 +258,7 @@ function handleLastPage() {
         @run="emit('run', task.id)"
         @edit="emit('edit', task)"
         @delete="emit('delete', task.id)"
-        @toggle-schedule="emit('toggle-schedule', task.id)"
+        @open-schedule-config="emit('open-schedule-config', task)"
         @view-history="emit('view-history', task.id)"
         @stop="emit('stop', task.id)"
         @set-webhook="emit('set-webhook', task)"

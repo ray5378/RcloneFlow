@@ -1,17 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatBytes } from '../../utils/format'
-import { getResolvedTotalCount, getUnifiedProgressText } from './progressText'
+import { getResolvedTotalCount, getUnifiedProgressText, type TaskProgressLike } from './progressText'
 import { t } from '../../i18n'
-
-interface Progress {
-  percentage?: number
-  bytes?: number
-  totalBytes?: number
-  speed?: number
-  completedFiles?: number
-  totalCount?: number
-}
+import type { Run } from '../../types'
 
 interface Summary {
   totalBytes?: number
@@ -20,26 +12,8 @@ interface Summary {
   message?: string
 }
 
-interface RunRecord {
-  id: number
-  taskId: number
-  taskName?: string
-  taskMode?: string
-  trigger?: string
-  status?: string
-  sourceRemote?: string
-  sourcePath?: string
-  targetRemote?: string
-  targetPath?: string
-  startedAt?: string
-  bytesTransferred?: number
-  speed?: string
-  summary?: any
-  progress?: Progress
-}
-
-const props = defineProps<{ run: RunRecord; progress?: Progress; summary?: Summary }>()
-const emit = defineEmits<{ click: [run: RunRecord]; viewDetail: [run: RunRecord]; viewLog: [run: RunRecord]; clear: [id: number] }>()
+const props = defineProps<{ run: Run; progress?: TaskProgressLike; summary?: Summary }>()
+const emit = defineEmits<{ click: [run: Run]; viewDetail: [run: Run]; viewLog: [run: Run]; clear: [id: number] }>()
 
 const runTitle = computed(() => props.run.taskName || `${t('runItem.taskFallback')} #${props.run.taskId}`)
 const statusClass = computed(() => getStatusClass(props.run.status || ''))
@@ -108,7 +82,7 @@ function getTriggerText(trigger: string) {
   return map[trigger] || trigger
 }
 
-function getProgressText(run: RunRecord): string {
+function getProgressText(run: Run): string {
   if (run.status === 'running') return getUnifiedProgressText(props.progress)
   return '-'
 }

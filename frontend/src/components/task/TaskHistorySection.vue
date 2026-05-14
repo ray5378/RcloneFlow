@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import TaskHistoryPanel from './TaskHistoryPanel.vue'
 import RunDetailModal from './RunDetailModal.vue'
+import type { Run } from '../../types'
+import type { TaskProgressLike } from './progressText'
 
 defineProps<{
   currentTotal: number
@@ -10,10 +12,10 @@ defineProps<{
   jumpPage: number
   historyFilterTaskId: number | null
   historyStatusFilter: string
-  filteredRuns: any[]
-  getRunProgressFromSummary: (run: any) => any
-  getRealtimeProgressByRun: (run: any) => any
-  getFinalSummary: (run: any) => any
+  filteredRuns: Run[]
+  getRunProgressFromSummary: (run: Run) => TaskProgressLike | null
+  getRealtimeProgressByRun: (run: Run) => TaskProgressLike | null
+  getFinalSummary: (run: Run) => any
   showDetailModal: boolean
   runDetail: any
   getStatusClass: (status: string) => string
@@ -40,8 +42,8 @@ const emit = defineEmits<{
   (e: 'update-jump-page', value: number): void
   (e: 'jump-page'): void
   (e: 'clear-all'): void
-  (e: 'view-detail', run: any): void
-  (e: 'view-log', run: any): void
+  (e: 'view-detail', run: Run): void
+  (e: 'view-log', run: Run): void
   (e: 'clear-run', runId: number): void
   (e: 'close-detail'): void
   (e: 'set-final-filter', value: 'all' | 'success' | 'failed' | 'other'): void

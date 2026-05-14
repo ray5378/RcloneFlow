@@ -19,6 +19,17 @@ export interface ScheduleTempState {
   week: string[]
 }
 
+export function createScheduleForm(input?: Partial<ScheduleFormLike> | null): ScheduleFormLike {
+  return {
+    enableSchedule: !!input?.enableSchedule,
+    scheduleMinute: input?.scheduleMinute || '00',
+    scheduleHour: input?.scheduleHour || '00',
+    scheduleDay: input?.scheduleDay || '*',
+    scheduleMonth: input?.scheduleMonth || '*',
+    scheduleWeek: input?.scheduleWeek || '*',
+  }
+}
+
 export const scheduleFieldOptions: Record<ScheduleField, string[]> = {
   month: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
   week: ['0', '1', '2', '3', '4', '5', '6'],
@@ -91,6 +102,35 @@ export function toggleAllScheduleTempField(temp: ScheduleTempState, field: Sched
     ...temp,
     [field]: current.length === all.length ? [] : [...all],
   }
+}
+
+export function buildScheduleSpec(form?: Partial<ScheduleFormLike> | null): string {
+  const draft = createScheduleForm(form)
+  return [draft.scheduleMinute || '00', draft.scheduleHour || '*', draft.scheduleDay || '*', draft.scheduleMonth || '*', draft.scheduleWeek || '*'].join('|')
+}
+
+export function parseScheduleSpec(spec?: string | null, enabled = true): ScheduleFormLike {
+  const parts = String(spec || '').split('|')
+  return createScheduleForm({
+    enableSchedule: enabled,
+    scheduleMinute: parts[0] || '00',
+    scheduleHour: parts[1] || '00',
+    scheduleDay: parts[2] || '*',
+    scheduleMonth: parts[3] || '*',
+    scheduleWeek: parts[4] || '*',
+  })
+}
+
+export function formatScheduleSpec(spec?: string | null): string {
+  if (!spec) return '-'
+  const parts = spec.split('|')
+  if (parts.length !== 5) return spec
+  const [min, hour, day, month, week] = parts
+  const weekMap = getWeekLabels()
+  const weekDay = week !== '*' ? (weekMap[Number.parseInt(week, 10) % 7] || week) : ''
+  const monthStr = month !== '*' ? `${month}${t('schedule.monthSuffix')}` : ''
+  const dayStr = day !== '*' ? `${day}` : ''
+  return `${hour}:${min} ${weekDay} ${monthStr}${dayStr}`.trim() || spec
 }
 
 function parseScheduleField(value?: string): string[] {

@@ -1,18 +1,12 @@
 import type { Ref } from 'vue'
+import type { CreateForm, ParsedRcloneCommand, TaskFormOptions } from '../components/task/types'
 import { t } from '../i18n'
 
-interface ParsedRcloneCommand {
-  mode: string
-  src: { remote: string; path: string }
-  dst: { remote: string; path: string }
-  options: Record<string, any>
-}
-
 interface UseTaskFormPrepareOptions {
-  createForm: Ref<any>
+  createForm: Ref<CreateForm>
   commandMode: Ref<boolean>
   commandText: Ref<string>
-  normalizeTaskOptions: (raw: Record<string, any> | undefined | null) => Record<string, any>
+  normalizeTaskOptions: (raw: TaskFormOptions | undefined | null) => TaskFormOptions
   parseRcloneCommand: (cmd: string) => ParsedRcloneCommand
   validateTaskForm: () => string
 }

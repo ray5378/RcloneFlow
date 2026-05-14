@@ -2,16 +2,38 @@
 import TaskListSection from './TaskListSection.vue'
 import WebhookConfigModal from './WebhookConfigModal.vue'
 import SingletonConfigModal from './SingletonConfigModal.vue'
+import type { Schedule, Task } from '../../types'
+import type { TaskProgressLike } from './progressText'
+
+interface WebhookFormState {
+  triggerId?: string
+  matchText?: string
+  postUrl?: string
+  wecomUrl?: string
+  notify?: {
+    manual?: boolean
+    schedule?: boolean
+    webhook?: boolean
+  }
+  status?: {
+    success?: boolean
+    failed?: boolean
+  }
+}
+
+interface SingletonFormState {
+  singletonEnabled?: boolean
+}
 
 defineProps<{
   taskSearch: string
-  filteredTasks: any[]
-  allTasks: any[]
-  getScheduleByTaskId: (taskId: number) => any
-  getTaskCardProgressByTask: (task: any) => any
+  filteredTasks: Task[]
+  allTasks: Task[]
+  getScheduleByTaskId: (taskId: number) => Schedule | null | undefined
+  getTaskCardProgressByTask: (taskId: number) => TaskProgressLike | null
   runningTaskId: number | null
   stoppedTaskId: number | null
-  scheduleToggledTaskId: number | null
+  openScheduleConfig: (task: Task) => void
   tasksTotal: number
   tasksPageSize: number
   tasksPage: number
@@ -19,14 +41,13 @@ defineProps<{
   tasksJumpPage: number | null
   setTaskSearch: (value: string) => void
   goToAddTask: () => void
-  runTask: (task: any) => void
-  editTask: (task: any) => void
-  deleteTask: (task: any) => void
-  toggleSchedule: (task: any) => void
-  viewTaskHistory: (task: any) => void
-  stopTaskAny: (task: any) => void
-  setWebhook: (task: any) => void
-  setSingletonMode: (task: any) => void
+  runTask: (taskId: number) => void
+  editTask: (task: Task) => void
+  deleteTask: (taskId: number) => void
+  viewTaskHistory: (taskId: number) => void
+  stopTaskAny: (taskId: number) => void
+  setWebhook: (task: Task) => void
+  setSingletonMode: (task: Task) => void
   saveTaskSortOrders: (orders: Record<number, number>, priorityTaskId?: number) => Promise<boolean>
   openTransferDetail: (taskId: number) => void
   prevTasksPage: () => void
@@ -34,7 +55,7 @@ defineProps<{
   setTasksJumpPageValue: (value: number | null) => void
   jumpToTasksPage: () => void
   showWebhookModal: boolean
-  webhookForm: any
+  webhookForm: WebhookFormState | null
   setWebhookTriggerId: (value: string) => void
   setWebhookMatchText: (value: string) => void
   setWebhookPostUrl: (value: string) => void
@@ -48,7 +69,7 @@ defineProps<{
   testWebhook: () => void
   closeWebhookModal: () => void
   showSingletonModal: boolean
-  singletonForm: any
+  singletonForm: SingletonFormState | null
   setSingletonEnabled: (value: boolean) => void
   saveSingleton: () => void
   closeSingletonModal: () => void
@@ -64,7 +85,6 @@ defineProps<{
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
     :stopped-task-id="stoppedTaskId"
-    :schedule-toggled-task-id="scheduleToggledTaskId"
     :tasks-total="tasksTotal"
     :tasks-page-size="tasksPageSize"
     :tasks-page="tasksPage"
@@ -76,7 +96,7 @@ defineProps<{
     @run="runTask"
     @edit="editTask"
     @delete="deleteTask"
-    @toggle-schedule="toggleSchedule"
+    @open-schedule-config="openScheduleConfig"
     @view-history="viewTaskHistory"
     @stop="stopTaskAny"
     @set-webhook="setWebhook"

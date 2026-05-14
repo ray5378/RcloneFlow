@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { TaskFormOptions } from './types'
 import { t } from '../../i18n'
 
-const props = defineProps<{ modelValue: any }>()
-const emit = defineEmits<{ 'update:modelValue': [value: any] }>()
+const props = defineProps<{ modelValue: TaskFormOptions }>()
+const emit = defineEmits<{ 'update:modelValue': [value: TaskFormOptions] }>()
 
-const options = computed({
+const options = computed<TaskFormOptions>({
   get: () => props.modelValue || {},
   set: (value) => emit('update:modelValue', value),
 })

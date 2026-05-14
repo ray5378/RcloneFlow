@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import RunItem from './RunItem.vue'
 import type { Run } from '../../types'
+import type { TaskProgressLike } from './progressText'
 import { t } from '../../i18n'
 
 const props = defineProps<{
@@ -13,8 +14,8 @@ const props = defineProps<{
   historyFilterTaskId: number | null
   historyStatusFilter: string
   filteredRuns: Run[]
-  getRunProgressFromSummary: (run: Run) => any
-  getRealtimeProgressByRun: (run: Run) => any
+  getRunProgressFromSummary: (run: Run) => TaskProgressLike | null
+  getRealtimeProgressByRun: (run: Run) => TaskProgressLike | null
   getFinalSummary: (run: Run) => any
 }>()
 

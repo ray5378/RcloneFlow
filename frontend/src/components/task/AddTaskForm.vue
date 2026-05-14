@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import ScheduleOptions from './ScheduleOptions.vue'
+import type { CreateForm, PathBreadcrumb, PathBrowseItem, TaskFormOptions, TaskFormOptionValue, UpdateTaskOption } from './types'
+import type { Task } from '../../types'
 import AdvancedTransferSection from './AdvancedTransferSection.vue'
 import AdvancedFilterSection from './AdvancedFilterSection.vue'
 import AdvancedCompareSection from './AdvancedCompareSection.vue'
@@ -12,19 +13,19 @@ import { t } from '../../i18n'
 const props = defineProps<{
   commandMode: boolean
   commandText: string
-  createForm: any
+  createForm: CreateForm
   remotes: string[]
   showSourcePathInput: boolean
   showTargetPathInput: boolean
-  sourceBreadcrumbs: Array<{ name: string; path: string }>
+  sourceBreadcrumbs: PathBreadcrumb[]
   sourceCurrentPath: string
-  sourcePathOptions: any[]
-  targetBreadcrumbs: Array<{ name: string; path: string }>
+  sourcePathOptions: PathBrowseItem[]
+  targetBreadcrumbs: PathBreadcrumb[]
   targetCurrentPath: string
-  targetPathOptions: any[]
+  targetPathOptions: PathBrowseItem[]
   showAdvancedOptions: boolean
   creatingState: string
-  editingTask: any
+  editingTask: Task | null
 }>()
 
 const emit = defineEmits<{
@@ -37,10 +38,10 @@ const emit = defineEmits<{
   'target-remote-change': []
   'load-source-path': [remote: string, path: string]
   'load-target-path': [remote: string, path: string]
-  'source-arrow': [item: any]
-  'source-click': [item: any]
-  'target-arrow': [item: any]
-  'target-click': [item: any]
+  'source-arrow': [item: PathBrowseItem]
+  'source-click': [item: PathBrowseItem]
+  'target-arrow': [item: PathBrowseItem]
+  'target-click': [item: PathBrowseItem]
   'submit': []
 }>()
 
@@ -64,20 +65,22 @@ const showTargetPathInputModel = computed({
   set: (value: boolean) => emit('update:showTargetPathInput', value),
 })
 
-const optionsModel = computed({
+const commandPlaceholder = computed(() => 'rclone copy source:dir target:dir --progress')
+
+const optionsModel = computed<TaskFormOptions>({
   get: () => {
     const raw = props.createForm?.options
     return raw && typeof raw === 'object' ? raw : { enableStreaming: true }
   },
-  set: (value: any) => {
+  set: (value: TaskFormOptions) => {
     props.createForm.options = value && typeof value === 'object' ? value : { enableStreaming: true }
   },
 })
 
-function updateOption(key: string, value: any) {
+const updateOption: UpdateTaskOption = (key, value) => {
   optionsModel.value = {
     ...optionsModel.value,
-    [key]: value,
+    [key]: value as TaskFormOptionValue,
   }
 }
 </script>
@@ -182,8 +185,6 @@ function updateOption(key: string, value: any) {
         </div>
         <input v-if="showTargetPathInputModel" v-model="createForm.targetPath" type="text" :placeholder="t('addTask.manualPathPlaceholder')" style="margin-top: 8px" />
       </div>
-
-      <ScheduleOptions :model-value="createForm" @update:model-value="Object.assign(createForm, $event)" />
 
       <div class="advanced-section">
         <div class="advanced-title">{{ t('addTask.advancedOptions') }}</div>

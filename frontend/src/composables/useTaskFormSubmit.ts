@@ -1,22 +1,28 @@
 import type { Ref } from 'vue'
+import type { CreateForm, TaskFormOptions, TaskMode } from '../components/task/types'
 import type { Task } from '../types'
 import { t } from '../i18n'
 
+interface TaskPayload {
+  name: string
+  mode: TaskMode
+  sourceRemote: string
+  sourcePath: string
+  targetRemote: string
+  targetPath: string
+  options: TaskFormOptions
+}
+
 interface UseTaskFormSubmitOptions {
-  createForm: Ref<any>
+  createForm: Ref<CreateForm>
   editingTask: Ref<Task | null>
   creatingState: Ref<'idle' | 'loading' | 'done'>
   currentModule: Ref<'history' | 'add' | 'tasks'>
-  normalizeTaskOptions: (raw: Record<string, any> | undefined | null) => Record<string, any>
-  getScheduleByTaskId: (taskId: number) => any
-  loadData: () => Promise<any>
+  normalizeTaskOptions: (raw: TaskFormOptions | undefined | null) => TaskFormOptions
+  loadData: () => Promise<void>
   taskApi: {
-    create: (task: any) => Promise<any>
-    update: (id: number, task: any) => Promise<any>
-  }
-  scheduleApi: {
-    create: (schedule: any) => Promise<any>
-    update: (id: number, enabled: boolean, spec?: string) => Promise<any>
+    create: (task: TaskPayload) => Promise<Task>
+    update: (id: number, task: TaskPayload) => Promise<unknown>
   }
 }
 
@@ -38,7 +44,7 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
     return ''
   }
 
-  function buildTaskPayload() {
+  function buildTaskPayload(): TaskPayload {
     return {
       name: options.createForm.value.name,
       mode: options.createForm.value.mode,
@@ -50,47 +56,22 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
     }
   }
 
-  function buildScheduleSpec() {
-    return [
-      options.createForm.value.scheduleMinute || '00',
-      options.createForm.value.scheduleHour || '*',
-      options.createForm.value.scheduleDay || '*',
-      options.createForm.value.scheduleMonth || '*',
-      options.createForm.value.scheduleWeek || '*',
-    ].join('|')
-  }
-
   async function submitTaskForm() {
     const taskData = buildTaskPayload()
 
     if (options.editingTask.value) {
       await options.taskApi.update(options.editingTask.value.id, taskData)
-      const oldSchedule = options.getScheduleByTaskId(options.editingTask.value.id)
-      if (options.createForm.value.enableSchedule) {
-        const spec = buildScheduleSpec()
-        if (oldSchedule) {
-          await options.scheduleApi.update(oldSchedule.id, true, spec)
-        } else {
-          await options.scheduleApi.create({ taskId: options.editingTask.value.id, spec, enabled: true })
-        }
-      } else if (oldSchedule) {
-        await options.scheduleApi.update(oldSchedule.id, false)
-      }
       return { kind: 'update' as const }
     }
 
     const task = await options.taskApi.create(taskData)
-    if (task && options.createForm.value.enableSchedule) {
-      const spec = buildScheduleSpec()
-      await options.scheduleApi.create({ taskId: task.id, spec, enabled: true })
-    }
     return { kind: 'create' as const, task }
   }
 
   async function completeTaskFormSubmit() {
     options.editingTask.value = null
     await options.loadData()
-    options.currentModule.value = 'add'
+    options.currentModule.value = 'tasks'
     options.creatingState.value = 'done'
   }
 
@@ -114,7 +95,6 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
     handleTaskFormDoneClick,
     validateTaskForm,
     buildTaskPayload,
-    buildScheduleSpec,
     submitTaskForm,
     completeTaskFormSubmit,
     resetTaskFormSubmitState,

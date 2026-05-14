@@ -1,23 +1,22 @@
 import { ref } from 'vue'
+import type { CreateForm, TaskFormOptions, TaskMode } from '../components/task/types'
 import type { Task } from '../types'
 import { useTaskFormNormalize } from './useTaskFormNormalize'
 
+function normalizeTaskMode(mode: string): TaskMode {
+  return mode === 'sync' || mode === 'move' || mode === 'copy' ? mode : 'copy'
+}
+
 export function useTaskFormState() {
   const { normalizeTaskOptionsForForm } = useTaskFormNormalize()
-  const createForm = ref({
+  const createForm = ref<CreateForm>({
     name: '',
     mode: 'copy',
     sourceRemote: '',
     sourcePath: '',
     targetRemote: '',
     targetPath: '',
-    enableSchedule: false,
-    scheduleMonth: '*',
-    scheduleWeek: '',
-    scheduleDay: '',
-    scheduleHour: '00',
-    scheduleMinute: '00',
-    options: { enableStreaming: true } as Record<string, any>,
+    options: { enableStreaming: true } as TaskFormOptions,
   })
 
   const commandMode = ref(false)
@@ -37,58 +36,25 @@ export function useTaskFormState() {
       sourcePath: '',
       targetRemote: '',
       targetPath: '',
-      enableSchedule: false,
-      scheduleMonth: '*',
-      scheduleWeek: '',
-      scheduleDay: '',
-      scheduleHour: '00',
-      scheduleMinute: '00',
       options: { enableStreaming: true },
     }
   }
 
-  function fillTaskFormForEdit(task: Task, scheduleSpec?: string) {
+  function fillTaskFormForEdit(task: Task): void {
     editingTask.value = task
     commandMode.value = false
     commandText.value = ''
     showAdvancedOptions.value = false
 
-    if (scheduleSpec) {
-      const parts = scheduleSpec.split('|')
-      createForm.value = {
-        name: task.name,
-        mode: task.mode,
-        sourceRemote: task.sourceRemote,
-        sourcePath: task.sourcePath || '',
-        targetRemote: task.targetRemote,
-        targetPath: task.targetPath || '',
-        enableSchedule: true,
-        scheduleMinute: parts[0] || '00',
-        scheduleHour: parts[1] || '*',
-        scheduleDay: parts[2] || '*',
-        scheduleMonth: parts[3] || '*',
-        scheduleWeek: parts[4] || '*',
-        options: normalizeTaskOptionsForForm(task.options as Record<string, any>),
-      }
-      return parts
-    }
-
     createForm.value = {
       name: task.name,
-      mode: task.mode,
+      mode: normalizeTaskMode(task.mode),
       sourceRemote: task.sourceRemote,
       sourcePath: task.sourcePath || '',
       targetRemote: task.targetRemote,
       targetPath: task.targetPath || '',
-      enableSchedule: false,
-      scheduleMonth: '*',
-      scheduleWeek: '',
-      scheduleDay: '',
-      scheduleHour: '00',
-      scheduleMinute: '00',
-      options: normalizeTaskOptionsForForm(task.options as Record<string, any>),
+      options: normalizeTaskOptionsForForm(task.options as TaskFormOptions | undefined),
     }
-    return null
   }
 
   return {

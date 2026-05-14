@@ -1,3 +1,5 @@
+import type { TaskFormOptions } from '../components/task/types'
+
 const multilineOptionKeys = [
   'exclude',
   'excludeFrom',
@@ -34,7 +36,7 @@ function toStringArray(value: unknown): string[] {
 }
 
 export function useTaskFormNormalize() {
-  function normalizeTaskOptions(raw: Record<string, any> | undefined | null) {
+  function normalizeTaskOptions(raw: TaskFormOptions | undefined | null): TaskFormOptions {
     const options = { ...(raw || {}) }
     if (typeof options.enableStreaming === 'undefined') {
       options.enableStreaming = true
@@ -47,7 +49,7 @@ export function useTaskFormNormalize() {
     return options
   }
 
-  function normalizeTaskOptionsForForm(raw: Record<string, any> | undefined | null) {
+  function normalizeTaskOptionsForForm(raw: TaskFormOptions | undefined | null): TaskFormOptions {
     const options = { ...(raw || {}) }
     if (typeof options.enableStreaming === 'undefined') {
       options.enableStreaming = true

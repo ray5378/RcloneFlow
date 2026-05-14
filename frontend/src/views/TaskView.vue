@@ -9,6 +9,7 @@ import TaskListViewShell from '../components/task/TaskListViewShell.vue'
 import TaskHistoryViewShell from '../components/task/TaskHistoryViewShell.vue'
 import TaskEditorViewShell from '../components/task/TaskEditorViewShell.vue'
 import ToastCenter from '../components/toast/ToastCenter.vue'
+import ScheduleConfigModal from '../components/task/ScheduleConfigModal.vue'
 import TransferringModal from '../components/task/transferring/TransferringModal.vue'
 import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { setErrorHandler } from '../composables/useError'
@@ -30,6 +31,9 @@ import { useTaskViewModalBindings } from '../composables/useTaskViewModalBinding
 import { useToastCenter } from '../composables/useToastCenter'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 import { useActiveTransferDetail } from '../composables/useActiveTransferDetail'
+import { computed } from 'vue'
+import { t } from '../i18n'
+import { useScheduleConfigModal } from '../composables/useScheduleConfigModal'
 
 // 1) 页面级基础能力
 const { toasts, showToast } = useToastCenter()
@@ -345,11 +349,9 @@ const {
 // 14) 任务列表动作运行时
 const {
   deleteTask,
-  toggleSchedule,
   clearAllRunsWithConfirm,
   runningTaskId,
   stoppedTaskId,
-  scheduleToggledTaskId,
   stopTaskAny,
   runTask,
   goToAddTask,
@@ -376,6 +378,71 @@ const {
   scheduleApi,
 })
 
+const {
+  scheduleConfigVisible,
+  scheduleConfigSaving,
+  scheduleConfigDraft,
+  scheduleConfigTitle,
+  openScheduleConfigForTask,
+  closeScheduleConfig,
+  saveScheduleConfig,
+} = useScheduleConfigModal({
+  createForm,
+  getScheduleByTaskId,
+  scheduleApi,
+  loadData,
+  showToast,
+})
+
+const taskEditorVisible = computed(() => currentModule.value === 'add')
+const taskEditorTitle = computed(() => editingTask.value ? t('taskEditor.editTitle') : t('taskEditor.createTitle'))
+
+const taskEditorSnapshot = computed(() => JSON.stringify({
+  commandMode: commandMode.value,
+  commandText: commandText.value,
+  createForm: createForm.value,
+  showSourcePathInput: showSourcePathInput.value,
+  showTargetPathInput: showTargetPathInput.value,
+  showAdvancedOptions: showAdvancedOptions.value,
+}))
+
+const taskEditorBaseline = computed(() => JSON.stringify({
+  commandMode: false,
+  commandText: '',
+  createForm: {
+    name: editingTask.value?.name ?? '',
+    mode: editingTask.value ? createForm.value.mode : 'copy',
+    sourceRemote: editingTask.value?.sourceRemote ?? '',
+    sourcePath: editingTask.value?.sourcePath ?? '',
+    targetRemote: editingTask.value?.targetRemote ?? '',
+    targetPath: editingTask.value?.targetPath ?? '',
+    options: editingTask.value ? createForm.value.options : { enableStreaming: true },
+  },
+  showSourcePathInput: false,
+  showTargetPathInput: false,
+  showAdvancedOptions: false,
+}))
+
+const hasTaskEditorChanges = computed(() => taskEditorSnapshot.value !== taskEditorBaseline.value)
+
+function doCloseTaskEditorModal() {
+  creatingState.value = 'idle'
+  currentModule.value = 'tasks'
+}
+
+function closeTaskEditorModal() {
+  if (creatingState.value === 'loading') return
+  if (!hasTaskEditorChanges.value) {
+    doCloseTaskEditorModal()
+    return
+  }
+  showConfirm(
+    t('taskEditor.closeConfirmTitle'),
+    t('taskEditor.closeConfirmMessage'),
+    () => doCloseTaskEditorModal(),
+  )
+}
+
 </script>
 
 
@@ -383,7 +450,7 @@ const {
   <ToastCenter :toasts="toasts" />
 
   <TaskListViewShell
-    v-if="currentModule === 'tasks'"
+    v-if="currentModule !== 'history'"
     :task-search="taskSearch"
     :filtered-tasks="filteredTasks"
     :all-tasks="tasks"
@@ -391,7 +458,6 @@ const {
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
     :stopped-task-id="stoppedTaskId"
-    :schedule-toggled-task-id="scheduleToggledTaskId"
     :tasks-total="tasksTotal"
     :tasks-page-size="tasksPageSize"
     :tasks-page="tasksPage"
@@ -402,7 +468,7 @@ const {
     :run-task="runTask"
     :edit-task="editTask"
     :delete-task="deleteTask"
-    :toggle-schedule="toggleSchedule"
+    :open-schedule-config="openScheduleConfigForTask"
     :view-task-history="viewTaskHistory"
     :stop-task-any="stopTaskAny"
     :set-webhook="setWebhook"
@@ -493,7 +559,8 @@ const {
   />
 
   <TaskEditorViewShell
-    v-if="currentModule === 'add'"
+    :visible="taskEditorVisible"
+    :title="taskEditorTitle"
     :command-mode="commandMode"
     :command-text="commandText"
     :create-form="createForm"
@@ -523,6 +590,17 @@ const {
     :on-target-arrow="onTargetArrow"
     :on-target-click="onTargetClick"
     :create-task="createTask"
+    :close-editor-modal="closeTaskEditorModal"
+  />
+
+  <ScheduleConfigModal
+    :visible="scheduleConfigVisible"
+    :title="scheduleConfigTitle"
+    :model-value="scheduleConfigDraft"
+    :saving="scheduleConfigSaving"
+    @update:model-value="scheduleConfigDraft = $event"
+    @save="saveScheduleConfig"
+    @close="closeScheduleConfig"
   />
 
   <TransferringModal

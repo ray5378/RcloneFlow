@@ -1,20 +1,16 @@
 import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
+import type { CreateForm, PathBreadcrumb, PathBrowseItem } from '../components/task/types'
 import type { Task } from '../types'
 
-interface PathBrowseItem {
-  IsDir?: boolean
-  Path: string
-}
-
 interface UseTaskPathBrowseOptions {
-  createForm: Ref<any>
-  listPath: (remote: string, path: string) => Promise<{ items?: any[] }>
+  createForm: Ref<CreateForm>
+  listPath: (remote: string, path: string) => Promise<{ items?: PathBrowseItem[] }>
 }
 
 export function useTaskPathBrowse(options: UseTaskPathBrowseOptions) {
-  const sourcePathOptions = ref<any[]>([])
-  const targetPathOptions = ref<any[]>([])
+  const sourcePathOptions = ref<PathBrowseItem[]>([])
+  const targetPathOptions = ref<PathBrowseItem[]>([])
   const showSourcePathInput = ref(false)
   const showTargetPathInput = ref(false)
   const sourceCurrentPath = ref('')
@@ -121,7 +117,7 @@ export function useTaskPathBrowse(options: UseTaskPathBrowseOptions) {
     loadTargetPath(options.createForm.value.targetRemote, item.Path)
   }
 
-  const sourceBreadcrumbs = computed(() => {
+  const sourceBreadcrumbs = computed<PathBreadcrumb[]>(() => {
     if (!options.createForm.value.sourceRemote) return []
     const parts = (sourceCurrentPath.value || '').split('/').filter(Boolean)
     const crumbs = [{ name: options.createForm.value.sourceRemote + ':', path: '' }]
@@ -133,7 +129,7 @@ export function useTaskPathBrowse(options: UseTaskPathBrowseOptions) {
     return crumbs
   })
 
-  const targetBreadcrumbs = computed(() => {
+  const targetBreadcrumbs = computed<PathBreadcrumb[]>(() => {
     if (!options.createForm.value.targetRemote) return []
     const parts = (targetCurrentPath.value || '').split('/').filter(Boolean)
     const crumbs = [{ name: options.createForm.value.targetRemote + ':', path: '' }]

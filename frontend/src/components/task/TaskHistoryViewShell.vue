@@ -2,6 +2,8 @@
 import TaskHistorySection from './TaskHistorySection.vue'
 import RunLogModal from './RunLogModal.vue'
 import RunningHintModal from './RunningHintModal.vue'
+import type { Run } from '../../types'
+import type { TaskProgressLike } from './progressText'
 
 defineProps<{
   currentTotal: number
@@ -11,10 +13,10 @@ defineProps<{
   jumpPage: number
   historyFilterTaskId: number | null
   historyStatusFilter: string
-  filteredRuns: any[]
-  getRunProgressFromSummary: (run: any) => any
-  getRealtimeProgressByRun: (run: any) => any
-  getFinalSummaryFromComposable: (run: any) => any
+  filteredRuns: Run[]
+  getRunProgressFromSummary: (run: Run) => TaskProgressLike | null
+  getRealtimeProgressByRun: (run: Run) => TaskProgressLike | null
+  getFinalSummaryFromComposable: (run: Run) => any
   showDetailModal: boolean
   runDetail: any
   getStatusClass: (status: string) => string
@@ -37,9 +39,9 @@ defineProps<{
   setJumpPageValue: (value: number) => void
   jumpToPage: () => void
   clearAllRunsWithConfirm: () => void
-  showRunDetail: (run: any) => void
-  openRunLog: (run: any) => void
-  clearRun: (run: any) => void
+  showRunDetail: (run: Run) => void
+  openRunLog: (run: Run) => void
+  clearRun: (run: number) => void
   closeRunDetail: () => void
   setFinalFilter: (filter: string) => void
   goPrevFilesPage: () => void

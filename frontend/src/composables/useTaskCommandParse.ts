@@ -1,10 +1,4 @@
-interface ParsedRcloneCommand {
-  mode: string
-  src: { remote: string; path: string }
-  dst: { remote: string; path: string }
-  options: Record<string, any>
-}
-
+import type { ParsedRcloneCommand, TaskFormOptions, TaskMode } from '../components/task/types'
 import { t } from '../i18n'
 
 export function parseRcloneCommand(cmd: string): ParsedRcloneCommand {
@@ -14,10 +8,10 @@ export function parseRcloneCommand(cmd: string): ParsedRcloneCommand {
   if (tokens.length < 3) throw new Error(t('runtime.commandMissingSrcDst'))
 
   const sub = tokens[1]
-  const mode = sub === 'sync' ? 'sync' : sub === 'move' ? 'move' : 'copy'
+  const mode: TaskMode = sub === 'sync' ? 'sync' : sub === 'move' ? 'move' : 'copy'
   const src = parseRemotePath(tokens[2])
   const dst = parseRemotePath(tokens[3])
-  const options: Record<string, any> = {}
+  const options: TaskFormOptions = {}
 
   for (let i = 4; i < tokens.length; i++) {
     const token = tokens[i]

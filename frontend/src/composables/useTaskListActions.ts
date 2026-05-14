@@ -42,20 +42,6 @@ export function useTaskListActions(options: UseTaskListActionsOptions) {
     })
   }
 
-  const scheduleToggledTaskId = ref<number | null>(null)
-
-  async function toggleSchedule(taskId: number) {
-    const schedule = getScheduleByTaskId(taskId)
-    if (!schedule) return
-    await options.scheduleApi.update(schedule.id, !schedule.enabled)
-    scheduleToggledTaskId.value = taskId
-    setTimeout(() => {
-      if (scheduleToggledTaskId.value === taskId) {
-        scheduleToggledTaskId.value = null
-      }
-    }, 1000)
-    await options.loadData()
-  }
 
   async function deleteSchedule(id: number) {
     if (!confirm(t('schedule.deleteConfirm'))) return
@@ -76,9 +62,7 @@ export function useTaskListActions(options: UseTaskListActionsOptions) {
   return {
     getScheduleByTaskId,
     deleteTask,
-    toggleSchedule,
     deleteSchedule,
     clearAllRunsWithConfirm,
-    scheduleToggledTaskId,
   }
 }
