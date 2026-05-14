@@ -40,6 +40,11 @@ export async function updateTaskOptions(taskId: number, options: Record<string, 
   return patch('/api/tasks', { id: taskId, options })
 }
 
+/** 批量保存任务排序 */
+export async function updateTaskSortOrders(orders: Record<number, number>): Promise<void> {
+  return patch('/api/tasks', { orders })
+}
+
 export interface RunTaskResult {
   started: boolean
   reason?: 'singleton_blocked' | 'already_running' | string

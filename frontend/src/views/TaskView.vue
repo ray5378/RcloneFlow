@@ -103,6 +103,7 @@ const {
   taskSearch,
   tasksTotal,
   currentTasksPages,
+  filteredTasksRaw,
   filteredTasks,
   jumpToTasksPage,
 } = useTaskListView(tasks)
@@ -352,6 +353,7 @@ const {
   runTask,
   goToAddTask,
   editTask,
+  saveTaskSortOrders,
 } = useTaskListRuntime({
   openMenuId,
   historyFilterTaskId,
@@ -383,6 +385,7 @@ const {
     v-if="currentModule === 'tasks'"
     :task-search="taskSearch"
     :filtered-tasks="filteredTasks"
+    :all-tasks="filteredTasksRaw"
     :get-schedule-by-task-id="getScheduleByTaskId"
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
@@ -403,6 +406,7 @@ const {
     :stop-task-any="stopTaskAny"
     :set-webhook="setWebhook"
     :set-singleton-mode="setSingletonMode"
+    :save-task-sort-orders="saveTaskSortOrders"
     :open-transfer-detail="openActiveTransfer"
     :prev-tasks-page="prevTasksPage"
     :next-tasks-page="nextTasksPage"

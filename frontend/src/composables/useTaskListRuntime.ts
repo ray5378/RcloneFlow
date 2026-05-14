@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { Schedule, Task } from '../types'
+import { t } from '../i18n'
 import { useTaskListActions } from './useTaskListActions'
 import { useTaskRunActions } from './useTaskRunActions'
 import { useTaskFormEntry } from './useTaskFormEntry'
@@ -27,6 +28,7 @@ export function useTaskListRuntime(options: {
     delete: (id: number) => Promise<boolean>
     run: (taskId: number) => Promise<any>
     kill: (taskId: number) => Promise<void>
+    updateSortOrders: (orders: Record<number, number>) => Promise<boolean>
   }
   scheduleApi: {
     delete: (id: number) => Promise<void>
@@ -83,6 +85,14 @@ export function useTaskListRuntime(options: {
     restoreTaskPathBrowse: options.restoreTaskPathBrowse,
   })
 
+  async function saveTaskSortOrders(orders: Record<number, number>) {
+    const ok = await options.taskApi.updateSortOrders(orders)
+    if (!ok) return false
+    await options.loadData()
+    options.showToast(t('runtime.taskSortSave'), 'success')
+    return true
+  }
+
   return {
     deleteTask,
     toggleSchedule,
@@ -95,5 +105,6 @@ export function useTaskListRuntime(options: {
     runTask,
     goToAddTask,
     editTask,
+    saveTaskSortOrders,
   }
 }

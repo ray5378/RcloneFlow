@@ -6,6 +6,7 @@ import SingletonConfigModal from './SingletonConfigModal.vue'
 defineProps<{
   taskSearch: string
   filteredTasks: any[]
+  allTasks: any[]
   getScheduleByTaskId: (taskId: number) => any
   getTaskCardProgressByTask: (task: any) => any
   runningTaskId: number | null
@@ -26,6 +27,7 @@ defineProps<{
   stopTaskAny: (task: any) => void
   setWebhook: (task: any) => void
   setSingletonMode: (task: any) => void
+  saveTaskSortOrders: (orders: Record<number, number>) => Promise<boolean>
   openTransferDetail: (taskId: number) => void
   prevTasksPage: () => void
   nextTasksPage: () => void
@@ -56,6 +58,7 @@ defineProps<{
   <TaskListSection
     :search="taskSearch"
     :filtered-tasks="filteredTasks"
+    :all-tasks="allTasks"
     :get-schedule-by-task-id="getScheduleByTaskId"
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
     :running-task-id="runningTaskId"
@@ -77,6 +80,7 @@ defineProps<{
     @set-webhook="setWebhook"
     @set-singleton="setSingletonMode"
     @open-transfer-detail="openTransferDetail"
+    @save-sort="saveTaskSortOrders"
     @prev-page="prevTasksPage"
     @next-page="nextTasksPage"
     @update:jump-page="setTasksJumpPageValue"
