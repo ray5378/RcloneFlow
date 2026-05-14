@@ -36,6 +36,7 @@ defineProps<{
   showWebhookModal: boolean
   webhookForm: any
   setWebhookTriggerId: (value: string) => void
+  setWebhookMatchText: (value: string) => void
   setWebhookPostUrl: (value: string) => void
   setWebhookWecomUrl: (value: string) => void
   setWebhookNotifyManual: (value: boolean) => void
@@ -90,6 +91,7 @@ defineProps<{
   <WebhookConfigModal
     :visible="showWebhookModal"
     :trigger-id="webhookForm?.triggerId ?? ''"
+    :match-text="webhookForm?.matchText ?? ''"
     :post-url="webhookForm?.postUrl ?? ''"
     :wecom-url="(webhookForm as any)?.wecomUrl ?? ''"
     :notify-manual="webhookForm?.notify?.manual ?? false"
@@ -99,6 +101,7 @@ defineProps<{
     :status-failed="(webhookForm as any)?.status?.failed ?? false"
     :can-test="!!(webhookForm?.postUrl) || !!((webhookForm as any)?.wecomUrl)"
     @update:trigger-id="setWebhookTriggerId"
+    @update:match-text="setWebhookMatchText"
     @update:post-url="setWebhookPostUrl"
     @update:wecom-url="setWebhookWecomUrl"
     @update:notify-manual="setWebhookNotifyManual"

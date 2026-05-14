@@ -4,6 +4,7 @@ import { t } from '../../i18n'
 defineProps<{
   visible: boolean
   triggerId: string
+  matchText: string
   postUrl: string
   wecomUrl: string
   notifyManual: boolean
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   (e: 'save'): void
   (e: 'test'): void
   (e: 'update:triggerId', value: string): void
+  (e: 'update:matchText', value: string): void
   (e: 'update:postUrl', value: string): void
   (e: 'update:wecomUrl', value: string): void
   (e: 'update:notifyManual', value: boolean): void
@@ -28,7 +30,7 @@ const emit = defineEmits<{
   (e: 'update:statusFailed', value: boolean): void
 }>()
 
-function onTextInput(event: Event, key: 'triggerId' | 'postUrl' | 'wecomUrl') {
+function onTextInput(event: Event, key: 'triggerId' | 'matchText' | 'postUrl' | 'wecomUrl') {
   const target = event.target as HTMLInputElement
   emit(`update:${key}` as any, target.value)
 }
@@ -50,6 +52,11 @@ function onCheckbox(event: Event, key: 'notifyManual' | 'notifySchedule' | 'noti
         <div class="detail-item full-width">
           <label>{{ t('webhookModal.triggerId') }}</label>
           <input :value="triggerId" type="text" :placeholder="t('webhookModal.triggerPlaceholder')" @input="onTextInput($event, 'triggerId')" />
+        </div>
+        <div class="detail-item full-width">
+          <label>{{ t('webhookModal.matchText') }}</label>
+          <input :value="matchText" type="text" :placeholder="t('webhookModal.matchPlaceholder')" @input="onTextInput($event, 'matchText')" />
+          <p class="hint">{{ t('webhookModal.matchHint') }}</p>
         </div>
         <div class="detail-item full-width">
           <label>{{ t('webhookModal.postUrl') }}</label>

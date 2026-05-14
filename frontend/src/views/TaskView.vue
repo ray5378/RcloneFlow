@@ -294,6 +294,7 @@ const {
   closeLogModal,
   closeGlobalStatsModal,
   setWebhookTriggerId,
+  setWebhookMatchText,
   setWebhookPostUrl,
   setWebhookWecomUrl,
   setWebhookNotifyManual,
@@ -415,6 +416,7 @@ const {
     :show-webhook-modal="showWebhookModal"
     :webhook-form="webhookForm"
     :set-webhook-trigger-id="setWebhookTriggerId"
+    :set-webhook-match-text="setWebhookMatchText"
     :set-webhook-post-url="setWebhookPostUrl"
     :set-webhook-wecom-url="setWebhookWecomUrl"
     :set-webhook-notify-manual="setWebhookNotifyManual"

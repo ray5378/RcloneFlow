@@ -1,7 +1,9 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -33,9 +35,29 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	bodyBytes, _ := io.ReadAll(r.Body)
+	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+	bodyText := string(bodyBytes)
+
+	shouldTrigger := func(opts map[string]any) bool {
+		matchText := strings.TrimSpace(toString(opts["webhookMatchText"]))
+		if matchText == "" {
+			return true
+		}
+		return strings.Contains(bodyText, matchText)
+	}
+
 	// 优先：数字则按任务ID直接触发
 	if tid, err := strconv.ParseInt(id, 10, 64); err == nil {
 		if t, ok := c.taskSvc.GetTask(tid); ok {
+			var opts map[string]any
+			if len(t.Options) > 0 {
+				_ = json.Unmarshal(t.Options, &opts)
+			}
+			if !shouldTrigger(opts) {
+				WriteJSON(w, 200, map[string]any{"ok": true, "triggered": false, "reason": "webhook_match_not_hit"})
+				return
+			}
 			result, err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook")
 			if err != nil {
 				WriteJSON(w, 500, map[string]any{"error": err.Error()})
@@ -66,6 +88,10 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 		if wid == "" || wid != id {
 			continue
 		}
+		if !shouldTrigger(opts) {
+			WriteJSON(w, 200, map[string]any{"ok": true, "triggered": false, "reason": "webhook_match_not_hit"})
+			return
+		}
 		result, err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook")
 		if err != nil {
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
@@ -75,4 +101,9 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 		return
 	}
 	WriteJSON(w, 404, map[string]any{"error": "webhook id not found"})
+}
+
+func toString(v any) string {
+	s, _ := v.(string)
+	return s
 }

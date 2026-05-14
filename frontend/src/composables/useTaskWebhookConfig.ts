@@ -13,6 +13,7 @@ export function useTaskWebhookConfig(options: {
     taskId: null,
     postUrl: '',
     triggerId: '',
+    matchText: '',
     notify: { manual: false, schedule: false, webhook: false },
     status: { success: true, failed: true },
     wecomUrl: '',
@@ -26,6 +27,7 @@ export function useTaskWebhookConfig(options: {
       webhookForm.value.postUrl = opts?.webhookPostUrl || ''
       webhookForm.value.wecomUrl = opts?.wecomPostUrl || ''
       webhookForm.value.triggerId = opts?.webhookId || ''
+      webhookForm.value.matchText = opts?.webhookMatchText || ''
       const n = opts?.webhookNotifyOn || {}
       webhookForm.value.notify = {
         manual: !!n.manual,
@@ -38,6 +40,7 @@ export function useTaskWebhookConfig(options: {
       webhookForm.value.postUrl = ''
       webhookForm.value.wecomUrl = ''
       webhookForm.value.triggerId = ''
+      webhookForm.value.matchText = ''
       webhookForm.value.notify = { manual: false, schedule: false, webhook: false }
       webhookForm.value.status = { success: true, failed: true }
     }
@@ -53,6 +56,7 @@ export function useTaskWebhookConfig(options: {
       const id = webhookForm.value.taskId
       const payload = {
         webhookId: webhookForm.value.triggerId,
+        webhookMatchText: webhookForm.value.matchText,
         webhookPostUrl: webhookForm.value.postUrl,
         wecomPostUrl: webhookForm.value.wecomUrl || '',
         webhookNotifyOn: webhookForm.value.notify,
