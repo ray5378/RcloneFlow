@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import TaskCard from './TaskCard.vue'
 import TaskListHeader from './TaskListHeader.vue'
 import TaskListPagination from './TaskListPagination.vue'
@@ -46,6 +46,7 @@ const sortInputs = ref<Record<number, number | null>>({})
 const savingNow = ref(false)
 const hasPendingChanges = ref(false)
 const lastPriorityTaskId = ref<number | null>(null)
+const listTopRef = ref<HTMLElement | null>(null)
 
 function buildSortMap(tasks: any[]) {
   const map: Record<number, number | null> = {}
@@ -180,10 +181,43 @@ watch(() => props.allTasks, (tasks) => {
   if (hasPendingChanges.value) return
   sortInputs.value = { ...buildSortMap(tasks) }
 }, { deep: true })
+
+function scrollListToTop() {
+  nextTick(() => {
+    listTopRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+function handlePrevPage() {
+  emit('prev-page')
+  scrollListToTop()
+}
+
+function handleNextPage() {
+  emit('next-page')
+  scrollListToTop()
+}
+
+function handleJumpPage() {
+  emit('jump-page')
+  scrollListToTop()
+}
+
+function handleFirstPage() {
+  emit('update:jump-page', 1)
+  emit('jump-page')
+  scrollListToTop()
+}
+
+function handleLastPage() {
+  emit('update:jump-page', props.currentTasksPages)
+  emit('jump-page')
+  scrollListToTop()
+}
 </script>
 
 <template>
-  <div class="card">
+  <div ref="listTopRef" class="card">
     <TaskListHeader
       :search="search"
       :sorting="sorting"
@@ -229,10 +263,13 @@ watch(() => props.allTasks, (tasks) => {
       :page="tasksPage"
       :total-pages="currentTasksPages"
       :jump-page="tasksJumpPage"
-      @prev="emit('prev-page')"
-      @next="emit('next-page')"
+      :total-items="tasksTotal"
+      @first="handleFirstPage"
+      @prev="handlePrevPage"
+      @next="handleNextPage"
+      @last="handleLastPage"
       @update:jump-page="emit('update:jump-page', $event)"
-      @jump="emit('jump-page')"
+      @jump="handleJumpPage"
     />
   </div>
 </template>
