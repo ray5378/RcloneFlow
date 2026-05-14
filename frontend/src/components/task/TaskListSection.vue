@@ -20,6 +20,7 @@ const props = defineProps<{
   currentTasksPages: number
   tasksJumpPage: number | null
   savingSort?: boolean
+  saveTaskSortOrders: (orders: Record<number, number>) => Promise<boolean>
 }>()
 
 const emit = defineEmits<{
@@ -38,12 +39,11 @@ const emit = defineEmits<{
   (e: 'next-page'): void
   (e: 'update:jump-page', value: number | null): void
   (e: 'jump-page'): void
-  (e: 'save-sort', orders: Record<number, number>): void
 }>()
 
 const sorting = ref(false)
 const sortInputs = ref<Record<number, number | null>>({})
-const originalSortInputs = ref<Record<number, number | null>>({})
+const savingNow = ref(false)
 
 function buildSortMap(tasks: any[]) {
   const map: Record<number, number | null> = {}
@@ -55,15 +55,12 @@ function buildSortMap(tasks: any[]) {
 
 function startSort() {
   sorting.value = true
-  const base = buildSortMap(props.allTasks)
-  sortInputs.value = { ...base }
-  originalSortInputs.value = { ...base }
+  sortInputs.value = { ...buildSortMap(props.allTasks) }
 }
 
 function cancelSort() {
   sorting.value = false
   sortInputs.value = {}
-  originalSortInputs.value = {}
 }
 
 function onSortInput(taskId: number, event: Event) {
@@ -84,19 +81,7 @@ function onSortInput(taskId: number, event: Event) {
   }
 }
 
-const sortDirty = computed(() => {
-  const currentIds = Object.keys(sortInputs.value)
-  const originalIds = Object.keys(originalSortInputs.value)
-  if (currentIds.length !== originalIds.length) return true
-  return currentIds.some((id) => sortInputs.value[Number(id)] !== originalSortInputs.value[Number(id)])
-})
-
-const saveDisabled = computed(() => !sortDirty.value || props.savingSort)
-
-const previewTasks = computed(() => {
-  if (!sorting.value) return props.filteredTasks
-
-  const tasks = [...props.allTasks]
+function buildResolvedSortMap(tasks: any[]) {
   const used = new Map<number, number>()
 
   tasks.forEach((task, index) => {
@@ -108,47 +93,69 @@ const previewTasks = computed(() => {
   })
 
   tasks.forEach((task, index) => {
-    if (usedHasTask(used, task.id)) return
+    if (hasTask(used, task.id)) return
     let current = typeof task.sortOrder === 'number' && Number.isFinite(task.sortOrder) ? task.sortOrder : index + 1
     while (used.has(current)) current += 1
     used.set(current, task.id)
   })
 
+  const ordered = Array.from(used.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([, taskId]) => taskId)
+
   const finalMap = new Map<number, number>()
-  Array.from(used.entries()).forEach(([sortOrder, taskId]) => {
-    finalMap.set(taskId, sortOrder)
+  ordered.forEach((taskId, index) => {
+    finalMap.set(taskId, index + 1)
   })
 
-  return tasks
-    .map(task => ({ ...task, __previewSortOrder: finalMap.get(task.id) ?? task.sortOrder ?? task.id }))
-    .sort((a, b) => (a.__previewSortOrder - b.__previewSortOrder) || (a.id - b.id))
-})
+  return finalMap
+}
 
-function usedHasTask(used: Map<number, number>, taskId: number) {
+function hasTask(used: Map<number, number>, taskId: number) {
   for (const usedTaskId of used.values()) {
     if (usedTaskId === taskId) return true
   }
   return false
 }
 
-async function saveSort() {
-  if (saveDisabled.value) return
+const previewTasks = computed(() => {
+  if (!sorting.value) return props.filteredTasks
+
+  const tasks = [...props.allTasks]
+  const finalMap = buildResolvedSortMap(tasks)
+
+  return tasks
+    .map(task => ({ ...task, __previewSortOrder: finalMap.get(task.id) ?? task.sortOrder ?? task.id }))
+    .sort((a, b) => (a.__previewSortOrder - b.__previewSortOrder) || (a.id - b.id))
+})
+
+async function commitSort(taskId: number) {
+  if (savingNow.value || props.savingSort) return
+  const current = sortInputs.value[taskId]
+  if (current === null || current === undefined || !Number.isFinite(current)) return
+
+  const finalMap = buildResolvedSortMap([...props.allTasks])
   const orders: Record<number, number> = {}
-  Object.entries(sortInputs.value).forEach(([taskId, value]) => {
-    if (value === null || value === undefined || !Number.isFinite(value)) return
-    orders[Number(taskId)] = value
+  finalMap.forEach((sortOrder, id) => {
+    orders[id] = sortOrder
   })
-  emit('save-sort', orders)
-  cancelSort()
+
+  Object.entries(orders).forEach(([id, sortOrder]) => {
+    sortInputs.value[Number(id)] = sortOrder
+  })
+
+  savingNow.value = true
+  const ok = await props.saveTaskSortOrders(orders)
+  savingNow.value = false
+  if (ok) {
+    cancelSort()
+  }
 }
 
 watch(() => props.allTasks, (tasks) => {
   if (!sorting.value) return
-  const base = buildSortMap(tasks)
-  if (!Object.keys(sortInputs.value).length) {
-    sortInputs.value = { ...base }
-    originalSortInputs.value = { ...base }
-  }
+  if (savingNow.value) return
+  sortInputs.value = { ...buildSortMap(tasks) }
 }, { deep: true })
 </script>
 
@@ -157,15 +164,14 @@ watch(() => props.allTasks, (tasks) => {
     <TaskListHeader
       :search="search"
       :sorting="sorting"
-      :saving-sort="savingSort"
+      :saving-sort="savingSort || savingNow"
       @update:search="emit('update:search', $event)"
       @add="emit('add')"
       @toggle-sort="startSort"
-      @save-sort="saveSort"
       @cancel-sort="cancelSort"
     />
 
-    <div v-if="sorting" class="sort-hint">{{ t('taskUI.sortHint') }}</div>
+    <div v-if="sorting" class="sort-hint">{{ t('taskUI.sortAutoSaveHint') }}</div>
 
     <div class="list">
       <TaskCard
@@ -180,6 +186,7 @@ watch(() => props.allTasks, (tasks) => {
         :sorting="sorting"
         :sort-value="sortInputs[task.id] ?? null"
         @sort-input="onSortInput(task.id, $event)"
+        @sort-enter="commitSort(task.id)"
         @run="emit('run', task.id)"
         @edit="emit('edit', task)"
         @delete="emit('delete', task.id)"

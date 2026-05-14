@@ -217,6 +217,7 @@ export default {
     cancelSort: '取消排序',
     sortNumber: '排序号',
     sortHint: '可直接输入排序号；数字越小越靠前，允许跳号。若与已有排序号重复，被顶替的任务会自动顺延到后面。',
+    sortAutoSaveHint: '输入排序号后按 Enter：系统会按顶替规则立即重排，自动把全部任务序号更新为连续顺序，并直接保存到数据库。',
   },
   runItem: {
     finished: '完成',

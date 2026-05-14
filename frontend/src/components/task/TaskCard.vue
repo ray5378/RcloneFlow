@@ -55,6 +55,7 @@ const emit = defineEmits<{
   setSingleton: [task: Task]
   openTransferDetail: [taskId: number]
   sortInput: [event: Event]
+  sortEnter: [event: KeyboardEvent]
 }>()
 
 function getLiveProgress(): Progress | null {
@@ -102,7 +103,7 @@ function isScheduleToggled(): boolean {
       <div class="name list-item-name">
         <div v-if="sorting" class="sort-editor" @click.stop>
           <span class="sort-label">{{ t('taskUI.sortNumber') }}</span>
-          <input class="sort-input" type="number" inputmode="numeric" step="1" :value="sortValue ?? ''" @click.stop @input="emit('sortInput', $event)" />
+          <input class="sort-input" type="number" inputmode="numeric" step="1" :value="sortValue ?? ''" @click.stop @input="emit('sortInput', $event)" @keydown.enter.stop.prevent="emit('sortEnter', $event)" />
         </div>
         <strong>{{ task.name }}</strong>
         <span class="mode-tag list-item-tag">{{ task.mode }}</span>

@@ -217,6 +217,7 @@ export default {
     cancelSort: 'Cancel sort',
     sortNumber: 'Sort number',
     sortHint: 'Enter sort numbers directly. Smaller numbers appear first, gaps are allowed. If a number is already used, the replaced task is automatically pushed down.',
+    sortAutoSaveHint: 'After entering a sort number, press Enter: the list is immediately reordered with collision replacement, all task numbers are normalized into a continuous sequence, and the result is saved to the database right away.',
   },
   runItem: {
     finished: 'Finished',

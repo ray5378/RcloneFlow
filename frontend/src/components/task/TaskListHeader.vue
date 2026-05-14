@@ -6,7 +6,6 @@ const emit = defineEmits<{
   (e: 'update:search', value: string): void
   (e: 'add'): void
   (e: 'toggle-sort'): void
-  (e: 'save-sort'): void
   (e: 'cancel-sort'): void
 }>()
 
@@ -22,10 +21,7 @@ function onSearchInput(event: Event) {
     <div class="header-actions">
       <input :value="search" type="text" :placeholder="t('taskUI.searchTask')" class="search-input" @input="onSearchInput" />
       <button v-if="!sorting" class="ghost small" @click="emit('toggle-sort')">{{ t('taskUI.taskSort') }}</button>
-      <template v-else>
-        <button class="primary small" :disabled="savingSort" @click="emit('save-sort')">{{ t('taskUI.saveSort') }}</button>
-        <button class="ghost small" :disabled="savingSort" @click="emit('cancel-sort')">{{ t('taskUI.cancelSort') }}</button>
-      </template>
+      <button v-else class="ghost small" :disabled="savingSort" @click="emit('cancel-sort')">{{ t('taskUI.cancelSort') }}</button>
       <button class="primary small" @click="emit('add')">+ {{ t('taskUI.addTask') }}</button>
     </div>
   </div>
