@@ -9,7 +9,7 @@ import (
 	"rcloneflow/internal/service"
 )
 
-func TestHandleActiveRuns_CASCompatibleFallsBackToPreflightTotalCount(t *testing.T) {
+func TestHandleActiveRuns_CASCompatibleFallsBackToActiveTransferTotalCount(t *testing.T) {
 	summary := map[string]any{
 		"progress": map[string]any{
 			"bytes":          float64(100),
@@ -19,8 +19,9 @@ func TestHandleActiveRuns_CASCompatibleFallsBackToPreflightTotalCount(t *testing
 			"percentage":     float64(100),
 			"completedFiles": float64(1),
 		},
-		"preflight": map[string]any{
-			"totalCount": float64(1),
+		"activeTransfer": map[string]any{
+			"trackingMode": "cas",
+			"totalCount":   float64(1),
 		},
 		"effectiveOptions": map[string]any{
 			"openlistCasCompatible": true,
@@ -57,7 +58,7 @@ func TestHandleActiveRuns_CASCompatibleFallsBackToPreflightTotalCount(t *testing
 	}
 }
 
-func TestBuildActiveRunItems_CASCompatibleFallsBackToPreflightTotalCount(t *testing.T) {
+func TestBuildActiveRunItems_CASCompatibleFallsBackToActiveTransferTotalCount(t *testing.T) {
 	summary := map[string]any{
 		"progress": map[string]any{
 			"bytes":          float64(100),
@@ -67,8 +68,9 @@ func TestBuildActiveRunItems_CASCompatibleFallsBackToPreflightTotalCount(t *test
 			"percentage":     float64(100),
 			"completedFiles": float64(1),
 		},
-		"preflight": map[string]any{
-			"totalCount": float64(1),
+		"activeTransfer": map[string]any{
+			"trackingMode": "cas",
+			"totalCount":   float64(1),
 		},
 		"effectiveOptions": map[string]any{
 			"openlistCasCompatible": true,
