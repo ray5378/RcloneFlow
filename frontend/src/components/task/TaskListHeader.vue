@@ -26,7 +26,34 @@ function onSearchInput(event: Event) {
         <button class="primary small" :disabled="savingSort" @click="emit('save-sort')">{{ t('taskUI.saveSort') }}</button>
         <button class="ghost small" :disabled="savingSort" @click="emit('cancel-sort')">{{ t('taskUI.cancelSort') }}</button>
       </template>
-      <button class="primary small" @click="emit('add')">+ {{ t('taskUI.addTask') }}</button>
+      <button class="primary small add-task-btn" @click="emit('add')">+ {{ t('taskUI.addTask') }}</button>
     </div>
   </div>
 </template>
+
+<style scoped>
+.add-task-btn {
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .header-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .search-input {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+
+  .add-task-btn {
+    font-size: 12px;
+    padding: 8px 10px;
+    min-width: 0;
+    flex-shrink: 1;
+  }
+}
+</style>

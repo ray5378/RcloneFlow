@@ -2,7 +2,7 @@
 import { t } from '../../../i18n'
 import { formatBytes } from '../../../utils/format'
 import type { ActiveTransferPendingFile, TrackingMode } from '../../../api/activeTransfer'
-import { getTrackingLabels, getTransferStatusLabel } from './transferringLabels'
+import { getTrackingLabels } from './transferringLabels'
 
 const props = defineProps<{
   items: ActiveTransferPendingFile[]
@@ -24,6 +24,12 @@ function onJumpInput(event: Event) {
   const target = event.target as HTMLInputElement
   emit('update:jump-page', target.value === '' ? null : Number(target.value))
 }
+
+function getDisplayName(item: ActiveTransferPendingFile) {
+  const raw = item.path || item.name || ''
+  const normalized = raw.replace(/\\/g, '/')
+  return normalized.split('/').filter(Boolean).pop() || raw
+}
 </script>
 
 <template>
@@ -31,9 +37,8 @@ function onJumpInput(event: Event) {
     <div class="title">{{ getTrackingLabels(props.trackingMode).pending }} <span v-if="props.total != null">({{ items.length }}/{{ props.total }})</span></div>
     <div v-if="items.length" class="list">
       <div v-for="item in items" :key="item.path || item.name" class="row">
-        <span class="name" :title="item.path || item.name">{{ item.path || item.name }}</span>
+        <span class="name" :title="item.path || item.name">{{ getDisplayName(item) }}</span>
         <span class="size">{{ formatBytes(item.sizeBytes || 0) }}</span>
-        <span class="tag">{{ getTransferStatusLabel(item.status) }}</span>
       </div>
     </div>
     <div v-else class="empty">{{ t('activeTransfer.emptyList') }}</div>
@@ -51,11 +56,17 @@ function onJumpInput(event: Event) {
 .title { font-size: 12px; color:#999; margin-bottom: 6px; }
 .list { width:100%; box-sizing:border-box; border:1px solid #333; border-radius:8px; padding:8px; max-height:320px; overflow:auto; }
 body.light .list { border-color:#ddd; }
-.row { display:grid; grid-template-columns:minmax(0, 1fr) 110px 96px; gap:12px; padding:6px 0; font-size:13px; align-items:center; }
+.row { display:grid; grid-template-columns:minmax(0, 1fr) 110px; gap:12px; padding:6px 0; font-size:13px; align-items:center; }
 .name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .size { font-size:12px; color:#999; white-space:nowrap; text-align:right; }
-.tag { color:#999; white-space:nowrap; text-align:right; }
 .pagination { padding-top:8px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+
+@media (max-width: 768px) {
+  .list { padding: 8px 10px; }
+  .row { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+  .name { font-size: 13px; }
+  .size { font-size: 11px; }
+}
 .page-btn { padding:4px 8px; border-radius:6px; border:1px solid #444; background:transparent; color:inherit; cursor:pointer; }
 .page-btn:disabled { opacity:.5; cursor:not-allowed; }
 .page-input { width:72px; min-width:72px; padding:4px 8px; border-radius:6px; border:1px solid #444; background:transparent; color:inherit; }

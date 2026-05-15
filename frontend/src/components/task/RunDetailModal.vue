@@ -125,7 +125,7 @@ const activeFilesTotal = computed(() => Math.max(0, Number(props.runFilesTotal) 
 
         <div class="detail-item full-width">
           <label>{{ t('modal.details') }}</label>
-          <div>
+          <div class="detail-files-section">
             <div class="files-toolbar">
               <span>{{ countLine(t('modal.countLine'), activeFilesTotal) }}</span>
               <div class="pager-inline">
@@ -158,7 +158,7 @@ const activeFilesTotal = computed(() => Math.max(0, Number(props.runFilesTotal) 
 </template>
 
 <style scoped>
-.detail-modal{ width: 135% !important; max-width: 1200px !important; }
+.detail-modal{ width:min(96vw, 1100px) !important; max-width:1100px !important; }
 .summary-box{background:#111827;border:1px solid #333;border-radius:10px;padding:12px 14px;margin-top:6px;max-width:1200px}
 .summary-title{font-size:13px;color:#94a3b8;margin-bottom:10px}
 .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
@@ -197,5 +197,73 @@ body.light .files-header{background:#f5f5f5;color:#4b5563}
 @media (max-width: 1100px){
   .summary-grid{grid-template-columns:repeat(2,1fr)}
   .files-toolbar{flex-direction:column;align-items:flex-start}
+}
+
+@media (max-width: 768px){
+  .detail-modal{
+    width: min(100vw - 16px, 100%) !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 16px) !important;
+    border-radius: 14px;
+  }
+  .summary-box{
+    padding: 10px 12px;
+  }
+  .summary-grid{
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .summary-val{
+    font-size: 16px;
+  }
+  .detail-files-section{
+    min-width: 0;
+  }
+  .files-toolbar{
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .pager-inline{
+    width: 100%;
+    justify-content: space-between;
+  }
+  .files-table{
+    margin-top: 10px;
+    border-radius: 8px;
+  }
+  .files-header{
+    display: none;
+  }
+  .files-body{
+    max-height: none;
+  }
+  .files-table :deep(.files-row){
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 10px;
+    padding: 10px 12px;
+  }
+  .files-table :deep(.files-row .name){
+    grid-column: 1 / -1;
+    font-size: 13px;
+    white-space: normal;
+    word-break: break-all;
+  }
+  .files-table :deep(.files-row .status),
+  .files-table :deep(.files-row .time),
+  .files-table :deep(.files-row .size){
+    font-size: 11px;
+  }
+  .files-table :deep(.files-row .status){
+    justify-self: start;
+    text-align: left;
+  }
+  .files-table :deep(.files-row .time){
+    justify-self: start;
+    text-align: left;
+  }
+  .files-table :deep(.files-row .size){
+    justify-self: end;
+    text-align: right;
+  }
 }
 </style>
