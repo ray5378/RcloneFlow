@@ -52,12 +52,9 @@ defineProps<{
   closeLogModal: () => void
   runningHintVisible: boolean
   runningHintRun: any
-  runningHintDebugOpen: boolean
   runningHintPhaseText: string
   runningHintProgressText: string
-  runningHintDebugInfo: any
   closeRunningHint: () => void
-  toggleRunningHintDebug: () => void
   openRunningHintLog: () => void
 }>()
 </script>
@@ -118,12 +115,7 @@ defineProps<{
     :run="runningHintRun"
     :phase-text="runningHintPhaseText"
     :progress-text="runningHintProgressText"
-    :debug-open="runningHintDebugOpen"
-    :debug-check-text="runningHintDebugInfo.checkText"
-    :debug-progress-line="runningHintDebugInfo.progressLine"
-    :debug-progress-json="runningHintDebugInfo.progressJson"
     @close="closeRunningHint"
-    @toggle-debug="toggleRunningHintDebug"
     @open-log="openRunningHintLog"
   />
 </template>

@@ -1,8 +1,4 @@
 <script setup lang="ts">
-const props = defineProps<{
-  runningHintDebugEnabled?: boolean
-}>()
-
 import GlobalStatsModal from '../components/task/GlobalStatsModal.vue'
 import ConfirmModal from '../components/task/ConfirmModal.vue'
 import TaskListViewShell from '../components/task/TaskListViewShell.vue'
@@ -223,15 +219,12 @@ const openRunLogFromHint = (run: any) => openRunLog(run)
 const {
   runningHintVisible,
   runningHintRun,
-  runningHintDebugOpen,
   runningHintPhaseText,
   runningHintProgressText,
-  runningHintDebugInfo,
   openRunningHint,
   closeRunningHint,
-  toggleRunningHintDebug,
   openRunningHintLog,
-} = useRunningHintRuntime(activeRuns, openRunLogFromHint, props.runningHintDebugEnabled === true)
+} = useRunningHintRuntime(activeRuns, openRunLogFromHint)
 
 // 10) 运行详情入口编排
 const {
@@ -548,13 +541,9 @@ function closeTaskEditorModal() {
     :close-log-modal="closeLogModal"
     :running-hint-visible="runningHintVisible"
     :running-hint-run="runningHintRun"
-    :running-hint-debug-enabled="runningHintDebugEnabled"
-    :running-hint-debug-open="runningHintDebugOpen"
     :running-hint-phase-text="runningHintPhaseText"
     :running-hint-progress-text="runningHintProgressText"
-    :running-hint-debug-info="runningHintDebugInfo"
     :close-running-hint="closeRunningHint"
-    :toggle-running-hint-debug="toggleRunningHintDebug"
     :open-running-hint-log="openRunningHintLog"
   />
 

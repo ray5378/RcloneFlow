@@ -206,16 +206,6 @@ onMounted(load)
           </div>
         </div>
 
-        <div class="section">
-          <div class="section-title">{{ t('defaults.runningDebug') }}</div>
-          <div class="grid">
-            <label :title="t('defaults.runningDebugTitle')">{{ t('defaults.runningDebugLabel') }}</label>
-            <select v-model="form.RUNNING_HINT_DEBUG_ENABLED">
-              <option value="false">{{ t('modal.off') }}</option>
-              <option value="true">{{ t('modal.on') }}</option>
-            </select>
-          </div>
-        </div>
       </div>
       <div class="modal-footer">
         <button class="ghost" @click="onReset" :disabled="saving">{{ t('modal.resetDefaults') }}</button>

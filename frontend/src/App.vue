@@ -20,7 +20,6 @@ const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
 const showDefaultsModal = ref(false)
 const showMobileMenu = ref(false)
-const runningHintDebugEnabled = ref(false)
 
 const user = getUser()
 const passwordForm = reactive({ username: user?.username || '', oldPassword: '', newPassword: '', confirmPassword: '' })
@@ -56,15 +55,13 @@ function toggleTheme() {
 
 async function loadRuntimeSettings() {
   try {
-    const resp = await getSettings()
-    runningHintDebugEnabled.value = String(resp.webhook?.RUNNING_HINT_DEBUG_ENABLED?.effective || 'false') === 'true'
+    await getSettings()
   } catch {
-    runningHintDebugEnabled.value = false
+    // ignore runtime settings load failures here
   }
 }
 
-function handleDefaultsSaved(values: Record<string, string>) {
-  runningHintDebugEnabled.value = String(values.RUNNING_HINT_DEBUG_ENABLED || 'false') === 'true'
+function handleDefaultsSaved(_values: Record<string, string>) {
 }
 
 async function handleLoginSuccess() {
@@ -171,7 +168,7 @@ onMounted(async () => {
 
       <main class="main">
         <BrowserView v-if="currentPage === 'browser'" :version="version" />
-        <TaskView v-if="currentPage === 'tasks'" :key="taskViewKey" :running-hint-debug-enabled="runningHintDebugEnabled" />
+        <TaskView v-if="currentPage === 'tasks'" :key="taskViewKey" />
       </main>
 
       <nav v-if="isMobile" class="mobile-bottom-nav">
