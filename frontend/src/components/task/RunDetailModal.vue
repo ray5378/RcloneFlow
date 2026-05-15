@@ -162,7 +162,7 @@ const activeFilesTotal = computed(() => Math.max(0, Number(props.runFilesTotal) 
 .summary-box{background:#111827;border:1px solid #333;border-radius:10px;padding:12px 14px;margin-top:6px;max-width:1200px}
 .summary-title{font-size:13px;color:#94a3b8;margin-bottom:10px}
 .summary-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-.summary-cell{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px}
+.summary-cell{min-width:0;background:#0f172a;border:1px solid #334155;border-radius:10px;padding:10px 12px}
 .summary-key{font-size:12px;color:#94a3b8;margin-bottom:6px}
 .summary-val{font-size:18px;font-weight:700;color:#e5e7eb}
 .summary-val.est{color:#93c5fd}
@@ -175,6 +175,7 @@ body.light .summary-val{color:#111827}
 .summary-cell.clickable{cursor:pointer;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
 .summary-cell.clickable:hover{background:#1f2937;border-color:#475569;box-shadow:0 0 0 1px #334155 inset}
 body.light .summary-cell.clickable:hover{background:#f0f4f8;border-color:#cbd5e1;box-shadow:0 0 0 1px #cbd5e1 inset}
+.detail-item{min-width:0;}
 .detail-path{
   display:block;
   max-width:100%;
@@ -184,7 +185,7 @@ body.light .summary-cell.clickable:hover{background:#f0f4f8;border-color:#cbd5e1
   word-break:break-word;
   line-height:1.5;
 }
-.files-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;max-width:1200px}
+.files-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;max-width:1200px;min-width:0;}
 .files-table{margin-top:14px;border:1px solid #333;border-radius:10px;overflow:hidden}
 .files-table.large{max-width:1200px}
 .files-header,.files-row{display:grid;grid-template-columns:1fr 140px 200px 140px;gap:18px;align-items:center}
@@ -196,7 +197,7 @@ body.light .files-header{background:#f5f5f5;color:#4b5563}
 .files-table .status.success{color:#34d399}
 .files-table .status.failed{color:#f87171}
 .files-table .status.skipped{color:#fbbf24}
-.pager-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pager-inline{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-width:0;}
 .files-pager{display:flex;align-items:center;gap:8px;margin-top:10px;flex-wrap:wrap}
 .pager-inline button,
 .files-pager button,
@@ -239,6 +240,15 @@ body.light .files-header{background:#f5f5f5;color:#4b5563}
   .pager-inline{
     width: 100%;
     justify-content: space-between;
+    gap: 6px;
+  }
+  .pager-inline :deep(button),
+  .pager-inline button{
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  .pager-inline span{
+    font-size: 12px;
   }
   .files-table{
     margin-top: 10px;
