@@ -252,4 +252,26 @@ input, select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--b
 .modal-footer .primary.saved { background: var(--success); color: #fff; border: none; }
 .modal-footer .primary.failed { background: var(--danger); color: #fff; border: none; }
 .error { color: var(--danger); font-size: 12px; margin-top: 4px; }
+
+@media (max-width: 768px) {
+  .modal-content.large {
+    width: min(100vw - 16px, 100%);
+    max-width: none;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .grid > label {
+    margin-top: 4px;
+  }
+
+  .grid > input,
+  .grid > select {
+    width: 100%;
+    min-width: 0;
+  }
+}
 </style>
