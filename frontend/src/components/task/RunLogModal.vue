@@ -33,9 +33,9 @@ const emit = defineEmits<{
 
 <style scoped>
 .modal-content.log-modal {
-  width: 92vw !important;
+  width: min(96vw, 1200px) !important;
   max-width: 1200px !important;
-  max-height: 80vh;
+  max-height: calc(100dvh - 24px);
   display: flex;
   flex-direction: column;
 }
@@ -43,6 +43,7 @@ const emit = defineEmits<{
 .log-modal .modal-body {
   padding: 12px 16px;
   width: 100%;
+  min-width: 0;
   flex: 1;
   overflow: hidden;
   display: flex;
@@ -50,8 +51,10 @@ const emit = defineEmits<{
 
 .log-box {
   width: 100%;
+  min-width: 0;
   display: flex;
   justify-content: center;
+  overflow: hidden;
 }
 
 .log-pre {
@@ -62,10 +65,31 @@ const emit = defineEmits<{
   height: 100%;
   overflow: auto;
   white-space: pre-wrap;
-  width: calc(100% - 64px);
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  width: 100%;
   max-width: 1100px;
   box-sizing: border-box;
   margin: 0;
   border: 1px solid #334155;
+}
+
+@media (max-width: 768px) {
+  .modal-content.log-modal {
+    width: min(100vw - 16px, 100%) !important;
+    max-width: none !important;
+    max-height: calc(100dvh - 16px);
+    border-radius: 14px;
+  }
+
+  .log-modal .modal-body {
+    padding: 10px 12px;
+  }
+
+  .log-pre {
+    padding: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
 }
 </style>
