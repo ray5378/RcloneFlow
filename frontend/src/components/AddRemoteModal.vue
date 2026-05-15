@@ -523,7 +523,8 @@ defineExpose({
 
 <template>
   <Modal :show="show" :title="editMode ? t('remote.editTitle') : t('remote.addTitle')" @close="emit('close')">
-    <div v-if="!editMode" class="stepper">
+    <div class="add-remote-body">
+      <div v-if="!editMode" class="stepper">
       <div class="step" :class="{ active: step === 0, done: step > 0 }">1. {{ t('remote.stepChooseType') }}</div>
       <div class="step" :class="{ active: step === 1, done: step > 1 }">2. {{ t('remote.stepConfig') }}</div>
       <div class="step" :class="{ active: step === 2, done: step > 2 }">3. {{ t('remote.stepName') }}</div>
@@ -637,10 +638,18 @@ defineExpose({
         </button>
       </div>
     </div>
+    </div>
   </Modal>
 </template>
 
 <style scoped>
+.add-remote-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  max-height: calc(85vh - 88px);
+  overflow-y: auto;
+}
 .stepper { display: flex; gap: 8px; margin-bottom: 20px; }
 .step { padding: 8px 12px; border-radius: 8px; background: #1f2937; color: #cbd5e1; font-size: 14px; border:1px solid #374151 }
 .step.active { background: #1e3a5f; color: #60a5fa; border-color:#2563eb }
@@ -665,4 +674,31 @@ body.light .provider-card.selected { border-color: #2563eb; background: #eff6ff;
 button { padding: 10px 14px; border-radius: 10px; border: none; background: #2563eb; color: white; cursor: pointer; }
 button.ghost { background: #eef2ff; color: #1d4ed8; }
 button:disabled { opacity: .6; cursor: not-allowed; }
+
+@media (max-width: 768px) {
+  .add-remote-body {
+    max-height: calc(85vh - 72px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-right: 2px;
+  }
+
+  .stepper {
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .provider-grid {
+    grid-template-columns: 1fr;
+    max-height: none;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+  }
+
+  .actions button {
+    flex: 1 1 auto;
+  }
+}
 </style>
