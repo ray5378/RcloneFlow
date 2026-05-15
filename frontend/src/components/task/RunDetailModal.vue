@@ -71,11 +71,11 @@ const activeFilesTotal = computed(() => Math.max(0, Number(props.runFilesTotal) 
         </div>
         <div class="detail-item full-width">
           <label>{{ t('modal.sourcePath') }}</label>
-          <span>{{ props.runDetail.sourceRemote }}:{{ props.runDetail.sourcePath || '/' }}</span>
+          <span class="detail-path">{{ props.runDetail.sourceRemote }}:{{ props.runDetail.sourcePath || '/' }}</span>
         </div>
         <div class="detail-item full-width">
           <label>{{ t('modal.targetPath') }}</label>
-          <span>{{ props.runDetail.targetRemote }}:{{ props.runDetail.targetPath || '/' }}</span>
+          <span class="detail-path">{{ props.runDetail.targetRemote }}:{{ props.runDetail.targetPath || '/' }}</span>
         </div>
         <div class="detail-item full-width">
           <label>{{ t('modal.summary') }}</label>
@@ -175,6 +175,15 @@ body.light .summary-val{color:#111827}
 .summary-cell.clickable{cursor:pointer;transition:background .15s ease,border-color .15s ease,box-shadow .15s ease}
 .summary-cell.clickable:hover{background:#1f2937;border-color:#475569;box-shadow:0 0 0 1px #334155 inset}
 body.light .summary-cell.clickable:hover{background:#f0f4f8;border-color:#cbd5e1;box-shadow:0 0 0 1px #cbd5e1 inset}
+.detail-path{
+  display:block;
+  max-width:100%;
+  min-width:0;
+  white-space:normal;
+  overflow-wrap:anywhere;
+  word-break:break-word;
+  line-height:1.5;
+}
 .files-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px;max-width:1200px}
 .files-table{margin-top:14px;border:1px solid #333;border-radius:10px;overflow:hidden}
 .files-table.large{max-width:1200px}
@@ -215,6 +224,10 @@ body.light .files-header{background:#f5f5f5;color:#4b5563}
   }
   .summary-val{
     font-size: 16px;
+  }
+  .detail-path{
+    font-size: 13px;
+    line-height: 1.6;
   }
   .detail-files-section{
     min-width: 0;
