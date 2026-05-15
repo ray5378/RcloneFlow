@@ -48,9 +48,9 @@ function handleClose() {
 <template>
   <div v-if="visible" class="modal-overlay task-editor-overlay" @click.self="handleClose">
     <div class="modal-content task-editor-modal">
-      <div class="modal-header">
-        <h3>{{ title }}</h3>
-        <button class="close-btn" @click="handleClose">×</button>
+      <div class="modal-header task-editor-header">
+        <h3 class="task-editor-title">{{ title }}</h3>
+        <button class="close-btn task-editor-close-btn" @click="handleClose" aria-label="关闭">×</button>
       </div>
       <div class="task-editor-body">
         <AddTaskForm
@@ -101,9 +101,31 @@ function handleClose() {
   padding: 0;
 }
 
+.task-editor-header {
+  margin-bottom: 0;
+  padding: 22px 28px 18px;
+}
+
+.task-editor-title {
+  margin: 0;
+  padding-right: 16px;
+}
+
+.task-editor-close-btn {
+  margin-top: -2px;
+  margin-right: 2px;
+  padding: 6px;
+  flex-shrink: 0;
+}
+
 .task-editor-body {
   max-height: calc(100vh - 120px);
   overflow: auto;
+  padding: 6px 28px 28px;
+}
+
+.task-editor-body :deep(.form-content) {
+  padding-top: 12px;
 }
 
 .task-editor-body :deep(.card) {

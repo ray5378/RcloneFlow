@@ -178,7 +178,7 @@ export default {
   },
   taskEditor: {
     createTitle: '新建任务',
-    editTitle: '编辑任务',
+    editTitle: '修改任务',
     closeConfirmTitle: '关闭任务编辑器',
     closeConfirmMessage: '当前表单有未保存修改，确定要关闭吗？',
   },
