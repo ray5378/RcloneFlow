@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -264,9 +265,6 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}
 
 	// dynamic progress flush thresholds (read on each run start; consumer also re-reads periodically)
-	_ = config.GetProgressFlushInterval()
-	_ = config.GetProgressFlushDeltaPct()
-	_ = config.GetProgressFlushDeltaBytes()
 
 	cmd := runner.CmdContext(runCtx, args...)
 	// fan-out: write to parser via io.Pipe（由 consumer 单点写入同一文件）
@@ -956,8 +954,57 @@ var fileLineRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*(\d+(?:\.\d+)?)\s
 var fileCopiedRe = regexp.MustCompile(`(?i)INFO\s*:\s*([^:]+):\s*Copied\s*\(new\)`)
 var fileCASMatchedRe = regexp.MustCompile(`(?i)(?:INFO|NOTICE)\s*:\s*([^:]+):\s*CAS compatible match after source cleanup\b`)
 
+// progressFlushGate 控制进度写库频率，避免每1秒的rclone stats触发全量DB写入。
+type progressFlushGate struct {
+	lastFlush     time.Time
+	lastFlushPct  float64
+	lastFlushByts int64
+	interval      time.Duration
+	deltaPct      float64
+	deltaBytes    int64
+}
+
+func newProgressFlushGate() progressFlushGate {
+	return progressFlushGate{
+		interval:   config.GetProgressFlushInterval(),
+		deltaPct:   config.GetProgressFlushDeltaPct(),
+		deltaBytes: config.GetProgressFlushDeltaBytes(),
+	}
+}
+
+func (g *progressFlushGate) shouldFlush(pct, byts float64) bool {
+	if g.interval <= 0 && g.deltaPct <= 0 && g.deltaBytes <= 0 {
+		return true
+	}
+	if g.lastFlush.IsZero() {
+		return true
+	}
+	now := time.Now()
+	if now.Sub(g.lastFlush) >= g.interval {
+		return true
+	}
+	if g.deltaPct > 0 && pct >= 0 && math.Abs(pct-g.lastFlushPct) >= g.deltaPct {
+		return true
+	}
+	if g.deltaBytes > 0 && byts >= 0 && int64(byts)-g.lastFlushByts >= g.deltaBytes {
+		return true
+	}
+	return false
+}
+
+func (g *progressFlushGate) markFlushed(pct, byts float64) {
+	g.lastFlush = time.Now()
+	if pct >= 0 {
+		g.lastFlushPct = pct
+	}
+	if byts >= 0 {
+		g.lastFlushByts = int64(byts)
+	}
+}
+
 func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats bool, fp *fileProgress, openlistCASCompatible bool, isMove bool, cfg string, dst string, excludeFrom string) {
 	wantParse := parseStats
+	flushGate := newProgressFlushGate()
 	s := bufio.NewScanner(rd)
 	s.Buffer(make([]byte, 0, 128*1024), 2*1024*1024)
 	for s.Scan() {
@@ -1084,6 +1131,14 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						prog["percentage"] = v
 					}
 				}
+				pctThr, bytsThr := -1.0, -1.0
+
+				if v, ok := prog["percentage"].(float64); ok { pctThr = v }
+
+				if v, ok := prog["bytes"].(float64); ok { bytsThr = v }
+
+				if flushGate.shouldFlush(pctThr, bytsThr) {
+
 				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
@@ -1137,6 +1192,10 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					"eta":            prog["eta"],
 				})
 				continue
+					flushGate.markFlushed(pctThr, bytsThr)
+
+				}
+
 			}
 		}
 		if len(line) > 0 {
@@ -1166,6 +1225,14 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					prog["eta"] = v
 				}
 			}
+			pctThr, bytsThr := -1.0, -1.0
+
+			if v, ok := prog["percentage"].(float64); ok { pctThr = v }
+
+			if v, ok := prog["bytes"].(float64); ok { bytsThr = v }
+
+			if flushGate.shouldFlush(pctThr, bytsThr) {
+
 			_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 				if rr.Summary == nil {
 					rr.Summary = map[string]any{}
@@ -1217,10 +1284,22 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				"eta":            prog["eta"],
 			})
 			continue
+				flushGate.markFlushed(pctThr, bytsThr)
+
+			}
+
 		}
 		// 3) parseOneLineProgress 兜底（仅在需要时）
 		if wantParse {
 			if prog, ok := parseOneLineProgress(line); ok {
+				pctThr, bytsThr := -1.0, -1.0
+
+				if v, ok := prog["percentage"].(float64); ok { pctThr = v }
+
+				if v, ok := prog["bytes"].(float64); ok { bytsThr = v }
+
+				if flushGate.shouldFlush(pctThr, bytsThr) {
+
 				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
@@ -1264,6 +1343,10 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					"totalCount":     prog["plannedFiles"],
 					"eta":            prog["eta"],
 				})
+					flushGate.markFlushed(pctThr, bytsThr)
+
+				}
+
 			}
 		}
 		// 文件级完成识别不依赖 wantParse：即使当前流不做 aggregate 解析，也要累计 completedFiles。
