@@ -310,7 +310,7 @@ export default {
   webhookModal: {
     title: 'Webhook notifications',
     triggerId: 'Webhook receiver (trigger ID):',
-    triggerPlaceholder: 'Leave empty to use task ID (example: /webhook/<taskId> or /webhook/<yourId>)',
+    triggerPlaceholder: 'Leave empty to use task ID (example: http://127.0.0.1:17870/webhook/triggerId)',
     matchText: 'Trigger match text:',
     matchPlaceholder: 'Leave empty to trigger on any webhook; e.g. transfer.complete',
     matchHint: 'If set, the task is triggered only when the incoming webhook request content contains this text; leave empty to skip matching.',

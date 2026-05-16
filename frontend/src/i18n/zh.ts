@@ -310,7 +310,7 @@ export default {
   webhookModal: {
     title: 'Webhook 通知',
     triggerId: 'Webhook 接收（触发ID）：',
-    triggerPlaceholder: '留空=使用任务ID（示例：/webhook/<任务ID> 或 /webhook/<你的ID>）',
+    triggerPlaceholder: '留空=使用任务ID（示例：http://127.0.0.1:17870/webhook/触发ID）',
     matchText: '触发匹配字段：',
     matchPlaceholder: '留空=接收到 webhook 就触发；例如：transfer.complete',
     matchHint: '如果填写，只有当收到的 webhook 请求内容中包含这段文本时才触发；为空则不做匹配。',
