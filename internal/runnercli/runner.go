@@ -1038,7 +1038,10 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						tb := anyFloat64(item["size"])
 						sp := anyFloat64(item["speed"])
 						var pctPtr *float64
-						if v, ok := item["percentage"].(float64); ok {
+						if tb > 0 {
+							computed := (cb / tb) * 100
+							pctPtr = &computed
+						} else if v, ok := item["percentage"].(float64); ok {
 							pct := v
 							pctPtr = &pct
 						}
