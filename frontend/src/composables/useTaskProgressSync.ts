@@ -133,6 +133,11 @@ export function useTaskProgressSync(options: {
     // 这样完成态只保留一份冻结帧，避免 active 消失后再次 handoff 造成二次抖动。
     const frozen = completedFreezeByTask[taskId]
     if (frozen) {
+      // loadData 后发现任务已退出运行态，立即清掉冻结帧
+      if (!runningRunByTaskId.value.has(Number(taskId))) {
+        delete completedFreezeByTask[taskId]
+        return null
+      }
       const frozenAt = Number(frozen.__frozenAt || 0)
       if (frozenAt > 0 && Date.now() - frozenAt <= FINISH_WINDOW_MS) return frozen
       delete completedFreezeByTask[taskId]

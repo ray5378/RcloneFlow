@@ -255,7 +255,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             }
           }
           scheduleActiveRunsReload(0)
-          scheduleDataReload(800)
+          scheduleDataReload(0)
         } else if (msg.type === 'run_progress' && msg.data) {
           const idx = options.activeRuns.value.findIndex(r => r.runRecord?.id === msg.data.run_id)
           if (idx !== -1) {
