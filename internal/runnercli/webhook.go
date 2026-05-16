@@ -288,13 +288,7 @@ func toBool(v any) bool {
 }
 
 func hasTransferEvidence(sum map[string]any) bool {
-	if toInt64(sum["transferredBytes"]) > 0 {
-		return true
-	}
-	if toInt64(sum["completedCount"]) > 0 {
-		return true
-	}
-	return false
+	return toInt64(sum["completedCount"]) > 0
 }
 
 // nested 获取 a.b.c 路径

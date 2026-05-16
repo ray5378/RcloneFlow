@@ -18,7 +18,7 @@ func TestHasTransferEvidence(t *testing.T) {
     sum map[string]any
     want bool
   }{
-    {name: "transferred bytes", sum: map[string]any{"transferredBytes": float64(1), "completedCount": float64(0)}, want: true},
+    {name: "transferred bytes only, no copied files", sum: map[string]any{"transferredBytes": float64(1), "completedCount": float64(0)}, want: false},
     {name: "completed count only", sum: map[string]any{"transferredBytes": float64(0), "completedCount": float64(1)}, want: true},
     {name: "no transfer", sum: map[string]any{"transferredBytes": float64(0), "completedCount": float64(0)}, want: false},
   }
@@ -39,7 +39,7 @@ func TestPostWebhookIfNeeded_HasTransferFilter(t *testing.T) {
     wantPosts int
   }{
     {
-      name: "sends when transferredBytes positive",
+      name: "skips when only transferredBytes positive but no copied files",
       notifyStatus: map[string]any{"success": true, "failed": true, "hasTransfer": true},
       finalSummary: map[string]any{
         "counts": map[string]any{"copied": float64(0), "failed": float64(0), "skipped": float64(0), "total": float64(1)},
@@ -47,7 +47,7 @@ func TestPostWebhookIfNeeded_HasTransferFilter(t *testing.T) {
         "totalBytes": float64(1024),
         "avgSpeedBps": float64(100),
       },
-      wantPosts: 1,
+      wantPosts: 0,
     },
     {
       name: "sends when completedCount positive and bytes zero",
