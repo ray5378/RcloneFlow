@@ -128,6 +128,11 @@ func (r *Runner) postWebhookIfNeeded(runID int64) {
 	}
 	st := strings.ToLower(run.Status)
 	allowed := (st == "finished" && statusOn["success"]) || (st == "failed" && statusOn["failed"])
+	// 勾选了"有传输"时，只要运行结束（成功或失败）且实际有传输就发送通知，
+	// 不再受 success/failed 复选框限制；hasTransfer 作为主过滤条件。
+	if statusOn["hasTransfer"] && (st == "finished" || st == "failed") {
+		allowed = true
+	}
 	if !allowed { return }
 	// 构造载荷（沿用约定字段）
 	payload := map[string]any{}

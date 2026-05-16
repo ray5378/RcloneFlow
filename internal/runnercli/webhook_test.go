@@ -72,6 +72,17 @@ func TestPostWebhookIfNeeded_HasTransferFilter(t *testing.T) {
       wantPosts: 0,
     },
     {
+      name: "hasTransfer overrides success=false failed=false when copied files exist",
+      notifyStatus: map[string]any{"success": false, "failed": false, "hasTransfer": true},
+      finalSummary: map[string]any{
+        "counts": map[string]any{"copied": float64(3), "failed": float64(0), "skipped": float64(0), "total": float64(3)},
+        "transferredBytes": float64(0),
+        "totalBytes": float64(0),
+        "avgSpeedBps": float64(0),
+      },
+      wantPosts: 1,
+    },
+    {
       name: "legacy config still sends without hasTransfer field",
       notifyStatus: map[string]any{"success": true, "failed": true},
       finalSummary: map[string]any{
