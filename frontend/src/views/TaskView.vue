@@ -299,6 +299,7 @@ const {
   setWebhookNotifyWebhook,
   setWebhookStatusSuccess,
   setWebhookStatusFailed,
+  setWebhookStatusHasTransfer,
   setSingletonEnabled,
   setCommandMode,
   setCommandText,
@@ -483,6 +484,7 @@ function closeTaskEditorModal() {
     :set-webhook-notify-webhook="setWebhookNotifyWebhook"
     :set-webhook-status-success="setWebhookStatusSuccess"
     :set-webhook-status-failed="setWebhookStatusFailed"
+    :set-webhook-status-has-transfer="setWebhookStatusHasTransfer"
     :save-webhook="saveWebhook"
     :test-webhook="testWebhook"
     :close-webhook-modal="closeWebhookModal"

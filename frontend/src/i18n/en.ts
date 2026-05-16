@@ -324,7 +324,7 @@ export default {
     schedule: 'Schedule',
     success: 'Success',
     failed: 'Failed',
-    statusHint: 'Notifications are sent only when the selected statuses match; both are checked by default.',
+    statusHint: 'Notifications are sent only when the selected statuses match. If "Transferred" is checked, notifications are sent only when the run actually transferred data or had successful processed files.',
     test: 'Send test',
   },
   transferOptions: {

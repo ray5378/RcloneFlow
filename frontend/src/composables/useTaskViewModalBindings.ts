@@ -21,7 +21,11 @@ export function useTaskViewModalBindings(options: {
       options.webhookForm.value.notify = { manual: false, schedule: false, webhook: false }
     }
     if (!options.webhookForm.value.status) {
-      options.webhookForm.value.status = { success: true, failed: true }
+      options.webhookForm.value.status = { success: true, failed: true, hasTransfer: false }
+      return
+    }
+    if (typeof options.webhookForm.value.status.hasTransfer !== 'boolean') {
+      options.webhookForm.value.status.hasTransfer = false
     }
   }
 
@@ -34,6 +38,7 @@ export function useTaskViewModalBindings(options: {
   const setWebhookNotifyWebhook = (value: boolean) => { ensureWebhookFormShape(); options.webhookForm.value.notify.webhook = value }
   const setWebhookStatusSuccess = (value: boolean) => { ensureWebhookFormShape(); options.webhookForm.value.status.success = value }
   const setWebhookStatusFailed = (value: boolean) => { ensureWebhookFormShape(); options.webhookForm.value.status.failed = value }
+  const setWebhookStatusHasTransfer = (value: boolean) => { ensureWebhookFormShape(); options.webhookForm.value.status.hasTransfer = value }
 
   const setSingletonEnabled = (value: boolean) => { options.singletonForm.value.singletonEnabled = value }
   const setCommandMode = (value: boolean) => { options.commandMode.value = value }
@@ -54,6 +59,7 @@ export function useTaskViewModalBindings(options: {
     setWebhookNotifyWebhook,
     setWebhookStatusSuccess,
     setWebhookStatusFailed,
+    setWebhookStatusHasTransfer,
     setSingletonEnabled,
     setCommandMode,
     setCommandText,

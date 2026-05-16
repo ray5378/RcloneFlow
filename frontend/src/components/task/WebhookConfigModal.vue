@@ -12,6 +12,7 @@ defineProps<{
   notifyWebhook: boolean
   statusSuccess: boolean
   statusFailed: boolean
+  statusHasTransfer: boolean
   canTest: boolean
 }>()
 
@@ -28,6 +29,7 @@ const emit = defineEmits<{
   (e: 'update:notifyWebhook', value: boolean): void
   (e: 'update:statusSuccess', value: boolean): void
   (e: 'update:statusFailed', value: boolean): void
+  (e: 'update:statusHasTransfer', value: boolean): void
 }>()
 
 function onTextInput(event: Event, key: 'triggerId' | 'matchText' | 'postUrl' | 'wecomUrl') {
@@ -35,7 +37,7 @@ function onTextInput(event: Event, key: 'triggerId' | 'matchText' | 'postUrl' | 
   emit(`update:${key}` as any, target.value)
 }
 
-function onCheckbox(event: Event, key: 'notifyManual' | 'notifySchedule' | 'notifyWebhook' | 'statusSuccess' | 'statusFailed') {
+function onCheckbox(event: Event, key: 'notifyManual' | 'notifySchedule' | 'notifyWebhook' | 'statusSuccess' | 'statusFailed' | 'statusHasTransfer') {
   const target = event.target as HTMLInputElement
   emit(`update:${key}` as any, target.checked)
 }
@@ -81,6 +83,7 @@ function onCheckbox(event: Event, key: 'notifyManual' | 'notifySchedule' | 'noti
           <div class="trigger-row">
             <label class="trigger-opt"><input :checked="statusSuccess" type="checkbox" @change="onCheckbox($event, 'statusSuccess')" /><span>{{ t('webhookModal.success') }}</span></label>
             <label class="trigger-opt"><input :checked="statusFailed" type="checkbox" @change="onCheckbox($event, 'statusFailed')" /><span>{{ t('webhookModal.failed') }}</span></label>
+            <label class="trigger-opt"><input :checked="statusHasTransfer" type="checkbox" @change="onCheckbox($event, 'statusHasTransfer')" /><span>{{ t('taskUI.hasTransfer') }}</span></label>
           </div>
           <p class="hint">{{ t('webhookModal.statusHint') }}</p>
         </div>

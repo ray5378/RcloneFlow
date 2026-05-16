@@ -119,11 +119,12 @@ func (r *Runner) postWebhookIfNeeded(runID int64) {
 	if !notifyOn[strings.ToLower(run.Trigger)] {
 		return
 	}
-	// 状态过滤（A 方案）：默认均为 true；可按需只发成功或只发失败
-	statusOn := map[string]bool{"success": true, "failed": true}
+	// 状态过滤（A 方案）：默认 success/failed 为 true；hasTransfer 默认 false（兼容旧配置）
+	statusOn := map[string]bool{"success": true, "failed": true, "hasTransfer": false}
 	if m, ok := opt["webhookNotifyStatus"].(map[string]any); ok {
 		if _, ok2 := m["success"]; ok2 { statusOn["success"] = toBool(m["success"]) }
 		if _, ok2 := m["failed"]; ok2 { statusOn["failed"] = toBool(m["failed"]) }
+		if _, ok2 := m["hasTransfer"]; ok2 { statusOn["hasTransfer"] = toBool(m["hasTransfer"]) }
 	}
 	st := strings.ToLower(run.Status)
 	allowed := (st == "finished" && statusOn["success"]) || (st == "failed" && statusOn["failed"])
@@ -199,6 +200,9 @@ func (r *Runner) postWebhookIfNeeded(runID int64) {
 	}
 	payload["run"] = runMap
 	payload["summary"] = sum
+	if statusOn["hasTransfer"] && !hasTransferEvidence(sum) {
+		return
+	}
 	// 发送（3 秒超时，最多 3 次）
 	for _, postURL := range postURLs {
 		go func(postURL string) {
@@ -281,6 +285,16 @@ func (r *Runner) postWebhookIfNeeded(runID int64) {
 func toBool(v any) bool {
 	s := strings.ToLower(fmt.Sprint(v))
 	return s == "1" || s == "true" || s == "yes" || s == "on"
+}
+
+func hasTransferEvidence(sum map[string]any) bool {
+	if toInt64(sum["transferredBytes"]) > 0 {
+		return true
+	}
+	if toInt64(sum["completedCount"]) > 0 {
+		return true
+	}
+	return false
 }
 
 // nested 获取 a.b.c 路径

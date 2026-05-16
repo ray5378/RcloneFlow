@@ -18,6 +18,7 @@ interface WebhookFormState {
   status?: {
     success?: boolean
     failed?: boolean
+    hasTransfer?: boolean
   }
 }
 
@@ -65,6 +66,7 @@ defineProps<{
   setWebhookNotifyWebhook: (value: boolean) => void
   setWebhookStatusSuccess: (value: boolean) => void
   setWebhookStatusFailed: (value: boolean) => void
+  setWebhookStatusHasTransfer: (value: boolean) => void
   saveWebhook: () => void
   testWebhook: () => void
   closeWebhookModal: () => void
@@ -119,6 +121,7 @@ defineProps<{
     :notify-webhook="webhookForm?.notify?.webhook ?? false"
     :status-success="(webhookForm as any)?.status?.success ?? false"
     :status-failed="(webhookForm as any)?.status?.failed ?? false"
+    :status-has-transfer="(webhookForm as any)?.status?.hasTransfer ?? false"
     :can-test="!!(webhookForm?.postUrl) || !!((webhookForm as any)?.wecomUrl)"
     @update:trigger-id="setWebhookTriggerId"
     @update:match-text="setWebhookMatchText"
@@ -129,6 +132,7 @@ defineProps<{
     @update:notify-webhook="setWebhookNotifyWebhook"
     @update:status-success="setWebhookStatusSuccess"
     @update:status-failed="setWebhookStatusFailed"
+    @update:status-has-transfer="setWebhookStatusHasTransfer"
     @save="saveWebhook"
     @test="testWebhook"
     @close="closeWebhookModal"

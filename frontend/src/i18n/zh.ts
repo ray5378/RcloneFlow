@@ -324,7 +324,7 @@ export default {
     schedule: '定时',
     success: '成功',
     failed: '失败',
-    statusHint: '仅当匹配状态时发送通知；默认两个都勾选。',
+    statusHint: '仅当匹配状态时发送通知；勾选“有传输”后，仅当本次任务实际发生传输或存在成功处理文件时才通知。',
     test: '发送测试',
   },
   transferOptions: {
