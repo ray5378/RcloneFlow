@@ -19,11 +19,20 @@ describe('formatBytes', () => {
     expect(formatBytes(500)).toBe('500 B')
     expect(formatBytes(1024)).toBe('1.0 KB')
     expect(formatBytes(1024 * 1024)).toBe('1.0 MB')
-    expect(formatBytes(1024 * 1024 * 1024)).toBe('1.0 GB')
+    expect(formatBytes(1024 * 1024 * 1024)).toBe('1.00 GB')
   })
 
-  it('should handle TB', () => {
-    expect(formatBytes(1024 * 1024 * 1024 * 1024)).toBe('1.0 TB')
+  it('should format GB values with 2 decimals', () => {
+    // 1.33 GB
+    expect(formatBytes(1429365116)).toBe('1.33 GB')
+    // 4.22 GB
+    expect(formatBytes(4534483558)).toBe('4.22 GB')
+    // 5.4 GB
+    expect(formatBytes(5798205850)).toBe('5.40 GB')
+  })
+
+  it('should handle TB with 2 decimals', () => {
+    expect(formatBytes(1024 * 1024 * 1024 * 1024)).toBe('1.00 TB')
   })
 })
 

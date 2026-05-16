@@ -9,7 +9,11 @@ export function formatBytes(bytes: number): string {
     size /= 1024
     unitIndex++
   }
-  return `${size.toFixed(unitIndex > 0 ? 1 : 0)} ${units[unitIndex]}`
+  let decimals = 0
+  if (unitIndex > 0) {
+    decimals = unitIndex >= 3 ? 2 : 1
+  }
+  return `${size.toFixed(decimals)} ${units[unitIndex]}`
 }
 
 export function formatBytesPerSec(bps: number): string {
