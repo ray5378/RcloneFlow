@@ -15,7 +15,7 @@ export function useTaskWebhookConfig(options: {
     triggerId: '',
     matchText: '',
     notify: { manual: false, schedule: false, webhook: false },
-    status: { success: true, failed: true },
+    status: { success: true, failed: true, hasTransfer: false },
     wecomUrl: '',
   })
 
@@ -35,14 +35,18 @@ export function useTaskWebhookConfig(options: {
         webhook: !!n.webhook,
       }
       const s = opts?.webhookNotifyStatus || {}
-      webhookForm.value.status = { success: s.success !== false, failed: s.failed !== false }
+      webhookForm.value.status = {
+        success: s.success !== false,
+        failed: s.failed !== false,
+        hasTransfer: !!s.hasTransfer,
+      }
     } catch {
       webhookForm.value.postUrl = ''
       webhookForm.value.wecomUrl = ''
       webhookForm.value.triggerId = ''
       webhookForm.value.matchText = ''
       webhookForm.value.notify = { manual: false, schedule: false, webhook: false }
-      webhookForm.value.status = { success: true, failed: true }
+      webhookForm.value.status = { success: true, failed: true, hasTransfer: false }
     }
     showWebhookModal.value = true
   }
