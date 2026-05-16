@@ -499,13 +499,8 @@ export default {
     on: '开启',
   },
   defaults: {
-    auth: '认证',
-    accessTokenTtl: '访问令牌有效期',
     accessTokenTtlTitle: 'JWT 访问令牌有效期，示例：24h',
-    durationPlaceholder24h: '如 24h',
-    refreshTokenTtl: '刷新令牌有效期',
     refreshTokenTtlTitle: 'Refresh 令牌有效期，示例：90d',
-    durationPlaceholder90d: '如 90d',
     logRealtime: '日志与等级（实时生效）',
     logLevel: '日志级别',
     logLevelTitle: '日志级别（保存后即时生效）',

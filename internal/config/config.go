@@ -81,7 +81,7 @@ func DefaultConfig() *Config {
 			PoolInterval:     30, // 30秒
 			ScheduleInterval: 1,  // 1分钟
 			CleanupInterval:  24, // 24小时清理一次
-			CleanupRetention: 30, // 保留30天
+			CleanupRetention: 2, // 保留2天
 		},
 	}
 }

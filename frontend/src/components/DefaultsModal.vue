@@ -26,7 +26,7 @@ function validate() {
       errors.value[k] = t('defaults.errNonNegative')
     }
   }
-  const durFields = ['ACCESS_TOKEN_TTL', 'REFRESH_TOKEN_TTL', 'FINISH_WAIT_INTERVAL', 'FINISH_WAIT_TIMEOUT']
+  const durFields = ['FINISH_WAIT_INTERVAL', 'FINISH_WAIT_TIMEOUT']
   for (const k of durFields) {
     const v = (form.value as any)[k]
     if (v && !durationRe.test(String(v))) {
@@ -39,7 +39,6 @@ function validate() {
 function flat(resp: any) {
   const out: Record<string, string> = {}
   const patch = (grp: any) => { Object.keys(grp || {}).forEach(k => out[k] = grp[k]?.effective ?? '') }
-  patch(resp.auth)
   patch(resp.log)
   patch(resp.history)
   patch(resp.precheck)
@@ -117,18 +116,6 @@ onMounted(load)
         <button class="close-btn" @click="$emit('close')">×</button>
       </div>
       <div class="modal-body" v-if="!loading">
-        <div class="section">
-          <div class="section-title">{{ t('defaults.auth') }}</div>
-          <div class="grid">
-            <label :title="t('defaults.accessTokenTtlTitle')">{{ t('defaults.accessTokenTtl') }}</label>
-            <input v-model="form.ACCESS_TOKEN_TTL" :placeholder="t('defaults.durationPlaceholder24h')" />
-            <div class="error" v-if="errors.ACCESS_TOKEN_TTL">{{ errors.ACCESS_TOKEN_TTL }}</div>
-            <label :title="t('defaults.refreshTokenTtlTitle')">{{ t('defaults.refreshTokenTtl') }}</label>
-            <input v-model="form.REFRESH_TOKEN_TTL" :placeholder="t('defaults.durationPlaceholder90d')" />
-            <div class="error" v-if="errors.REFRESH_TOKEN_TTL">{{ errors.REFRESH_TOKEN_TTL }}</div>
-          </div>
-        </div>
-
         <div class="section">
           <div class="section-title">{{ t('defaults.logRealtime') }}</div>
           <div class="grid">

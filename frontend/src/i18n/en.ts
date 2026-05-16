@@ -499,13 +499,8 @@ export default {
     on: 'On',
   },
   defaults: {
-    auth: 'Authentication',
-    accessTokenTtl: 'Access token TTL',
     accessTokenTtlTitle: 'JWT access token lifetime, e.g. 24h',
-    durationPlaceholder24h: 'e.g. 24h',
-    refreshTokenTtl: 'Refresh token TTL',
     refreshTokenTtlTitle: 'Refresh token lifetime, e.g. 90d',
-    durationPlaceholder90d: 'e.g. 90d',
     logRealtime: 'Logging & level (applies immediately)',
     logLevel: 'Log level',
     logLevelTitle: 'Log level (takes effect immediately after save)',
