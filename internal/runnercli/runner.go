@@ -314,7 +314,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	})
 
 	// 两路都写入同一日志文件，并启用 one-line 解析 + 按文件统计
-	fileStats := &fileProgress{m: map[string]*fileProg{}}
+	fileStats := &fileProgress{m: map[string]*fileProg{}, recentCap: 100}
 	// 仅解析 stderr（rclone 进度通常在 stderr），stdout 只写文件，减少重复解析/写库
 	casMode := isOpenlistCASCompatible(run)
 	excludeFrom := ""
@@ -894,10 +894,27 @@ type fileProg struct {
 }
 
 type fileProgress struct {
-	m      map[string]*fileProg
-	mu     sync.Mutex
-	ver    uint64
-	copied []string
+	m           map[string]*fileProg
+	mu          sync.Mutex
+	ver         uint64
+	copied      []string
+	recent      []fileProg
+	recentCap   int
+	recentStart int
+	recentLen   int
+}
+
+func (fp *fileProgress) pushRecent(p fileProg) {
+	if fp.recentCap <= 0 {
+		return
+	}
+	if fp.recentLen < fp.recentCap {
+		fp.recent = append(fp.recent, p)
+		fp.recentLen++
+		return
+	}
+	fp.recent[fp.recentStart] = p
+	fp.recentStart = (fp.recentStart + 1) % fp.recentCap
 }
 
 func (fp *fileProgress) update(name string, bytes, total, speed, pct float64) {
@@ -919,6 +936,7 @@ func (fp *fileProgress) update(name string, bytes, total, speed, pct float64) {
 	if pct >= 0 {
 		p.Pct = pct
 	}
+	fp.pushRecent(*p)
 	fp.mu.Unlock()
 	atomic.AddUint64(&fp.ver, 1)
 }
@@ -926,18 +944,28 @@ func (fp *fileProgress) update(name string, bytes, total, speed, pct float64) {
 func (fp *fileProgress) markCopied(name string) {
 	fp.mu.Lock()
 	fp.copied = append(fp.copied, name)
+	if v, ok := fp.m[name]; ok {
+		fp.pushRecent(*v)
+	}
 	fp.mu.Unlock()
 }
 
 func (fp *fileProgress) snapshot(limit int) []fileProg {
 	fp.mu.Lock()
 	defer fp.mu.Unlock()
-	out := make([]fileProg, 0, len(fp.m))
-	for _, v := range fp.m {
-		out = append(out, *v)
+	if limit > 0 && fp.recentCap != limit {
+		fp.recentCap = limit
 	}
-	if limit > 0 && len(out) > limit {
-		out = out[len(out)-limit:]
+	if fp.recentLen == 0 {
+		return nil
+	}
+	out := make([]fileProg, 0, fp.recentLen)
+	if fp.recentStart+fp.recentLen <= fp.recentCap {
+		out = append(out, fp.recent[fp.recentStart:fp.recentStart+fp.recentLen]...)
+	} else {
+		first := fp.recentCap - fp.recentStart
+		out = append(out, fp.recent[fp.recentStart:]...)
+		out = append(out, fp.recent[:fp.recentLen-first]...)
 	}
 	return out
 }
