@@ -55,7 +55,7 @@ function mergeNonDecreasingSummary(prev: ActiveTransferSummary | null, next: Act
   const nextTotalCount = nextLogicalTotalCount
   const nextCompletedCount = Math.max(Number(prev.completedCount || 0), Number(next.completedCount || 0))
   let nextPercentage = Number(next.percentage || 0)
-  if (nextTotalBytes > 0) {
+  if (!nextPercentage && nextTotalBytes > 0) {
     nextPercentage = Math.min(100, (Number(next.bytes || 0) / nextTotalBytes) * 100)
   }
   nextPercentage = Math.max(Number(prev.percentage || 0), nextPercentage)

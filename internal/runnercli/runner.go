@@ -1117,6 +1117,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						}
 					}
 				}
+				recomputeProgressPct(prog)
 				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
@@ -1199,6 +1200,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					prog["eta"] = v
 				}
 			}
+				recomputeProgressPct(prog)
 			_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 				if rr.Summary == nil {
 					rr.Summary = map[string]any{}
@@ -1254,6 +1256,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 		// 3) parseOneLineProgress 兜底（仅在需要时）
 		if wantParse {
 			if prog, ok := parseOneLineProgress(line); ok {
+				recomputeProgressPct(prog)
 				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
@@ -2346,6 +2349,15 @@ func extractMsgFromLogLine(line string) string {
 		return ""
 	}
 	return strings.TrimSpace(m[4])
+}
+
+// recomputeProgressPct 从 bytes/totalBytes 重新计算总进度百分比，不依赖 rclone 的 percentage 字段精度
+func recomputeProgressPct(prog map[string]any) {
+	if b, ok := prog["bytes"].(float64); ok {
+		if tb, ok2 := prog["totalBytes"].(float64); ok2 && tb > 0 {
+			prog["percentage"] = (b / tb) * 100
+		}
+	}
 }
 
 func anyString(v any) string {

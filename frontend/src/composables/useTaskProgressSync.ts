@@ -39,8 +39,7 @@ export function useTaskProgressSync(options: {
     const logicalTotalCount = Number(raw.logicalTotalCount || raw.totalCount || plannedFiles || 0)
     const totalCount = logicalTotalCount
     let percentage = Number(raw.percentage || 0)
-    if (totalBytes > 0) { percentage = (bytes / totalBytes) * 100 }
-    else if (!percentage || Number.isNaN(percentage)) { percentage = 0 }
+    if ((!percentage || Number.isNaN(percentage)) && totalBytes > 0) percentage = (bytes / totalBytes) * 100
     const completedFiles = Number(raw.completedFiles || 0)
     return {
       bytes,
