@@ -315,7 +315,7 @@ export default {
     matchPlaceholder: '留空=接收到 webhook 就触发；例如：transfer.complete',
     matchHint: '如果填写，只有当收到的 webhook 请求内容中包含这段文本时才触发；为空则不做匹配。',
     postUrl: '对外 POST 地址：',
-    postHint: '任务完成或失败后，将以 POST 通知该地址。',
+    postHint: '任务完成或失败后，将以 POST 通知该地址，可以指向容器内其他任务触发ID以触发其他任务运行。例如：其他任务触发ID为 cas2local 则填写 http://127.0.0.1:17870/webhook/cas2local',
     wecomUrl: '企业微信地址：',
     wecomHint: '若填写，将同时向企业微信机器人发送 Markdown 通知。',
     triggerSource: '触发来源：',

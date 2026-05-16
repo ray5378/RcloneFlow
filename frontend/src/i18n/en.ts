@@ -315,7 +315,7 @@ export default {
     matchPlaceholder: 'Leave empty to trigger on any webhook; e.g. transfer.complete',
     matchHint: 'If set, the task is triggered only when the incoming webhook request content contains this text; leave empty to skip matching.',
     postUrl: 'POST URL:',
-    postHint: 'After the task succeeds or fails, a POST notification will be sent to this URL.',
+    postHint: 'After the task succeeds or fails, a POST will be sent to this URL. You can point to another task trigger ID within the container to trigger other tasks. e.g. if the other task trigger ID is cas2local, fill http://127.0.0.1:17870/webhook/cas2local',
     wecomUrl: 'WeCom bot URL:',
     wecomHint: 'If set, a Markdown notification will also be sent to the WeCom bot.',
     triggerSource: 'Trigger source:',
