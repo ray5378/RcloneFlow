@@ -146,7 +146,10 @@ func isCASObjectNotFoundFailureRow(path, msg string) bool {
 	if path == "" || msg == "" {
 		return false
 	}
-	return strings.Contains(msg, "failed to copy") && strings.Contains(msg, "object not found")
+	if !strings.Contains(msg, "failed to copy") {
+		return false
+	}
+	return strings.Contains(msg, "not found") || strings.Contains(msg, "no such file")
 }
 
 func isCASAttemptObjectNotFoundSummaryRow(path, msg string) bool {
