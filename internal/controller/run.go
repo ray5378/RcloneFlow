@@ -487,16 +487,27 @@ func ensureHistoricalFinalSummary(run service.RunRecord, sum map[string]any) map
 	fs, hasFS := sum["finalSummary"].(map[string]any)
 	need := !hasFS || fs == nil
 	if !need {
-		counts, _ := fs["counts"].(map[string]any)
-		copied := 0.0
-		if counts != nil {
-			if v, ok := counts["copied"].(float64); ok {
-				copied = v
+		if counts, ok := fs["counts"].(map[string]any); ok {
+			copied, _ := counts["copied"].(float64)
+			failed, _ := counts["failed"].(float64)
+			total, _ := counts["total"].(float64)
+			if total > 0 && copied > 0 && failed > 0 {
+				need = true
 			}
 		}
-		if copied <= 0 {
-			if total, ok := counts["total"].(float64); !ok || total <= 0 {
-				need = true
+		if !need {
+			// 原逻辑：copied <= 0 且 total <= 0 时重建
+			counts, _ := fs["counts"].(map[string]any)
+			copied := 0.0
+			if counts != nil {
+				if v, ok := counts["copied"].(float64); ok {
+					copied = v
+				}
+			}
+			if copied <= 0 {
+				if total, ok := counts["total"].(float64); !ok || total <= 0 {
+					need = true
+				}
 			}
 		}
 	}
