@@ -263,11 +263,6 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		})
 	}
 
-	// dynamic progress flush thresholds (read on each run start; consumer also re-reads periodically)
-	_ = config.GetProgressFlushInterval()
-	_ = config.GetProgressFlushDeltaPct()
-	_ = config.GetProgressFlushDeltaBytes()
-
 	cmd := runner.CmdContext(runCtx, args...)
 	// fan-out: write to parser via io.Pipe（由 consumer 单点写入同一文件）
 	outR, outW := io.Pipe()

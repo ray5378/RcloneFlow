@@ -26,15 +26,7 @@ function validate() {
       errors.value[k] = t('defaults.errNonNegative')
     }
   }
-  const mb = (form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES
-  if (mb !== '' && (isNaN(Number(mb)) || Number(mb) < 0)) {
-    errors.value.PROGRESS_FLUSH_MIN_DELTA_BYTES = t('defaults.errNonNegativeMb')
-  }
-  const pct = (form.value as any).PROGRESS_FLUSH_MIN_DELTA_PCT
-  if (pct !== '' && (isNaN(Number(pct)) || Number(pct) < 0 || Number(pct) > 100)) {
-    errors.value.PROGRESS_FLUSH_MIN_DELTA_PCT = t('defaults.errPct')
-  }
-  const durFields = ['ACCESS_TOKEN_TTL', 'REFRESH_TOKEN_TTL', 'PROGRESS_FLUSH_INTERVAL', 'FINISH_WAIT_INTERVAL', 'FINISH_WAIT_TIMEOUT']
+  const durFields = ['ACCESS_TOKEN_TTL', 'REFRESH_TOKEN_TTL', 'FINISH_WAIT_INTERVAL', 'FINISH_WAIT_TIMEOUT']
   for (const k of durFields) {
     const v = (form.value as any)[k]
     if (v && !durationRe.test(String(v))) {
@@ -51,7 +43,6 @@ function flat(resp: any) {
   patch(resp.log)
   patch(resp.history)
   patch(resp.precheck)
-  patch(resp.progress)
   patch(resp.webdav)
   patch(resp.webhook)
   return out
@@ -62,10 +53,6 @@ async function load() {
   try {
     const resp = await getSettings()
     form.value = flat(resp)
-    const b = Number((form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES || 0)
-    if (!isNaN(b) && isFinite(b) && b > 0) {
-      ;(form.value as any).PROGRESS_FLUSH_MIN_DELTA_BYTES = String(Math.round((b / 1048576) * 100) / 100)
-    }
   } finally {
     loading.value = false
   }
@@ -78,10 +65,6 @@ async function onSave() {
     const v = (form.value as any)[k]
     payload[k] = v === undefined || v === null ? '' : String(v)
   })
-  const mb = Number(payload.PROGRESS_FLUSH_MIN_DELTA_BYTES)
-  if (!isNaN(mb) && isFinite(mb) && mb >= 0) {
-    payload.PROGRESS_FLUSH_MIN_DELTA_BYTES = String(Math.round(mb * 1048576))
-  }
   saving.value = true
   saveFailed.value = false
   try {
@@ -171,20 +154,6 @@ onMounted(load)
           </div>
         </div>
 
-        <div class="section">
-          <div class="section-title">{{ t('defaults.progressFlush') }}</div>
-          <div class="grid">
-            <label :title="t('defaults.flushIntervalTitle')">{{ t('defaults.flushInterval') }}</label>
-            <input v-model="form.PROGRESS_FLUSH_INTERVAL" :placeholder="t('defaults.durationPlaceholder5s')" />
-            <div class="error" v-if="errors.PROGRESS_FLUSH_INTERVAL">{{ errors.PROGRESS_FLUSH_INTERVAL }}</div>
-            <label :title="t('defaults.flushPctTitle')">{{ t('defaults.flushPct') }}</label>
-            <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_PCT" type="number" min="0" step="0.1" />
-            <div class="error" v-if="errors.PROGRESS_FLUSH_MIN_DELTA_PCT">{{ errors.PROGRESS_FLUSH_MIN_DELTA_PCT }}</div>
-            <label :title="t('defaults.flushMbTitle')">{{ t('defaults.flushMb') }}</label>
-            <input v-model="form.PROGRESS_FLUSH_MIN_DELTA_BYTES" type="number" min="0" step="0.01" />
-            <div class="error" v-if="errors.PROGRESS_FLUSH_MIN_DELTA_BYTES">{{ errors.PROGRESS_FLUSH_MIN_DELTA_BYTES }}</div>
-          </div>
-        </div>
 
         <div class="section">
           <div class="section-title">{{ t('modal.webdavFinalize') }}</div>

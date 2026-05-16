@@ -29,47 +29,6 @@ func readOverrides() map[string]string {
 	return m
 }
 
-func GetProgressFlushInterval() time.Duration {
-	if v := os.Getenv("PROGRESS_FLUSH_INTERVAL"); v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
-			return d
-		}
-	}
-	if v := readOverrides()["PROGRESS_FLUSH_INTERVAL"]; v != "" {
-		if d, err := time.ParseDuration(v); err == nil {
-			return d
-		}
-	}
-	return 5 * time.Second
-}
-
-func GetProgressFlushDeltaPct() float64 {
-	if v := os.Getenv("PROGRESS_FLUSH_MIN_DELTA_PCT"); v != "" {
-		if n, err := strconv.ParseFloat(v, 64); err == nil {
-			return n
-		}
-	}
-	if v := readOverrides()["PROGRESS_FLUSH_MIN_DELTA_PCT"]; v != "" {
-		if n, err := strconv.ParseFloat(v, 64); err == nil {
-			return n
-		}
-	}
-	return 1
-}
-
-func GetProgressFlushDeltaBytes() int64 {
-	if v := os.Getenv("PROGRESS_FLUSH_MIN_DELTA_BYTES"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			return n
-		}
-	}
-	if v := readOverrides()["PROGRESS_FLUSH_MIN_DELTA_BYTES"]; v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-			return n
-		}
-	}
-	return 50 * 1024 * 1024
-}
 
 func GetFinishWaitInterval() time.Duration {
 	if v := os.Getenv("FINISH_WAIT_INTERVAL"); v != "" {
