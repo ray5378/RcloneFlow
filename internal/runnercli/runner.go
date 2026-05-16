@@ -1322,6 +1322,9 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				if msg == "" {
 					msg = strings.TrimSpace(jsonMsg)
 				}
+				if isRunObjectNotFoundSummary(path, msg) || isAttemptObjectNotFoundSummary(path, msg) {
+					continue
+				}
 				if isCASCompatibleNotFound(path, msg, openlistCASCompatible) {
 					if r.confirmCASMatch(cfg, dst, path) {
 						fp.update(path, -1, -1, -1, 100)
@@ -2197,9 +2200,6 @@ func analyzeCASAttemptLogSegment(path string, startOffset int64, openlistCASComp
 			msg := strings.TrimSpace(anyString(rec["msg"]))
 			obj := strings.TrimSpace(anyString(rec["object"]))
 			if level == "ERROR" {
-				if isCASCompatibleNotFound(obj, msg, openlistCASCompatible) {
-					continue
-				}
 				if obj != "" {
 					res.RealFailures[obj] = msg
 				}
@@ -2215,9 +2215,6 @@ func analyzeCASAttemptLogSegment(path string, startOffset int64, openlistCASComp
 			continue
 		}
 		if strings.EqualFold(level, "ERROR") {
-			if isCASCompatibleNotFound(p, msg, openlistCASCompatible) {
-				continue
-			}
 			if strings.TrimSpace(p) != "" {
 				res.RealFailures[p] = msg
 			}
