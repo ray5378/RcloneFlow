@@ -1109,7 +1109,9 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						prog["eta"] = v
 					}
 					if v, ok2 := parsed["percentage"]; ok2 {
-						prog["percentage"] = v
+						if _, ok3 := prog["percentage"]; !ok3 {
+							prog["percentage"] = v
+						}
 					}
 				}
 				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
