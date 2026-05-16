@@ -242,6 +242,26 @@ func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[str
 	lines := strings.Split(string(data), "\n")
 	re := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR)\s*:\s*(.+?):\s*(.+)$`)
 	tsRe := regexp.MustCompile(`\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2}\s+(?:INFO|NOTICE|ERROR)\s*:`)
+	// 第一遍：收集 CAS 匹配路径
+	casMatched := map[string]struct{}{}
+	for _, ln := range lines {
+		l := strings.TrimSpace(ln)
+		if l == "" {
+			continue
+		}
+		for _, seg := range splitHistoricalLogSegments(l) {
+			m := re.FindStringSubmatch(seg)
+			if len(m) == 0 {
+				continue
+			}
+			path := strings.TrimSpace(m[3])
+			msg := strings.TrimSpace(m[4])
+			if low := strings.ToLower(msg); strings.Contains(low, "cas compatible match after source cleanup") && path != "" {
+				casMatched[path] = struct{}{}
+			}
+		}
+	}
+	// 第二遍：计数，过滤掉 CAS 已匹配文件的原始错误行
 	counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
 	for _, ln := range lines {
 		l := strings.TrimSpace(ln)
@@ -272,6 +292,10 @@ func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[str
 			msg := strings.TrimSpace(m[4])
 			_, bucket, ok := classifyHistoricalLogRow(level, path, msg)
 			if !ok {
+				continue
+			}
+			// CAS 兼容：跳过 CAS 已匹配文件的原始错误行
+			if _, casOk := casMatched[path]; casOk && strings.EqualFold(level, "ERROR") && isCASObjectNotFoundFailureRow(path, msg) {
 				continue
 			}
 			counts[bucket]++
