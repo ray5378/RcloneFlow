@@ -2210,7 +2210,8 @@ func isAttemptObjectNotFoundSummary(path, msg string) bool {
 }
 
 func isRunObjectNotFoundSummary(path, msg string) bool {
-	if !strings.EqualFold(strings.TrimSpace(path), "Failed to copy with 2 errors") && !strings.HasPrefix(strings.TrimSpace(path), "Failed to copy with ") {
+	p := strings.TrimSpace(path)
+	if !strings.EqualFold(p, "Failed to copy with 2 errors") && !strings.HasPrefix(p, "Failed to copy with ") && !strings.EqualFold(p, "Failed to copy") {
 		return false
 	}
 	low := strings.ToLower(strings.TrimSpace(msg))
