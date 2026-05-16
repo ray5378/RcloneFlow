@@ -32,6 +32,7 @@ import (
 type Runner struct {
 	mu              sync.Mutex
 	procs           map[int64]*exec.Cmd
+	cancelFns       map[int64]context.CancelFunc
 	db              *store.DB
 	activeMgr       *active_transfer.Manager
 	casVerifier     func(cfg, dst, rel string) (bool, error)
@@ -46,6 +47,7 @@ func New(db *store.DB, activeMgr ...*active_transfer.Manager) *Runner {
 	}
 	return &Runner{
 		procs:           map[int64]*exec.Cmd{},
+		cancelFns:       map[int64]context.CancelFunc{},
 		db:              db,
 		activeMgr:       mgr,
 		casVerifier:     defaultCASFileExists,
@@ -59,6 +61,11 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		r.mu.Unlock()
 		return errors.New("run already exists")
 	}
+	r.mu.Unlock()
+
+	runCtx, runCancel := context.WithCancel(ctx)
+	r.mu.Lock()
+	r.cancelFns[run.ID] = runCancel
 	r.mu.Unlock()
 
 	runner := &adapter.CmdRunner{}
@@ -261,7 +268,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	_ = config.GetProgressFlushDeltaPct()
 	_ = config.GetProgressFlushDeltaBytes()
 
-	cmd := runner.CmdContext(ctx, args...)
+	cmd := runner.CmdContext(runCtx, args...)
 	// fan-out: write to parser via io.Pipe（由 consumer 单点写入同一文件）
 	outR, outW := io.Pipe()
 	errR, errW := io.Pipe()
@@ -326,6 +333,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}()
 	go func() {
 		defer func() {
+			r.mu.Lock()
+			delete(r.cancelFns, run.ID)
+			delete(r.procs, run.ID)
+			r.mu.Unlock()
 			if casCompat != nil && casCompat.ExcludeFrom != "" {
 				_ = os.Remove(casCompat.ExcludeFrom)
 			}
@@ -339,6 +350,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			consumeWG.Wait()
 			stderrFile.Close()
 			if err == nil && (cmd.ProcessState == nil || cmd.ProcessState.Success()) {
+				break
+			}
+			// 如果已触发停止，不再重试
+			if runCtx.Err() != nil {
 				break
 			}
 			if casManagedRetries && attempt <= maxCASAttempts {
@@ -372,13 +387,13 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					err = nil
 					break
 				}
-				if len(analysis.RealFailures) > 0 && attempt < maxCASAttempts {
+				if len(analysis.RealFailures) > 0 && attempt < maxCASAttempts && runCtx.Err() == nil {
 					attempt++
 					outR, outW = io.Pipe()
 					errR, errW = io.Pipe()
 					stderrFile, _ = os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
 					attemptLogOffset, _ = stderrFile.Seek(0, io.SeekCurrent)
-					cmd = runner.CmdContext(ctx, args...)
+					cmd = runner.CmdContext(runCtx, args...)
 					cmd.Stdout = outW
 					cmd.Stderr = errW
 					if startErr := cmd.Start(); startErr != nil {
@@ -833,11 +848,17 @@ func sizeOfPaged(r *adapter.CmdRunner, cfg, target string, opts map[string]any) 
 }
 
 func (r *Runner) Stop(runID int64) error {
+	// Cancel context first to signal retry loops to abort
 	r.mu.Lock()
+	if cf, ok := r.cancelFns[runID]; ok {
+		cf()
+	}
 	cmd, ok := r.procs[runID]
 	r.mu.Unlock()
 	if !ok || cmd == nil || cmd.Process == nil {
-		return errors.New("not running")
+		// Process already exited (e.g. retry loop about to start a new one);
+		// context cancellation above will abort any pending retry.
+		return nil
 	}
 	_ = cmd.Process.Signal(syscall.SIGINT)
 	if wait(cmd, 10*time.Second) {
