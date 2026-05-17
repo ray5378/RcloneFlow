@@ -126,7 +126,7 @@ func TestManager_ListOrdering_IsStableAndReadable(t *testing.T) {
 	if len(completed) != 2 {
 		t.Fatalf("completed len=%d, want 2", len(completed))
 	}
-	if completed[0].Path != "b/file2.mkv" || completed[1].Path != "a/file1.mkv" {
+	if completed[0].Path != "a/file1.mkv" || completed[1].Path != "b/file2.mkv" {
 		t.Fatalf("unexpected completed order: %#v", completed)
 	}
 

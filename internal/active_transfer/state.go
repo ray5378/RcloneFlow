@@ -487,10 +487,16 @@ func (m *Manager) ListCompleted(taskID int64, offset, limit int) ActiveTransferL
 	}
 	sort.SliceStable(items, func(i, j int) bool {
 		if items[i].Order != items[j].Order {
-			return items[i].Order > items[j].Order
+			if items[i].Order == 0 {
+				return false
+			}
+			if items[j].Order == 0 {
+				return true
+			}
+			return items[i].Order < items[j].Order
 		}
 		if items[i].At != items[j].At {
-			return items[i].At > items[j].At
+			return items[i].At < items[j].At
 		}
 		return items[i].Path < items[j].Path
 	})

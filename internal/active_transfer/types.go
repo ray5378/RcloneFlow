@@ -142,10 +142,16 @@ func (s *ActiveTransferState) Snapshot() ActiveTransferSnapshot {
 	}
 	sort.SliceStable(completed, func(i, j int) bool {
 		if completed[i].Order != completed[j].Order {
-			return completed[i].Order > completed[j].Order
+			if completed[i].Order == 0 {
+				return false
+			}
+			if completed[j].Order == 0 {
+				return true
+			}
+			return completed[i].Order < completed[j].Order
 		}
 		if completed[i].At != completed[j].At {
-			return completed[i].At > completed[j].At
+			return completed[i].At < completed[j].At
 		}
 		return completed[i].Path < completed[j].Path
 	})
