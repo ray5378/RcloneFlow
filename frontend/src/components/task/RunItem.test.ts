@@ -17,17 +17,18 @@ describe('RunItem', () => {
     ].map(match => match[0])
 
     expect(historySource).toContain('class="list history-list-cards"')
+    expect(historySource).toContain('v-if="currentTotal > 0"')
+    expect(historySource).not.toContain('currentTotal > runsPageSize')
     expect(historySource).toContain('gap: 8px')
     expect(historySource).toContain('margin-top: 16px')
-    expect(historySource).toContain('padding: 0 16px')
+    expect(historySource).toContain('padding: 0 16px 16px')
     expect(historySource).toContain('box-sizing: border-box')
     expect(historySource).toContain('margin-bottom: 0')
     expect(baseStyles).toContain('border: 1px solid')
     expect(baseStyles).toContain('border-radius: 12px')
     expect(baseStyles).toContain('transform: translateY(-2px)')
-    for (const rule of hoverRules) {
-      expect(rule).not.toMatch(/background\s*:/)
-    }
+    expect(hoverRules.join('\n')).toContain('background: #252525')
+    expect(hoverRules.join('\n')).toContain('background: #f8f8f8')
     expect(runSource).not.toContain('border-left-color')
   })
 

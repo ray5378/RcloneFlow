@@ -27,9 +27,8 @@ describe('TaskCard', () => {
       expect(rule).not.toMatch(/background\s*:/)
       expect(rule).not.toMatch(/border-radius\s*:/)
     }
-    for (const rule of hoverRules) {
-      expect(rule).not.toMatch(/background\s*:/)
-    }
+    expect(hoverRules.join('\n')).toContain('background: #252525')
+    expect(hoverRules.join('\n')).toContain('background: #f8f8f8')
     expect(listSectionSource).toContain('class="list task-list-cards"')
     expect(listSectionSource).toContain('v-if="!sorting"')
     expect(listSectionSource).not.toContain('tasksTotal > tasksPageSize')

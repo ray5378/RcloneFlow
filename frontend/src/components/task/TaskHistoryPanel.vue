@@ -80,7 +80,7 @@ function pageInfo(page: number, total: number) {
         <button :class="['filter-btn', historyStatusFilter === 'skipped' && 'active']" @click.stop="emit('set-status-filter', 'skipped')">{{ t('taskUI.skipped') }}</button>
         <button :class="['filter-btn', historyStatusFilter === 'hasTransfer' && 'active']" @click.stop="emit('set-status-filter', 'hasTransfer')">{{ t('taskUI.hasTransfer') }}</button>
       </div>
-      <div class="pagination" v-if="currentTotal > runsPageSize" data-no-back @click.stop>
+      <div class="pagination" v-if="currentTotal > 0" data-no-back @click.stop>
         <span class="page-current">{{ pageInfo(runsPage, currentTotalPages) }}</span>
         <button class="page-btn" :disabled="runsPage <= 1" @click.stop="emit('prev-page')">{{ t('taskUI.prevPage') }}</button>
         <button class="page-btn" :disabled="runsPage >= currentTotalPages" @click.stop="emit('next-page')">{{ t('taskUI.nextPage') }}</button>
@@ -114,7 +114,7 @@ function pageInfo(page: number, total: number) {
 .history-list-cards{
   gap: 8px;
   margin-top: 16px;
-  padding: 0 16px;
+  padding: 0 16px 16px;
   box-sizing: border-box;
 }
 .history-list-cards :deep(.run-item){
