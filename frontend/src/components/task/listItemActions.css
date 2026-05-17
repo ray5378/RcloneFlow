@@ -24,17 +24,6 @@
   color: #fff !important;
 }
 
-.list-item-actions button.ghost.small.action-info:hover {
-  background: rgba(59, 130, 246, 0.18) !important;
-  border-color: rgba(59, 130, 246, 0.45) !important;
-  color: #bfdbfe !important;
-}
-
-.list-item-actions button.ghost.small.action-danger:hover {
-  background: rgba(239, 68, 68, 0.18) !important;
-  border-color: rgba(239, 68, 68, 0.45) !important;
-  color: #fecaca !important;
-}
 
 :global(body.light) .list-item-actions button.ghost.small:hover {
   background: #e5e7eb !important;
@@ -42,14 +31,3 @@
   color: #111827 !important;
 }
 
-:global(body.light) .list-item-actions button.ghost.small.action-info:hover {
-  background: #dbeafe !important;
-  border-color: rgba(37, 99, 235, 0.42) !important;
-  color: #1d4ed8 !important;
-}
-
-:global(body.light) .list-item-actions button.ghost.small.action-danger:hover {
-  background: #fee2e2 !important;
-  border-color: rgba(220, 38, 38, 0.38) !important;
-  color: #b91c1c !important;
-}

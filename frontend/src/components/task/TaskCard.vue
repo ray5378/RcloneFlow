@@ -75,9 +75,9 @@ function isStopped(): boolean {
       </div>
 
       <div v-if="!sorting" class="item-actions list-item-actions list-item-actions-right">
-        <button class="ghost small action-info" @click.stop="emit('viewHistory', task.id!)">📋 {{ t('taskCard.history') }}</button>
-        <button class="ghost small action-info" @click.stop="emit('openTransferDetail', task.id!)">📦 {{ t('activeTransfer.title') }}</button>
-        <button class="ghost small action-danger" :class="{ 'btn-stopped': isStopped() }" @click.stop="emit('stop', task.id!)">
+        <button class="ghost small" @click.stop="emit('viewHistory', task.id!)">📋 {{ t('taskCard.history') }}</button>
+        <button class="ghost small" @click.stop="emit('openTransferDetail', task.id!)">📦 {{ t('activeTransfer.title') }}</button>
+        <button class="ghost small" :class="{ 'btn-stopped': isStopped() }" @click.stop="emit('stop', task.id!)">
           {{ isStopped() ? `⏹ ${t('taskCard.stopped')}` : `⏹ ${t('taskCard.stopTransfer')}` }}
         </button>
         <button class="ghost small" @click.stop="emit('openScheduleConfig', task)">
@@ -89,7 +89,7 @@ function isStopped(): boolean {
         <button class="ghost small" @click.stop="emit('setWebhook', task)">🔗 {{ t('taskCard.webhook') }}</button>
         <button class="ghost small" @click.stop="emit('setSingleton', task)">🔒 {{ t('taskCard.singleton') }}</button>
         <button class="ghost small" @click.stop="emit('edit', task)">✏️ {{ t('taskCard.edit') }}</button>
-        <button class="ghost small action-danger danger-text" @click.stop="emit('delete', task)">🗑️ {{ t('taskCard.delete') }}</button>
+        <button class="ghost small danger-text" @click.stop="emit('delete', task)">🗑️ {{ t('taskCard.delete') }}</button>
       </div>
     </div>
 
