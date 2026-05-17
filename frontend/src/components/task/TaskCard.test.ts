@@ -32,6 +32,8 @@ describe('TaskCard', () => {
     }
     expect(listSectionSource).toContain('class="list task-list-cards"')
     expect(listSectionSource).toContain('gap: 8px')
+    expect(listSectionSource).toContain('padding: 0 16px')
+    expect(listSectionSource).toContain('box-sizing: border-box')
     expect(listSectionSource).toContain('margin-bottom: 0')
     expect(baseStyles).toContain('border: 1px solid')
     expect(baseStyles).toContain('box-shadow')
