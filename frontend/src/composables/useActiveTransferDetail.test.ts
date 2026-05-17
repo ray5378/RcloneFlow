@@ -116,6 +116,75 @@ describe('useActiveTransferDetail', () => {
     unmount()
   })
 
+  it('limits websocket snapshot completed and pending lists to one page while browsing page one', async () => {
+    getActiveTransfer.mockResolvedValueOnce({
+      runId: 81,
+      taskId: 11,
+      trackingMode: 'normal',
+      summary: {
+        trackingMode: 'normal',
+        completedCount: 0,
+        pendingCount: 0,
+        totalCount: 0,
+        percentage: 0,
+        bytes: 0,
+        totalBytes: 0,
+        speed: 0,
+        eta: 0,
+      },
+      currentFile: null,
+      currentFiles: [],
+      degraded: false,
+    })
+    getActiveTransferCompleted.mockResolvedValueOnce({ total: 0, items: [] })
+    getActiveTransferPending.mockResolvedValueOnce({ total: 0, items: [] })
+
+    const { api, unmount } = await mountActiveTransferDetail()
+
+    api.openActiveTransfer(11)
+    await flushPromises()
+
+    listeners.get('active_transfer_snapshot')?.({
+      run_id: 81,
+      task_id: 11,
+      snapshot: {
+        runId: 81,
+        taskId: 11,
+        trackingMode: 'normal',
+        totalCount: 25,
+        completedCount: 25,
+        pendingCount: 25,
+        completed: Array.from({ length: 25 }, (_, idx) => ({
+          name: `completed-${idx + 1}`,
+          path: `completed-${idx + 1}`,
+          status: 'copied',
+          order: idx + 1,
+        })),
+        pending: Array.from({ length: 25 }, (_, idx) => ({
+          name: `pending-${idx + 1}`,
+          path: `pending-${idx + 1}`,
+          status: 'pending',
+          order: idx + 1,
+        })),
+        degraded: false,
+      },
+    })
+    await Promise.resolve()
+
+    expect(api.activeTransferCompletedTotal.value).toBe(25)
+    expect(api.activeTransferPendingTotal.value).toBe(25)
+    expect(api.activeTransferCompletedItems.value).toHaveLength(10)
+    expect(api.activeTransferPendingItems.value).toHaveLength(10)
+    expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual(
+      Array.from({ length: 10 }, (_, idx) => `completed-${idx + 1}`),
+    )
+    expect(api.activeTransferPendingItems.value.map(item => item.name)).toEqual(
+      Array.from({ length: 10 }, (_, idx) => `pending-${idx + 1}`),
+    )
+
+    unmount()
+  })
+
   it('prefers snapshot count fields over retained item lengths in degraded mode', async () => {
     getActiveTransfer.mockResolvedValueOnce({
       runId: 31,

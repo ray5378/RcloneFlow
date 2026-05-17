@@ -160,12 +160,12 @@ export function useActiveTransferDetail() {
       pendingJumpPage.value = pendingTotalPages.value
     }
     if (completedPage.value <= 1) {
-      completedItems.value = completed
+      completedItems.value = completed.slice(0, PAGE_SIZE)
     } else if (wasBrowsingCompletedLastPage) {
       completedItems.value = appendNewCompletedItemsForLastPage(completedItems.value, completed)
     }
     if (pendingPage.value <= 1) {
-      pendingItems.value = pending
+      pendingItems.value = pending.slice(0, PAGE_SIZE)
     }
 
     const stableTotalCount = Math.max(
