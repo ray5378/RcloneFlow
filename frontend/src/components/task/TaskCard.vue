@@ -121,7 +121,7 @@ function isStopped(): boolean {
 
 .task-card { padding: 14px 18px; }
 .task-card.active { background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.34); }
-body.light .task-card.active { background: rgba(25, 118, 210, 0.06); border-color: rgba(25, 118, 210, 0.24); }
+body.light .task-card.active { background: #f5f7fa; border-color: rgba(25, 118, 210, 0.22); }
 .task-main { display: flex; flex-wrap: wrap; align-items: center; }
 .name { gap: 8px; }
 .sort-editor { display: inline-flex; align-items: center; gap: 8px; margin-right: 10px; }

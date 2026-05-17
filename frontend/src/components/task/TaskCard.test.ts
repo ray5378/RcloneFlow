@@ -36,6 +36,8 @@ describe('TaskCard', () => {
     expect(baseStyles).toContain('border: 1px solid')
     expect(baseStyles).toContain('box-shadow')
     expect(baseStyles).toContain('transform: translateY(-2px)')
+    expect(componentSource).toContain('background: #f5f7fa')
+    expect(componentSource).toContain('border-color: rgba(25, 118, 210, 0.22)')
     expect(componentSource).not.toContain('border-left-color')
   })
 
