@@ -29,7 +29,7 @@ describe('TaskCard', () => {
     for (const rule of hoverRules) {
       expect(rule).not.toMatch(/background\s*:/)
     }
-    expect(baseStyles).toContain('margin-bottom: 14px')
+    expect(baseStyles).toContain('margin-bottom: 110px')
     expect(baseStyles).toContain('border: 1px solid')
     expect(baseStyles).toContain('box-shadow')
     expect(baseStyles).toContain('transform: translateY(-2px)')
