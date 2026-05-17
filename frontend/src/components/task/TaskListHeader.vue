@@ -21,26 +21,36 @@ function onSearchInput(event: Event) {
     <div class="title">{{ t('taskUI.taskList') }}</div>
     <div class="header-actions">
       <input :value="search" type="text" :placeholder="t('taskUI.searchTask')" class="search-input" @input="onSearchInput" />
-      <button v-if="!sorting" class="ghost small action-btn" @click="emit('toggle-sort')">{{ t('taskUI.taskSort') }}</button>
+      <button v-if="!sorting" class="ghost small task-header-action-btn" @click="emit('toggle-sort')">{{ t('taskUI.taskSort') }}</button>
       <template v-else>
-        <button class="primary small action-btn" :disabled="savingSort" @click="emit('save-sort')">{{ t('taskUI.saveSort') }}</button>
-        <button class="ghost small action-btn" :disabled="savingSort" @click="emit('cancel-sort')">{{ t('taskUI.cancelSort') }}</button>
+        <button class="primary small task-header-action-btn" :disabled="savingSort" @click="emit('save-sort')">{{ t('taskUI.saveSort') }}</button>
+        <button class="ghost small task-header-action-btn" :disabled="savingSort" @click="emit('cancel-sort')">{{ t('taskUI.cancelSort') }}</button>
       </template>
-      <button class="primary small action-btn add-task-btn" @click="emit('add')">{{ t('taskUI.addTask') }}</button>
+      <button class="primary small task-header-action-btn add-task-btn" @click="emit('add')">{{ t('taskUI.addTask') }}</button>
     </div>
   </div>
 </template>
 
 <style scoped>
-.header-actions > button.action-btn {
-  width: 88px !important;
-  min-width: 88px !important;
-  height: 32px !important;
-  padding: 0 12px !important;
+.header-actions > button.task-header-action-btn,
+.header-actions > button.primary.task-header-action-btn,
+.header-actions > button.ghost.task-header-action-btn,
+.header-actions > button.primary.small.task-header-action-btn,
+.header-actions > button.ghost.small.task-header-action-btn {
+  inline-size: 88px !important;
+  min-inline-size: 88px !important;
+  max-inline-size: 88px !important;
+  block-size: 32px !important;
+  min-block-size: 32px !important;
+  max-block-size: 32px !important;
+  padding: 0 10px !important;
+  line-height: 1 !important;
   white-space: nowrap;
-  display: inline-flex;
+  display: inline-flex !important;
   align-items: center;
   justify-content: center;
+  flex: 0 0 88px !important;
+  box-sizing: border-box;
 }
 
 .add-task-btn {
@@ -60,13 +70,20 @@ function onSearchInput(event: Event) {
     flex: 1 1 100%;
   }
 
-  .header-actions > button.action-btn {
-    width: 88px !important;
-    min-width: 88px !important;
-    height: 32px !important;
-    padding: 0 10px !important;
+  .header-actions > button.task-header-action-btn,
+  .header-actions > button.primary.task-header-action-btn,
+  .header-actions > button.ghost.task-header-action-btn,
+  .header-actions > button.primary.small.task-header-action-btn,
+  .header-actions > button.ghost.small.task-header-action-btn {
+    inline-size: 88px !important;
+    min-inline-size: 88px !important;
+    max-inline-size: 88px !important;
+    block-size: 32px !important;
+    min-block-size: 32px !important;
+    max-block-size: 32px !important;
+    padding: 0 8px !important;
     font-size: 12px;
-    flex-shrink: 1;
+    flex: 0 0 88px !important;
   }
 }
 </style>
