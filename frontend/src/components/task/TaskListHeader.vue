@@ -32,11 +32,15 @@ function onSearchInput(event: Event) {
 </template>
 
 <style scoped>
-.action-btn {
-  min-width: 88px;
-  height: 32px;
-  padding: 6px 12px;
+.header-actions > button.action-btn {
+  width: 88px !important;
+  min-width: 88px !important;
+  height: 32px !important;
+  padding: 0 12px !important;
   white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .add-task-btn {
@@ -56,10 +60,12 @@ function onSearchInput(event: Event) {
     flex: 1 1 100%;
   }
 
-  .action-btn {
+  .header-actions > button.action-btn {
+    width: 88px !important;
+    min-width: 88px !important;
+    height: 32px !important;
+    padding: 0 10px !important;
     font-size: 12px;
-    padding: 8px 10px;
-    min-width: 88px;
     flex-shrink: 1;
   }
 }
