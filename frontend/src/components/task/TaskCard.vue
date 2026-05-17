@@ -120,8 +120,6 @@ function isStopped(): boolean {
 @import './listItemSpacing.css';
 
 .task-card { padding: 14px 18px; }
-.task-card:hover { background: rgba(99, 102, 241, 0.10); }
-body.light .task-card:hover { background: rgba(25, 118, 210, 0.08); }
 .task-card.active { background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.34); }
 body.light .task-card.active { background: rgba(25, 118, 210, 0.06); border-color: rgba(25, 118, 210, 0.24); }
 .task-main { display: flex; flex-wrap: wrap; align-items: center; }

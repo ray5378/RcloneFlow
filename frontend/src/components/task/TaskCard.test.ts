@@ -5,7 +5,7 @@ import { createApp, h } from 'vue'
 import TaskCard from './TaskCard.vue'
 
 describe('TaskCard', () => {
-  it('keeps task cards bordered, path details unboxed, and hover elevated', () => {
+  it('keeps task cards bordered, path details unboxed, and hover elevated without recoloring', () => {
     const here = resolve(__dirname)
     const componentSource = readFileSync(resolve(here, './TaskCard.vue'), 'utf8')
     const baseStyles = readFileSync(resolve(here, './listItemBase.css'), 'utf8')
@@ -15,17 +15,24 @@ describe('TaskCard', () => {
       ...componentSource.matchAll(/\.task-paths\s*\{[^}]*\}/g),
       ...globalStyles.matchAll(/\.task-paths\s*\{[^}]*\}/g),
     ].map(match => match[0])
+    const hoverRules = [
+      ...componentSource.matchAll(/\.task-card:hover\s*\{[^}]*\}/g),
+      ...baseStyles.matchAll(/:where\(\.task-card, \.run-item\):hover\s*\{[^}]*\}/g),
+      ...baseStyles.matchAll(/body\.light\s+:where\(\.task-card, \.run-item\):hover\s*\{[^}]*\}/g),
+    ].map(match => match[0])
 
     expect(taskPathsRules.length).toBeGreaterThan(0)
     for (const rule of taskPathsRules) {
       expect(rule).not.toMatch(/background\s*:/)
       expect(rule).not.toMatch(/border-radius\s*:/)
     }
+    for (const rule of hoverRules) {
+      expect(rule).not.toMatch(/background\s*:/)
+    }
+    expect(baseStyles).toContain('margin-bottom: 14px')
     expect(baseStyles).toContain('border: 1px solid')
     expect(baseStyles).toContain('box-shadow')
     expect(baseStyles).toContain('transform: translateY(-2px)')
-    expect(componentSource).toContain('rgba(99, 102, 241, 0.10)')
-    expect(componentSource).toContain('rgba(25, 118, 210, 0.08)')
     expect(componentSource).not.toContain('border-left-color')
   })
 
