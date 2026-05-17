@@ -260,4 +260,87 @@ describe('useActiveTransferDetail', () => {
 
     unmount()
   })
+
+  it('appends new websocket completed items while the user is browsing the last completed page', async () => {
+    const overview = {
+      runId: 61,
+      taskId: 9,
+      trackingMode: 'normal',
+      summary: {
+        trackingMode: 'normal',
+        completedCount: 12,
+        pendingCount: 0,
+        totalCount: 12,
+        percentage: 80,
+        bytes: 800,
+        totalBytes: 1000,
+        speed: 10,
+        eta: 20,
+      },
+      currentFile: null,
+      currentFiles: [],
+      degraded: false,
+    }
+    getActiveTransfer.mockResolvedValueOnce(overview).mockResolvedValueOnce(overview)
+    getActiveTransferCompleted
+      .mockResolvedValueOnce({
+        total: 12,
+        items: Array.from({ length: 10 }, (_, idx) => ({
+          name: `page-1-${idx}`,
+          path: `page-1-${idx}`,
+          status: 'copied',
+          order: idx + 1,
+        })),
+      })
+      .mockResolvedValueOnce({
+        total: 12,
+        items: [
+          { name: 'page-2-a', path: 'page-2-a', status: 'copied', order: 11 },
+          { name: 'page-2-b', path: 'page-2-b', status: 'copied', order: 12 },
+        ],
+      })
+    getActiveTransferPending
+      .mockResolvedValueOnce({ total: 0, items: [] })
+      .mockResolvedValueOnce({ total: 0, items: [] })
+
+    const { api, unmount } = await mountActiveTransferDetail()
+
+    api.openActiveTransfer(9)
+    await flushPromises()
+
+    api.nextActiveTransferCompletedPage()
+    await flushPromises()
+
+    expect(api.activeTransferCompletedPage.value).toBe(2)
+    expect(api.activeTransferCompletedTotalPages.value).toBe(2)
+    expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual(['page-2-a', 'page-2-b'])
+
+    listeners.get('active_transfer_snapshot')?.({
+      run_id: 61,
+      task_id: 9,
+      snapshot: {
+        runId: 61,
+        taskId: 9,
+        trackingMode: 'normal',
+        totalCount: 13,
+        completedCount: 13,
+        pendingCount: 0,
+        completed: [
+          { name: 'page-2-a', path: 'page-2-a', status: 'copied', order: 11 },
+          { name: 'page-2-b', path: 'page-2-b', status: 'copied', order: 12 },
+          { name: 'newly-completed', path: 'newly-completed', status: 'copied', order: 13 },
+        ],
+        pending: [],
+        degraded: false,
+      },
+    })
+    await Promise.resolve()
+
+    expect(api.activeTransferCompletedTotal.value).toBe(13)
+    expect(api.activeTransferCompletedPage.value).toBe(2)
+    expect(api.activeTransferCompletedTotalPages.value).toBe(2)
+    expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual(['page-2-a', 'page-2-b', 'newly-completed'])
+
+    unmount()
+  })
 })

@@ -46,6 +46,32 @@ function sortPendingItems(items: ActiveTransferPendingFile[]) {
   })
 }
 
+function completedItemKey(item: ActiveTransferCompletedFile) {
+  return String(item.path || item.name || '')
+}
+
+function isCompletedItemNewerThanPage(item: ActiveTransferCompletedFile, pageItems: ActiveTransferCompletedFile[]) {
+  if (!pageItems.length) return true
+  const itemOrder = Number(item.order || 0)
+  const maxOrder = Math.max(...pageItems.map(existing => Number(existing.order || 0)))
+  if (itemOrder > 0 || maxOrder > 0) return itemOrder > maxOrder
+  const itemAt = String(item.at || '')
+  const maxAt = pageItems.reduce((max, existing) => {
+    const at = String(existing.at || '')
+    return at > max ? at : max
+  }, '')
+  return itemAt > maxAt
+}
+
+function appendNewCompletedItemsForLastPage(current: ActiveTransferCompletedFile[], incoming: ActiveTransferCompletedFile[]) {
+  const existingKeys = new Set(current.map(completedItemKey).filter(Boolean))
+  const additions = incoming.filter(item => {
+    const key = completedItemKey(item)
+    return key && !existingKeys.has(key) && isCompletedItemNewerThanPage(item, current)
+  })
+  return additions.length ? sortCompletedItems([...current, ...additions]) : current
+}
+
 function mergeNonDecreasingSummary(prev: ActiveTransferSummary | null, next: ActiveTransferSummary | null): ActiveTransferSummary | null {
   if (!next) return prev
   if (!prev) return next
@@ -130,6 +156,8 @@ export function useActiveTransferDetail() {
     }
     if (completedPage.value <= 1) {
       completedItems.value = completed
+    } else if (completedPage.value === completedTotalPages.value) {
+      completedItems.value = appendNewCompletedItemsForLastPage(completedItems.value, completed)
     }
     if (pendingPage.value <= 1) {
       pendingItems.value = pending
