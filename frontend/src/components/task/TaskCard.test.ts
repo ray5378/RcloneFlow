@@ -28,8 +28,9 @@ describe('TaskCard', () => {
       expect(rule).not.toMatch(/border-radius\s*:/)
     }
     expect(hoverRules.join('\n')).toContain('background: #252525')
-    expect(baseStyles).toContain(':global(body.light) :where(.task-card, .run-item):hover')
-    expect(hoverRules.join('\n')).toContain('background: #f8f8f8')
+    expect(baseStyles).toContain(':global(body.light .task-card:hover)')
+    expect(baseStyles).toContain(':global(body.light .run-item:hover)')
+    expect(baseStyles).toContain('background: #f8f8f8')
     expect(listSectionSource).toContain('class="list task-list-cards"')
     expect(listSectionSource).toContain('v-if="!sorting"')
     expect(listSectionSource).not.toContain('tasksTotal > tasksPageSize')
