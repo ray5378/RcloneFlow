@@ -92,7 +92,7 @@ function pageInfo(page: number, total: number) {
         <button v-if="historyFilterTaskId !== null" class="ghost small" @click.stop="emit('back')">← {{ t('taskUI.back') }}</button>
       </div>
     </div>
-    <div class="list">
+    <div class="list history-list-cards">
       <RunItem
         v-for="run in displayRuns"
         :key="run.id"
@@ -111,6 +111,15 @@ function pageInfo(page: number, total: number) {
 </template>
 
 <style scoped>
+.history-list-cards{
+  gap: 8px;
+  margin-top: 16px;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+.history-list-cards :deep(.run-item){
+  margin-bottom: 0;
+}
 .history-header{ cursor:pointer; }
 .history-header > *{ cursor:auto; }
 .history-filters{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
