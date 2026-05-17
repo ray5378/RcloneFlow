@@ -299,6 +299,8 @@ export default {
     preflightPending: 'Scanning the file list. Counts and pending items will fill in gradually.',
     empty: 'No active transfer details available',
     emptyList: 'No items',
+    waitingCompleted: 'Waiting to complete',
+    waitingFile: 'Waiting for file',
     loadMore: 'Load more',
     prevPage: 'Previous',
     nextPage: 'Next',

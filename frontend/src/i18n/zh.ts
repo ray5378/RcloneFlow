@@ -299,6 +299,8 @@ export default {
     preflightPending: '正在扫描文件列表，数量和待传清单会逐步补齐',
     empty: '当前暂无可展示的传输明细',
     emptyList: '暂无条目',
+    waitingCompleted: '等待完成',
+    waitingFile: '等待文件',
     loadMore: '加载更多',
     prevPage: '上一页',
     nextPage: '下一页',
