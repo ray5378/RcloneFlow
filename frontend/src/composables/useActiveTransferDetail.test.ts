@@ -20,6 +20,34 @@ vi.mock('./useWebSocket', () => ({
   },
 }))
 
+async function mountActiveTransferDetail() {
+  let api!: ReturnType<typeof useActiveTransferDetail>
+  const Host = defineComponent({
+    setup() {
+      api = useActiveTransferDetail()
+      return () => null
+    },
+  })
+
+  const el = document.createElement('div')
+  document.body.appendChild(el)
+  const app = createApp(Host)
+  app.mount(el)
+
+  return {
+    api,
+    unmount: () => {
+      app.unmount()
+      el.remove()
+    },
+  }
+}
+
+async function flushPromises() {
+  await Promise.resolve()
+  await Promise.resolve()
+}
+
 describe('useActiveTransferDetail', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -56,22 +84,10 @@ describe('useActiveTransferDetail', () => {
     })
     getActiveTransferPending.mockResolvedValueOnce({ total: 0, items: [] })
 
-    let api!: ReturnType<typeof useActiveTransferDetail>
-    const Host = defineComponent({
-      setup() {
-        api = useActiveTransferDetail()
-        return () => null
-      },
-    })
-
-    const el = document.createElement('div')
-    document.body.appendChild(el)
-    const app = createApp(Host)
-    app.mount(el)
+    const { api, unmount } = await mountActiveTransferDetail()
 
     api.openActiveTransfer(7)
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushPromises()
 
     expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual(['oldest', 'middle', 'newest'])
 
@@ -97,8 +113,7 @@ describe('useActiveTransferDetail', () => {
 
     expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual(['oldest', 'latest'])
 
-    app.unmount()
-    el.remove()
+    unmount()
   })
 
   it('prefers snapshot count fields over retained item lengths in degraded mode', async () => {
@@ -130,22 +145,10 @@ describe('useActiveTransferDetail', () => {
       items: [{ name: 'pending-a', path: 'pending-a', status: 'pending', order: 2 }],
     })
 
-    let api!: ReturnType<typeof useActiveTransferDetail>
-    const Host = defineComponent({
-      setup() {
-        api = useActiveTransferDetail()
-        return () => null
-      },
-    })
-
-    const el = document.createElement('div')
-    document.body.appendChild(el)
-    const app = createApp(Host)
-    app.mount(el)
+    const { api, unmount } = await mountActiveTransferDetail()
 
     api.openActiveTransfer(7)
-    await Promise.resolve()
-    await Promise.resolve()
+    await flushPromises()
 
     listeners.get('active_transfer_snapshot')?.({
       run_id: 31,
@@ -172,7 +175,89 @@ describe('useActiveTransferDetail', () => {
     expect(api.activeTransferSummary.value?.completedCount).toBe(2050)
     expect(api.activeTransferSummary.value?.pendingCount).toBe(0)
 
-    app.unmount()
-    el.remove()
+    unmount()
+  })
+
+  it('does not let websocket snapshots replace completed items while the user is browsing another completed page', async () => {
+    const overview = {
+      runId: 51,
+      taskId: 8,
+      trackingMode: 'normal',
+      summary: {
+        trackingMode: 'normal',
+        completedCount: 12,
+        pendingCount: 0,
+        totalCount: 12,
+        percentage: 80,
+        bytes: 800,
+        totalBytes: 1000,
+        speed: 10,
+        eta: 20,
+      },
+      currentFile: null,
+      currentFiles: [],
+      degraded: false,
+    }
+    getActiveTransfer.mockResolvedValueOnce(overview).mockResolvedValueOnce(overview)
+    getActiveTransferCompleted
+      .mockResolvedValueOnce({
+        total: 12,
+        items: Array.from({ length: 10 }, (_, idx) => ({
+          name: `page-1-${idx}`,
+          path: `page-1-${idx}`,
+          status: 'copied',
+          order: idx + 1,
+        })),
+      })
+      .mockResolvedValueOnce({
+        total: 12,
+        items: [
+          { name: 'page-2-a', path: 'page-2-a', status: 'copied', order: 11 },
+          { name: 'page-2-b', path: 'page-2-b', status: 'copied', order: 12 },
+        ],
+      })
+    getActiveTransferPending
+      .mockResolvedValueOnce({ total: 0, items: [] })
+      .mockResolvedValueOnce({ total: 0, items: [] })
+
+    const { api, unmount } = await mountActiveTransferDetail()
+
+    api.openActiveTransfer(8)
+    await flushPromises()
+
+    api.nextActiveTransferCompletedPage()
+    await flushPromises()
+
+    expect(api.activeTransferCompletedPage.value).toBe(2)
+    expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual(['page-2-a', 'page-2-b'])
+
+    listeners.get('active_transfer_snapshot')?.({
+      run_id: 51,
+      task_id: 8,
+      snapshot: {
+        runId: 51,
+        taskId: 8,
+        trackingMode: 'normal',
+        totalCount: 13,
+        completedCount: 13,
+        pendingCount: 0,
+        currentFile: { name: 'current', path: 'current', status: 'in_progress', order: 13 },
+        currentFiles: [{ name: 'current', path: 'current', status: 'in_progress', order: 13 }],
+        completed: [
+          { name: 'socket-first-page-a', path: 'socket-first-page-a', status: 'copied', order: 1 },
+          { name: 'socket-first-page-b', path: 'socket-first-page-b', status: 'copied', order: 2 },
+        ],
+        pending: [],
+        degraded: false,
+      },
+    })
+    await Promise.resolve()
+
+    expect(api.activeTransferCompletedTotal.value).toBe(13)
+    expect(api.activeTransferCurrentFiles.value.map(item => item.name)).toEqual(['current'])
+    expect(api.activeTransferCompletedPage.value).toBe(2)
+    expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual(['page-2-a', 'page-2-b'])
+
+    unmount()
   })
 })

@@ -116,10 +116,10 @@ export function useActiveTransferDetail() {
 
     const completed = sortCompletedItems(snapshot.completed || [])
     const pending = sortPendingItems(snapshot.pending || [])
-    completedItems.value = completed
-    pendingItems.value = pending
-    completedTotal.value = Number(snapshot.completedCount || completed.length || 0)
-    pendingTotal.value = Number(snapshot.pendingCount || pending.length || 0)
+    const nextCompletedTotal = Number(snapshot.completedCount || completed.length || 0)
+    const nextPendingTotal = Number(snapshot.pendingCount || pending.length || 0)
+    completedTotal.value = nextCompletedTotal
+    pendingTotal.value = nextPendingTotal
     if (completedPage.value > completedTotalPages.value) {
       completedPage.value = completedTotalPages.value
       completedJumpPage.value = completedTotalPages.value
@@ -127,6 +127,12 @@ export function useActiveTransferDetail() {
     if (pendingPage.value > pendingTotalPages.value) {
       pendingPage.value = pendingTotalPages.value
       pendingJumpPage.value = pendingTotalPages.value
+    }
+    if (completedPage.value <= 1) {
+      completedItems.value = completed
+    }
+    if (pendingPage.value <= 1) {
+      pendingItems.value = pending
     }
 
     const stableTotalCount = Math.max(
