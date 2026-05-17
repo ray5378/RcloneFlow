@@ -28,6 +28,7 @@ describe('RunItem', () => {
     expect(baseStyles).toContain('border-radius: 12px')
     expect(baseStyles).toContain('transform: translateY(-2px)')
     expect(hoverRules.join('\n')).toContain('background: #252525')
+    expect(baseStyles).toContain(':global(body.light) :where(.task-card, .run-item):hover')
     expect(hoverRules.join('\n')).toContain('background: #f8f8f8')
     expect(runSource).not.toContain('border-left-color')
   })
