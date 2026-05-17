@@ -322,13 +322,25 @@ describe('useActiveTransferDetail', () => {
         runId: 61,
         taskId: 9,
         trackingMode: 'normal',
-        totalCount: 13,
-        completedCount: 13,
+        totalCount: 23,
+        completedCount: 23,
         pendingCount: 0,
         completed: [
+          { name: 'retained-from-other-page-a', path: 'retained-from-other-page-a', status: 'copied', order: 3 },
+          { name: 'retained-from-other-page-b', path: 'retained-from-other-page-b', status: 'copied', order: 4 },
           { name: 'page-2-a', path: 'page-2-a', status: 'copied', order: 11 },
           { name: 'page-2-b', path: 'page-2-b', status: 'copied', order: 12 },
-          { name: 'newly-completed', path: 'newly-completed', status: 'copied', order: 13 },
+          { name: 'newly-completed-13', path: 'newly-completed-13', status: 'copied', order: 13 },
+          { name: 'newly-completed-14', path: 'newly-completed-14', status: 'copied', order: 14 },
+          { name: 'newly-completed-15', path: 'newly-completed-15', status: 'copied', order: 15 },
+          { name: 'newly-completed-16', path: 'newly-completed-16', status: 'copied', order: 16 },
+          { name: 'newly-completed-17', path: 'newly-completed-17', status: 'copied', order: 17 },
+          { name: 'newly-completed-18', path: 'newly-completed-18', status: 'copied', order: 18 },
+          { name: 'newly-completed-19', path: 'newly-completed-19', status: 'copied', order: 19 },
+          { name: 'newly-completed-20', path: 'newly-completed-20', status: 'copied', order: 20 },
+          { name: 'belongs-page-3-21', path: 'belongs-page-3-21', status: 'copied', order: 21 },
+          { name: 'belongs-page-3-22', path: 'belongs-page-3-22', status: 'copied', order: 22 },
+          { name: 'belongs-page-3-23', path: 'belongs-page-3-23', status: 'copied', order: 23 },
         ],
         pending: [],
         degraded: false,
@@ -336,10 +348,130 @@ describe('useActiveTransferDetail', () => {
     })
     await Promise.resolve()
 
-    expect(api.activeTransferCompletedTotal.value).toBe(13)
+    expect(api.activeTransferCompletedTotal.value).toBe(23)
+    expect(api.activeTransferCompletedPage.value).toBe(2)
+    expect(api.activeTransferCompletedTotalPages.value).toBe(3)
+    expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual([
+      'page-2-a',
+      'page-2-b',
+      'newly-completed-13',
+      'newly-completed-14',
+      'newly-completed-15',
+      'newly-completed-16',
+      'newly-completed-17',
+      'newly-completed-18',
+      'newly-completed-19',
+      'newly-completed-20',
+    ])
+
+    unmount()
+  })
+
+  it('does not append websocket completed items that belong to pages after the currently browsed page', async () => {
+    const overview = {
+      runId: 71,
+      taskId: 10,
+      trackingMode: 'normal',
+      summary: {
+        trackingMode: 'normal',
+        completedCount: 20,
+        pendingCount: 0,
+        totalCount: 20,
+        percentage: 80,
+        bytes: 800,
+        totalBytes: 1000,
+        speed: 10,
+        eta: 20,
+      },
+      currentFile: null,
+      currentFiles: [],
+      degraded: false,
+    }
+    getActiveTransfer.mockResolvedValueOnce(overview).mockResolvedValueOnce(overview)
+    getActiveTransferCompleted
+      .mockResolvedValueOnce({
+        total: 20,
+        items: Array.from({ length: 10 }, (_, idx) => ({
+          name: `page-1-${idx + 1}`,
+          path: `page-1-${idx + 1}`,
+          status: 'copied',
+          order: idx + 1,
+        })),
+      })
+      .mockResolvedValueOnce({
+        total: 20,
+        items: Array.from({ length: 10 }, (_, idx) => ({
+          name: `page-2-${idx + 11}`,
+          path: `page-2-${idx + 11}`,
+          status: 'copied',
+          order: idx + 11,
+        })),
+      })
+    getActiveTransferPending
+      .mockResolvedValueOnce({ total: 0, items: [] })
+      .mockResolvedValueOnce({ total: 0, items: [] })
+
+    const { api, unmount } = await mountActiveTransferDetail()
+
+    api.openActiveTransfer(10)
+    await flushPromises()
+
+    api.nextActiveTransferCompletedPage()
+    await flushPromises()
+
     expect(api.activeTransferCompletedPage.value).toBe(2)
     expect(api.activeTransferCompletedTotalPages.value).toBe(2)
-    expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual(['page-2-a', 'page-2-b', 'newly-completed'])
+    expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual([
+      'page-2-11',
+      'page-2-12',
+      'page-2-13',
+      'page-2-14',
+      'page-2-15',
+      'page-2-16',
+      'page-2-17',
+      'page-2-18',
+      'page-2-19',
+      'page-2-20',
+    ])
+
+    listeners.get('active_transfer_snapshot')?.({
+      run_id: 71,
+      task_id: 10,
+      snapshot: {
+        runId: 71,
+        taskId: 10,
+        trackingMode: 'normal',
+        totalCount: 23,
+        completedCount: 23,
+        pendingCount: 0,
+        completed: [
+          { name: 'page-2-11', path: 'page-2-11', status: 'copied', order: 11 },
+          { name: 'page-2-12', path: 'page-2-12', status: 'copied', order: 12 },
+          { name: 'belongs-page-3-21', path: 'belongs-page-3-21', status: 'copied', order: 21 },
+          { name: 'belongs-page-3-22', path: 'belongs-page-3-22', status: 'copied', order: 22 },
+          { name: 'belongs-page-3-23', path: 'belongs-page-3-23', status: 'copied', order: 23 },
+        ],
+        pending: [],
+        degraded: false,
+      },
+    })
+    await Promise.resolve()
+
+    expect(api.activeTransferCompletedTotal.value).toBe(23)
+    expect(api.activeTransferCompletedTotalPages.value).toBe(3)
+    expect(api.activeTransferCompletedPage.value).toBe(2)
+    expect(api.activeTransferCompletedItems.value.map(item => item.name)).toEqual([
+      'page-2-11',
+      'page-2-12',
+      'page-2-13',
+      'page-2-14',
+      'page-2-15',
+      'page-2-16',
+      'page-2-17',
+      'page-2-18',
+      'page-2-19',
+      'page-2-20',
+    ])
 
     unmount()
   })

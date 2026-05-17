@@ -64,11 +64,13 @@ function isCompletedItemNewerThanPage(item: ActiveTransferCompletedFile, pageIte
 }
 
 function appendNewCompletedItemsForLastPage(current: ActiveTransferCompletedFile[], incoming: ActiveTransferCompletedFile[]) {
+  const remainingSlots = Math.max(0, PAGE_SIZE - current.length)
+  if (remainingSlots <= 0) return current
   const existingKeys = new Set(current.map(completedItemKey).filter(Boolean))
-  const additions = incoming.filter(item => {
+  const additions = sortCompletedItems(incoming.filter(item => {
     const key = completedItemKey(item)
     return key && !existingKeys.has(key) && isCompletedItemNewerThanPage(item, current)
-  })
+  })).slice(0, remainingSlots)
   return additions.length ? sortCompletedItems([...current, ...additions]) : current
 }
 
@@ -142,6 +144,7 @@ export function useActiveTransferDetail() {
 
     const completed = sortCompletedItems(snapshot.completed || [])
     const pending = sortPendingItems(snapshot.pending || [])
+    const wasBrowsingCompletedLastPage = completedPage.value > 1 && completedPage.value === completedTotalPages.value
     const nextCompletedTotal = Number(snapshot.completedCount || completed.length || 0)
     const nextPendingTotal = Number(snapshot.pendingCount || pending.length || 0)
     completedTotal.value = nextCompletedTotal
@@ -156,7 +159,7 @@ export function useActiveTransferDetail() {
     }
     if (completedPage.value <= 1) {
       completedItems.value = completed
-    } else if (completedPage.value === completedTotalPages.value) {
+    } else if (wasBrowsingCompletedLastPage) {
       completedItems.value = appendNewCompletedItemsForLastPage(completedItems.value, completed)
     }
     if (pendingPage.value <= 1) {
