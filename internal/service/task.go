@@ -399,6 +399,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
 			dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
 			s.activeMgr.InitState(run.ID, taskID, mode, nil)
+			if opts != nil && opts.Transfers > 0 {
+				s.activeMgr.SetTransferSlots(run.ID, opts.Transfers)
+			}
 			go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
 				candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
 				if err != nil {
@@ -444,6 +447,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
 		dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
 		s.activeMgr.InitState(run.ID, taskID, mode, nil)
+		if opts != nil && opts.Transfers > 0 {
+			s.activeMgr.SetTransferSlots(run.ID, opts.Transfers)
+		}
 		go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
 			candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
 			if err != nil {

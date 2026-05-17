@@ -301,6 +301,7 @@ export default {
     emptyList: 'No items',
     waitingCompleted: 'Waiting to complete',
     waitingFile: 'Waiting for file',
+    waitingTransfer: 'Waiting to transfer',
     loadMore: 'Load more',
     prevPage: 'Previous',
     nextPage: 'Next',

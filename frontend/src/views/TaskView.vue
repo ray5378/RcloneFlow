@@ -40,6 +40,7 @@ const {
   activeTransferSummary,
   activeTransferCurrentFile,
   activeTransferCurrentFiles,
+  activeTransferSlots,
   activeTransferCompletedItems,
   activeTransferPendingItems,
   activeTransferCompletedTotal,
@@ -600,6 +601,7 @@ function closeTaskEditorModal() {
     :summary="activeTransferSummary"
     :current-file="activeTransferCurrentFile"
     :current-files="activeTransferCurrentFiles"
+    :transfer-slots="activeTransferSlots"
     :completed-items="activeTransferCompletedItems"
     :pending-items="activeTransferPendingItems"
     :completed-total="activeTransferCompletedTotal"

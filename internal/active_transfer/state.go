@@ -128,6 +128,7 @@ func (m *Manager) InitState(runID, taskID int64, mode TrackingMode, candidates [
 		TotalCount:         len(candidates),
 		CompletedCount:     0,
 		PendingCount:       len(candidates),
+		TransferSlots:      1,
 		PreflightPending:   true,
 		PreflightFinished:  len(candidates) > 0,
 		NextOrder:          1,
@@ -427,6 +428,18 @@ func (m *Manager) MarkCompleted(runID int64, path string, status FileStatus, mes
 	m.persistSnapshotLockedImmediate(st)
 }
 
+func (m *Manager) SetTransferSlots(runID int64, slots int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	st, ok := m.byRunID[runID]
+	if !ok || st == nil {
+		return
+	}
+	st.TransferSlots = normalizedTransferSlots(slots)
+	st.UpdatedAt = time.Now()
+	m.persistSnapshotLockedImmediate(st)
+}
+
 func (m *Manager) BuildSummary(taskID int64, bytes, total, speed, eta int64, percentage float64) (ActiveTransferOverviewResponse, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -450,17 +463,20 @@ func (m *Manager) BuildSummary(taskID int64, bytes, total, speed, eta int64, per
 		}
 		return currentFiles[i].Path < currentFiles[j].Path
 	})
+	transferSlots := normalizedTransferSlots(st.TransferSlots)
 	return ActiveTransferOverviewResponse{
-		TaskID:       st.TaskID,
-		RunID:        st.RunID,
-		TrackingMode: st.TrackingMode,
-		CurrentFile:  cloneCurrent(st.CurrentFile),
+		TaskID:        st.TaskID,
+		RunID:         st.RunID,
+		TrackingMode:  st.TrackingMode,
+		TransferSlots: transferSlots,
+		CurrentFile:   cloneCurrent(st.CurrentFile),
 		CurrentFiles: currentFiles,
 		Summary: ActiveTransferSummary{
 			TrackingMode:      st.TrackingMode,
 			CompletedCount:    st.CompletedCount,
 			PendingCount:      st.PendingCount,
 			TotalCount:        st.TotalCount,
+			TransferSlots:     transferSlots,
 			PreflightPending:  st.PreflightPending,
 			PreflightFinished: st.PreflightFinished,
 			Bytes:             bytes,

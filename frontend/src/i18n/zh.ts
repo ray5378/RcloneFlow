@@ -301,6 +301,7 @@ export default {
     emptyList: '暂无条目',
     waitingCompleted: '等待完成',
     waitingFile: '等待文件',
+    waitingTransfer: '等待传输',
     loadMore: '加载更多',
     prevPage: '上一页',
     nextPage: '下一页',

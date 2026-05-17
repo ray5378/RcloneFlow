@@ -66,6 +66,7 @@ type ActiveTransferSummary struct {
 	CompletedCount    int          `json:"completedCount"`
 	PendingCount      int          `json:"pendingCount"`
 	TotalCount        int          `json:"totalCount"`
+	TransferSlots     int          `json:"transferSlots,omitempty"`
 	PreflightPending  bool         `json:"preflightPending,omitempty"`
 	PreflightFinished bool         `json:"preflightFinished,omitempty"`
 	Percentage        float64      `json:"percentage,omitempty"`
@@ -87,6 +88,7 @@ type ActiveTransferState struct {
 	TotalCount    int
 	CompletedCount int
 	PendingCount   int
+	TransferSlots  int
 	Degraded           bool
 	DegradeReason      string
 	PreflightPending   bool
@@ -102,6 +104,7 @@ type ActiveTransferOverviewResponse struct {
 	RunID         int64                  `json:"runId"`
 	TrackingMode  TrackingMode           `json:"trackingMode"`
 	Summary       ActiveTransferSummary  `json:"summary"`
+	TransferSlots int                    `json:"transferSlots,omitempty"`
 	CurrentFile   *TransferCurrentFile   `json:"currentFile,omitempty"`
 	CurrentFiles  []TransferCurrentFile  `json:"currentFiles,omitempty"`
 	Degraded      bool                   `json:"degraded,omitempty"`
@@ -120,6 +123,7 @@ type ActiveTransferSnapshot struct {
 	TotalCount      int                     `json:"totalCount"`
 	CompletedCount  int                     `json:"completedCount,omitempty"`
 	PendingCount    int                     `json:"pendingCount,omitempty"`
+	TransferSlots   int                     `json:"transferSlots,omitempty"`
 	CurrentFile     *TransferCurrentFile    `json:"currentFile,omitempty"`
 	CurrentFiles    []TransferCurrentFile   `json:"currentFiles,omitempty"`
 	Completed       []TransferCompletedFile `json:"completed,omitempty"`
@@ -197,6 +201,7 @@ func (s *ActiveTransferState) Snapshot() ActiveTransferSnapshot {
 		TotalCount:       s.TotalCount,
 		CompletedCount:   s.CompletedCount,
 		PendingCount:     s.PendingCount,
+		TransferSlots:    normalizedTransferSlots(s.TransferSlots),
 		CurrentFile:      cloneCurrent(s.CurrentFile),
 		CurrentFiles:     currentFiles,
 		Completed:        completed,
@@ -223,6 +228,7 @@ func RestoreStateFromSnapshot(snap ActiveTransferSnapshot) *ActiveTransferState 
 		TotalCount:    snap.TotalCount,
 		CompletedCount: snap.CompletedCount,
 		PendingCount:   snap.PendingCount,
+		TransferSlots:  normalizedTransferSlots(snap.TransferSlots),
 		Degraded:          snap.Degraded,
 		DegradeReason:     snap.DegradeReason,
 		PreflightPending:  snap.PreflightPending,
@@ -311,6 +317,13 @@ func RestoreStateFromSnapshot(snap ActiveTransferSnapshot) *ActiveTransferState 
 		st.UpdatedAt = time.Now()
 	}
 	return st
+}
+
+func normalizedTransferSlots(v int) int {
+	if v < 1 {
+		return 1
+	}
+	return v
 }
 
 func SnapshotEnvelope(snap ActiveTransferSnapshot) map[string]any {

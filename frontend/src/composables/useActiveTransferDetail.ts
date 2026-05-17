@@ -114,6 +114,7 @@ export function useActiveTransferDetail() {
   const summary = ref<ActiveTransferSummary | null>(null)
   const currentFile = ref<ActiveTransferCurrentFile | null>(null)
   const currentFiles = ref<ActiveTransferCurrentFile[]>([])
+  const transferSlots = ref(1)
   const completedItems = ref<ActiveTransferCompletedFile[]>([])
   const pendingItems = ref<ActiveTransferPendingFile[]>([])
   const completedTotal = ref(0)
@@ -140,6 +141,7 @@ export function useActiveTransferDetail() {
     trackingMode.value = snapshot.trackingMode
     currentFile.value = snapshot.currentFile || null
     currentFiles.value = sortCurrentFiles(snapshot.currentFiles || (snapshot.currentFile ? [snapshot.currentFile] : []))
+    transferSlots.value = Math.max(1, Number(snapshot.transferSlots || transferSlots.value || 1))
     degraded.value = !!snapshot.degraded
 
     const completed = sortCompletedItems(snapshot.completed || [])
@@ -184,6 +186,7 @@ export function useActiveTransferDetail() {
       bytes: Number(summary.value?.bytes || 0),
       totalBytes: Number(summary.value?.totalBytes || 0),
       speed: Number(summary.value?.speed || 0),
+      transferSlots: transferSlots.value,
       eta: Number(summary.value?.eta || 0),
       phase: summary.value?.phase,
       lastUpdatedAt: summary.value?.lastUpdatedAt,
@@ -205,6 +208,7 @@ export function useActiveTransferDetail() {
       summary.value = mergeNonDecreasingSummary(summary.value, overview.summary)
       currentFile.value = overview.currentFile || null
       currentFiles.value = sortCurrentFiles(overview.currentFiles || (overview.currentFile ? [overview.currentFile] : []))
+      transferSlots.value = Math.max(1, Number(overview.transferSlots || overview.summary?.transferSlots || transferSlots.value || 1))
       degraded.value = !!overview.degraded
       completedItems.value = sortCompletedItems(completed.items || [])
       pendingItems.value = sortPendingItems(pending.items || [])
@@ -224,6 +228,7 @@ export function useActiveTransferDetail() {
         summary.value = null
         currentFile.value = null
         currentFiles.value = []
+        transferSlots.value = 1
         completedItems.value = []
         pendingItems.value = []
         completedTotal.value = 0
@@ -256,6 +261,7 @@ export function useActiveTransferDetail() {
     summary.value = null
     currentFile.value = null
     currentFiles.value = []
+    transferSlots.value = 1
     completedItems.value = []
     pendingItems.value = []
     completedTotal.value = 0
@@ -367,6 +373,7 @@ export function useActiveTransferDetail() {
     activeTransferSummary: summary,
     activeTransferCurrentFile: currentFile,
     activeTransferCurrentFiles: currentFiles,
+    activeTransferSlots: transferSlots,
     activeTransferCompletedItems: visibleCompletedItems,
     activeTransferPendingItems: visiblePendingItems,
     activeTransferCompletedTotal: completedTotal,

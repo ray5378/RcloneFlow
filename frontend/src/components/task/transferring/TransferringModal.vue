@@ -12,6 +12,7 @@ const props = defineProps<{
   summary: ActiveTransferSummary | null
   currentFile: ActiveTransferCurrentFile | null | undefined
   currentFiles?: ActiveTransferCurrentFile[]
+  transferSlots?: number
   completedItems: ActiveTransferCompletedFile[]
   pendingItems: ActiveTransferPendingFile[]
   completedTotal?: number
@@ -59,7 +60,7 @@ const emit = defineEmits<{
         <div v-else-if="!summary && !currentFile && !(currentFiles && currentFiles.length) && !completedItems.length && !pendingItems.length" class="state-box">{{ t('activeTransfer.empty') }}</div>
         <template v-else>
           <TransferSummaryBar :summary="summary" />
-          <TransferCurrentFileCard :current-file="currentFile" :current-files="currentFiles" :tracking-mode="trackingMode" />
+          <TransferCurrentFileCard :current-file="currentFile" :current-files="currentFiles" :transfer-slots="transferSlots" :tracking-mode="trackingMode" />
           <div class="two-col">
             <TransferCompletedList
               :items="completedItems"

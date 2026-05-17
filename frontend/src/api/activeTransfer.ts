@@ -18,6 +18,7 @@ export interface ActiveTransferSummary {
   totalBytes: number
   speed: number
   eta?: number
+  transferSlots?: number
   phase?: string
   lastUpdatedAt?: string
 }
@@ -56,6 +57,7 @@ export interface ActiveTransferOverview {
   runId: number
   trackingMode: TrackingMode
   summary: ActiveTransferSummary
+  transferSlots?: number
   currentFile?: ActiveTransferCurrentFile | null
   currentFiles?: ActiveTransferCurrentFile[]
   degraded?: boolean
@@ -74,6 +76,7 @@ export interface ActiveTransferSnapshot {
   totalCount: number
   completedCount?: number
   pendingCount?: number
+  transferSlots?: number
   currentFile?: ActiveTransferCurrentFile | null
   currentFiles?: ActiveTransferCurrentFile[]
   completed?: ActiveTransferCompletedFile[]
