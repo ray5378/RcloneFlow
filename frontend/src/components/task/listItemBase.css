@@ -1,7 +1,7 @@
 :where(.task-card, .run-item) {
   position: relative;
   padding: 12px 16px;
-  margin-bottom: 110px;
+  margin-bottom: 14px;
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 12px;
   cursor: pointer;

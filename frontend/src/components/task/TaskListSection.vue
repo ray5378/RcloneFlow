@@ -242,7 +242,7 @@ function handleLastPage() {
 
     <div v-if="sorting" class="sort-hint">{{ t('taskUI.sortAutoSaveHint') }}</div>
 
-    <div class="list">
+    <div class="list task-list-cards">
       <TaskCard
         v-for="task in previewTasks"
         :key="task.id"
@@ -284,6 +284,14 @@ function handleLastPage() {
 </template>
 
 <style scoped>
+.task-list-cards {
+  gap: 110px;
+}
+
+.task-list-cards :deep(.task-card) {
+  margin-bottom: 0;
+}
+
 .sort-hint {
   margin: 0 0 12px;
   padding: 10px 12px;

@@ -9,6 +9,7 @@ describe('TaskCard', () => {
     const here = resolve(__dirname)
     const componentSource = readFileSync(resolve(here, './TaskCard.vue'), 'utf8')
     const baseStyles = readFileSync(resolve(here, './listItemBase.css'), 'utf8')
+    const listSectionSource = readFileSync(resolve(here, './TaskListSection.vue'), 'utf8')
     const globalStyles = readFileSync(resolve(here, '../../styles/global.css'), 'utf8')
 
     const taskPathsRules = [
@@ -29,7 +30,9 @@ describe('TaskCard', () => {
     for (const rule of hoverRules) {
       expect(rule).not.toMatch(/background\s*:/)
     }
-    expect(baseStyles).toContain('margin-bottom: 110px')
+    expect(listSectionSource).toContain('class="list task-list-cards"')
+    expect(listSectionSource).toContain('gap: 110px')
+    expect(listSectionSource).toContain('margin-bottom: 0')
     expect(baseStyles).toContain('border: 1px solid')
     expect(baseStyles).toContain('box-shadow')
     expect(baseStyles).toContain('transform: translateY(-2px)')
