@@ -269,7 +269,7 @@ function handleLastPage() {
     </div>
 
     <TaskListPagination
-      v-if="!sorting && tasksTotal > tasksPageSize"
+      v-if="!sorting"
       :page="tasksPage"
       :total-pages="currentTasksPages"
       :jump-page="tasksJumpPage"

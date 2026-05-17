@@ -31,6 +31,8 @@ describe('TaskCard', () => {
       expect(rule).not.toMatch(/background\s*:/)
     }
     expect(listSectionSource).toContain('class="list task-list-cards"')
+    expect(listSectionSource).toContain('v-if="!sorting"')
+    expect(listSectionSource).not.toContain('tasksTotal > tasksPageSize')
     expect(listSectionSource).toContain('gap: 8px')
     expect(listSectionSource).toContain('margin-top: 16px')
     expect(listSectionSource).toContain('padding: 0 16px')
