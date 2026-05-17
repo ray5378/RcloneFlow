@@ -285,7 +285,7 @@ function handleLastPage() {
 
 <style scoped>
 .task-list-cards {
-  gap: 15px;
+  gap: 8px;
 }
 
 .task-list-cards :deep(.task-card) {
