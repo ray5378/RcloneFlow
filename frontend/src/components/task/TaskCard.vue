@@ -120,9 +120,10 @@ function isStopped(): boolean {
 @import './listItemSpacing.css';
 
 .task-card { padding: 14px 18px; }
-.task-card:hover { background: transparent; border-left-color: rgba(99, 102, 241, 0.55); }
-body.light .task-card:hover { background: transparent; border-left-color: rgba(25, 118, 210, 0.38); }
-.task-card.active { border-left: 3px solid var(--accent, #4f46e5); }
+.task-card:hover { background: rgba(99, 102, 241, 0.10); }
+body.light .task-card:hover { background: rgba(25, 118, 210, 0.08); }
+.task-card.active { background: rgba(99, 102, 241, 0.08); }
+body.light .task-card.active { background: rgba(25, 118, 210, 0.06); }
 .task-main { display: flex; flex-wrap: wrap; align-items: center; }
 .name { gap: 8px; }
 .sort-editor { display: inline-flex; align-items: center; gap: 8px; margin-right: 10px; }
@@ -133,8 +134,7 @@ body.light .sort-input { background: #fff; color: #222; border-color: #ccc; }
 .schedule-badge { padding: 2px 6px; border-radius: 4px; font-size: 10px; }
 .schedule-badge.enabled { background: #22c55e33; color: #22c55e; }
 .schedule-badge.disabled { background: #666633; color: #999; }
-.task-paths { padding: 8px 12px; background: #1a1a1a; border-radius: 6px; }
-body.light .task-paths { background: #f5f5f5; }
+.task-paths { padding: 8px 0 0; }
 .path-row { font-size: 12px; }
 .path-label { min-width: 40px; }
 .path-value { color: #ccc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
