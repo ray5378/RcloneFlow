@@ -21,17 +21,24 @@ function onSearchInput(event: Event) {
     <div class="title">{{ t('taskUI.taskList') }}</div>
     <div class="header-actions">
       <input :value="search" type="text" :placeholder="t('taskUI.searchTask')" class="search-input" @input="onSearchInput" />
-      <button v-if="!sorting" class="ghost small" @click="emit('toggle-sort')">{{ t('taskUI.taskSort') }}</button>
+      <button v-if="!sorting" class="ghost small action-btn" @click="emit('toggle-sort')">{{ t('taskUI.taskSort') }}</button>
       <template v-else>
-        <button class="primary small" :disabled="savingSort" @click="emit('save-sort')">{{ t('taskUI.saveSort') }}</button>
-        <button class="ghost small" :disabled="savingSort" @click="emit('cancel-sort')">{{ t('taskUI.cancelSort') }}</button>
+        <button class="primary small action-btn" :disabled="savingSort" @click="emit('save-sort')">{{ t('taskUI.saveSort') }}</button>
+        <button class="ghost small action-btn" :disabled="savingSort" @click="emit('cancel-sort')">{{ t('taskUI.cancelSort') }}</button>
       </template>
-      <button class="primary small add-task-btn" @click="emit('add')">+ {{ t('taskUI.addTask') }}</button>
+      <button class="primary small action-btn add-task-btn" @click="emit('add')">{{ t('taskUI.addTask') }}</button>
     </div>
   </div>
 </template>
 
 <style scoped>
+.action-btn {
+  min-width: 88px;
+  height: 32px;
+  padding: 6px 12px;
+  white-space: nowrap;
+}
+
 .add-task-btn {
   white-space: nowrap;
 }
@@ -49,10 +56,10 @@ function onSearchInput(event: Event) {
     flex: 1 1 100%;
   }
 
-  .add-task-btn {
+  .action-btn {
     font-size: 12px;
     padding: 8px 10px;
-    min-width: 0;
+    min-width: 88px;
     flex-shrink: 1;
   }
 }
