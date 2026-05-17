@@ -268,18 +268,19 @@ function handleLastPage() {
       <div v-if="!previewTasks.length" class="empty">{{ t('taskUI.noTasks') }}</div>
     </div>
 
-    <TaskListPagination
-      v-if="!sorting"
-      :page="tasksPage"
-      :total-pages="currentTasksPages"
-      :jump-page="tasksJumpPage"
-      @first="handleFirstPage"
-      @prev="handlePrevPage"
-      @next="handleNextPage"
-      @last="handleLastPage"
-      @update:jump-page="emit('update:jump-page', $event)"
-      @jump="handleJumpPage"
-    />
+    <div v-if="!sorting" class="task-list-pagination-wrap">
+      <TaskListPagination
+        :page="tasksPage"
+        :total-pages="currentTasksPages"
+        :jump-page="tasksJumpPage"
+        @first="handleFirstPage"
+        @prev="handlePrevPage"
+        @next="handleNextPage"
+        @last="handleLastPage"
+        @update:jump-page="emit('update:jump-page', $event)"
+        @jump="handleJumpPage"
+      />
+    </div>
   </div>
 </template>
 
@@ -293,6 +294,10 @@ function handleLastPage() {
 
 .task-list-cards :deep(.task-card) {
   margin-bottom: 0;
+}
+
+.task-list-pagination-wrap {
+  margin-bottom: 16px;
 }
 
 .sort-hint {

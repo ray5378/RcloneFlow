@@ -37,6 +37,8 @@ describe('TaskCard', () => {
     expect(listSectionSource).toContain('margin-top: 16px')
     expect(listSectionSource).toContain('padding: 0 16px')
     expect(listSectionSource).toContain('box-sizing: border-box')
+    expect(listSectionSource).toContain('task-list-pagination-wrap')
+    expect(listSectionSource).toContain('margin-bottom: 16px')
     expect(listSectionSource).toContain('margin-bottom: 0')
     expect(baseStyles).toContain('border: 1px solid')
     expect(baseStyles).toContain('box-shadow')
