@@ -21,8 +21,12 @@ function sortCompletedItems(items: ActiveTransferCompletedFile[]) {
   return [...items].sort((a, b) => {
     const ao = Number(a.order || 0)
     const bo = Number(b.order || 0)
-    if (ao !== bo) return bo - ao
-    const atCmp = String(b.at || '').localeCompare(String(a.at || ''))
+    if (ao !== bo) {
+      if (!ao) return 1
+      if (!bo) return -1
+      return ao - bo
+    }
+    const atCmp = String(a.at || '').localeCompare(String(b.at || ''))
     if (atCmp !== 0) return atCmp
     return String(a.path || a.name || '').localeCompare(String(b.path || b.name || ''))
   })
