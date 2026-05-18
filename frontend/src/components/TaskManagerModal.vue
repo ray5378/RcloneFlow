@@ -93,8 +93,8 @@ async function confirmImport() {
   if (!pendingImportData) return
 
   try {
-    const existingTasks = await getTasks()
-    const existingNames = new Set(existingTasks.map(t => t.name.toLowerCase()))
+    const existingTasks = await getTasks() || []
+    const existingNames = new Set(existingTasks.map((t: any) => (t.name || '').toLowerCase()))
     const incomingNames = pendingImportData.tasks.map((t: any) => (t.name || '').toLowerCase()).filter(Boolean)
     const conflicts = incomingNames.filter((n: string) => existingNames.has(n))
 
