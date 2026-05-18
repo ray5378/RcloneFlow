@@ -672,7 +672,7 @@ func (s *TaskService) ImportTasks(data map[string]any, strategy string) (importe
 				continue
 			}
 
-			_ = s.db.AddSchedule(store.Schedule{
+			_, _ = s.db.AddSchedule(store.Schedule{
 				TaskID:  taskID,
 				Spec:    spec,
 				Enabled: enabled,
