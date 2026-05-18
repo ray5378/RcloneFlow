@@ -553,6 +553,12 @@ export default {
     invalidFile: 'Invalid import file',
     noTasksToImport: 'No tasks found in the import file',
     operationFailed: 'Operation failed',
+    importConfirmTitle: 'Confirm Import',
+    importConfirmTasks: '{count} tasks',
+    importConfirmSchedules: '{count} schedules',
+    importConfirmRemotes: '{count} rclone remotes',
+    importConfirmHint: 'Imported items will be appended to the existing list. Duplicate names can be skipped or overwritten.',
+    confirmImport: 'Confirm Import',
   },
   runtime: {
     deleteTaskConfirm: 'Delete this task? This action cannot be undone!',

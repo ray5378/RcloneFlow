@@ -553,6 +553,12 @@ export default {
     invalidFile: '无效的导入文件',
     noTasksToImport: '导入文件中没有任务',
     operationFailed: '操作失败',
+    importConfirmTitle: '确认导入',
+    importConfirmTasks: '{count} 个任务',
+    importConfirmSchedules: '{count} 个定时任务',
+    importConfirmRemotes: '{count} 个 rclone 远程配置',
+    importConfirmHint: '导入后将追加到现有列表，同名任务可选择跳过或覆盖',
+    confirmImport: '确认导入',
   },
   runtime: {
     deleteTaskConfirm: '确定删除此任务？此操作不可恢复！',

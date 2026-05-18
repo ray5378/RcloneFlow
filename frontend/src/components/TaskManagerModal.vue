@@ -11,10 +11,14 @@ const emit = defineEmits<{
   (e: 'refresh'): void
 }>()
 
+const showImportConfirm = ref(false)
 const showConflictModal = ref(false)
 const showClearTasksConfirm = ref(false)
 const showClearHistoryConfirm = ref(false)
 const conflictCount = ref(0)
+const pendingImportTaskCount = ref(0)
+const pendingImportScheduleCount = ref(0)
+const pendingImportRemoteCount = ref(0)
 const importResult = ref<{ imported: number; skipped: number; overwritten: number; remotesAdded?: number; remotesSkipped?: number } | null>(null)
 const importing = ref(false)
 const processing = ref(false)
@@ -68,19 +72,11 @@ function handleImportFile(event: Event) {
         return
       }
 
-      const existingTasks = await getTasks()
-      const existingNames = new Set(existingTasks.map(t => t.name.toLowerCase()))
-      const incomingNames = data.tasks.map((t: any) => (t.name || '').toLowerCase()).filter(Boolean)
-      const conflicts = incomingNames.filter((n: string) => existingNames.has(n))
-
-      if (conflicts.length > 0) {
-        conflictCount.value = conflicts.length
-        pendingImportData = data
-        showConflictModal.value = true
-      } else {
-        pendingImportData = data
-        await doImport('skip')
-      }
+      pendingImportData = data
+      pendingImportTaskCount.value = data.tasks.length
+      pendingImportScheduleCount.value = Array.isArray(data.schedules) ? data.schedules.length : 0
+      pendingImportRemoteCount.value = data.rcloneConfig ? Object.keys(data.rcloneConfig).length : 0
+      showImportConfirm.value = true
     } catch (err: any) {
       showErrorToast(t('taskManager.invalidFile') + ': ' + (err?.message || String(err)))
     }
@@ -90,6 +86,32 @@ function handleImportFile(event: Event) {
   }
   reader.readAsText(file)
   input.value = ''
+}
+
+async function confirmImport() {
+  showImportConfirm.value = false
+  if (!pendingImportData) return
+
+  try {
+    const existingTasks = await getTasks()
+    const existingNames = new Set(existingTasks.map(t => t.name.toLowerCase()))
+    const incomingNames = pendingImportData.tasks.map((t: any) => (t.name || '').toLowerCase()).filter(Boolean)
+    const conflicts = incomingNames.filter((n: string) => existingNames.has(n))
+
+    if (conflicts.length > 0) {
+      conflictCount.value = conflicts.length
+      showConflictModal.value = true
+    } else {
+      await doImport('skip')
+    }
+  } catch (err: any) {
+    showErrorToast(err?.message || t('taskManager.operationFailed'))
+  }
+}
+
+function cancelImport() {
+  showImportConfirm.value = false
+  pendingImportData = null
 }
 
 async function doImport(strategy: 'skip' | 'overwrite') {
@@ -219,6 +241,31 @@ async function handleClearHistory() {
     </div>
   </div>
 
+  <div v-if="showImportConfirm" class="modal-overlay" @click.self="cancelImport">
+    <div class="modal-content confirm-modal">
+      <div class="modal-header">
+        <h3>{{ t('taskManager.importConfirmTitle') }}</h3>
+        <button class="close-btn" @click="cancelImport">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="import-summary">
+          {{ t('taskManager.importConfirmTasks', { count: pendingImportTaskCount }) }}
+          <span v-if="pendingImportScheduleCount > 0">
+            {{ t('taskManager.importConfirmSchedules', { count: pendingImportScheduleCount }) }}
+          </span>
+          <span v-if="pendingImportRemoteCount > 0">
+            {{ t('taskManager.importConfirmRemotes', { count: pendingImportRemoteCount }) }}
+          </span>
+        </p>
+        <p class="import-hint">{{ t('taskManager.importConfirmHint') }}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" @click="cancelImport">{{ t('common.cancel') }}</button>
+        <button class="primary" @click="confirmImport">{{ t('taskManager.confirmImport') }}</button>
+      </div>
+    </div>
+  </div>
+
   <div v-if="showConflictModal" class="modal-overlay" @click.self="showConflictModal = false">
     <div class="modal-content confirm-modal">
       <div class="modal-header">
@@ -282,6 +329,9 @@ async function handleClearHistory() {
 .result-banner { margin-top: 12px; padding: 10px 14px; border-radius: 8px; background: rgba(100, 181, 246, 0.1); border: 1px solid rgba(100, 181, 246, 0.3); color: #64b5f6; font-size: 13px; text-align: center; }
 .confirm-modal { width: min(420px, 92vw); }
 .modal-body p { margin: 0; line-height: 1.6; color: #ccc; }
+.import-summary { font-size: 14px; font-weight: 600; color: #eee; }
+.import-summary span { display: block; margin-top: 4px; font-weight: 400; color: #aaa; }
+.import-hint { font-size: 12px; color: #888; margin-top: 10px !important; }
 .modal-footer .primary.danger { background: #ff5252; }
 .modal-footer .primary.danger:hover { background: #ff1744; }
 .modal-footer .primary:disabled, .modal-footer .ghost:disabled { opacity: 0.5; cursor: not-allowed; }
