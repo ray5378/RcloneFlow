@@ -1,0 +1,33 @@
+.list-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.list-item-actions.list-item-actions-right {
+  margin-left: auto;
+  justify-content: flex-end;
+}
+
+.list-item-actions :where(button.ghost.small) {
+  min-height: 28px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  line-height: 1.2;
+  transition: background-color 0.18s ease, border-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.list-item-actions button.ghost.small:hover {
+  background: #374151 !important;
+  border-color: rgba(148, 163, 184, 0.42) !important;
+  color: #fff !important;
+}
+
+
+:global(body.light) .list-item-actions button.ghost.small:hover {
+  background: #e5e7eb !important;
+  border-color: rgba(148, 163, 184, 0.55) !important;
+  color: #111827 !important;
+}
+

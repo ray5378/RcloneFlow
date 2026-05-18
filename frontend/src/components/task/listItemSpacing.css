@@ -1,0 +1,31 @@
+.list-item-primary-group {
+  gap: 12px;
+}
+
+.list-item-secondary-group {
+  margin-top: 8px;
+}
+
+.list-item-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.list-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.list-item-summary {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.list-item-actions-spaced {
+  margin-top: 8px;
+}

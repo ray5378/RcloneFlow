@@ -1,0 +1,24 @@
+services:
+  rcloneflow:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rcloneflow:local
+    platform: linux/amd64
+    container_name: rcloneflow
+    user: 1000:1000
+    environment:
+      - TZ=Asia/Shanghai
+      - APP_ADDR=:17870
+      - APP_DATA_DIR=/app/data
+      - RCLONE_CONFIG=/app/data/rclone.conf
+      - EMBED_RC=true
+      - RCLONE_RC_URL=http://127.0.0.1:5572
+      - RCLONE_RC_USER=rc
+      - RCLONE_RC_PASS=rcpass
+    volumes:
+      - ./app/data:/app/data
+    ports:
+      - 17870:17870
+    restart: always
+networks: {}

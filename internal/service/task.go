@@ -1,0 +1,700 @@
+package service
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"rcloneflow/internal/active_transfer"
+	"rcloneflow/internal/adapter"
+	runnercli "rcloneflow/internal/runnercli"
+	"rcloneflow/internal/settings"
+	"rcloneflow/internal/store"
+)
+
+// TaskService 任务服务层
+type TaskService struct {
+	db        *store.DB
+	runner    adapter.TaskRunner
+	activeMgr *active_transfer.Manager
+}
+
+// NewTaskService 创建任务服务
+func NewTaskService(db *store.DB, runner adapter.TaskRunner, activeMgr ...*active_transfer.Manager) *TaskService {
+	var mgr *active_transfer.Manager
+	if len(activeMgr) > 0 {
+		mgr = activeMgr[0]
+	}
+	return &TaskService{db: db, runner: runner, activeMgr: mgr}
+}
+
+// ListTasks 获取所有任务
+func (s *TaskService) ListTasks() ([]store.Task, error) {
+	return s.db.ListTasks()
+}
+
+// CreateTask 创建新任务
+func (s *TaskService) CreateTask(task store.Task) (store.Task, error) {
+	if err := s.ensureTaskNameUnique(task.Name, 0); err != nil {
+		return store.Task{}, err
+	}
+	return s.db.AddTask(task)
+}
+
+// UpdateTask 更新任务（容忍部分字段未提供；未提供的字段保持不变，避免误清空）
+func (s *TaskService) UpdateTask(id int64, task store.Task) error {
+	cur, ok := s.db.GetTask(id)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	merged := cur
+	if strings.TrimSpace(task.Name) != "" {
+		merged.Name = task.Name
+	}
+	if strings.TrimSpace(task.Mode) != "" {
+		merged.Mode = task.Mode
+	}
+	if strings.TrimSpace(task.SourceRemote) != "" {
+		merged.SourceRemote = task.SourceRemote
+	}
+	if strings.TrimSpace(task.SourcePath) != "" {
+		merged.SourcePath = task.SourcePath
+	}
+	if strings.TrimSpace(task.TargetRemote) != "" {
+		merged.TargetRemote = task.TargetRemote
+	}
+	if strings.TrimSpace(task.TargetPath) != "" {
+		merged.TargetPath = task.TargetPath
+	}
+	if len(task.Options) > 0 {
+		merged.Options = task.Options
+	}
+	if err := s.ensureTaskNameUnique(merged.Name, id); err != nil {
+		return err
+	}
+	return s.db.UpdateTask(id, merged)
+}
+
+func (s *TaskService) ensureTaskNameUnique(name string, excludeID int64) error {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return nil
+	}
+	tasks, err := s.db.ListTasks()
+	if err != nil {
+		return err
+	}
+	for _, task := range tasks {
+		if task.ID == excludeID {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(task.Name), trimmed) {
+			return ErrTaskNameExists
+		}
+	}
+	return nil
+}
+
+func (s *TaskService) UpdateTaskSortOrders(orders map[int64]int64, priorityTaskID int64) error {
+	tasks, err := s.db.ListTasks()
+	if err != nil {
+		return err
+	}
+
+	byID := make(map[int64]store.Task, len(tasks))
+	used := make(map[int64]int64, len(tasks))
+	for _, task := range tasks {
+		byID[task.ID] = task
+	}
+
+	if priorityTaskID != 0 {
+		if _, ok := byID[priorityTaskID]; !ok {
+			return ErrTaskNotFound
+		}
+	}
+
+	orderedIDs := make([]int64, 0, len(orders))
+	if priorityTaskID != 0 {
+		if _, ok := orders[priorityTaskID]; ok {
+			orderedIDs = append(orderedIDs, priorityTaskID)
+		}
+	}
+	for _, task := range tasks {
+		if task.ID == priorityTaskID {
+			continue
+		}
+		if _, ok := orders[task.ID]; ok {
+			orderedIDs = append(orderedIDs, task.ID)
+		}
+	}
+
+	for _, taskID := range orderedIDs {
+		requested := orders[taskID]
+		if _, ok := byID[taskID]; !ok {
+			return ErrTaskNotFound
+		}
+		current := requested
+		for {
+			if _, exists := used[current]; !exists {
+				used[current] = taskID
+				break
+			}
+			current++
+		}
+	}
+
+	for _, task := range tasks {
+		if _, ok := orders[task.ID]; ok {
+			continue
+		}
+		current := task.SortOrder
+		if current == 0 {
+			current = task.ID
+		}
+		for {
+			if _, exists := used[current]; !exists {
+				used[current] = task.ID
+				break
+			}
+			current++
+		}
+	}
+
+	finalIDs := make([]int64, 0, len(used))
+	for _, taskID := range used {
+		finalIDs = append(finalIDs, taskID)
+	}
+
+	updates := make(map[int64]int64, len(finalIDs))
+	type pair struct {
+		sortOrder int64
+		taskID    int64
+		}
+	pairs := make([]pair, 0, len(used))
+	for sortOrder, taskID := range used {
+		pairs = append(pairs, pair{sortOrder: sortOrder, taskID: taskID})
+	}
+	for i := 0; i < len(pairs); i++ {
+		for j := i + 1; j < len(pairs); j++ {
+			if pairs[j].sortOrder < pairs[i].sortOrder {
+				pairs[i], pairs[j] = pairs[j], pairs[i]
+			}
+		}
+	}
+	for index, item := range pairs {
+		updates[item.taskID] = int64(index + 1)
+	}
+
+	return s.db.UpdateTaskSortOrders(updates)
+}
+
+// UpdateTaskOptions 仅更新任务的 Options 字段（用于“传输选项”任务级覆盖）
+func (s *TaskService) UpdateTaskOptions(id int64, opts map[string]any) error {
+	// 读出任务，合并 Options 再回写（保留已有键，覆盖提交的键）
+	t, ok := s.db.GetTask(id)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	merged := map[string]any{}
+	if len(t.Options) > 0 {
+		var cur map[string]any
+		if json.Unmarshal(t.Options, &cur) == nil && cur != nil {
+			for k, v := range cur {
+				merged[k] = v
+			}
+		}
+	}
+	for k, v := range opts {
+		merged[k] = v
+	}
+	b, err := json.Marshal(merged)
+	if err != nil {
+		return err
+	}
+	t.Options = b
+	return s.db.UpdateTask(id, t)
+}
+
+// DeleteTask 删除任务，并连带清理关联历史/日志/调度
+func (s *TaskService) DeleteTask(id int64) error {
+	task, ok := s.db.GetTask(id)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	runs, err := s.db.ListRunsByTask(id)
+	if err != nil {
+		return err
+	}
+
+	logDirs := make(map[string]struct{})
+	for _, run := range runs {
+		if run.Summary == nil {
+			continue
+		}
+		if p, ok := run.Summary["stderrFile"].(string); ok && p != "" {
+			_ = os.Remove(p)
+			logDirs[filepath.Dir(p)] = struct{}{}
+		}
+	}
+	for dir := range logDirs {
+		if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
+			_ = os.Remove(dir)
+		}
+	}
+
+	logsBase := os.Getenv("APP_DATA_DIR")
+	if logsBase == "" {
+		logsBase = "./data"
+	}
+	logsDir := filepath.Join(logsBase, "logs")
+	trimmedName := strings.TrimSpace(task.Name)
+	if trimmedName != "" {
+		pattern := filepath.Join(logsDir, trimmedName+"-*")
+		if matches, err := filepath.Glob(pattern); err == nil {
+			for _, dir := range matches {
+				_ = os.RemoveAll(dir)
+			}
+		}
+	}
+
+	return s.db.DeleteTask(id)
+}
+
+type TaskRunResult struct {
+	Started bool   `json:"started"`
+	Reason  string `json:"reason,omitempty"`
+	Message string `json:"message,omitempty"`
+	TaskID  int64  `json:"taskId,omitempty"`
+}
+
+// RunTask 运行指定任务
+func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string) (TaskRunResult, error) {
+	t, ok := s.db.GetTask(taskID)
+	if !ok {
+		return TaskRunResult{}, ErrTaskNotFound
+	}
+
+	// 解析任务选项
+	var opts *adapter.TaskOptions
+	if len(t.Options) > 0 {
+		if taskOpts, err := adapter.ParseTaskOptionsCompat(t.Options); err == nil {
+			opts = taskOpts
+		}
+	}
+
+	// 所有任务默认使用流式/大文件友好的传输配置，用户显式选项覆盖默认值
+	opts = adapter.MergeTaskOptions(opts)
+
+	effectiveOptions := map[string]any{}
+	if bs, err := json.Marshal(opts); err == nil {
+		_ = json.Unmarshal(bs, &effectiveOptions)
+	}
+	// 合并原始任务 Options（显式配置覆盖默认/推导值，比如 transfers=2 应覆盖默认1）
+	if len(t.Options) > 0 {
+		var raw map[string]any
+		if err := json.Unmarshal(t.Options, &raw); err == nil && raw != nil {
+			for k, v := range raw {
+				// 总是用任务显式值覆盖（包括 transfers/checkers/bufferSize 等）
+				effectiveOptions[k] = v
+			}
+		}
+	}
+
+	streamingEnabled := true
+	if v, ok := effectiveOptions["enableStreaming"].(bool); ok {
+		streamingEnabled = v
+	}
+
+	// 同一任务并发保护：只要该 task 已有 running，就静默跳过后续触发。
+	// 这比全局 singletonMode 更基础，适用于 manual / schedule / webhook 全部入口。
+	// 这里不再新增 skipped 历史，避免定时重复命中时污染历史与日志。
+	if activeRun, err := s.db.GetActiveRunByTaskID(taskID); err == nil && activeRun.ID > 0 {
+		return TaskRunResult{
+			Started: false,
+			Reason:  "already_running",
+			Message: "任务已在运行中，跳过本次执行",
+			TaskID:  taskID,
+		}, nil
+	}
+
+	// 单例模式检查：如果开启了单例模式，使用原子操作确保只有一个任务运行
+	singletonMode, isSingleton := effectiveOptions["singletonMode"].(bool)
+
+	// 构建运行记录
+	newRun := store.Run{
+		TaskID:  taskID,
+		Status:  "running",
+		Trigger: trigger,
+		Summary: map[string]any{
+			"streamingEnabled": streamingEnabled,
+			"effectiveOptions": effectiveOptions,
+		},
+		TaskName:     t.Name,
+		TaskMode:     t.Mode,
+		SourceRemote: t.SourceRemote,
+		SourcePath:   t.SourcePath,
+		TargetRemote: t.TargetRemote,
+		TargetPath:   t.TargetPath,
+	}
+
+	// 单例模式：使用原子操作 TryAcquireRun
+	if isSingleton && singletonMode {
+		run, existed, err := s.db.TryAcquireRun(&newRun)
+		if err != nil {
+			return TaskRunResult{}, fmt.Errorf("单例模式：申请运行记录失败，%w", err)
+		}
+		if existed {
+			// 记录跳过到历史，但对外按“正常跳过”处理，不当作错误返回。
+			_, _ = s.db.AddRun(store.Run{
+				TaskID:  taskID,
+				Status:  "skipped",
+				Trigger: trigger,
+				Summary: map[string]any{
+					"finalSummary": map[string]any{
+						"message": "单例模式：有其他任务正在运行，跳过本次执行",
+					},
+				},
+				TaskName:     t.Name,
+				TaskMode:     t.Mode,
+				SourceRemote: t.SourceRemote,
+				SourcePath:   t.SourcePath,
+				TargetRemote: t.TargetRemote,
+				TargetPath:   t.TargetPath,
+			})
+			return TaskRunResult{
+				Started: false,
+				Reason:  "singleton_blocked",
+				Message: "单例模式：有其他任务正在运行，跳过本次执行",
+				TaskID:  taskID,
+			}, nil
+		}
+		// 成功创建记录，run 已填充
+		// 成功创建记录，run 已填充
+		// 合并全局传输设置
+		if ts, err := settings.Load(); err == nil {
+			_ = s.db.UpdateRun(run.ID, func(rr *store.Run) {
+				if rr.Summary == nil {
+					rr.Summary = map[string]any{}
+				}
+				rr.Summary["transferDefaults"] = ts
+			})
+		}
+		// 异步启动任务：先立即初始化空状态并启动传输，候选文件后台补齐
+		if s.activeMgr != nil {
+			mode := active_transfer.TrackingModeNormal
+			if opts != nil && opts.OpenlistCasCompatible {
+				mode = active_transfer.TrackingModeCAS
+			}
+			cfg := os.Getenv("RCLONE_CONFIG")
+			if cfg == "" {
+				dataDir := os.Getenv("APP_DATA_DIR")
+				if dataDir == "" {
+					dataDir = "./data"
+				}
+				cfg = filepath.Join(dataDir, "rclone.conf")
+			}
+			src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
+			dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
+			s.activeMgr.InitState(run.ID, taskID, mode, nil)
+			if opts != nil && opts.Transfers > 0 {
+				s.activeMgr.SetTransferSlots(run.ID, opts.Transfers)
+			}
+			go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
+				candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
+				if err != nil {
+					s.activeMgr.SetPreflightResult(runID, err)
+					return
+				}
+				s.activeMgr.MergeCandidates(runID, candidates)
+			}(run.ID, taskID, mode, cfg, src, dst, opts)
+		}
+		go func() {
+			_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+		}()
+		return TaskRunResult{Started: true, TaskID: taskID}, nil
+	}
+
+	// 非单例模式：直接创建运行记录
+	run, err := s.db.AddRun(newRun)
+	if err != nil {
+		return TaskRunResult{}, err
+	}
+	// 合并全局传输设置
+	if ts, err := settings.Load(); err == nil {
+		_ = s.db.UpdateRun(run.ID, func(rr *store.Run) {
+			if rr.Summary == nil {
+				rr.Summary = map[string]any{}
+			}
+			rr.Summary["transferDefaults"] = ts
+		})
+	}
+	if s.activeMgr != nil {
+		mode := active_transfer.TrackingModeNormal
+		if opts != nil && opts.OpenlistCasCompatible {
+			mode = active_transfer.TrackingModeCAS
+		}
+		cfg := os.Getenv("RCLONE_CONFIG")
+		if cfg == "" {
+			dataDir := os.Getenv("APP_DATA_DIR")
+			if dataDir == "" {
+				dataDir = "./data"
+			}
+			cfg = filepath.Join(dataDir, "rclone.conf")
+		}
+		src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
+		dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
+		s.activeMgr.InitState(run.ID, taskID, mode, nil)
+		if opts != nil && opts.Transfers > 0 {
+			s.activeMgr.SetTransferSlots(run.ID, opts.Transfers)
+		}
+		go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
+			candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
+			if err != nil {
+				s.activeMgr.SetPreflightResult(runID, err)
+				return
+			}
+			s.activeMgr.MergeCandidates(runID, candidates)
+		}(run.ID, taskID, mode, cfg, src, dst, opts)
+	}
+	go func() {
+		_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+	}()
+	return TaskRunResult{Started: true, TaskID: taskID}, nil
+}
+
+// GetTask 获取单个任务
+func (s *TaskService) GetTask(id int64) (store.Task, bool) {
+	return s.db.GetTask(id)
+}
+
+// ExportTasks 导出所有任务和定时任务
+func (s *TaskService) ExportTasks() (map[string]any, error) {
+	tasks, err := s.db.ListTasks()
+	if err != nil {
+		return nil, err
+	}
+	schedules, err := s.db.ListSchedules()
+	if err != nil {
+		return nil, err
+	}
+
+	exportTasks := make([]map[string]any, 0, len(tasks))
+	for _, t := range tasks {
+		taskMap := map[string]any{
+			"name":         t.Name,
+			"mode":         t.Mode,
+			"sourceRemote": t.SourceRemote,
+			"sourcePath":   t.SourcePath,
+			"targetRemote": t.TargetRemote,
+			"targetPath":   t.TargetPath,
+			"sortOrder":    t.SortOrder,
+		}
+		if len(t.Options) > 0 {
+			var opts map[string]any
+			if json.Unmarshal(t.Options, &opts) == nil {
+				taskMap["options"] = opts
+			}
+		}
+		exportTasks = append(exportTasks, taskMap)
+	}
+
+	taskNameByID := make(map[int64]string)
+	for _, t := range tasks {
+		taskNameByID[t.ID] = t.Name
+	}
+
+	exportSchedules := make([]map[string]any, 0, len(schedules))
+	for _, sc := range schedules {
+		taskName, ok := taskNameByID[sc.TaskID]
+		if !ok {
+			continue
+		}
+		exportSchedules = append(exportSchedules, map[string]any{
+			"taskName": taskName,
+			"spec":     sc.Spec,
+			"enabled":  sc.Enabled,
+		})
+	}
+
+	return map[string]any{
+		"version":    1,
+		"exportedAt": time.Now().Format(time.RFC3339),
+		"tasks":      exportTasks,
+		"schedules":  exportSchedules,
+	}, nil
+}
+
+// ImportTasks 导入任务和定时任务
+func (s *TaskService) ImportTasks(data map[string]any, strategy string) (imported, skipped, overwritten int, err error) {
+	tasksData, ok := data["tasks"].([]any)
+	if !ok {
+		return 0, 0, 0, fmt.Errorf("无效的任务数据")
+	}
+	schedulesData, _ := data["schedules"].([]any)
+
+	existingTasks, err := s.db.ListTasks()
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	existingNames := make(map[string]int64)
+	for _, t := range existingTasks {
+		existingNames[strings.ToLower(strings.TrimSpace(t.Name))] = t.ID
+	}
+
+	type importedTask struct {
+		name string
+		id   int64
+	}
+	importedTasks := make([]importedTask, 0)
+
+	for _, td := range tasksData {
+		taskMap, ok := td.(map[string]any)
+		if !ok {
+			skipped++
+			continue
+		}
+
+		name, _ := taskMap["name"].(string)
+		if name == "" {
+			skipped++
+			continue
+		}
+
+		mode, _ := taskMap["mode"].(string)
+		sourceRemote, _ := taskMap["sourceRemote"].(string)
+		sourcePath, _ := taskMap["sourcePath"].(string)
+		targetRemote, _ := taskMap["targetRemote"].(string)
+		targetPath, _ := taskMap["targetPath"].(string)
+
+		if mode == "" || sourceRemote == "" || targetRemote == "" {
+			skipped++
+			continue
+		}
+
+		newTask := store.Task{
+			Name:         name,
+			Mode:         mode,
+			SourceRemote: sourceRemote,
+			SourcePath:   sourcePath,
+			TargetRemote: targetRemote,
+			TargetPath:   targetPath,
+		}
+
+		if opts, ok := taskMap["options"]; ok {
+			optsBytes, err := json.Marshal(opts)
+			if err == nil {
+				newTask.Options = optsBytes
+			}
+		}
+
+		lowerName := strings.ToLower(strings.TrimSpace(name))
+		if existingID, exists := existingNames[lowerName]; exists {
+			if strategy == "overwrite" {
+				cur, ok := s.db.GetTask(existingID)
+				if !ok {
+					skipped++
+					continue
+				}
+				if newTask.SourcePath == "" {
+					newTask.SourcePath = cur.SourcePath
+				}
+				if newTask.TargetPath == "" {
+					newTask.TargetPath = cur.TargetPath
+				}
+				if len(newTask.Options) == 0 {
+					newTask.Options = cur.Options
+				}
+				if err := s.db.UpdateTask(existingID, newTask); err != nil {
+					skipped++
+					continue
+				}
+				overwritten++
+				importedTasks = append(importedTasks, importedTask{name: name, id: existingID})
+			} else {
+				skipped++
+			}
+		} else {
+			created, err := s.db.AddTask(newTask)
+			if err != nil {
+				skipped++
+				continue
+			}
+			imported++
+			importedTasks = append(importedTasks, importedTask{name: name, id: created.ID})
+			existingNames[lowerName] = created.ID
+		}
+	}
+
+	if len(schedulesData) > 0 {
+		taskIDByName := make(map[string]int64)
+		for _, t := range importedTasks {
+			taskIDByName[t.name] = t.id
+		}
+		for _, t := range existingTasks {
+			if _, exists := taskIDByName[t.Name]; !exists {
+				taskIDByName[t.Name] = t.ID
+			}
+		}
+
+		allSchedules, err := s.db.ListSchedules()
+		if err != nil {
+			return imported, skipped, overwritten, err
+		}
+		existingSchedKeys := make(map[string]bool)
+		for _, sc := range allSchedules {
+			existingSchedKeys[fmt.Sprintf("%d:%s", sc.TaskID, sc.Spec)] = true
+		}
+
+		for _, sd := range schedulesData {
+			schedMap, ok := sd.(map[string]any)
+			if !ok {
+				continue
+			}
+			taskName, _ := schedMap["taskName"].(string)
+			spec, _ := schedMap["spec"].(string)
+			enabled, _ := schedMap["enabled"].(bool)
+
+			if taskName == "" || spec == "" {
+				continue
+			}
+
+			taskID, exists := taskIDByName[taskName]
+			if !exists {
+				continue
+			}
+
+			scheduleKey := fmt.Sprintf("%d:%s", taskID, spec)
+			if existingSchedKeys[scheduleKey] {
+				continue
+			}
+
+			_ = s.db.AddSchedule(store.Schedule{
+				TaskID:  taskID,
+				Spec:    spec,
+				Enabled: enabled,
+			})
+		}
+	}
+
+	return imported, skipped, overwritten, nil
+}
+
+// ClearAllTasks 清空所有任务及其关联数据
+func (s *TaskService) ClearAllTasks() error {
+	tasks, err := s.db.ListTasks()
+	if err != nil {
+		return err
+	}
+
+	for _, t := range tasks {
+		if err := s.DeleteTask(t.ID); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}

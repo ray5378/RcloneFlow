@@ -1,0 +1,146 @@
+import { t } from '../../i18n'
+
+export type ScheduleField = 'month' | 'week' | 'day' | 'hour' | 'minute'
+
+export interface ScheduleFormLike {
+  enableSchedule: boolean
+  scheduleMinute: string
+  scheduleHour: string
+  scheduleDay: string
+  scheduleMonth: string
+  scheduleWeek: string
+}
+
+export interface ScheduleTempState {
+  minute: string[]
+  hour: string[]
+  day: string[]
+  month: string[]
+  week: string[]
+}
+
+export function createScheduleForm(input?: Partial<ScheduleFormLike> | null): ScheduleFormLike {
+  return {
+    enableSchedule: !!input?.enableSchedule,
+    scheduleMinute: input?.scheduleMinute || '00',
+    scheduleHour: input?.scheduleHour || '00',
+    scheduleDay: input?.scheduleDay || '*',
+    scheduleMonth: input?.scheduleMonth || '*',
+    scheduleWeek: input?.scheduleWeek || '*',
+  }
+}
+
+export const scheduleFieldOptions: Record<ScheduleField, string[]> = {
+  month: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'],
+  week: ['0', '1', '2', '3', '4', '5', '6'],
+  day: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31'],
+  hour: Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0')),
+  minute: Array.from({ length: 60 }, (_, i) => String(i).padStart(2, '0')),
+}
+
+export function getWeekLabels() {
+  return [
+    t('runtime.sunday'),
+    t('runtime.monday'),
+    t('runtime.tuesday'),
+    t('runtime.wednesday'),
+    t('runtime.thursday'),
+    t('runtime.friday'),
+    t('runtime.saturday'),
+  ]
+}
+
+export const weekLabels = getWeekLabels()
+
+export function createEmptyScheduleTempState(): ScheduleTempState {
+  return {
+    minute: [],
+    hour: [],
+    day: [],
+    month: [],
+    week: [],
+  }
+}
+
+export function parseScheduleFormToTemp(form?: Partial<ScheduleFormLike> | null): ScheduleTempState {
+  return {
+    minute: parseScheduleField(form?.scheduleMinute),
+    hour: parseScheduleField(form?.scheduleHour),
+    day: parseScheduleField(form?.scheduleDay),
+    month: parseScheduleField(form?.scheduleMonth),
+    week: parseScheduleField(form?.scheduleWeek),
+  }
+}
+
+export function buildScheduleFormFieldsFromTemp(temp: ScheduleTempState): Omit<ScheduleFormLike, 'enableSchedule'> {
+  return {
+    scheduleMinute: formatScheduleField('minute', temp.minute),
+    scheduleHour: formatScheduleField('hour', temp.hour),
+    scheduleDay: formatScheduleField('day', temp.day),
+    scheduleMonth: formatScheduleField('month', temp.month),
+    scheduleWeek: formatScheduleField('week', temp.week),
+  }
+}
+
+export function toggleScheduleTempField(temp: ScheduleTempState, field: ScheduleField, value: string): ScheduleTempState {
+  const current = temp[field]
+  const nextField = current.includes(value)
+    ? current.filter(item => item !== value)
+    : [...current, value]
+
+  return {
+    ...temp,
+    [field]: nextField,
+  }
+}
+
+export function toggleAllScheduleTempField(temp: ScheduleTempState, field: ScheduleField): ScheduleTempState {
+  const all = scheduleFieldOptions[field]
+  const current = temp[field]
+
+  return {
+    ...temp,
+    [field]: current.length === all.length ? [] : [...all],
+  }
+}
+
+export function buildScheduleSpec(form?: Partial<ScheduleFormLike> | null): string {
+  const draft = createScheduleForm(form)
+  return [draft.scheduleMinute || '00', draft.scheduleHour || '*', draft.scheduleDay || '*', draft.scheduleMonth || '*', draft.scheduleWeek || '*'].join('|')
+}
+
+export function parseScheduleSpec(spec?: string | null, enabled = true): ScheduleFormLike {
+  const parts = String(spec || '').split('|')
+  return createScheduleForm({
+    enableSchedule: enabled,
+    scheduleMinute: parts[0] || '00',
+    scheduleHour: parts[1] || '00',
+    scheduleDay: parts[2] || '*',
+    scheduleMonth: parts[3] || '*',
+    scheduleWeek: parts[4] || '*',
+  })
+}
+
+export function formatScheduleSpec(spec?: string | null): string {
+  if (!spec) return '-'
+  const parts = spec.split('|')
+  if (parts.length !== 5) return spec
+  const [min, hour, day, month, week] = parts
+  const weekMap = getWeekLabels()
+  const weekDay = week !== '*' ? (weekMap[Number.parseInt(week, 10) % 7] || week) : ''
+  const monthStr = month !== '*' ? `${month}${t('schedule.monthSuffix')}` : ''
+  const dayStr = day !== '*' ? `${day}` : ''
+  return `${hour}:${min} ${weekDay} ${monthStr}${dayStr}`.trim() || spec
+}
+
+function parseScheduleField(value?: string): string[] {
+  if (!value || value === '*') return []
+  return value.split(',').map(v => v.trim()).filter(Boolean)
+}
+
+function formatScheduleField(field: ScheduleField, values: string[]): string {
+  if (!values.length) return '*'
+  const all = scheduleFieldOptions[field]
+  if (values.length === all.length) return '*'
+  return [...values].sort().join(',')
+}

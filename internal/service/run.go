@@ -1,0 +1,222 @@
+package service
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"time"
+)
+
+// RunRecord 运行记录结构。
+// Summary 当前同时承载两类信息：
+// - summary.progress：历史 run 的运行中快照
+// - summary.finalSummary：历史详情 / 最终总结
+// 但 active runs 主链只允许消费 summary.progress，不得把 finalSummary 回流成运行中字段。
+type RunRecord struct {
+	ID               int64  `json:"id"`
+	TaskID           int64  `json:"taskId"`
+	Status           string `json:"status"`
+	Trigger          string `json:"trigger"`
+	StartedAt        string `json:"startedAt"`
+	FinishedAt       string `json:"finishedAt,omitempty"`
+	TaskName         string `json:"taskName,omitempty"`
+	TaskMode         string `json:"taskMode,omitempty"`
+	SourceRemote     string `json:"sourceRemote,omitempty"`
+	SourcePath       string `json:"sourcePath,omitempty"`
+	TargetRemote     string `json:"targetRemote,omitempty"`
+	TargetPath       string `json:"targetPath,omitempty"`
+	BytesTransferred int64  `json:"bytesTransferred,omitempty"`
+	Speed            string `json:"speed,omitempty"`
+	Error            string `json:"error,omitempty"`
+	Summary          string `json:"summary,omitempty"`
+}
+
+// RunServiceInterface 运行记录服务接口
+type RunServiceInterface interface {
+	ListRuns(page, pageSize int) ([]RunRecord, int, error)
+	ListRunsByTask(taskId int64) ([]RunRecord, error)
+	ListActiveRuns() ([]RunRecord, error)
+	GetActiveRunByTaskID(taskID int64) (RunRecord, error)
+	GetRun(id int64) (RunRecord, error)
+	UpdateRun(id int64, updateFn func(*RunRecord))
+	DeleteRun(id int64) error
+	DeleteAllRuns() error
+	DeleteRunsByTask(taskId int64) error
+	CleanOldRuns(days int) (int64, error)
+}
+
+// RunService 运行记录服务层
+type RunService struct {
+	db RunServiceInterface
+}
+
+// NewRunService 创建运行记录服务
+func NewRunService(db RunServiceInterface) *RunService {
+	return &RunService{db: db}
+}
+
+// ListRuns 获取所有运行记录（分页）
+func (s *RunService) ListRuns(page, pageSize int) ([]RunRecord, int, error) {
+	return s.db.ListRuns(page, pageSize)
+}
+
+func (s *RunService) ListRunsByTask(taskId int64) ([]RunRecord, error) {
+	return s.db.ListRunsByTask(taskId)
+}
+
+// ListActiveRuns 获取所有运行中的任务
+func (s *RunService) ListActiveRuns() ([]RunRecord, error) {
+	return s.db.ListActiveRuns()
+}
+
+// GetActiveRunByTaskID 获取任务当前运行中的记录
+func (s *RunService) GetActiveRunByTaskID(taskID int64) (RunRecord, error) {
+	return s.db.GetActiveRunByTaskID(taskID)
+}
+
+// UpdateRunStatus 更新运行状态
+func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
+	s.db.UpdateRun(id, func(r *RunRecord) {
+		// 读取旧 summary
+		var old map[string]any
+		if r.Summary != "" {
+			_ = json.Unmarshal([]byte(r.Summary), &old)
+		}
+		if old == nil {
+			old = map[string]any{}
+		}
+		// 合并：src 覆盖 dst 的同名键；map 递归
+		merged := deepMerge(old, summary)
+		if bs, err := json.Marshal(merged); err == nil {
+			r.Summary = string(bs)
+		}
+		finished, _ := merged["finished"].(bool)
+		success, _ := merged["success"].(bool)
+		if finished {
+			if success {
+				r.Status = "finished"
+				r.Error = ""
+			} else {
+				r.Status = "failed"
+				if errMsg, ok := merged["error"].(string); ok {
+					r.Error = errMsg
+				}
+			}
+		}
+	})
+}
+
+// deepMerge merges b into a (map[string]any); for nested maps it recurses.
+func deepMerge(a, b map[string]any) map[string]any {
+	if a == nil {
+		a = map[string]any{}
+	}
+	for k, v := range b {
+		if vm, ok := v.(map[string]any); ok {
+			if am, ok2 := a[k].(map[string]any); ok2 {
+				a[k] = deepMerge(am, vm)
+			} else {
+				a[k] = deepMerge(map[string]any{}, vm)
+			}
+		} else {
+			a[k] = v
+		}
+	}
+	return a
+}
+
+func (s *RunService) DeleteRun(id int64) error {
+	run, err := s.db.GetRun(id)
+	if err != nil {
+		return err
+	}
+	cleanupRunLog(run)
+	return s.db.DeleteRun(id)
+}
+
+func (s *RunService) DeleteAllRuns() error {
+	page := 1
+	pageSize := 500
+	for {
+		runs, total, err := s.db.ListRuns(page, pageSize)
+		if err != nil {
+			return err
+		}
+		for _, run := range runs {
+			cleanupRunLog(run)
+		}
+		if len(runs) == 0 || page*pageSize >= total {
+			break
+		}
+		page++
+	}
+	return s.db.DeleteAllRuns()
+}
+
+func (s *RunService) DeleteRunsByTask(taskId int64) error {
+	runs, err := s.db.ListRunsByTask(taskId)
+	if err != nil {
+		return err
+	}
+	for _, run := range runs {
+		cleanupRunLog(run)
+	}
+	return s.db.DeleteRunsByTask(taskId)
+}
+
+func cleanupRunLog(run RunRecord) {
+	if run.Summary == "" {
+		return
+	}
+	var summary map[string]any
+	if err := json.Unmarshal([]byte(run.Summary), &summary); err != nil || summary == nil {
+		return
+	}
+	p, _ := summary["stderrFile"].(string)
+	if p == "" {
+		return
+	}
+	_ = os.Remove(p)
+	dir := filepath.Dir(p)
+	if entries, err := os.ReadDir(dir); err == nil && len(entries) == 0 {
+		_ = os.Remove(dir)
+	}
+}
+
+// CleanOldRuns 删除指定天数之前的运行记录，返回删除的记录数
+func (s *RunService) CleanOldRuns(days int) (int64, error) {
+	if days <= 0 {
+		return 0, nil
+	}
+	cutoff := time.Now().AddDate(0, 0, -days)
+	page := 1
+	pageSize := 500
+	deleted := int64(0)
+	for {
+		runs, total, err := s.db.ListRuns(page, pageSize)
+		if err != nil {
+			return deleted, err
+		}
+		if len(runs) == 0 {
+			break
+		}
+		for _, run := range runs {
+			startedAt, err := time.Parse(time.RFC3339, run.StartedAt)
+			if err != nil {
+				continue
+			}
+			if startedAt.Before(cutoff) {
+				if err := s.DeleteRun(run.ID); err != nil {
+					return deleted, err
+				}
+				deleted++
+			}
+		}
+		if page*pageSize >= total {
+			break
+		}
+		page++
+	}
+	return deleted, nil
+}
+
