@@ -688,8 +688,67 @@ func TestHandleRunFiles_NonCASHistoryKeepsObjectNotFoundFailures(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal response: %v", err)
 	}
-	if got := int(resp["total"].(float64)); got != 2 {
-		t.Fatalf("total=%d, want 2", got)
+	if got := int(resp["total"].(float64)); got != 1 {
+		t.Fatalf("total=%d, want 1 (nil path should be filtered)", got)
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("len(items)=%d, want 1", len(items))
+	}
+}
+
+func TestHandleRunFiles_CASHistorySuppressesNilPathAndSummaryRows(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-cas-nil-path-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : movie.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n" +
+		"2026/05/13 15:48:31 ERROR : Failed to copy with 3 errors: last error was: object not found\n" +
+		"2026/05/13 15:48:32 ERROR : Failed to copy: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : movie.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{
+		"stderrFile": tmpFile.Name(),
+		"transferDefaults": map[string]any{"openlistCasCompatible": true},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        14,
+		TaskID:    114,
+		Status:    "finished",
+		StartedAt: "2026-05-13T15:43:32+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/14/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 1 {
+		t.Fatalf("total=%d, want 1 (only CAS matched row should remain), got items: %v", got, resp["items"])
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("len(items)=%d, want 1", len(items))
+	}
+	it, _ := items[0].(map[string]any)
+	if got := it["action"].(string); got != "CAS Matched" {
+		t.Fatalf("action=%q, want CAS Matched", got)
+	}
+	name := it["name"].(string)
+	if name == "<nil>" || strings.Contains(name, "Failed to copy") || strings.Contains(name, "Attempt") {
+		t.Fatalf("name should not contain <nil> or summary text, got %q", name)
 	}
 }
 

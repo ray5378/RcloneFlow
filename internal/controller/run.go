@@ -24,6 +24,15 @@ func classifyHistoricalLogRow(level, path, msg string) (map[string]any, string, 
 	row := map[string]any{"path": path, "status": "", "action": "", "sizeBytes": 0}
 	low := strings.ToLower(strings.TrimSpace(msg))
 	upperLevel := strings.ToUpper(strings.TrimSpace(level))
+	if isCASAttemptObjectNotFoundSummaryRow(path, msg) {
+		return nil, "", false
+	}
+	if isCASRunObjectNotFoundSummaryRow(path, msg) {
+		return nil, "", false
+	}
+	if strings.TrimSpace(path) == "<nil>" {
+		return nil, "", false
+	}
 	if upperLevel == "ERROR" {
 		row["status"] = "failed"
 		row["action"] = "Error"
@@ -207,6 +216,9 @@ func filterCASHistoricalDetailRows(rows []map[string]any) []map[string]any {
 		path := strings.TrimSpace(fmt.Sprint(row["path"]))
 		msg := strings.TrimSpace(fmt.Sprint(row["message"]))
 		action := strings.ToLower(strings.TrimSpace(fmt.Sprint(row["action"])))
+		if path == "<nil>" {
+			continue
+		}
 		if isCASAttemptObjectNotFoundSummaryRow(path, msg) {
 			continue
 		}

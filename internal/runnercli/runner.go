@@ -2167,6 +2167,12 @@ func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlist
 	if isAttemptObjectNotFoundSummary(path, msg) {
 		return nil, "", false
 	}
+	if isRunObjectNotFoundSummary(path, msg) {
+		return nil, "", false
+	}
+	if strings.TrimSpace(path) == "<nil>" {
+		return nil, "", false
+	}
 	if upperLevel == "ERROR" {
 		row["status"] = "failed"
 		row["action"] = "Error"

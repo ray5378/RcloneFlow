@@ -91,6 +91,21 @@ func TestIsCASPath(t *testing.T) {
 	}
 }
 
+func TestClassifyRunLogRow_NilPathIgnored(t *testing.T) {
+	if row, bucket, ok := classifyRunLogRow("ERROR", "<nil>", "Attempt 1/1 failed with 2 errors and: object not found", nil, true); ok || row != nil || bucket != "" {
+		t.Fatalf("expected <nil> path to be ignored, got row=%v bucket=%q ok=%v", row, bucket, ok)
+	}
+}
+
+func TestClassifyRunLogRow_FailedToCopySummaryIgnored(t *testing.T) {
+	if row, bucket, ok := classifyRunLogRow("ERROR", "Failed to copy with 3 errors", "last error was: object not found", nil, true); ok || row != nil || bucket != "" {
+		t.Fatalf("expected Failed to copy summary to be ignored, got row=%v bucket=%q ok=%v", row, bucket, ok)
+	}
+	if row, bucket, ok := classifyRunLogRow("ERROR", "Failed to copy", "object not found", nil, true); ok || row != nil || bucket != "" {
+		t.Fatalf("expected Failed to copy summary to be ignored, got row=%v bucket=%q ok=%v", row, bucket, ok)
+	}
+}
+
 func TestTrimCASSuffix(t *testing.T) {
 	got := trimCASSuffix("dir/movie.mkv.cas")
 	if got != "dir/movie.mkv" {
