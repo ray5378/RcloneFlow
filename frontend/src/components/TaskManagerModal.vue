@@ -78,6 +78,7 @@ function handleImportFile(event: Event) {
         pendingImportData = data
         showConflictModal.value = true
       } else {
+        pendingImportData = data
         await doImport('skip')
       }
     } catch (err: any) {
@@ -103,6 +104,15 @@ async function doImport(strategy: 'skip' | 'overwrite') {
     importResult.value = result
     showConflictModal.value = false
     pendingImportData = null
+    let msg = t('taskManager.importSuccess', {
+      imported: result.imported,
+      skipped: result.skipped,
+      overwritten: result.overwritten,
+    })
+    if (result.remotesAdded != null || result.remotesSkipped != null) {
+      msg += ` | rclone: +${result.remotesAdded || 0} skipped ${result.remotesSkipped || 0}`
+    }
+    showSuccessToast(msg)
     emit('refresh')
   } catch (e: any) {
     showErrorToast(e?.message || t('taskManager.importFailed'))
