@@ -45,9 +45,19 @@ function handleImportFile(event: Event) {
   const reader = new FileReader()
   reader.onload = async (e) => {
     try {
-      const data = JSON.parse(e.target?.result as string)
+      const raw = e.target?.result
+      if (raw == null) {
+        alert(t('taskManager.invalidFile') + ': 文件读取结果为空')
+        return
+      }
+      const text = typeof raw === 'string' ? raw.trim() : new TextDecoder().decode(raw as ArrayBuffer).trim()
+      if (!text) {
+        alert(t('taskManager.invalidFile') + ': 文件内容为空')
+        return
+      }
+      const data = JSON.parse(text)
       if (!data.tasks || !Array.isArray(data.tasks)) {
-        alert(t('taskManager.invalidFile'))
+        alert(t('taskManager.invalidFile') + ': 缺少 tasks 字段，文件包含的键: ' + JSON.stringify(Object.keys(data)))
         return
       }
       if (data.tasks.length === 0) {
@@ -68,8 +78,11 @@ function handleImportFile(event: Event) {
         await doImport('skip')
       }
     } catch (err: any) {
-      alert(t('taskManager.invalidFile'))
+      alert(t('taskManager.invalidFile') + ': ' + (err?.message || String(err)))
     }
+  }
+  reader.onerror = () => {
+    alert(t('taskManager.invalidFile') + ': 文件读取失败')
   }
   reader.readAsText(file)
   input.value = ''
