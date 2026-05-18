@@ -122,6 +122,7 @@ async function doImport(strategy: 'skip' | 'overwrite') {
       tasks: pendingImportData.tasks,
       schedules: pendingImportData.schedules || [],
       conflictStrategy: strategy,
+      rcloneConfig: pendingImportData.rcloneConfig || null,
     })
     importResult.value = result
     showConflictModal.value = false
@@ -133,6 +134,9 @@ async function doImport(strategy: 'skip' | 'overwrite') {
     })
     if (result.remotesAdded != null || result.remotesSkipped != null) {
       msg += ` | rclone: +${result.remotesAdded || 0} skipped ${result.remotesSkipped || 0}`
+    }
+    if (Array.isArray((result as any).remoteErrors) && (result as any).remoteErrors.length > 0) {
+      msg += '\n' + (result as any).remoteErrors.join('\n')
     }
     showSuccessToast(msg)
     emit('refresh')

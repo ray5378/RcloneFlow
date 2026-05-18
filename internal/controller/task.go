@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"strconv"
@@ -349,6 +350,7 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 
 		remotesAdded := 0
 		remotesSkipped := 0
+		var remoteErrors []string
 		if rcloneCfg, ok := req.RawData["rcloneConfig"].(map[string]any); ok {
 			existingRemotes, err := c.rc.ListRemotes(r.Context())
 			if err != nil {
@@ -379,21 +381,26 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 						params[k] = val
 					}
 				}
-				if err := c.rc.CreateRemote(r.Context(), name, typ, params); err == nil {
-					remotesAdded++
-				} else {
+				if err := c.rc.CreateRemote(r.Context(), name, typ, params); err != nil {
+					remoteErrors = append(remoteErrors, fmt.Sprintf("%s(%s): %s", name, typ, err.Error()))
 					remotesSkipped++
+				} else {
+					remotesAdded++
 				}
 			}
 		}
 
-		WriteJSON(w, 200, map[string]any{
+		resp := map[string]any{
 			"imported":       imported,
 			"skipped":        skipped,
 			"overwritten":    overwritten,
 			"remotesAdded":   remotesAdded,
 			"remotesSkipped": remotesSkipped,
-		})
+		}
+		if len(remoteErrors) > 0 {
+			resp["remoteErrors"] = remoteErrors
+		}
+		WriteJSON(w, 200, resp)
 		return
 	}
 
