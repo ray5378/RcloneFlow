@@ -506,9 +506,9 @@ async function openEditRemote(name: string) {
           <div class="title">{{ t('remote.panelTitle') }}</div>
           <div class="subtitle">{{ t('remote.panelSubtitle') }}</div>
         </div>
-        <div class="actions">
-          <button class="ghost small" @click="openManageStorage">{{ t('remote.manageButton') }}</button>
-          <button class="ghost small" @click="openAddRemote">{{ t('remote.addButton') }}</button>
+        <div class="actions list-item-actions">
+          <button class="ghost small" @click="openManageStorage">⚙️ {{ t('remote.manageButton') }}</button>
+          <button class="ghost small" @click="openAddRemote">➕ {{ t('remote.addButton') }}</button>
         </div>
       </div>
     </div>
@@ -647,9 +647,9 @@ async function openEditRemote(name: string) {
     <div class="card-header">
       <div style="display: flex; justify-content: space-between; align-items: center; width: 100%">
         <div class="title">{{ t('remote.manageTitle') }}</div>
-        <div class="actions">
-          <button class="ghost small" @click="subview = 'explorer'">{{ t('remote.backButton') }}</button>
-          <button class="ghost small" @click="openAddRemote">{{ t('remote.addButton') }}</button>
+        <div class="actions list-item-actions">
+          <button class="ghost small" @click="subview = 'explorer'">← {{ t('remote.backButton') }}</button>
+          <button class="ghost small" @click="openAddRemote">➕ {{ t('remote.addButton') }}</button>
         </div>
       </div>
     </div>
