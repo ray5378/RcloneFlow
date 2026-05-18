@@ -27,10 +27,10 @@ export default {
     logout: 'Sign out',
   },
   browser: {
-    title: 'Files',
+    title: 'Storage',
   },
   task: {
-    title: 'Tasks',
+    title: 'Task Manager',
   },
   account: {
     title: 'Account',

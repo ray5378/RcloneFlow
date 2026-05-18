@@ -27,10 +27,10 @@ export default {
     logout: '退出登录',
   },
   browser: {
-    title: '文件',
+    title: '存储管理',
   },
   task: {
-    title: '任务',
+    title: '任务管理',
   },
   account: {
     title: '账号管理',

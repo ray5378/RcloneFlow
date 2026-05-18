@@ -44,8 +44,8 @@ const user = getUser()
 const passwordForm = reactive({ username: user?.username || '', oldPassword: '', newPassword: '', confirmPassword: '' })
 
 const pages = computed<Record<string, { name: string; icon: string }>>(() => ({
-  browser: { name: t('browser.title'), icon: '📁' },
-  tasks: { name: t('task.title'), icon: '📋' },
+  browser: { name: t('browser.title'), icon: '☁️' },
+  tasks: { name: t('task.title'), icon: '📝' },
 }))
 
 const localeLabel = computed(() => locale.value === 'zh' ? t('locale.en') : t('locale.zh'))
