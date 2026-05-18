@@ -662,7 +662,8 @@ async function openEditRemote(name: string) {
           <button class="ghost small" @click="openEditRemote(name)">✏️ {{ t('remote.editConfig') }}</button>
           <button class="ghost small" @click="openEditDesc(name)">📝 {{ t('remote.editDesc') }}</button>
           <button
-            class="ghost small"
+            class="ghost small test-btn"
+            :class="{ 'test-success': testState[name] === 'success', 'test-failed': testState[name] === 'failed' }"
             @click="testRemote(name)"
             :disabled="testState[name] === 'testing'"
           >
@@ -903,5 +904,27 @@ body.light .modal-footer {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+}
+
+/* 连接测试按钮状态样式 */
+.actions.list-item-actions button.test-btn.test-success {
+  background: #16a34a !important;
+  border-color: #16a34a !important;
+  color: #fff !important;
+}
+.actions.list-item-actions button.test-btn.test-failed {
+  background: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #fff !important;
+}
+:global(body.light) .actions.list-item-actions button.test-btn.test-success {
+  background: #22c55e !important;
+  border-color: #22c55e !important;
+  color: #fff !important;
+}
+:global(body.light) .actions.list-item-actions button.test-btn.test-failed {
+  background: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #fff !important;
 }
 </style>
