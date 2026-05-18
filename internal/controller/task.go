@@ -358,12 +358,12 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 			for _, name := range existingRemotes {
 				existingSet[strings.ToLower(name)] = true
 			}
-			for name, params := range rcloneCfg {
+			for name, v := range rcloneCfg {
 				if existingSet[strings.ToLower(name)] {
 					remotesSkipped++
 					continue
 				}
-				paramMap, ok := params.(map[string]any)
+				paramMap, ok := v.(map[string]any)
 				if !ok {
 					remotesSkipped++
 					continue
@@ -373,7 +373,13 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 					remotesSkipped++
 					continue
 				}
-				if err := c.rc.CreateRemote(r.Context(), name, typ, paramMap); err == nil {
+				params := make(map[string]any)
+				for k, val := range paramMap {
+					if k != "type" {
+						params[k] = val
+					}
+				}
+				if err := c.rc.CreateRemote(r.Context(), name, typ, params); err == nil {
 					remotesAdded++
 				} else {
 					remotesSkipped++

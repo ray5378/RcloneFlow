@@ -33,8 +33,12 @@ function getByPath(obj: Record<string, any>, path: string): string | undefined {
   return path.split('.').reduce<any>((acc, key) => (acc == null ? undefined : acc[key]), obj)
 }
 
-export function t(key: I18nKey, fallback?: string): string {
-  return getByPath(messages[locale.value] as Record<string, any>, key) || fallback || key
+export function t(key: I18nKey, params?: Record<string, any>, fallback?: string): string {
+  let result = getByPath(messages[locale.value] as Record<string, any>, key) || fallback || key
+  if (params) {
+    result = result.replace(/\{(\w+)\}/g, (_, k) => (params[k] != null ? String(params[k]) : `{${k}}`))
+  }
+  return result
 }
 
 // 过渡兼容：旧代码还能继续跑，逐步迁移到 t(key)
