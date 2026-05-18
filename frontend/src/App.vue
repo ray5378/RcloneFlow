@@ -192,13 +192,6 @@ onMounted(async () => {
         <TaskView v-if="currentPage === 'tasks'" :key="taskViewKey" />
       </main>
 
-      <nav v-if="isMobile" class="mobile-bottom-nav">
-        <div v-for="(page, key) in pages" :key="key" class="nav-item" :class="{ active: currentPage === key }" @click="switchPage(key)">
-          <span class="icon">{{ page.icon }}</span>
-          <span>{{ page.name }}</span>
-        </div>
-      </nav>
-
       <div v-if="showSettingsModal" class="modal-overlay" @click.self="showSettingsModal = false">
         <div class="modal-content settings-modal">
           <div class="modal-header">
@@ -288,7 +281,7 @@ onMounted(async () => {
 .header-brand { font-size: 20px; font-weight: 800; }
 .header-brand small { margin-left: 8px; font-size: 12px; color: #999; }
 .header-nav { display: flex; gap: 12px; }
-.header-nav button, .mobile-bottom-nav .nav-item, .mobile-menu-nav button, .settings-btn, .close-btn, .modal-footer button { cursor: pointer; }
+.header-nav button, .mobile-menu-nav button, .settings-btn, .close-btn, .modal-footer button { cursor: pointer; }
 .header-nav button { background: transparent; border: none; color: #ccc; padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 6px; }
 .header-nav button .nav-icon { font-size: 18px; }
 .header-nav button.active { background: #64b5f6; color: #fff; }
@@ -307,9 +300,6 @@ onMounted(async () => {
 .mobile-menu-nav button.active { border-color: #64b5f6; background: rgba(100, 181, 246, .15); }
 .mobile-menu-footer { position: absolute; bottom: 16px; left: 16px; right: 16px; }
 .version-info { color: #999; font-size: 12px; }
-.mobile-bottom-nav { position: sticky; bottom: 0; display: flex; justify-content: space-around; border-top: 1px solid #222; background: rgba(17, 17, 17, .95); backdrop-filter: blur(8px); padding: 8px 0; }
-.mobile-bottom-nav .nav-item { display: flex; flex-direction: column; align-items: center; color: #bbb; font-size: 12px; }
-.mobile-bottom-nav .nav-item.active { color: #64b5f6; }
 .modal-content { background: #1a1a1a; color: #eee; border: 1px solid #2f2f2f; border-radius: 14px; width: min(520px, 92vw); padding: 18px; box-sizing: border-box; }
 .settings-modal { width: min(460px, 92vw); }
 .settings-list { display: flex; flex-direction: column; gap: 10px; }
