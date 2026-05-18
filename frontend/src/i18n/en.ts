@@ -119,7 +119,7 @@ export default {
     manageButton: 'Manage storage',
     backButton: 'Back',
     editConfig: 'Edit config',
-    editDesc: 'Custom description',
+    editDesc: 'Add Note',
     deleteStorage: 'Delete storage',
     deleteStorageConfirm: 'Delete storage "{name}"? This action cannot be undone!',
     stepChooseType: 'Choose type',

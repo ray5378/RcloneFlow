@@ -119,7 +119,7 @@ export default {
     manageButton: '管理存储',
     backButton: '返回',
     editConfig: '修改配置',
-    editDesc: '自定义介绍',
+    editDesc: '添加备注',
     deleteStorage: '删除存储',
     deleteStorageConfirm: '确定删除存储 "{name}"？此操作不可恢复！',
     stepChooseType: '选择类型',

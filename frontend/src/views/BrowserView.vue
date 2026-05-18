@@ -20,7 +20,6 @@ const browserPath = ref('')
 const browserItems = ref<FileItem[]>([])
 const browserError = ref('')
 const testState = ref<Record<string, RemoteTestState>>({})
-const remoteMenu = ref('')
 const confirmModal = ref<{ show: boolean; title: string; message: string; onConfirm: () => void }>({
   show: false,
   title: '',
@@ -527,7 +526,7 @@ async function openEditRemote(name: string) {
         @dragend="onDragEnd"
       >
         <div class="tile-header">
-          <span class="tile-name">{{ name }}</span>
+          <span class="tile-name">☁️ {{ name }}</span>
           <span class="tile-drag">⋮⋮</span>
         </div>
         <div v-if="descriptions[name]" class="tile-desc">
@@ -659,29 +658,17 @@ async function openEditRemote(name: string) {
         <div class="name">
           <strong>{{ name }}</strong>
         </div>
-        <div class="actions" @click.stop>
-          <button class="ghost small" @click="openEditRemote(name)">{{ t('remote.editConfig') }}</button>
-          <button class="ghost small" @click="openEditDesc(name)">{{ t('remote.editDesc') }}</button>
+        <div class="actions list-item-actions" @click.stop>
+          <button class="ghost small" @click="openEditRemote(name)">✏️ {{ t('remote.editConfig') }}</button>
+          <button class="ghost small" @click="openEditDesc(name)">📝 {{ t('remote.editDesc') }}</button>
           <button
             class="ghost small"
             @click="testRemote(name)"
             :disabled="testState[name] === 'testing'"
           >
-            {{ getTestText(name) }}
+            🔗 {{ getTestText(name) }}
           </button>
-          <div class="menu-area">
-            <button
-              class="menu-btn"
-              @click="remoteMenu = remoteMenu === name ? '' : name"
-            >
-              ⋮
-            </button>
-            <div v-if="remoteMenu === name" class="menu-pop">
-              <button class="danger-text" @click="deleteRemote(name); remoteMenu = ''">
-                🗑️ {{ t('remote.deleteStorage') }}
-              </button>
-            </div>
-          </div>
+          <button class="ghost small danger-text" @click="deleteRemote(name)">🗑️ {{ t('remote.deleteStorage') }}</button>
         </div>
       </div>
     </div>
