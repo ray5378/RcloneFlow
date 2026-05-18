@@ -167,7 +167,7 @@ export default {
     confirmDeleteAction: 'Delete',
     newName: 'New name',
     confirm: 'Confirm',
-    test: 'Test',
+    test: 'Connection Test',
     testing: 'Testing...',
     testSuccess: 'Success ✓',
     testFailed: 'Failed ✗',

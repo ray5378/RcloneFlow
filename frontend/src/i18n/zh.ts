@@ -167,7 +167,7 @@ export default {
     confirmDeleteAction: '确定删除',
     newName: '新名称',
     confirm: '确定',
-    test: '测试',
+    test: '连接测试',
     testing: '测试中...',
     testSuccess: '成功 ✓',
     testFailed: '失败 ✗',

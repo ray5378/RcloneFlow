@@ -678,7 +678,7 @@ async function openEditRemote(name: string) {
             </button>
             <div v-if="remoteMenu === name" class="menu-pop">
               <button class="danger-text" @click="deleteRemote(name); remoteMenu = ''">
-                🗑️
+                🗑️ {{ t('remote.deleteStorage') }}
               </button>
             </div>
           </div>
