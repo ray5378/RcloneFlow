@@ -72,8 +72,9 @@ export async function importTasks(payload: {
   tasks: any[]
   schedules: any[]
   conflictStrategy: 'skip' | 'overwrite'
+  remoteConflictStrategy?: 'skip' | 'overwrite'
   rcloneConfig?: Record<string, Record<string, unknown>> | null
-}): Promise<{ imported: number; skipped: number; overwritten: number; remotesAdded?: number; remotesSkipped?: number; remoteErrors?: string[] }> {
+}): Promise<{ imported: number; skipped: number; overwritten: number; remotesAdded?: number; remotesSkipped?: number; remotesOverwritten?: number; remoteErrors?: string[] }> {
   return post('/api/tasks/import', payload)
 }
 

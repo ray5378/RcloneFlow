@@ -350,6 +350,7 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 
 		remotesAdded := 0
 		remotesSkipped := 0
+		remotesOverwritten := 0
 		var remoteErrors []string
 		if rcloneCfg, ok := req.RawData["rcloneConfig"].(map[string]any); ok {
 			existingRemotes, err := c.rc.ListRemotes(r.Context())
@@ -360,11 +361,11 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 			for _, name := range existingRemotes {
 				existingSet[strings.ToLower(name)] = true
 			}
+			remoteStrategy, _ := req.RawData["remoteConflictStrategy"].(string)
+			if remoteStrategy != "skip" && remoteStrategy != "overwrite" {
+				remoteStrategy = "skip"
+			}
 			for name, v := range rcloneCfg {
-				if existingSet[strings.ToLower(name)] {
-					remotesSkipped++
-					continue
-				}
 				paramMap, ok := v.(map[string]any)
 				if !ok {
 					remotesSkipped++
@@ -381,6 +382,24 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 						params[k] = val
 					}
 				}
+				if existingSet[strings.ToLower(name)] {
+					if remoteStrategy == "overwrite" {
+						if err := c.rc.DeleteRemote(r.Context(), name); err != nil {
+							remoteErrors = append(remoteErrors, fmt.Sprintf("%s(%s): delete failed: %s", name, typ, err.Error()))
+							remotesSkipped++
+							continue
+						}
+						if err := c.rc.CreateRemote(r.Context(), name, typ, params); err != nil {
+							remoteErrors = append(remoteErrors, fmt.Sprintf("%s(%s): %s", name, typ, err.Error()))
+							remotesSkipped++
+						} else {
+							remotesOverwritten++
+						}
+					} else {
+						remotesSkipped++
+					}
+					continue
+				}
 				if err := c.rc.CreateRemote(r.Context(), name, typ, params); err != nil {
 					remoteErrors = append(remoteErrors, fmt.Sprintf("%s(%s): %s", name, typ, err.Error()))
 					remotesSkipped++
@@ -391,11 +410,12 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 		}
 
 		resp := map[string]any{
-			"imported":       imported,
-			"skipped":        skipped,
-			"overwritten":    overwritten,
-			"remotesAdded":   remotesAdded,
-			"remotesSkipped": remotesSkipped,
+			"imported":          imported,
+			"skipped":           skipped,
+			"overwritten":       overwritten,
+			"remotesAdded":      remotesAdded,
+			"remotesSkipped":    remotesSkipped,
+			"remotesOverwritten": remotesOverwritten,
 		}
 		if len(remoteErrors) > 0 {
 			resp["remoteErrors"] = remoteErrors

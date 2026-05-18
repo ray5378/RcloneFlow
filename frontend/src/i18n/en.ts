@@ -542,6 +542,8 @@ export default {
     clearHistoryHint: 'Only clear run history, task configs are kept',
     conflictTitle: 'Duplicate tasks found',
     conflictMessage: 'Found {count} tasks with the same name, please choose how to handle them',
+    remoteConflictTitle: 'Duplicate rclone remotes found',
+    remoteConflictMessage: 'Found {count} rclone remotes with the same name, please choose how to handle them',
     skipAll: 'Skip all',
     overwriteAll: 'Overwrite all',
     importSuccess: 'Import complete: {imported} imported, {skipped} skipped, {overwritten} overwritten',

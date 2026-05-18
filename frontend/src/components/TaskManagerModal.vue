@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { exportTasks, importTasks, clearAllTasks } from '../api/task'
 import { clearAllRuns } from '../api/run'
 import { getTasks } from '../api/task'
+import { getRemotes } from '../api/remote'
 import { t } from '../i18n'
 import { showSuccessToast, showErrorToast } from '../api/errors'
 
@@ -13,17 +14,20 @@ const emit = defineEmits<{
 
 const showImportConfirm = ref(false)
 const showConflictModal = ref(false)
+const showRemoteConflictModal = ref(false)
 const showClearTasksConfirm = ref(false)
 const showClearHistoryConfirm = ref(false)
 const conflictCount = ref(0)
+const remoteConflictCount = ref(0)
 const pendingImportTaskCount = ref(0)
 const pendingImportScheduleCount = ref(0)
 const pendingImportRemoteCount = ref(0)
-const importResult = ref<{ imported: number; skipped: number; overwritten: number; remotesAdded?: number; remotesSkipped?: number } | null>(null)
+const importResult = ref<{ imported: number; skipped: number; overwritten: number; remotesAdded?: number; remotesSkipped?: number; remotesOverwritten?: number } | null>(null)
 const importing = ref(false)
 const processing = ref(false)
 
 let pendingImportData: any = null
+let pendingTaskStrategy: 'skip' | 'overwrite' = 'skip'
 
 async function handleExport() {
   try {
@@ -98,11 +102,28 @@ async function confirmImport() {
     const incomingNames = pendingImportData.tasks.map((t: any) => (t.name || '').toLowerCase()).filter(Boolean)
     const conflicts = incomingNames.filter((n: string) => existingNames.has(n))
 
+    let hasRemoteConflicts = false
+    if (pendingImportData.rcloneConfig) {
+      try {
+        const existingRemotes = await getRemotes()
+        const existingRemoteNames = new Set((existingRemotes.remotes || []).map((n: string) => n.toLowerCase()))
+        const incomingRemoteNames = Object.keys(pendingImportData.rcloneConfig).map((n: string) => n.toLowerCase())
+        hasRemoteConflicts = incomingRemoteNames.some((n: string) => existingRemoteNames.has(n))
+        if (hasRemoteConflicts) {
+          remoteConflictCount.value = incomingRemoteNames.filter((n: string) => existingRemoteNames.has(n)).length
+        }
+      } catch {
+        hasRemoteConflicts = false
+      }
+    }
+
     if (conflicts.length > 0) {
       conflictCount.value = conflicts.length
       showConflictModal.value = true
+    } else if (hasRemoteConflicts) {
+      showRemoteConflictModal.value = true
     } else {
-      await doImport('skip')
+      await doImport('skip', 'skip')
     }
   } catch (err: any) {
     showErrorToast(err?.message || t('taskManager.operationFailed'))
@@ -114,26 +135,54 @@ function cancelImport() {
   pendingImportData = null
 }
 
-async function doImport(strategy: 'skip' | 'overwrite') {
+async function handleTaskConflictResolved() {
+  showConflictModal.value = false
+  if (!pendingImportData) return
+
+  let hasRemoteConflicts = false
+  if (pendingImportData.rcloneConfig) {
+    try {
+      const existingRemotes = await getRemotes()
+      const existingRemoteNames = new Set((existingRemotes.remotes || []).map((n: string) => n.toLowerCase()))
+      const incomingRemoteNames = Object.keys(pendingImportData.rcloneConfig).map((n: string) => n.toLowerCase())
+      hasRemoteConflicts = incomingRemoteNames.some((n: string) => existingRemoteNames.has(n))
+      if (hasRemoteConflicts) {
+        remoteConflictCount.value = incomingRemoteNames.filter((n: string) => existingRemoteNames.has(n)).length
+      }
+    } catch {
+      hasRemoteConflicts = false
+    }
+  }
+
+  if (hasRemoteConflicts) {
+    showRemoteConflictModal.value = true
+  } else {
+    await doImport(pendingTaskStrategy, 'skip')
+  }
+}
+
+async function doImport(taskStrategy: 'skip' | 'overwrite', remoteStrategy: 'skip' | 'overwrite') {
   if (!pendingImportData) return
   importing.value = true
   try {
     const result = await importTasks({
       tasks: pendingImportData.tasks,
       schedules: pendingImportData.schedules || [],
-      conflictStrategy: strategy,
+      conflictStrategy: taskStrategy,
+      remoteConflictStrategy: remoteStrategy,
       rcloneConfig: pendingImportData.rcloneConfig || null,
     })
     importResult.value = result
     showConflictModal.value = false
+    showRemoteConflictModal.value = false
     pendingImportData = null
     let msg = t('taskManager.importSuccess', {
       imported: result.imported,
       skipped: result.skipped,
       overwritten: result.overwritten,
     })
-    if (result.remotesAdded != null || result.remotesSkipped != null) {
-      msg += ` | rclone: +${result.remotesAdded || 0} skipped ${result.remotesSkipped || 0}`
+    if (result.remotesAdded != null || result.remotesSkipped != null || result.remotesOverwritten != null) {
+      msg += ` | rclone: +${result.remotesAdded || 0} ~${result.remotesOverwritten || 0} skipped ${result.remotesSkipped || 0}`
     }
     if (Array.isArray((result as any).remoteErrors) && (result as any).remoteErrors.length > 0) {
       msg += '\n' + (result as any).remoteErrors.join('\n')
@@ -281,8 +330,25 @@ async function handleClearHistory() {
       </div>
       <div class="modal-footer">
         <button class="ghost" @click="showConflictModal = false; pendingImportData = null">{{ t('common.cancel') }}</button>
-        <button class="ghost" @click="doImport('skip')" :disabled="importing">{{ t('taskManager.skipAll') }}</button>
-        <button class="primary" @click="doImport('overwrite')" :disabled="importing">{{ t('taskManager.overwriteAll') }}</button>
+        <button class="ghost" @click="pendingTaskStrategy = 'skip'; handleTaskConflictResolved()" :disabled="importing">{{ t('taskManager.skipAll') }}</button>
+        <button class="primary" @click="pendingTaskStrategy = 'overwrite'; handleTaskConflictResolved()" :disabled="importing">{{ t('taskManager.overwriteAll') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showRemoteConflictModal" class="modal-overlay" @click.self="showRemoteConflictModal = false">
+    <div class="modal-content confirm-modal">
+      <div class="modal-header">
+        <h3>{{ t('taskManager.remoteConflictTitle') }}</h3>
+        <button class="close-btn" @click="showRemoteConflictModal = false">×</button>
+      </div>
+      <div class="modal-body">
+        <p>{{ t('taskManager.remoteConflictMessage', { count: remoteConflictCount }) }}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" @click="showRemoteConflictModal = false; pendingImportData = null">{{ t('common.cancel') }}</button>
+        <button class="ghost" @click="doImport(pendingTaskStrategy, 'skip')" :disabled="importing">{{ t('taskManager.skipAll') }}</button>
+        <button class="primary" @click="doImport(pendingTaskStrategy, 'overwrite')" :disabled="importing">{{ t('taskManager.overwriteAll') }}</button>
       </div>
     </div>
   </div>

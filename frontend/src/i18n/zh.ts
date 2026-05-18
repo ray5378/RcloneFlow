@@ -542,6 +542,8 @@ export default {
     clearHistoryHint: '仅清空运行历史记录，不影响任务配置',
     conflictTitle: '发现同名任务',
     conflictMessage: '发现 {count} 个同名任务，请选择处理方式',
+    remoteConflictTitle: '发现同名 rclone 配置',
+    remoteConflictMessage: '发现 {count} 个同名 rclone 远程配置，请选择处理方式',
     skipAll: '全部跳过',
     overwriteAll: '全部覆盖',
     importSuccess: '导入成功，成功 {imported} 个，跳过 {skipped} 个，覆盖 {overwritten} 个',
