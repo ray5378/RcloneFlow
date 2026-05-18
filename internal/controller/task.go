@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/service"
@@ -139,6 +141,172 @@ func (c *TaskController) HandleBootstrap(w http.ResponseWriter, r *http.Request)
 		"tasks":      tasks,
 		"activeRuns": activeRuns,
 	})
+}
+
+func (c *TaskController) buildActiveRunItems() ([]map[string]any, error) {
+	runs, err := c.runSvc.ListActiveRuns()
+	if err != nil {
+		return nil, err
+	}
+	items := make([]map[string]any, 0, len(runs))
+	for _, run := range runs {
+		var summary map[string]any
+		var progress map[string]any
+		switch v := any(run.Summary).(type) {
+		case map[string]any:
+			summary = v
+			if p, ok := v["progress"].(map[string]any); ok {
+				progress = p
+			}
+		case string:
+			if v != "" {
+				var m map[string]any
+				if json.Unmarshal([]byte(v), &m) == nil {
+					summary = m
+					if p, ok := m["progress"].(map[string]any); ok {
+						progress = p
+					}
+				}
+			}
+		}
+		bytes := int64(0)
+		if v, ok := progress["bytes"].(float64); ok {
+			bytes = int64(v)
+		}
+		progressTotal := int64(0)
+		if v, ok := progress["totalBytes"].(float64); ok {
+			progressTotal = int64(v)
+		}
+		total := progressTotal
+		if total > 0 && bytes > total {
+			bytes = total
+		}
+		speed := int64(0)
+		if v, ok := progress["speed"].(float64); ok {
+			speed = int64(v)
+		}
+		eta := float64(0)
+		if v, ok := progress["eta"].(float64); ok {
+			eta = v
+		}
+		pct := 0.0
+		if v, ok := progress["percentage"].(float64); ok {
+			pct = v
+		} else if total > 0 {
+			pct = float64(bytes) / float64(total) * 100
+		}
+		if pct < 0 {
+			pct = 0
+		}
+		if pct > 100 {
+			pct = 100
+		}
+		completedFiles := float64(0)
+		if v, ok := progress["completedFiles"].(float64); ok {
+			completedFiles = v
+		}
+		plannedFiles := float64(0)
+		if v, ok := progress["plannedFiles"].(float64); ok {
+			plannedFiles = v
+		}
+		logicalTotalCount := plannedFiles
+		casCompatible := false
+		if summary != nil {
+			if opts, ok := summary["effectiveOptions"].(map[string]any); ok {
+				casCompatible, _ = opts["openlistCasCompatible"].(bool)
+			}
+		}
+		if logicalTotalCount <= 0 && summary != nil {
+			if pf, ok := summary["preflight"].(map[string]any); ok {
+				if v, ok2 := pf["totalCount"].(float64); ok2 {
+					logicalTotalCount = v
+				}
+			}
+		}
+		if logicalTotalCount <= 0 && summary != nil && casCompatible {
+			if at, ok := summary["activeTransfer"].(map[string]any); ok {
+				if v, ok2 := at["totalCount"].(float64); ok2 {
+					logicalTotalCount = v
+				}
+			}
+		}
+		if logicalTotalCount > 0 && completedFiles > logicalTotalCount {
+			completedFiles = logicalTotalCount
+		}
+		phase := "transferring"
+		if total == 0 && bytes == 0 {
+			phase = "preparing"
+		}
+		if summary != nil {
+			if fw, ok := summary["finishWait"].(map[string]any); ok {
+				if en, ok2 := fw["enabled"].(bool); ok2 && en {
+					if done, ok3 := fw["done"].(bool); !ok3 || !done {
+						phase = "finalizing"
+					}
+				}
+			}
+		}
+		progressLine := ""
+		if summary != nil {
+			if v, ok := summary["progressLine"].(string); ok {
+				progressLine = v
+			}
+		}
+		stable := map[string]any{
+			"bytes":             bytes,
+			"totalBytes":        total,
+			"speed":             speed,
+			"eta":               eta,
+			"percentage":        pct,
+			"phase":             phase,
+			"lastUpdatedAt":     time.Now().Format(time.RFC3339),
+			"completedFiles":    completedFiles,
+			"plannedFiles":      plannedFiles,
+			"logicalTotalCount": logicalTotalCount,
+			"totalCount":        logicalTotalCount,
+		}
+		calcPct := 0.0
+		if total > 0 {
+			calcPct = float64(bytes) / float64(total) * 100
+		}
+		pctMismatch := total > 0 && math.Abs(calcPct-pct) > 1.5
+		countMismatch := logicalTotalCount > 0 && completedFiles > logicalTotalCount
+		etaMismatch := eta > 0 && speed > 0 && total > bytes && math.Abs((float64(total-bytes)/float64(speed))-eta) > 300
+		progressMismatch := pctMismatch || countMismatch || etaMismatch
+		progressCheck := map[string]any{
+			"ok":            !progressMismatch,
+			"pctMismatch":   pctMismatch,
+			"countMismatch": countMismatch,
+			"etaMismatch":   etaMismatch,
+			"calcPct":       calcPct,
+		}
+		item := map[string]any{
+			"runRecord": map[string]any{
+				"id":               run.ID,
+				"taskId":           run.TaskID,
+				"status":           run.Status,
+				"bytesTransferred": run.BytesTransferred,
+				"error":            run.Error,
+				"startedAt":        run.StartedAt,
+				"finishedAt":       run.FinishedAt,
+			},
+			"progress":         stable,
+			"progressLine":     progressLine,
+			"progressSource":   "summary.progress",
+			"progressMismatch": progressMismatch,
+			"progressCheck":    progressCheck,
+		}
+		if start, err := time.Parse(time.RFC3339, run.StartedAt); err == nil {
+			dur := int64(time.Since(start).Seconds())
+			if dur < 0 {
+				dur = 0
+			}
+			item["runRecord"].(map[string]any)["durationSeconds"] = dur
+			item["runRecord"].(map[string]any)["durationText"] = humanDuration(dur)
+		}
+		items = append(items, item)
+	}
+	return items, nil
 }
 
 // HandleTaskActions 处理任务操作（删除、运行）
