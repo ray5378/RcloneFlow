@@ -752,6 +752,296 @@ func TestHandleRunFiles_CASHistorySuppressesNilPathAndSummaryRows(t *testing.T) 
 	}
 }
 
+func TestHandleRunFiles_CASHistorySuppressesAllSummaryVariants(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-cas-summary-variants-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : file1.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:46:10 ERROR : file2.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : Attempt 1/1 failed with 2 errors and: object not found\n" +
+		"2026/05/13 15:48:31 ERROR : Failed to copy with 2 errors: last error was: object not found\n" +
+		"2026/05/13 15:48:32 ERROR : Failed to copy: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : file1.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n" +
+		"2026/05/13 15:49:08 NOTICE : file2.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{
+		"stderrFile": tmpFile.Name(),
+		"transferDefaults": map[string]any{"openlistCasCompatible": true},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        15,
+		TaskID:    115,
+		Status:    "finished",
+		StartedAt: "2026-05-13T15:43:32+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/15/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 2 {
+		t.Fatalf("total=%d, want 2 (only CAS matched rows should remain), got items: %v", got, resp["items"])
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("len(items)=%d, want 2", len(items))
+	}
+	for i, raw := range items {
+		it, _ := raw.(map[string]any)
+		if got := it["action"].(string); got != "CAS Matched" {
+			t.Fatalf("items[%d] action=%q, want CAS Matched", i, got)
+		}
+		name := it["name"].(string)
+		if name == "<nil>" || strings.Contains(name, "Failed to copy") || strings.Contains(name, "Attempt") {
+			t.Fatalf("items[%d] name should not contain <nil> or summary text, got %q", i, name)
+		}
+	}
+}
+
+func TestHandleRunFiles_CASHistoryKeepsRealErrors(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-cas-real-errors-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : file1.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:46:10 ERROR : file2.mkv: Failed to copy: permission denied\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : file1.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{
+		"stderrFile": tmpFile.Name(),
+		"transferDefaults": map[string]any{"openlistCasCompatible": true},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        16,
+		TaskID:    116,
+		Status:    "finished",
+		StartedAt: "2026-05-13T15:43:32+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/16/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 2 {
+		t.Fatalf("total=%d, want 2 (1 CAS matched + 1 real error), got items: %v", got, resp["items"])
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("len(items)=%d, want 2", len(items))
+	}
+	casCount := 0
+	errCount := 0
+	for _, raw := range items {
+		it, _ := raw.(map[string]any)
+		switch it["action"].(string) {
+		case "CAS Matched":
+			casCount++
+		case "Error":
+			errCount++
+		}
+	}
+	if casCount != 1 {
+		t.Fatalf("casCount=%d, want 1", casCount)
+	}
+	if errCount != 1 {
+		t.Fatalf("errCount=%d, want 1 (permission denied should remain)", errCount)
+	}
+}
+
+func TestHandleRunFiles_CASHistoryHandlesMultipleAttempts(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-cas-multi-attempt-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : file.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:47:00 ERROR : <nil>: Attempt 1/3 failed with 1 errors and: object not found\n" +
+		"2026/05/13 15:47:30 ERROR : file.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:00 ERROR : <nil>: Attempt 2/3 failed with 1 errors and: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : file.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:49:00 ERROR : <nil>: Attempt 3/3 failed with 1 errors and: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : file.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{
+		"stderrFile": tmpFile.Name(),
+		"transferDefaults": map[string]any{"openlistCasCompatible": true},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        17,
+		TaskID:    117,
+		Status:    "finished",
+		StartedAt: "2026-05-13T15:43:32+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/17/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 1 {
+		t.Fatalf("total=%d, want 1 (only CAS matched row should remain after multiple attempts), got items: %v", got, resp["items"])
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("len(items)=%d, want 1", len(items))
+	}
+	it, _ := items[0].(map[string]any)
+	if got := it["action"].(string); got != "CAS Matched" {
+		t.Fatalf("action=%q, want CAS Matched", got)
+	}
+}
+
+func TestHandleRunFiles_CASHistoryHandlesMixedSuccessAndCAS(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-cas-mixed-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 INFO : file1.mkv: Copied (new)\n" +
+		"2026/05/13 15:46:10 ERROR : file2.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:46:11 INFO : file3.mkv: Copied (new)\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 1 errors and: object not found\n" +
+		"2026/05/13 15:48:31 ERROR : Failed to copy with 1 errors: last error was: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : file2.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{
+		"stderrFile": tmpFile.Name(),
+		"transferDefaults": map[string]any{"openlistCasCompatible": true},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        18,
+		TaskID:    118,
+		Status:    "finished",
+		StartedAt: "2026-05-13T15:43:32+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/18/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 3 {
+		t.Fatalf("total=%d, want 3 (2 copied + 1 CAS matched), got items: %v", got, resp["items"])
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 3 {
+		t.Fatalf("len(items)=%d, want 3", len(items))
+	}
+	copiedCount := 0
+	casCount := 0
+	for _, raw := range items {
+		it, _ := raw.(map[string]any)
+		switch it["action"].(string) {
+		case "Copied":
+			copiedCount++
+		case "CAS Matched":
+			casCount++
+		}
+	}
+	if copiedCount != 2 {
+		t.Fatalf("copiedCount=%d, want 2", copiedCount)
+	}
+	if casCount != 1 {
+		t.Fatalf("casCount=%d, want 1", casCount)
+	}
+}
+
+func TestHandleRunFiles_CASHistoryHandlesNoCASMatchRealFailure(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-cas-no-match-log-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : file.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 1 errors and: object not found\n" +
+		"2026/05/13 15:48:31 ERROR : Failed to copy with 1 errors: last error was: object not found\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	summary := map[string]any{
+		"stderrFile": tmpFile.Name(),
+		"transferDefaults": map[string]any{"openlistCasCompatible": true},
+	}
+	bs, _ := json.Marshal(summary)
+	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
+		ID:        19,
+		TaskID:    119,
+		Status:    "failed",
+		StartedAt: "2026-05-13T15:43:32+08:00",
+		Summary:   string(bs),
+	}}})}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/19/files?offset=0&limit=50", nil)
+	w := httptest.NewRecorder()
+	ctrl.HandleRunFiles(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("status=%d, want 200", w.Code)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if got := int(resp["total"].(float64)); got != 1 {
+		t.Fatalf("total=%d, want 1 (real failure should remain), got items: %v", got, resp["items"])
+	}
+	items, _ := resp["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("len(items)=%d, want 1", len(items))
+	}
+	it, _ := items[0].(map[string]any)
+	if got := it["action"].(string); got != "Error" {
+		t.Fatalf("action=%q, want Error", got)
+	}
+}
+
 func TestHandleActiveRuns_FlagsProgressMismatch(t *testing.T) {
 	summary := map[string]any{
 		"progress": map[string]any{

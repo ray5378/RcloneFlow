@@ -106,6 +106,165 @@ func TestClassifyRunLogRow_FailedToCopySummaryIgnored(t *testing.T) {
 	}
 }
 
+func TestClassifyRunLogRow_MultipleAttemptVariantsIgnored(t *testing.T) {
+	variants := []struct {
+		path string
+		msg  string
+	}{
+		{"<nil>", "Attempt 1/1 failed with 2 errors and: object not found"},
+		{"<nil>", "Attempt 1/3 failed with 1 errors and: object not found"},
+		{"<nil>", "Attempt 3/3 failed with 5 errors and: object not found"},
+		{"Attempt 1/1 failed with 2 errors and", "object not found"},
+		{"Attempt 2/3 failed with 1 errors and", "object not found"},
+	}
+	for _, v := range variants {
+		if row, bucket, ok := classifyRunLogRow("ERROR", v.path, v.msg, nil, true); ok || row != nil || bucket != "" {
+			t.Fatalf("expected variant path=%q msg=%q to be ignored, got row=%v bucket=%q ok=%v", v.path, v.msg, row, bucket, ok)
+		}
+	}
+}
+
+func TestBuildFinalSummaryFilesFromLog_SuppressesNilPathAndSummaryRows(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "test.log")
+	logText := "2026/05/13 15:46:09 ERROR : file1.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:46:10 ERROR : file2.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n" +
+		"2026/05/13 15:48:31 ERROR : Failed to copy with 2 errors: last error was: object not found\n" +
+		"2026/05/13 15:48:32 ERROR : Failed to copy: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : file1.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n" +
+		"2026/05/13 15:49:08 NOTICE : file2.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if err := os.WriteFile(logFile, []byte(logText), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	files, counts := buildFinalSummaryFilesFromLog(logFile, true, false)
+	if len(files) != 2 {
+		t.Fatalf("len(files)=%d, want 2 (only CAS matched rows), got: %v", len(files), files)
+	}
+	for _, f := range files {
+		path := anyString(f["path"])
+		if path == "<nil>" || strings.Contains(path, "Failed to copy") || strings.Contains(path, "Attempt") {
+			t.Fatalf("path should not contain <nil> or summary text, got %q", path)
+		}
+		action := anyString(f["action"])
+		if action != "CAS Matched" {
+			t.Fatalf("action=%q, want CAS Matched", action)
+		}
+	}
+	if counts["copied"] != 2 {
+		t.Fatalf("counts[copied]=%d, want 2", counts["copied"])
+	}
+	if counts["failed"] != 0 {
+		t.Fatalf("counts[failed]=%d, want 0", counts["failed"])
+	}
+}
+
+func TestBuildFinalSummaryFilesFromLog_KeepsRealErrors(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "test.log")
+	logText := "2026/05/13 15:46:09 ERROR : file1.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:46:10 ERROR : file2.mkv: Failed to copy: permission denied\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : file1.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if err := os.WriteFile(logFile, []byte(logText), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	files, counts := buildFinalSummaryFilesFromLog(logFile, true, false)
+	if len(files) != 2 {
+		t.Fatalf("len(files)=%d, want 2 (1 CAS matched + 1 real error), got: %v", len(files), files)
+	}
+	casCount := 0
+	errCount := 0
+	for _, f := range files {
+		action := anyString(f["action"])
+		switch action {
+		case "CAS Matched":
+			casCount++
+		case "Error":
+			errCount++
+		}
+	}
+	if casCount != 1 {
+		t.Fatalf("casCount=%d, want 1", casCount)
+	}
+	if errCount != 1 {
+		t.Fatalf("errCount=%d, want 1 (permission denied should remain)", errCount)
+	}
+	if counts["copied"] != 1 {
+		t.Fatalf("counts[copied]=%d, want 1", counts["copied"])
+	}
+	if counts["failed"] != 1 {
+		t.Fatalf("counts[failed]=%d, want 1", counts["failed"])
+	}
+}
+
+func TestBuildFinalSummaryFilesFromLog_MixedSuccessAndCAS(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "test.log")
+	logText := "2026/05/13 15:46:09 INFO : file1.mkv: Copied (new)\n" +
+		"2026/05/13 15:46:10 ERROR : file2.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:46:11 INFO : file3.mkv: Copied (new)\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 1 errors and: object not found\n" +
+		"2026/05/13 15:48:31 ERROR : Failed to copy with 1 errors: last error was: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : file2.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if err := os.WriteFile(logFile, []byte(logText), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	files, counts := buildFinalSummaryFilesFromLog(logFile, true, false)
+	if len(files) != 3 {
+		t.Fatalf("len(files)=%d, want 3 (2 copied + 1 CAS matched), got: %v", len(files), files)
+	}
+	copiedCount := 0
+	casCount := 0
+	for _, f := range files {
+		action := anyString(f["action"])
+		switch action {
+		case "Copied":
+			copiedCount++
+		case "CAS Matched":
+			casCount++
+		}
+	}
+	if copiedCount != 2 {
+		t.Fatalf("copiedCount=%d, want 2", copiedCount)
+	}
+	if casCount != 1 {
+		t.Fatalf("casCount=%d, want 1", casCount)
+	}
+	if counts["copied"] != 3 {
+		t.Fatalf("counts[copied]=%d, want 3", counts["copied"])
+	}
+	if counts["failed"] != 0 {
+		t.Fatalf("counts[failed]=%d, want 0", counts["failed"])
+	}
+}
+
+func TestBuildFinalSummaryFilesFromLog_NoCASMatchRealFailure(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "test.log")
+	logText := "2026/05/13 15:46:09 ERROR : file.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 1 errors and: object not found\n" +
+		"2026/05/13 15:48:31 ERROR : Failed to copy with 1 errors: last error was: object not found\n"
+	if err := os.WriteFile(logFile, []byte(logText), 0644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	files, counts := buildFinalSummaryFilesFromLog(logFile, true, false)
+	if len(files) != 1 {
+		t.Fatalf("len(files)=%d, want 1 (real failure should remain), got: %v", len(files), files)
+	}
+	it := files[0]
+	action := anyString(it["action"])
+	if action != "Error" {
+		t.Fatalf("action=%q, want Error", action)
+	}
+	if counts["failed"] != 1 {
+		t.Fatalf("counts[failed]=%d, want 1", counts["failed"])
+	}
+	if counts["copied"] != 0 {
+		t.Fatalf("counts[copied]=%d, want 0", counts["copied"])
+	}
+}
+
 func TestTrimCASSuffix(t *testing.T) {
 	got := trimCASSuffix("dir/movie.mkv.cas")
 	if got != "dir/movie.mkv" {
