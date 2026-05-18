@@ -884,4 +884,24 @@ body.light .modal-footer {
 .menu-area {
   position: relative;
 }
+
+/* 管理存储按钮 hover 风格（与任务卡片一致） */
+.actions.list-item-actions button.ghost.small:hover {
+  background: #374151 !important;
+  border-color: rgba(148, 163, 184, 0.42) !important;
+  color: #fff !important;
+}
+
+:global(body.light) .actions.list-item-actions button.ghost.small:hover {
+  background: #e5e7eb !important;
+  border-color: rgba(148, 163, 184, 0.55) !important;
+  color: #111827 !important;
+}
+
+.actions.list-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
 </style>
