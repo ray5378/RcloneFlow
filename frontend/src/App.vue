@@ -340,7 +340,7 @@ body.light .field-item input { background: #f5f5f5; border-color: #ddd; color: #
 body.light .modal-footer .ghost { border-color: #ddd; color: #666; }
 @media (max-width: 768px) {
   .settings-modal { max-width: 100%; }
-  .mobile-menu-overlay { align-items: center; justify-content: flex-start; padding-top: 70px; }
+  .mobile-menu-overlay { align-items: center; justify-content: center; }
   .mobile-menu { width: 280px; border-radius: 12px; }
 }
 .toast-container { position: fixed; top: 20px; right: 20px; z-index: 10001; display: flex; flex-direction: column; gap: 8px; }
