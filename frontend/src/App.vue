@@ -290,7 +290,7 @@ onMounted(async () => {
 .header-nav { display: flex; gap: 12px; }
 .header-nav button, .mobile-bottom-nav .nav-item, .mobile-menu-nav button, .settings-btn, .close-btn, .modal-footer button { cursor: pointer; }
 .header-nav button { background: transparent; border: none; color: #ccc; padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 6px; }
-.header-nav button .nav-icon { font-size: 16px; }
+.header-nav button .nav-icon { font-size: 18px; }
 .header-nav button.active { background: #64b5f6; color: #fff; }
 .header-actions { display: flex; gap: 8px; }
 .settings-btn { background: transparent; border: 1px solid #333; color: #ddd; border-radius: 10px; padding: 8px 12px; }
