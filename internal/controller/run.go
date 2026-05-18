@@ -568,7 +568,10 @@ func countCompletedFilesFromLog(logPath string) int {
 			}
 			name := strings.TrimSpace(m[3])
 			msg := strings.ToLower(strings.TrimSpace(m[4]))
-			if name == "" {
+			if name == "" || name == "<nil>" {
+				continue
+			}
+			if strings.HasPrefix(name, "Attempt ") || strings.HasPrefix(name, "Failed to copy") {
 				continue
 			}
 			// 统计明确的单文件完成事件；CAS 命中属于等效已传输，也计入完成数。

@@ -1089,3 +1089,240 @@ func TestHandleActiveRuns_FlagsProgressMismatch(t *testing.T) {
 		t.Fatalf("etaMismatch want true")
 	}
 }
+
+func TestCountCompletedFilesFromLog_NormalCopiedFiles(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-normal-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 INFO : file1.mkv: Copied (new)\n" +
+		"2026/05/13 15:46:10 INFO : file2.mkv: Copied (new)\n" +
+		"2026/05/13 15:46:11 INFO : file3.mkv: Copied (new)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 3 {
+		t.Fatalf("count=%d, want 3", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_CASMatchedFiles(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-cas-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 NOTICE : file1.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n" +
+		"2026/05/13 15:46:10 NOTICE : file2.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 2 {
+		t.Fatalf("count=%d, want 2", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_SuppressesNilPath(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-nil-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 NOTICE : <nil>: CAS compatible match after source cleanup (Failed to copy: object not found)\n" +
+		"2026/05/13 15:46:10 INFO : file1.mkv: Copied (new)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 1 {
+		t.Fatalf("count=%d, want 1 (<nil> should be suppressed)", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_SuppressesAttemptSummary(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-attempt-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : Attempt 1/3 failed with 1 errors and: object not found\n" +
+		"2026/05/13 15:46:10 INFO : file1.mkv: Copied (new)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 1 {
+		t.Fatalf("count=%d, want 1 (Attempt summary should be suppressed)", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_SuppressesFailedToCopySummary(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-failed-copy-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : Failed to copy with 2 errors: last error was: object not found\n" +
+		"2026/05/13 15:46:10 INFO : file1.mkv: Copied (new)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 1 {
+		t.Fatalf("count=%d, want 1 (Failed to copy summary should be suppressed)", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_MixedCopiedAndCAS(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-mixed-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 INFO : file1.mkv: Copied (new)\n" +
+		"2026/05/13 15:46:10 ERROR : file2.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:46:11 NOTICE : file2.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n" +
+		"2026/05/13 15:46:12 INFO : file3.mkv: Copied (new)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 3 {
+		t.Fatalf("count=%d, want 3 (file1 + file2 CAS + file3)", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_DeduplicatesSameFile(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-dedup-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 INFO : file1.mkv: Copied (new)\n" +
+		"2026/05/13 15:46:10 INFO : file1.mkv: Copied (new)\n" +
+		"2026/05/13 15:46:11 NOTICE : file1.mkv: CAS compatible match after source cleanup\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 1 {
+		t.Fatalf("count=%d, want 1 (same file should be deduplicated)", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_HandlesRenamedMovedDeleted(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-move-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 INFO : file1.mkv: Renamed\n" +
+		"2026/05/13 15:46:10 INFO : file2.mkv: Moved\n" +
+		"2026/05/13 15:46:11 INFO : file3.mkv: Deleted\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 3 {
+		t.Fatalf("count=%d, want 3", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_IgnoresErrorLines(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-errors-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : file1.mkv: Failed to copy: permission denied\n" +
+		"2026/05/13 15:46:10 ERROR : file2.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:46:11 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n" +
+		"2026/05/13 15:46:12 ERROR : Failed to copy with 2 errors: last error was: object not found\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 0 {
+		t.Fatalf("count=%d, want 0 (error lines should not count as completed)", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_EmptyLog(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-empty-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 0 {
+		t.Fatalf("count=%d, want 0", n)
+	}
+}
+
+func TestCountCompletedFilesFromLog_CASMatchedWithNilPathAndSummary(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "rcloneflow-active-cas-full-*.log")
+	if err != nil {
+		t.Fatalf("CreateTemp() error = %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	defer tmpFile.Close()
+	logText := "2026/05/13 15:46:09 ERROR : file1.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:46:10 ERROR : file2.mkv: Failed to copy: object not found\n" +
+		"2026/05/13 15:48:30 ERROR : <nil>: Attempt 1/1 failed with 2 errors and: object not found\n" +
+		"2026/05/13 15:48:31 ERROR : Failed to copy with 2 errors: last error was: object not found\n" +
+		"2026/05/13 15:49:07 NOTICE : file1.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n" +
+		"2026/05/13 15:49:08 NOTICE : file2.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
+	if _, err := tmpFile.WriteString(logText); err != nil {
+		t.Fatalf("WriteString() error = %v", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	n := countCompletedFilesFromLog(tmpFile.Name())
+	if n != 2 {
+		t.Fatalf("count=%d, want 2 (only CAS matched files should count)", n)
+	}
+}
