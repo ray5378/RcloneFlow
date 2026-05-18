@@ -42,3 +42,6 @@ export type { ToastType } from './errors'
 
 // ============ 认证 ============
 export { login, register, logout, getToken, isLoggedIn, getUser, changePassword } from './auth'
+
+// ============ Settings API ============
+export { getSettings, saveSettings, resetSettings, getRemoteOrder, saveRemoteOrder } from './settings'

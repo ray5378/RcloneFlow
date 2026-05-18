@@ -34,3 +34,23 @@ export async function resetSettings(): Promise<void> {
   })
   if (!res.ok) throw new Error(await res.text())
 }
+
+export async function getRemoteOrder(): Promise<string[]> {
+  const res = await fetch('/api/settings', {
+    headers: { 'Authorization': `Bearer ${getToken()}` }
+  })
+  if (!res.ok) throw new Error(await res.text())
+  const data = await res.json()
+  const order = data.remote?.REMOTE_ORDER?.effective || ''
+  if (!order) return []
+  return order.split(',').map(s => s.trim()).filter(Boolean)
+}
+
+export async function saveRemoteOrder(order: string[]): Promise<void> {
+  const res = await fetch('/api/settings', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+    body: JSON.stringify({ values: { REMOTE_ORDER: order.join(',') } })
+  })
+  if (!res.ok) throw new Error(await res.text())
+}
