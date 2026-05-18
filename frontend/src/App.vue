@@ -1,15 +1,32 @@
 <script setup lang="ts">
-import { ref, onMounted, reactive, computed } from 'vue'
+import { ref, onMounted, reactive, computed, onUnmounted } from 'vue'
 import BrowserView from './views/BrowserView.vue'
 import TaskView from './views/TaskView.vue'
 import LoginView from './views/LoginView.vue'
 import DefaultsModal from './components/DefaultsModal.vue'
 import TaskManagerModal from './components/TaskManagerModal.vue'
+import ToastCenter from './components/toast/ToastCenter.vue'
+import { useToastCenter } from './composables/useToastCenter'
+import { registerToast } from './api/errors'
 
 import * as api from './api'
 import { getSettings } from './api/settings'
 import { isLoggedIn as checkAuth, getUser, logout, changePassword } from './api/auth'
 import { locale, toggleLocale, t } from './i18n'
+
+const { toasts, showToast } = useToastCenter()
+registerToast(showToast)
+
+let toastCleanup: (() => void) | null = null
+onMounted(() => {
+  const handler = (e: Event) => {
+    const detail = (e as CustomEvent).detail
+    if (detail) showToast(detail.message, detail.type, detail.duration)
+  }
+  window.addEventListener('show-toast', handler)
+  toastCleanup = () => window.removeEventListener('show-toast', handler)
+})
+onUnmounted(() => { toastCleanup?.() })
 
 const currentPage = ref(localStorage.getItem('currentPage') || (location.hash.replace('#', '') || 'browser'))
 const taskViewKey = ref(0)
@@ -129,6 +146,7 @@ onMounted(async () => {
 
 <template>
   <div class="app">
+    <ToastCenter :toasts="toasts" />
     <LoginView v-if="authChecked && !isAuth" @success="handleLoginSuccess" />
     <template v-else-if="authChecked && isAuth">
       <header class="header">
@@ -323,5 +341,12 @@ body.light .modal-footer .ghost { border-color: #ddd; color: #666; }
   .mobile-menu-overlay { align-items: stretch; }
   .mobile-menu { width: 280px; }
 }
+.toast-container { position: fixed; top: 20px; right: 20px; z-index: 10001; display: flex; flex-direction: column; gap: 8px; }
+.toast { padding: 12px 20px; border-radius: 8px; font-size: 14px; min-width: 200px; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideIn 0.2s ease; }
+.toast.info { background: #3b82f6; color: #fff; }
+.toast.success { background: #10b981; color: #fff; }
+.toast.error { background: #ef4444; color: #fff; }
+.toast.warning { background: #f59e0b; color: #fff; }
+@keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 </style>
 tyle>
