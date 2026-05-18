@@ -118,6 +118,29 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// HandleBootstrap 首屏聚合加载（任务 + 活跃运行）
+func (c *TaskController) HandleBootstrap(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(405)
+		return
+	}
+
+	tasks, err := c.taskSvc.ListTasks()
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+	activeRuns, err := c.buildActiveRunItems()
+	if err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+	WriteJSON(w, 200, map[string]any{
+		"tasks":      tasks,
+		"activeRuns": activeRuns,
+	})
+}
+
 // HandleTaskActions 处理任务操作（删除、运行）
 func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Request) {
 	p := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
