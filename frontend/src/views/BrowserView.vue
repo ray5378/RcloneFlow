@@ -54,7 +54,7 @@ const showRenameInput = ref(false)
 const renamingItem = ref<FileItem | null>(null)
 const renameInput = ref('')
 
-const remoteOrder = ref<string[]>([])
+const remoteOrder = ref<string[]>(JSON.parse(localStorage.getItem('remoteOrder') || '[]'))
 const draggedRemote = ref('')
 
 function getOrderedRemotes() {
@@ -80,18 +80,11 @@ async function loadRemoteOrder() {
     const order = await api.getRemoteOrder()
     if (order.length > 0) {
       remoteOrder.value = order
+      localStorage.setItem('remoteOrder', JSON.stringify(order))
       return
     }
   } catch {
-    // fallback to localStorage
-  }
-  const stored = localStorage.getItem('remoteOrder')
-  if (stored) {
-    try {
-      remoteOrder.value = JSON.parse(stored)
-    } catch {
-      remoteOrder.value = []
-    }
+    // fallback to localStorage (already loaded as initial value)
   }
 }
 
@@ -186,8 +179,8 @@ const breadcrumbs = computed(() => {
 })
 
 onMounted(async () => {
-  await loadRemotes()
   await loadRemoteOrder()
+  await loadRemotes()
   // Close context menu on click outside
   document.addEventListener('click', () => {
     contextMenu.value.show = false
