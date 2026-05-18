@@ -72,7 +72,7 @@ export async function importTasks(payload: {
   tasks: any[]
   schedules: any[]
   conflictStrategy: 'skip' | 'overwrite'
-}): Promise<{ imported: number; skipped: number; overwritten: number }> {
+}): Promise<{ imported: number; skipped: number; overwritten: number; remotesAdded?: number; remotesSkipped?: number }> {
   return post('/api/tasks/import', payload)
 }
 

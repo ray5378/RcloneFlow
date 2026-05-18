@@ -319,6 +319,9 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
+		if cfg, err := c.rc.DumpConfig(r.Context()); err == nil {
+			data["rcloneConfig"] = cfg
+		}
 		WriteJSON(w, 200, data)
 		return
 	}
@@ -343,10 +346,47 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
+
+		remotesAdded := 0
+		remotesSkipped := 0
+		if rcloneCfg, ok := req.RawData["rcloneConfig"].(map[string]any); ok {
+			existingRemotes, err := c.rc.ListRemotes(r.Context())
+			if err != nil {
+				existingRemotes = []string{}
+			}
+			existingSet := make(map[string]bool)
+			for _, name := range existingRemotes {
+				existingSet[strings.ToLower(name)] = true
+			}
+			for name, params := range rcloneCfg {
+				if existingSet[strings.ToLower(name)] {
+					remotesSkipped++
+					continue
+				}
+				paramMap, ok := params.(map[string]any)
+				if !ok {
+					remotesSkipped++
+					continue
+				}
+				typ, _ := paramMap["type"].(string)
+				if typ == "" {
+					remotesSkipped++
+					continue
+				}
+				if err := c.rc.CreateRemote(r.Context(), name, typ, paramMap); err == nil {
+					remotesAdded++
+				} else {
+					remotesSkipped++
+				}
+			}
+		}
+
 		WriteJSON(w, 200, map[string]any{
-			"imported":    imported,
-			"skipped":     skipped,
-			"overwritten": overwritten,
+			"imported":       imported,
+			"skipped":        skipped,
+			"overwritten":    overwritten,
+			"remotesAdded":   remotesAdded,
+			"remotesSkipped": remotesSkipped,
 		})
 		return
 	}

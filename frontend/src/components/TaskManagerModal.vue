@@ -4,16 +4,18 @@ import { exportTasks, importTasks, clearAllTasks } from '../api/task'
 import { clearAllRuns } from '../api/run'
 import { getTasks } from '../api/task'
 import { t } from '../i18n'
+import { showSuccessToast, showErrorToast } from '../api/errors'
 
 const emit = defineEmits<{
   (e: 'close'): void
+  (e: 'refresh'): void
 }>()
 
 const showConflictModal = ref(false)
 const showClearTasksConfirm = ref(false)
 const showClearHistoryConfirm = ref(false)
 const conflictCount = ref(0)
-const importResult = ref<{ imported: number; skipped: number; overwritten: number } | null>(null)
+const importResult = ref<{ imported: number; skipped: number; overwritten: number; remotesAdded?: number; remotesSkipped?: number } | null>(null)
 const importing = ref(false)
 const processing = ref(false)
 
@@ -32,8 +34,9 @@ async function handleExport() {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+    showSuccessToast(t('taskManager.exportSuccess'))
   } catch (e: any) {
-    alert(e?.message || t('taskManager.exportFailed'))
+    showErrorToast(e?.message || t('taskManager.exportFailed'))
   }
 }
 
@@ -47,21 +50,21 @@ function handleImportFile(event: Event) {
     try {
       const raw = e.target?.result
       if (raw == null) {
-        alert(t('taskManager.invalidFile') + ': 文件读取结果为空')
+        showErrorToast(t('taskManager.invalidFile') + ': 文件读取结果为空')
         return
       }
       const text = typeof raw === 'string' ? raw.trim() : new TextDecoder().decode(raw as ArrayBuffer).trim()
       if (!text) {
-        alert(t('taskManager.invalidFile') + ': 文件内容为空')
+        showErrorToast(t('taskManager.invalidFile') + ': 文件内容为空')
         return
       }
       const data = JSON.parse(text)
       if (!data.tasks || !Array.isArray(data.tasks)) {
-        alert(t('taskManager.invalidFile') + ': 缺少 tasks 字段，文件包含的键: ' + JSON.stringify(Object.keys(data)))
+        showErrorToast(t('taskManager.invalidFile') + ': 缺少 tasks 字段')
         return
       }
       if (data.tasks.length === 0) {
-        alert(t('taskManager.noTasksToImport'))
+        showErrorToast(t('taskManager.noTasksToImport'))
         return
       }
 
@@ -78,11 +81,11 @@ function handleImportFile(event: Event) {
         await doImport('skip')
       }
     } catch (err: any) {
-      alert(t('taskManager.invalidFile') + ': ' + (err?.message || String(err)))
+      showErrorToast(t('taskManager.invalidFile') + ': ' + (err?.message || String(err)))
     }
   }
   reader.onerror = () => {
-    alert(t('taskManager.invalidFile') + ': 文件读取失败')
+    showErrorToast(t('taskManager.invalidFile') + ': 文件读取失败')
   }
   reader.readAsText(file)
   input.value = ''
@@ -100,8 +103,9 @@ async function doImport(strategy: 'skip' | 'overwrite') {
     importResult.value = result
     showConflictModal.value = false
     pendingImportData = null
+    emit('refresh')
   } catch (e: any) {
-    alert(e?.message || t('taskManager.importFailed'))
+    showErrorToast(e?.message || t('taskManager.importFailed'))
   } finally {
     importing.value = false
   }
@@ -112,10 +116,11 @@ async function handleClearTasks() {
   try {
     await clearAllTasks()
     showClearTasksConfirm.value = false
-    alert(t('taskManager.clearTasksSuccess'))
+    showSuccessToast(t('taskManager.clearTasksSuccess'))
+    emit('refresh')
     emit('close')
   } catch (e: any) {
-    alert(e?.message || t('taskManager.operationFailed'))
+    showErrorToast(e?.message || t('taskManager.operationFailed'))
   } finally {
     processing.value = false
   }
@@ -126,10 +131,11 @@ async function handleClearHistory() {
   try {
     await clearAllRuns()
     showClearHistoryConfirm.value = false
-    alert(t('taskManager.clearHistorySuccess'))
+    showSuccessToast(t('taskManager.clearHistorySuccess'))
+    emit('refresh')
     emit('close')
   } catch (e: any) {
-    alert(e?.message || t('taskManager.operationFailed'))
+    showErrorToast(e?.message || t('taskManager.operationFailed'))
   } finally {
     processing.value = false
   }

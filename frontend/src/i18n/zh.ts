@@ -531,10 +531,11 @@ export default {
   taskManager: {
     title: '任务管理',
     exportTasks: '导出所有任务',
-    exportHint: '导出任务和定时任务配置，用于备份',
+    exportHint: '导出任务、定时任务和 rclone 配置，用于备份',
     exportFailed: '导出失败',
+    exportSuccess: '导出成功',
     importTasks: '导入任务',
-    importHint: '从备份文件导入任务，追加到现有列表',
+    importHint: '从备份文件导入任务、定时任务和 rclone 配置，追加到现有列表',
     clearAllTasks: '清空所有任务',
     clearAllTasksHint: '删除所有任务、定时任务和运行历史',
     clearHistory: '清空所有任务历史',

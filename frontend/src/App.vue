@@ -258,7 +258,7 @@ onMounted(async () => {
       </div>
 
       <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal = false" @settings-saved="handleDefaultsSaved" />
-      <TaskManagerModal v-if="showTaskManagerModal" @close="showTaskManagerModal = false" />
+      <TaskManagerModal v-if="showTaskManagerModal" @close="showTaskManagerModal = false" @refresh="taskViewKey++" />
     </template>
   </div>
 </template>

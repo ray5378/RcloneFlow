@@ -531,10 +531,11 @@ export default {
   taskManager: {
     title: 'Task Manager',
     exportTasks: 'Export all tasks',
-    exportHint: 'Export tasks and schedules for backup',
+    exportHint: 'Export tasks, schedules, and rclone config for backup',
     exportFailed: 'Export failed',
+    exportSuccess: 'Export successful',
     importTasks: 'Import tasks',
-    importHint: 'Import tasks from a backup file, appended to existing list',
+    importHint: 'Import tasks, schedules, and rclone config from a backup file, appended to existing list',
     clearAllTasks: 'Clear all tasks',
     clearAllTasksHint: 'Delete all tasks, schedules, and run history',
     clearHistory: 'Clear all run history',
