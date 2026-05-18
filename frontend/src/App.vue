@@ -154,7 +154,7 @@ onMounted(async () => {
           <span v-if="!showMobileMenu">☰</span>
           <span v-else>✕</span>
         </button>
-        <div class="header-brand">RcloneFlow <small v-if="!isMobile">{{ version }}</small></div>
+        <div class="header-brand">RcloneFlow <small>{{ version }}</small></div>
         <nav v-if="!isMobile" class="header-nav">
           <button v-for="(page, key) in pages" :key="key" :class="{ active: currentPage === key }" @click="switchPage(key)">
             <span class="nav-icon">{{ page.icon }}</span>
@@ -182,7 +182,7 @@ onMounted(async () => {
                 <span>{{ page.name }}</span>
               </button>
             </nav>
-            <div class="mobile-menu-footer"><div class="version-info">{{ version }}</div></div>
+            <div class="mobile-menu-footer"></div>
           </div>
         </div>
       </transition>
@@ -299,7 +299,7 @@ onMounted(async () => {
 .main { min-height: calc(100vh - 56px); }
 .mobile-menu-btn, .close-btn { background: transparent; border: none; color: inherit; font-size: 22px; }
 .mobile-menu-overlay, .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex; align-items: center; justify-content: center; z-index: 50; }
-.mobile-menu { width: 320px; max-width: 92vw; height: 100%; background: #161616; padding: 16px; box-sizing: border-box; }
+.mobile-menu { width: 320px; max-width: 92vw; height: auto; max-height: 80vh; background: #161616; padding: 16px; box-sizing: border-box; border-radius: 12px; }
 .mobile-menu-header, .modal-header { display: flex; align-items: center; justify-content: space-between; }
 .mobile-menu-title { font-size: 18px; font-weight: 700; }
 .mobile-menu-nav { display: flex; flex-direction: column; gap: 10px; margin-top: 24px; }
@@ -340,8 +340,8 @@ body.light .field-item input { background: #f5f5f5; border-color: #ddd; color: #
 body.light .modal-footer .ghost { border-color: #ddd; color: #666; }
 @media (max-width: 768px) {
   .settings-modal { max-width: 100%; }
-  .mobile-menu-overlay { align-items: stretch; }
-  .mobile-menu { width: 280px; }
+  .mobile-menu-overlay { align-items: center; justify-content: flex-start; padding-top: 70px; }
+  .mobile-menu { width: 280px; border-radius: 12px; }
 }
 .toast-container { position: fixed; top: 20px; right: 20px; z-index: 10001; display: flex; flex-direction: column; gap: 8px; }
 .toast { padding: 12px 20px; border-radius: 8px; font-size: 14px; min-width: 200px; max-width: 400px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); animation: slideIn 0.2s ease; }
