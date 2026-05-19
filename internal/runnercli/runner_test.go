@@ -848,3 +848,121 @@ func containsCallArg(lines []string, want string) bool {
 	}
 	return false
 }
+
+func TestParseUnit(t *testing.T) {
+	tests := []struct {
+		input string
+		want  float64
+	}{
+		{"0 B", 0},
+		{"500 B", 500},
+		{"1 KiB", 1024},
+		{"1.5 KiB", 1536},
+		{"1 MiB", 1048576},
+		{"1 GiB", 1073741824},
+		{"1 TiB", 1099511627776},
+		{"1 PiB", 1125899906842624},
+		{"3.055 MiB", 3.055 * 1024 * 1024},
+		{"508KiB", 508 * 1024},
+		{"100", 100},
+		{"", 0},
+		{"invalid", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			got := parseUnit(tt.input)
+			if tt.want == 0 {
+				if got != 0 {
+					t.Errorf("parseUnit(%q) = %f, want 0", tt.input, got)
+				}
+			} else {
+				diff := got - tt.want
+				if diff < 0 {
+					diff = -diff
+				}
+				if diff > tt.want*0.01 {
+					t.Errorf("parseUnit(%q) = %f, want %f", tt.input, got, tt.want)
+				}
+			}
+		})
+	}
+}
+
+func TestUnitToMul(t *testing.T) {
+	tests := []struct {
+		unit string
+		want float64
+	}{
+		{"", 1},
+		{"K", 1024},
+		{"KI", 1024},
+		{"M", 1024 * 1024},
+		{"MI", 1024 * 1024},
+		{"G", 1024 * 1024 * 1024},
+		{"GI", 1024 * 1024 * 1024},
+		{"T", 1024 * 1024 * 1024 * 1024},
+		{"TI", 1024 * 1024 * 1024 * 1024},
+		{"P", 1024 * 1024 * 1024 * 1024 * 1024},
+		{"PI", 1024 * 1024 * 1024 * 1024 * 1024},
+		{"X", 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.unit, func(t *testing.T) {
+			if got := unitToMul(tt.unit); got != tt.want {
+				t.Errorf("unitToMul(%q) = %f, want %f", tt.unit, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestHumanDuration(t *testing.T) {
+	tests := []struct {
+		seconds int64
+		want    string
+	}{
+		{0, "0秒"},
+		{1, "1秒"},
+		{59, "59秒"},
+		{60, "1分"},
+		{61, "1分1秒"},
+		{3600, "1小时"},
+		{3661, "1小时1分1秒"},
+		{86400, "24小时"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.want, func(t *testing.T) {
+			if got := humanDuration(tt.seconds); got != tt.want {
+				t.Errorf("humanDuration(%d) = %q, want %q", tt.seconds, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseETA(t *testing.T) {
+	tests := []struct {
+		input string
+		want  int
+	}{
+		{"1m26s", 86},
+		{"2h3m4s", 7384},
+		{"45s", 45},
+		{"1h", 3600},
+		{"", 0},
+		{"invalid", 0},
+		{"-", 0},
+		{"01:23:45", 5025},
+		{"12:34", 754},
+		{"1d2h3m4s", 93784},
+		{"1d2h", 93600},
+		{"2h3m", 7380},
+		{"3m4s", 184},
+		{"1d", 86400},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			if got := parseETA(tt.input); got != tt.want {
+				t.Errorf("parseETA(%q) = %d, want %d", tt.input, got, tt.want)
+			}
+		})
+	}
+}

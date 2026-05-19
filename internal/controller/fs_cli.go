@@ -140,7 +140,7 @@ func canonicalRemoteName(name string) string {
 	return name
 }
 
-func runRclone(ctx context.Context, args ...string) (string, error) {
+var runRclone = func(ctx context.Context, args ...string) (string, error) {
 	// attach config
 	cfg := rcConfigPath()
 	if _, err := os.Stat(cfg); err == nil {

@@ -260,3 +260,30 @@ func TestProviders(t *testing.T) {
 		t.Fatalf("unexpected providers: %+v", providers)
 	}
 }
+
+func TestTaskOptions_IsEmpty(t *testing.T) {
+	var opts *TaskOptions
+	if !opts.IsEmpty() {
+		t.Error("nil TaskOptions should be empty")
+	}
+
+	opts = &TaskOptions{}
+	if !opts.IsEmpty() {
+		t.Error("zero-value TaskOptions should be empty")
+	}
+
+	opts = &TaskOptions{Exclude: []string{"*.tmp"}}
+	if opts.IsEmpty() {
+		t.Error("TaskOptions with Exclude should not be empty")
+	}
+
+	opts = &TaskOptions{IgnoreExisting: true}
+	if opts.IsEmpty() {
+		t.Error("TaskOptions with IgnoreExisting should not be empty")
+	}
+
+	opts = &TaskOptions{MinSize: "1M"}
+	if opts.IsEmpty() {
+		t.Error("TaskOptions with MinSize should not be empty")
+	}
+}

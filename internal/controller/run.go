@@ -889,6 +889,8 @@ func (c *RunController) HandleTaskKill(w http.ResponseWriter, r *http.Request) {
 	WriteJSON(w, 404, map[string]any{"error": "pid not found"})
 }
 
+var findProcess = os.FindProcess
+
 func killRunBySummary(run service.RunRecord) bool {
 	var pid int
 	var sum map[string]any
@@ -909,13 +911,13 @@ func killRunBySummary(run service.RunRecord) bool {
 		}
 	}
 	if pid > 0 {
-		if p, err := os.FindProcess(pid); err == nil {
+		if p, err := findProcess(pid); err == nil {
 			_ = p.Kill()
 			time.Sleep(2 * time.Second)
-			if p2, err := os.FindProcess(pid); err == nil {
+			if p2, err := findProcess(pid); err == nil {
 				_ = p2.Kill()
 				time.Sleep(2 * time.Second)
-				if p3, err := os.FindProcess(pid); err == nil {
+				if p3, err := findProcess(pid); err == nil {
 					_ = p3.Kill()
 				}
 			}

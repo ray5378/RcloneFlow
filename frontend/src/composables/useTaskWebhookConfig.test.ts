@@ -75,4 +75,74 @@ describe('useTaskWebhookConfig', () => {
       },
     }))
   })
+
+  it('should open and close modal', () => {
+    const { showWebhookModal, setWebhook } = useTaskWebhookConfig({ loadData, showToast })
+
+    expect(showWebhookModal.value).toBe(false)
+
+    setWebhook({ id: 1, options: {} })
+    expect(showWebhookModal.value).toBe(true)
+  })
+
+  it('should handle string options', () => {
+    const { webhookForm, setWebhook } = useTaskWebhookConfig({ loadData, showToast })
+
+    setWebhook({
+      id: 4,
+      options: JSON.stringify({
+        webhookPostUrl: 'http://example.com',
+        wecomPostUrl: 'http://wecom.com',
+        webhookId: 'trigger-1',
+        webhookMatchText: 'match',
+      }),
+    })
+
+    expect(webhookForm.value.postUrl).toBe('http://example.com')
+    expect(webhookForm.value.wecomUrl).toBe('http://wecom.com')
+    expect(webhookForm.value.triggerId).toBe('trigger-1')
+    expect(webhookForm.value.matchText).toBe('match')
+  })
+
+  it('should handle invalid options', () => {
+    const { webhookForm, setWebhook } = useTaskWebhookConfig({ loadData, showToast })
+
+    setWebhook({ id: 5, options: 'invalid-json' })
+
+    expect(webhookForm.value.postUrl).toBe('')
+    expect(webhookForm.value.notify).toEqual({ manual: false, schedule: false, webhook: false })
+  })
+
+  it('should save webhook settings', async () => {
+    const { webhookForm, saveWebhook } = useTaskWebhookConfig({ loadData, showToast })
+
+    webhookForm.value.taskId = 6
+    webhookForm.value.postUrl = 'http://example.com'
+    webhookForm.value.notify = { manual: true, schedule: false, webhook: true }
+
+    await saveWebhook()
+
+    expect((api as any).updateTaskOptions).toHaveBeenCalled()
+    expect(loadData).toHaveBeenCalled()
+  })
+
+  it('should do nothing when taskId is null', async () => {
+    const { saveWebhook } = useTaskWebhookConfig({ loadData, showToast })
+
+    await saveWebhook()
+
+    expect((api as any).updateTaskOptions).not.toHaveBeenCalled()
+  })
+
+  it('should show error when no URL configured', async () => {
+    const { webhookForm, testWebhook } = useTaskWebhookConfig({ loadData, showToast })
+
+    webhookForm.value.taskId = 7
+    webhookForm.value.postUrl = ''
+    webhookForm.value.wecomUrl = ''
+
+    await testWebhook()
+
+    expect(showToast).toHaveBeenCalledWith(expect.any(String), 'error')
+  })
 })

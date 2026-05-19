@@ -180,3 +180,39 @@ func TestActiveTransferController_RestoreFromSummarySnapshot(t *testing.T) {
 		t.Fatalf("completed total=%v", completed["total"])
 	}
 }
+
+func TestAnyInt64(t *testing.T) {
+	if anyInt64(float64(42)) != 42 {
+		t.Errorf("anyInt64(float64(42)) = %d, want 42", anyInt64(float64(42)))
+	}
+	if anyInt64(int64(100)) != 100 {
+		t.Errorf("anyInt64(int64(100)) = %d, want 100", anyInt64(int64(100)))
+	}
+	if anyInt64(int(200)) != 200 {
+		t.Errorf("anyInt64(int(200)) = %d, want 200", anyInt64(int(200)))
+	}
+	if anyInt64(nil) != 0 {
+		t.Errorf("anyInt64(nil) = %d, want 0", anyInt64(nil))
+	}
+	if anyInt64("invalid") != 0 {
+		t.Errorf("anyInt64(\"invalid\") = %d, want 0", anyInt64("invalid"))
+	}
+}
+
+func TestAnyFloat64(t *testing.T) {
+	if anyFloat64(float64(3.14)) != 3.14 {
+		t.Errorf("anyFloat64(float64(3.14)) = %f, want 3.14", anyFloat64(float64(3.14)))
+	}
+	if anyFloat64(int64(100)) != 100.0 {
+		t.Errorf("anyFloat64(int64(100)) = %f, want 100.0", anyFloat64(int64(100)))
+	}
+	if anyFloat64(int(200)) != 200.0 {
+		t.Errorf("anyFloat64(int(200)) = %f, want 200.0", anyFloat64(int(200)))
+	}
+	if anyFloat64(nil) != 0 {
+		t.Errorf("anyFloat64(nil) = %f, want 0", anyFloat64(nil))
+	}
+	if anyFloat64("invalid") != 0 {
+		t.Errorf("anyFloat64(\"invalid\") = %f, want 0", anyFloat64("invalid"))
+	}
+}

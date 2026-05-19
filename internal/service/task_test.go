@@ -501,3 +501,239 @@ func TestTaskService_DeleteTask_RemovesAllKnownRunLogs(t *testing.T) {
 		t.Fatal("expected task deleted")
 	}
 }
+
+func TestTaskService_GetTask(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	task, err := svc.CreateTask(store.Task{Name: "get-task", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	got, ok := svc.GetTask(task.ID)
+	if !ok {
+		t.Fatal("expected task to be found")
+	}
+	if got.Name != "get-task" {
+		t.Errorf("expected Name 'get-task', got '%s'", got.Name)
+	}
+
+	_, ok = svc.GetTask(999)
+	if ok {
+		t.Error("expected task 999 to not be found")
+	}
+}
+
+func TestTaskService_ListTasks_WithDB(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	_, err = svc.CreateTask(store.Task{Name: "task1", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+	_, err = svc.CreateTask(store.Task{Name: "task2", Mode: "sync", SourceRemote: "src", SourcePath: "/c", TargetRemote: "dst", TargetPath: "/d"})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	tasks, err := svc.ListTasks()
+	if err != nil {
+		t.Fatalf("ListTasks() error = %v", err)
+	}
+	if len(tasks) != 2 {
+		t.Errorf("expected 2 tasks, got %d", len(tasks))
+	}
+}
+
+func TestTaskService_UpdateTaskOptions(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	task, err := svc.CreateTask(store.Task{Name: "opts-task", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	opts := map[string]any{"transfers": 4, "checkers": 8}
+	err = svc.UpdateTaskOptions(task.ID, opts)
+	if err != nil {
+		t.Fatalf("UpdateTaskOptions() error = %v", err)
+	}
+
+	got, _ := db.GetTask(task.ID)
+	var parsed map[string]any
+	if err := json.Unmarshal(got.Options, &parsed); err != nil {
+		t.Fatalf("failed to parse options: %v", err)
+	}
+	if parsed["transfers"] != float64(4) {
+		t.Errorf("expected transfers=4, got %v", parsed["transfers"])
+	}
+}
+
+func TestTaskService_UpdateTaskSortOrders(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	task1, _ := svc.CreateTask(store.Task{Name: "task-a", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	task2, _ := svc.CreateTask(store.Task{Name: "task-b", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+
+	// Just verify it doesn't error
+	orders := map[int64]int64{task1.ID: 10, task2.ID: 20}
+	err = svc.UpdateTaskSortOrders(orders, task1.ID)
+	if err != nil {
+		t.Fatalf("UpdateTaskSortOrders() error = %v", err)
+	}
+
+	// Verify tasks still exist
+	tasks, _ := svc.ListTasks()
+	if len(tasks) != 2 {
+		t.Errorf("expected 2 tasks, got %d", len(tasks))
+	}
+}
+
+func TestTaskService_ExportTasks(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	_, err = svc.CreateTask(store.Task{Name: "export-task", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	exported, err := svc.ExportTasks()
+	if err != nil {
+		t.Fatalf("ExportTasks() error = %v", err)
+	}
+	tasks, ok := exported["tasks"].([]map[string]any)
+	if !ok {
+		t.Fatal("expected tasks in export")
+	}
+	if len(tasks) != 1 {
+		t.Errorf("expected 1 task in export, got %d", len(tasks))
+	}
+}
+
+func TestTaskService_ImportTasks(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+
+	importData := map[string]any{
+		"tasks": []any{
+			map[string]any{
+				"name":         "imported-task",
+				"mode":         "sync",
+				"sourceRemote": "src",
+				"sourcePath":   "/a",
+				"targetRemote": "dst",
+				"targetPath":   "/b",
+			},
+		},
+	}
+
+	imported, skipped, overwritten, err := svc.ImportTasks(importData, "skip")
+	if err != nil {
+		t.Fatalf("ImportTasks() error = %v", err)
+	}
+	if imported != 1 {
+		t.Errorf("expected 1 imported, got %d", imported)
+	}
+	if skipped != 0 {
+		t.Errorf("expected 0 skipped, got %d", skipped)
+	}
+	if overwritten != 0 {
+		t.Errorf("expected 0 overwritten, got %d", overwritten)
+	}
+}
+
+func TestTaskService_ClearAllTasks(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tasksvc_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTaskService(db, nil)
+	_, err = svc.CreateTask(store.Task{Name: "clear-task", Mode: "copy", SourceRemote: "src", SourcePath: "/a", TargetRemote: "dst", TargetPath: "/b"})
+	if err != nil {
+		t.Fatalf("CreateTask() error = %v", err)
+	}
+
+	err = svc.ClearAllTasks()
+	if err != nil {
+		t.Fatalf("ClearAllTasks() error = %v", err)
+	}
+
+	tasks, _ := svc.ListTasks()
+	if len(tasks) != 0 {
+		t.Errorf("expected 0 tasks after clear, got %d", len(tasks))
+	}
+}
