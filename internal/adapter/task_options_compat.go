@@ -39,7 +39,7 @@ func normalizeTaskOptionsMap(obj map[string]any) map[string]any {
 		}
 	}
 	if v, ok := obj["multiThreadStreams"]; ok {
-		obj["multiThreadStreams"] = normalizeIntLike(v)
+		obj["multiThreadStreams"] = NormalizeIntLike(v)
 	}
 	return obj
 }
@@ -74,7 +74,7 @@ func normalizeStringSliceLike(v any) any {
 	}
 }
 
-func normalizeIntLike(v any) int {
+func NormalizeIntLike(v any) int {
 	switch vv := v.(type) {
 	case nil:
 		return 0

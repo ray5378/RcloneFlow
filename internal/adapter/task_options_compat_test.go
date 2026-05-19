@@ -109,3 +109,35 @@ func TestMergeTaskOptions_PreservesOpenlistCASCompatible(t *testing.T) {
 		t.Fatalf("expected OpenlistCasCompatible to be preserved")
 	}
 }
+
+func TestNormalizeIntLike(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    any
+		expected int
+	}{
+		{"nil", nil, 0},
+		{"bool true", true, 4},
+		{"bool false", false, 0},
+		{"float64", 8.0, 8},
+		{"float32", float32(16), 16},
+		{"int", 32, 32},
+		{"int64", int64(64), 64},
+		{"string true", "true", 4},
+		{"string FALSE", "FALSE", 0},
+		{"string 128", "128", 128},
+		{"string empty", "", 0},
+		{"string invalid", "invalid", 0},
+		{"json.Number", json.Number("256"), 256},
+		{"default", "other", 0},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := NormalizeIntLike(tc.input)
+			if got != tc.expected {
+				t.Fatalf("expected %d, got %d", tc.expected, got)
+			}
+		})
+	}
+}
