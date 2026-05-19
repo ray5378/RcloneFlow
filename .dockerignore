@@ -1,0 +1,67 @@
+# Binaries
+/server
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of go coverage
+*.out
+
+# Dependency directories
+vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local data
+data/
+*.log
+*.pid
+
+# Environment
+.env
+.env.local
+
+# Backup files
+*.bak
+*.backup
+
+# Frontend
+frontend/dist/
+frontend/node_modules/
+frontend/coverage/
+web/
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Local build acceleration caches
+third_party/docker/
+third_party/npm-cache/
+third_party/go-mod-cache/
+third_party/apk-cache/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose*.yml
+
+# Documentation
+*.md
+LICENSE

@@ -21,10 +21,9 @@ RUN npm run build
 # Stage 2: go build (Alpine)
 FROM golang:1.25-alpine AS gobuilder
 RUN set -eux; \
-    echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/main" > /etc/apk/repositories; \
-    echo "https://dl-cdn.alpinelinux.org/alpine/v3.19/community" >> /etc/apk/repositories; \
-    echo "https://mirrors.aliyun.com/alpine/v3.19/main" >> /etc/apk/repositories; \
-    echo "https://mirrors.aliyun.com/alpine/v3.19/community" >> /etc/apk/repositories; \
+    alpine_ver=$(grep '^VERSION_ID' /etc/os-release | cut -d= -f2 | cut -d. -f1,2); \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v${alpine_ver}/main" > /etc/apk/repositories; \
+    echo "https://dl-cdn.alpinelinux.org/alpine/v${alpine_ver}/community" >> /etc/apk/repositories; \
     for i in 1 2 3; do apk update && apk add --no-cache build-base git sqlite-dev ca-certificates tzdata wget curl unzip && break || (echo "apk failed, retry $i" && sleep 5); done
 WORKDIR /app
 ENV GOPROXY=https://goproxy.cn,direct \
