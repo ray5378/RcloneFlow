@@ -2,7 +2,7 @@
 # 已移除对仓库内 third_party 构建缓存的依赖，避免收尾阶段继续耦合本地临时缓存。
 
 # Stage 1: web build (Vite + Vue)
-FROM node:18-alpine AS webbuilder
+FROM node:20-alpine AS webbuilder
 WORKDIR /fe
 COPY frontend/package*.json ./
 ENV NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
