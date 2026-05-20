@@ -2,3 +2,4 @@
 {"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T01:18:59.323Z","caller":"logger/logger_test.go:118","msg":"json format test"}
 {"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T01:28:18.192Z","caller":"logger/logger_test.go:118","msg":"json format test"}
 {"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T01:38:46.415Z","caller":"logger/logger_test.go:118","msg":"json format test"}
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T02:21:46.849Z","caller":"logger/logger_test.go:118","msg":"json format test"}

@@ -13,7 +13,6 @@ import { formatBytes, formatBytesPerSec, formatEta } from '../utils/format'
 import { useRunningHintRuntime } from '../composables/useRunningHintRuntime'
 import { useTaskHistoryRuntime } from '../composables/useTaskHistoryRuntime'
 import { useTaskViewRuntime } from '../composables/useTaskViewRuntime'
-import { useTaskViewState } from '../composables/useTaskViewState'
 import { useTaskViewRuntimeState } from '../composables/useTaskViewRuntimeState'
 import { useTaskViewAuxRuntime } from '../composables/useTaskViewAuxRuntime'
 import { useRunDetailRuntime } from '../composables/useRunDetailRuntime'
@@ -84,10 +83,6 @@ const {
   currentModule,
   historyFilterTaskId,
   historyStatusFilter,
-} = useTaskViewState()
-
-// 3) 运行时状态（active runs / 全局统计 / lookup）
-const {
   activeRuns,
   globalStats,
   showGlobalStatsModal,

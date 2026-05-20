@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { t } from '../i18n'
-import AddRemoteModal from '../components/AddRemoteModal.vue'
-import EditDescModal from '../components/EditDescModal.vue'
+import AddRemoteModal from '../components/modals/AddRemoteModal.vue'
+import EditDescModal from '../components/modals/EditDescModal.vue'
 import * as api from '../api'
 import type { RemoteTestState, FileItem } from '../types'
 

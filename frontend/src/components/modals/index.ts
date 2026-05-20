@@ -1,0 +1,5 @@
+export { default as AddRemoteModal } from './AddRemoteModal.vue'
+export { default as DefaultsModal } from './DefaultsModal.vue'
+export { default as EditDescModal } from './EditDescModal.vue'
+export { default as Modal } from './Modal.vue'
+export { default as TaskManagerModal } from './TaskManagerModal.vue'
