@@ -117,6 +117,7 @@ export function useActiveTransferDetail() {
   const transferSlots = ref(1)
   const completedItems = ref<ActiveTransferCompletedFile[]>([])
   const pendingItems = ref<ActiveTransferPendingFile[]>([])
+  const rawPendingItems = ref<ActiveTransferPendingFile[]>([])
   const completedTotal = ref(0)
   const pendingTotal = ref(0)
   const completedPage = ref(1)
@@ -128,7 +129,11 @@ export function useActiveTransferDetail() {
   const error = ref('')
 
   const completedTotalPages = computed(() => Math.max(1, Math.ceil(Math.max(completedTotal.value, 0) / PAGE_SIZE)))
-  const pendingTotalPages = computed(() => Math.max(1, Math.ceil(Math.max(pendingTotal.value, 0) / PAGE_SIZE)))
+  const pendingTotalPages = computed(() => {
+    const currentKeys = new Set((currentFiles.value || []).map(item => item.path || item.name).filter(Boolean))
+    const filtered = currentKeys.size ? rawPendingItems.value.filter(item => !currentKeys.has(item.path || item.name)) : rawPendingItems.value
+    return Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  })
 
   function shouldHandleRunMessage(incomingRunId: any, incomingTaskId?: any) {
     return visible.value && (
@@ -146,6 +151,7 @@ export function useActiveTransferDetail() {
 
     const completed = sortCompletedItems(snapshot.completed || [])
     const pending = sortPendingItems(snapshot.pending || [])
+    rawPendingItems.value = pending
     const wasBrowsingCompletedLastPage = completedPage.value > 1 && completedPage.value === completedTotalPages.value
     const nextCompletedTotal = Number(snapshot.completedCount || completed.length || 0)
     const nextPendingTotal = Number(snapshot.pendingCount || pending.length || 0)
@@ -164,8 +170,10 @@ export function useActiveTransferDetail() {
     } else if (wasBrowsingCompletedLastPage) {
       completedItems.value = appendNewCompletedItemsForLastPage(completedItems.value, completed)
     }
+    const currentKeys = new Set((currentFiles.value || []).map(item => item.path || item.name).filter(Boolean))
+    const filteredPending = currentKeys.size ? pending.filter(item => !currentKeys.has(item.path || item.name)) : pending
     if (pendingPage.value <= 1) {
-      pendingItems.value = pending.slice(0, PAGE_SIZE)
+      pendingItems.value = filteredPending.slice(0, PAGE_SIZE)
     }
 
     const stableTotalCount = Math.max(
@@ -201,7 +209,7 @@ export function useActiveTransferDetail() {
       const [overview, completed, pending] = await Promise.all([
         getActiveTransfer(taskId.value),
         getActiveTransferCompleted(taskId.value, Math.max(0, (completedPage.value - 1) * PAGE_SIZE), PAGE_SIZE),
-        getActiveTransferPending(taskId.value, Math.max(0, (pendingPage.value - 1) * PAGE_SIZE), PAGE_SIZE),
+        getActiveTransferPending(taskId.value, Math.max(0, (pendingPage.value - 1) * PAGE_SIZE), PAGE_SIZE * 2),
       ])
       runId.value = overview.runId
       trackingMode.value = overview.trackingMode
@@ -211,7 +219,11 @@ export function useActiveTransferDetail() {
       transferSlots.value = Math.max(1, Number(overview.transferSlots || overview.summary?.transferSlots || transferSlots.value || 1))
       degraded.value = !!overview.degraded
       completedItems.value = sortCompletedItems(completed.items || [])
-      pendingItems.value = sortPendingItems(pending.items || [])
+      rawPendingItems.value = sortPendingItems(pending.items || [])
+      const currentKeys = new Set((currentFiles.value || []).map(item => item.path || item.name).filter(Boolean))
+      const filteredPending = currentKeys.size ? rawPendingItems.value.filter(item => !currentKeys.has(item.path || item.name)) : rawPendingItems.value
+      const startIdx = Math.max(0, (pendingPage.value - 1) * PAGE_SIZE)
+      pendingItems.value = filteredPending.slice(startIdx, startIdx + PAGE_SIZE)
       completedTotal.value = completed.total || 0
       pendingTotal.value = pending.total || 0
       if (completedPage.value > completedTotalPages.value) {
@@ -231,6 +243,7 @@ export function useActiveTransferDetail() {
         transferSlots.value = 1
         completedItems.value = []
         pendingItems.value = []
+        rawPendingItems.value = []
         completedTotal.value = 0
         pendingTotal.value = 0
         degraded.value = false
@@ -264,6 +277,7 @@ export function useActiveTransferDetail() {
     transferSlots.value = 1
     completedItems.value = []
     pendingItems.value = []
+    rawPendingItems.value = []
     completedTotal.value = 0
     pendingTotal.value = 0
     completedPage.value = 1
@@ -318,10 +332,7 @@ export function useActiveTransferDetail() {
   }
 
   const visibleCompletedItems = computed(() => completedItems.value)
-  const visiblePendingItems = computed(() => {
-    const currentKeys = new Set((currentFiles.value || []).map(item => item.path || item.name).filter(Boolean))
-    return currentKeys.size ? pendingItems.value.filter(item => !currentKeys.has(item.path || item.name)) : pendingItems.value
-  })
+  const visiblePendingItems = computed(() => pendingItems.value)
 
   const offActiveTransferSnapshot = onWsMessage('active_transfer_snapshot', (data) => {
     if (shouldHandleRunMessage(data?.run_id, data?.task_id) && data?.snapshot) {
