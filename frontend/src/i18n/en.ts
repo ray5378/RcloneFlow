@@ -238,6 +238,9 @@ export default {
     sortNumber: 'Sort number',
     sortHint: 'Enter sort numbers directly. Smaller numbers appear first, gaps are allowed. If a number is already used, the replaced task is automatically pushed down.',
     sortAutoSaveHint: 'After entering a sort number, press Enter: the list is immediately reordered with collision replacement and all task numbers are normalized into a continuous sequence. When the result looks right, click Save sort to write everything to the database.',
+    tagsAction: 'Actions',
+    tagsKeyword: 'Keywords',
+    tagsClear: 'Clear filter',
   },
   runItem: {
     finished: 'Finished',

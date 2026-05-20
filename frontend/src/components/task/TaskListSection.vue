@@ -5,6 +5,7 @@ import TaskListHeader from './TaskListHeader.vue'
 import TaskListPagination from './TaskListPagination.vue'
 import type { Schedule, Task } from '../../types'
 import type { TaskProgressLike } from './progressText'
+import type { Tag } from '../../api/tags'
 import { t } from '../../i18n'
 
 type SortableTask = Task & { __previewSortOrder?: number }
@@ -23,6 +24,8 @@ const props = defineProps<{
   currentTasksPages: number
   tasksJumpPage: number | null
   savingSort?: boolean
+  actionTags: Tag[]
+  keywordTags: Tag[]
   saveTaskSortOrders: (orders: Record<number, number>, priorityTaskId?: number) => Promise<boolean>
 }>()
 
@@ -233,6 +236,8 @@ function handleLastPage() {
       :search="search"
       :sorting="sorting"
       :saving-sort="savingSort || savingNow"
+      :action-tags="actionTags"
+      :keyword-tags="keywordTags"
       @update:search="emit('update:search', $event)"
       @add="emit('add')"
       @toggle-sort="startSort"

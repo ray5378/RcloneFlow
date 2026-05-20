@@ -8,9 +8,15 @@ import (
 type User struct {
 	ID              int64     `json:"id"`
 	Username        string    `json:"username"`
-	Password        string    `json:"-"` // 不返回密码
+	Password        string    `json:"-"`
 	PasswordChanged bool      `json:"passwordChanged"`
 	CreatedAt       time.Time `json:"createdAt"`
+}
+
+type Tag struct {
+	ID   int64  `json:"id"`
+	Tag  string `json:"tag"`
+	Type string `json:"type"`
 }
 
 type Task struct {

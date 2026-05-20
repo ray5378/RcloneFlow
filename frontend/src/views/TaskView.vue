@@ -21,12 +21,13 @@ import { useTaskFormNormalize } from '../composables/useTaskFormNormalize'
 import { useTaskFormRuntime } from '../composables/useTaskFormRuntime'
 import { useTaskListRuntime } from '../composables/useTaskListRuntime'
 import { useTaskListView } from '../composables/useTaskListView'
+import { useTaskTags } from '../composables/useTaskTags'
 import { useTaskViewPagingBridge } from '../composables/useTaskViewPagingBridge'
 import { useTaskViewModalBindings } from '../composables/useTaskViewModalBindings'
 import { useToastCenter } from '../composables/useToastCenter'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 import { useActiveTransferDetail } from '../composables/useActiveTransferDetail'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { t } from '../i18n'
 import { useScheduleConfigModal } from '../composables/useScheduleConfigModal'
 
@@ -103,6 +104,10 @@ const {
   filteredTasks,
   jumpToTasksPage,
 } = useTaskListView(tasks)
+
+const { actionTags, keywordTags, reload: reloadTags } = useTaskTags(tasks)
+
+watch(tasks, () => { reloadTags() }, { deep: true })
 
 // 5) 运行详情 / 最终总结链
 const {
@@ -489,6 +494,8 @@ function closeTaskEditorModal() {
     :set-singleton-enabled="setSingletonEnabled"
     :save-singleton="saveSingleton"
     :close-singleton-modal="closeSingletonModal"
+    :action-tags="actionTags"
+    :keyword-tags="keywordTags"
   />
 
   <TaskHistoryViewShell

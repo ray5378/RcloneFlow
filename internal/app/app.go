@@ -101,8 +101,16 @@ func Run(cfg *config.Config) error {
 	fsCtrl := controller.NewFsController(rc)
 	authCtrl := controller.NewAuthController(db)
 
+	// 标签服务
+	tagSvc := service.NewTagService(db)
+	taskSvc.SetTagService(tagSvc)
+	if err := tagSvc.RecalcTags(); err != nil {
+		logger.Error("标签初始化失败", zap.Error(err))
+	}
+	tagCtrl := controller.NewTagController(tagSvc)
+
 	// 初始化路由
-	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, cfg.GetStaticDir())
+	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, cfg.GetStaticDir())
 
 	// 注入 settings → cleanup 重排钩子（在声明服务之后再赋值）
 	var cleanupSvc *service.CleanupService

@@ -24,6 +24,7 @@ type TaskService struct {
 	db        *store.DB
 	runner    adapter.TaskRunner
 	activeMgr *active_transfer.Manager
+	tagSvc    *TagService
 }
 
 // NewTaskService 创建任务服务
@@ -33,6 +34,18 @@ func NewTaskService(db *store.DB, runner adapter.TaskRunner, activeMgr ...*activ
 		mgr = activeMgr[0]
 	}
 	return &TaskService{db: db, runner: runner, activeMgr: mgr}
+}
+
+func (s *TaskService) SetTagService(svc *TagService) {
+	s.tagSvc = svc
+}
+
+func (s *TaskService) recalcTags() {
+	if s.tagSvc != nil {
+		if err := s.tagSvc.RecalcTags(); err != nil {
+			logger.Error("recalc tags failed", zap.Error(err))
+		}
+	}
 }
 
 // ListTasks 获取所有任务
@@ -45,7 +58,11 @@ func (s *TaskService) CreateTask(task store.Task) (store.Task, error) {
 	if err := s.ensureTaskNameUnique(task.Name, 0); err != nil {
 		return store.Task{}, err
 	}
-	return s.db.AddTask(task)
+	result, err := s.db.AddTask(task)
+	if err == nil {
+		s.recalcTags()
+	}
+	return result, err
 }
 
 // UpdateTask 更新任务（容忍部分字段未提供；未提供的字段保持不变，避免误清空）
@@ -79,7 +96,11 @@ func (s *TaskService) UpdateTask(id int64, task store.Task) error {
 	if err := s.ensureTaskNameUnique(merged.Name, id); err != nil {
 		return err
 	}
-	return s.db.UpdateTask(id, merged)
+	if err := s.db.UpdateTask(id, merged); err != nil {
+		return err
+	}
+	s.recalcTags()
+	return nil
 }
 
 func (s *TaskService) ensureTaskNameUnique(name string, excludeID int64) error {
@@ -264,7 +285,11 @@ func (s *TaskService) DeleteTask(id int64) error {
 		}
 	}
 
-	return s.db.DeleteTask(id)
+	err = s.db.DeleteTask(id)
+	if err == nil {
+		s.recalcTags()
+	}
+	return err
 }
 
 type TaskRunResult struct {

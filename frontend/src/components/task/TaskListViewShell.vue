@@ -4,6 +4,7 @@ import WebhookConfigModal from './WebhookConfigModal.vue'
 import SingletonConfigModal from './SingletonConfigModal.vue'
 import type { Schedule, Task } from '../../types'
 import type { TaskProgressLike } from './progressText'
+import type { Tag } from '../../api/tags'
 
 interface WebhookFormState {
   triggerId?: string
@@ -75,6 +76,8 @@ defineProps<{
   setSingletonEnabled: (value: boolean) => void
   saveSingleton: () => void
   closeSingletonModal: () => void
+  actionTags: Tag[]
+  keywordTags: Tag[]
 }>()
 </script>
 
@@ -92,6 +95,8 @@ defineProps<{
     :tasks-page="tasksPage"
     :current-tasks-pages="currentTasksPages"
     :tasks-jump-page="tasksJumpPage"
+    :action-tags="actionTags"
+    :keyword-tags="keywordTags"
     :save-task-sort-orders="saveTaskSortOrders"
     @update:search="setTaskSearch"
     @add="goToAddTask"

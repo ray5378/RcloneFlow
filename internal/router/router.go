@@ -21,6 +21,7 @@ type Router struct {
 	fsCtrl             *controller.FsController
 	authCtrl           *controller.AuthController
 	activeTransferCtrl *controller.ActiveTransferController
+	tagCtrl            *controller.TagController
 	staticDir          string
 }
 
@@ -34,6 +35,7 @@ func New(
 	fsCtrl *controller.FsController,
 	authCtrl *controller.AuthController,
 	activeTransferCtrl *controller.ActiveTransferController,
+	tagCtrl *controller.TagController,
 	staticDir string,
 ) *Router {
 	return &Router{
@@ -45,6 +47,7 @@ func New(
 		fsCtrl:             fsCtrl,
 		authCtrl:           authCtrl,
 		activeTransferCtrl: activeTransferCtrl,
+		tagCtrl:            tagCtrl,
 		staticDir:          staticDir,
 	}
 }
@@ -74,6 +77,9 @@ func (r *Router) Setup(mux *http.ServeMux) {
 
 	// 修改密码
 	apiMux.HandleFunc("/api/auth/change-password", r.authCtrl.ChangePassword)
+
+	// 标签
+	apiMux.HandleFunc("/api/tags", r.tagCtrl.HandleTags)
 
 	// 远程存储相关
 	apiMux.HandleFunc("/api/remotes", r.remoteCtrl.HandleRemotes)

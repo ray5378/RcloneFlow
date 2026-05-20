@@ -189,6 +189,17 @@ func (db *DB) migrate() error {
 				ALTER TABLE users ADD COLUMN password_changed INTEGER NOT NULL DEFAULT 0;
 			`,
 		},
+		{
+			version: 6,
+			sql: `
+				CREATE TABLE IF NOT EXISTS task_tags (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					tag TEXT NOT NULL UNIQUE,
+					type TEXT NOT NULL DEFAULT 'keyword',
+					created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+				);
+			`,
+		},
 	}
 
 	var currentVersion int
