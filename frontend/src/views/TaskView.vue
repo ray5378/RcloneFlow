@@ -329,6 +329,7 @@ const {
   closeGlobalStatsModal,
   setWebhookTriggerId,
   setWebhookMatchText,
+  setWebhookSecret,
   setWebhookPostUrl,
   setWebhookWecomUrl,
   setWebhookNotifyManual,
@@ -514,6 +515,7 @@ function closeTaskEditorModal() {
     :webhook-form="webhookForm"
     :set-webhook-trigger-id="setWebhookTriggerId"
     :set-webhook-match-text="setWebhookMatchText"
+    :set-webhook-secret="setWebhookSecret"
     :set-webhook-post-url="setWebhookPostUrl"
     :set-webhook-wecom-url="setWebhookWecomUrl"
     :set-webhook-notify-manual="setWebhookNotifyManual"

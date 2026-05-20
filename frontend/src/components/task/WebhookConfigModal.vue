@@ -5,6 +5,7 @@ defineProps<{
   visible: boolean
   triggerId: string
   matchText: string
+  webhookSecret: string
   postUrl: string
   wecomUrl: string
   notifyManual: boolean
@@ -22,6 +23,7 @@ const emit = defineEmits<{
   (e: 'test'): void
   (e: 'update:triggerId', value: string): void
   (e: 'update:matchText', value: string): void
+  (e: 'update:webhookSecret', value: string): void
   (e: 'update:postUrl', value: string): void
   (e: 'update:wecomUrl', value: string): void
   (e: 'update:notifyManual', value: boolean): void
@@ -32,11 +34,12 @@ const emit = defineEmits<{
   (e: 'update:statusHasTransfer', value: boolean): void
 }>()
 
-function onTextInput(event: Event, key: 'triggerId' | 'matchText' | 'postUrl' | 'wecomUrl') {
+function onTextInput(event: Event, key: 'triggerId' | 'matchText' | 'webhookSecret' | 'postUrl' | 'wecomUrl') {
   const value = (event.target as HTMLInputElement).value
   const eventMap = {
     triggerId: 'update:triggerId',
     matchText: 'update:matchText',
+    webhookSecret: 'update:webhookSecret',
     postUrl: 'update:postUrl',
     wecomUrl: 'update:wecomUrl',
   } as const
@@ -75,6 +78,11 @@ function onCheckbox(event: Event, key: CheckboxKey) {
           <label>{{ t('webhookModal.matchText') }}</label>
           <input :value="matchText" type="text" :placeholder="t('webhookModal.matchPlaceholder')" @input="onTextInput($event, 'matchText')" />
           <p class="hint">{{ t('webhookModal.matchHint') }}</p>
+        </div>
+        <div class="detail-item full-width">
+          <label>{{ t('webhookModal.secret') }}</label>
+          <input :value="webhookSecret" type="password" :placeholder="t('webhookModal.secretPlaceholder')" @input="onTextInput($event, 'webhookSecret')" />
+          <p class="hint">{{ t('webhookModal.secretHint') }}</p>
         </div>
         <div class="detail-item full-width">
           <label>{{ t('webhookModal.postUrl') }}</label>

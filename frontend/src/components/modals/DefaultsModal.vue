@@ -47,6 +47,7 @@ function flat(resp: any) {
   patch(resp.precheck)
   patch(resp.webdav)
   patch(resp.webhook)
+  patch(resp.cors)
   return out
 }
 
@@ -152,6 +153,15 @@ onUnmounted(() => {
           </div>
         </div>
 
+        <div class="section">
+          <div class="section-title">{{ t('defaults.cors') }}</div>
+          <div class="grid">
+            <label :title="t('defaults.corsOriginsTitle')">{{ t('defaults.corsOrigins') }}</label>
+            <input v-model="form.CORS_ALLOWED_ORIGINS" :placeholder="t('defaults.corsOriginsPlaceholder')" />
+            <p class="hint">{{ t('defaults.corsOriginsHint') }}</p>
+          </div>
+        </div>
+
 
         <div class="section">
           <div class="section-title">{{ t('modal.webdavFinalize') }}</div>
@@ -209,6 +219,7 @@ input, select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--b
 .modal-footer .primary.saved { background: var(--success); color: #fff; border: none; }
 .modal-footer .primary.failed { background: var(--danger); color: #fff; border: none; }
 .error { color: var(--danger); font-size: 12px; margin-top: 4px; }
+.hint { margin-top: 4px; color: var(--muted, #94a3b8); font-size: 12px; line-height: 1.5; }
 
 @media (max-width: 768px) {
   .modal-content.large {

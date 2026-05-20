@@ -31,6 +31,7 @@ export function useTaskViewModalBindings(options: {
 
   const setWebhookTriggerId = (value: string) => { options.webhookForm.value.triggerId = value }
   const setWebhookMatchText = (value: string) => { options.webhookForm.value.matchText = value }
+  const setWebhookSecret = (value: string) => { options.webhookForm.value.webhookSecret = value }
   const setWebhookPostUrl = (value: string) => { options.webhookForm.value.postUrl = value }
   const setWebhookWecomUrl = (value: string) => { options.webhookForm.value.wecomUrl = value }
   const setWebhookNotifyManual = (value: boolean) => { ensureWebhookFormShape(); options.webhookForm.value.notify.manual = value }
@@ -52,6 +53,7 @@ export function useTaskViewModalBindings(options: {
     closeGlobalStatsModal,
     setWebhookTriggerId,
     setWebhookMatchText,
+    setWebhookSecret,
     setWebhookPostUrl,
     setWebhookWecomUrl,
     setWebhookNotifyManual,

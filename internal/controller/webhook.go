@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -25,6 +26,26 @@ func NewWebhookController(taskSvc *service.TaskService) *WebhookController {
 	return &WebhookController{taskSvc: taskSvc, secret: os.Getenv("WEBHOOK_SECRET")}
 }
 
+func readSettingsWebhookSecret() string {
+	if v := os.Getenv("WEBHOOK_SECRET"); v != "" {
+		return v
+	}
+	dataDir := os.Getenv("APP_DATA_DIR")
+	if dataDir == "" {
+		dataDir = "."
+	}
+	fp := filepath.Join(dataDir, "settings.json")
+	b, err := os.ReadFile(fp)
+	if err != nil || len(b) == 0 {
+		return ""
+	}
+	var m map[string]string
+	if json.Unmarshal(b, &m) != nil {
+		return ""
+	}
+	return strings.TrimSpace(m["WEBHOOK_SECRET"])
+}
+
 // HandleTrigger 外部 webhook 触发任务
 // 支持两种方式：
 // 1) 直接按任务ID触发：/webhook/{taskId}
@@ -35,12 +56,13 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	if c.secret != "" {
+	secret := readSettingsWebhookSecret()
+	if secret != "" {
 		provided := r.URL.Query().Get("secret")
 		if provided == "" {
 			provided = r.Header.Get("X-Webhook-Secret")
 		}
-		if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(c.secret)) != 1 {
+		if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(secret)) != 1 {
 			WriteJSON(w, 401, map[string]any{"error": "unauthorized"})
 			return
 		}

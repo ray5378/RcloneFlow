@@ -9,6 +9,7 @@ import type { Tag } from '../../api/tags'
 interface WebhookFormState {
   triggerId?: string
   matchText?: string
+  webhookSecret?: string
   postUrl?: string
   wecomUrl?: string
   notify?: {
@@ -60,6 +61,7 @@ defineProps<{
   webhookForm: WebhookFormState | null
   setWebhookTriggerId: (value: string) => void
   setWebhookMatchText: (value: string) => void
+  setWebhookSecret: (value: string) => void
   setWebhookPostUrl: (value: string) => void
   setWebhookWecomUrl: (value: string) => void
   setWebhookNotifyManual: (value: boolean) => void
@@ -120,6 +122,7 @@ defineProps<{
     :visible="showWebhookModal"
     :trigger-id="webhookForm?.triggerId ?? ''"
     :match-text="webhookForm?.matchText ?? ''"
+    :webhook-secret="webhookForm?.webhookSecret ?? ''"
     :post-url="webhookForm?.postUrl ?? ''"
     :wecom-url="webhookForm?.wecomUrl ?? ''"
     :notify-manual="webhookForm?.notify?.manual ?? false"
@@ -131,6 +134,7 @@ defineProps<{
     :can-test="!!(webhookForm?.postUrl) || !!(webhookForm?.wecomUrl)"
     @update:trigger-id="setWebhookTriggerId"
     @update:match-text="setWebhookMatchText"
+    @update:webhook-secret="setWebhookSecret"
     @update:post-url="setWebhookPostUrl"
     @update:wecom-url="setWebhookWecomUrl"
     @update:notify-manual="setWebhookNotifyManual"
