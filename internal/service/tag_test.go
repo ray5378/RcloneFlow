@@ -135,8 +135,8 @@ func TestRecalcTags_MixedChineseEnglish(t *testing.T) {
 	svc := NewTagService(db)
 
 	tasks := []store.Task{
-		{Name: "CAS从云盘拉回本地189pro文件夹"},
-		{Name: "CAS从影响拉到本地Local_cas中的STRM-CAS文件夹"},
+		{Name: "CAS同步到本地"},
+		{Name: "CAS备份到云端"},
 	}
 	for _, tk := range tasks {
 		if _, err := db.AddTask(tk); err != nil {
@@ -157,6 +157,58 @@ func TestRecalcTags_MixedChineseEnglish(t *testing.T) {
 	}
 	if !hasCAS {
 		t.Fatal("expected auto keyword tag cas from mixed Chinese-English names")
+	}
+}
+
+func TestRecalcTags_HyphenUnderscore(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tag_svc_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTagService(db)
+
+	tasks := []store.Task{
+		{Name: "同步到 strm-cas 文件夹"},
+		{Name: "备份到 Local_cas 和 strm-cas 目录"},
+	}
+	for _, tk := range tasks {
+		if _, err := db.AddTask(tk); err != nil {
+			t.Fatalf("create task: %v", err)
+		}
+	}
+
+	if err := svc.RecalcTags(); err != nil {
+		t.Fatalf("RecalcTags: %v", err)
+	}
+
+	tags, _ := svc.ListTags()
+	hasSTRM := false
+	hasCAS := false
+	for _, tg := range tags {
+		switch tg.Tag {
+		case "strm":
+			if !tg.Selected {
+				hasSTRM = true
+			}
+		case "cas":
+			if !tg.Selected {
+				hasCAS = true
+			}
+		}
+	}
+	if !hasSTRM {
+		t.Fatal("expected auto keyword tag strm")
+	}
+	if !hasCAS {
+		t.Fatal("expected auto keyword tag cas")
 	}
 }
 
