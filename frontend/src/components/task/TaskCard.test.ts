@@ -8,7 +8,7 @@ describe('TaskCard', () => {
   it('keeps task cards bordered, path details unboxed, and hover elevated without recoloring', () => {
     const here = resolve(__dirname)
     const componentSource = readFileSync(resolve(here, './TaskCard.vue'), 'utf8')
-    const baseStyles = readFileSync(resolve(here, './listItemBase.css'), 'utf8')
+    const baseStyles = readFileSync(resolve(here, './listItem.css'), 'utf8')
     const listSectionSource = readFileSync(resolve(here, './TaskListSection.vue'), 'utf8')
     const globalStyles = readFileSync(resolve(here, '../../styles/global.css'), 'utf8')
 

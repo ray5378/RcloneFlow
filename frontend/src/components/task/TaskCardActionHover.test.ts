@@ -5,7 +5,7 @@ import { resolve } from 'path'
 describe('Task card action button hover colors', () => {
   it('uses one unified hover background for all task action buttons', () => {
     const componentSource = readFileSync(resolve(__dirname, './TaskCard.vue'), 'utf8')
-    const actionStyles = readFileSync(resolve(__dirname, './listItemActions.css'), 'utf8')
+    const actionStyles = readFileSync(resolve(__dirname, './listItem.css'), 'utf8')
 
     expect(componentSource).not.toContain('action-info')
     expect(componentSource).not.toContain('action-danger')

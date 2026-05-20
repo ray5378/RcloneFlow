@@ -8,7 +8,7 @@ describe('RunItem', () => {
   it('uses the same inset and spacing layout as task cards in history lists', () => {
     const here = resolve(__dirname)
     const historySource = readFileSync(resolve(here, './TaskHistoryPanel.vue'), 'utf8')
-    const baseStyles = readFileSync(resolve(here, './listItemBase.css'), 'utf8')
+    const baseStyles = readFileSync(resolve(here, './listItem.css'), 'utf8')
     const runSource = readFileSync(resolve(here, './RunItem.vue'), 'utf8')
 
     const hoverRules = [
