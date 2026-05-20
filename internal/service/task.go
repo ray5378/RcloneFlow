@@ -285,6 +285,10 @@ func (s *TaskService) DeleteTask(id int64) error {
 		}
 	}
 
+	if err := s.db.DeleteRunsByTask(id); err != nil {
+		return err
+	}
+
 	err = s.db.DeleteTask(id)
 	if err == nil {
 		s.recalcTags()

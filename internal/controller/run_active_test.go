@@ -38,6 +38,7 @@ func (m *mockRunSvcDB) UpdateRun(id int64, updateFn func(*service.RunRecord))   
 func (m *mockRunSvcDB) DeleteRun(id int64) error                                          { return nil }
 func (m *mockRunSvcDB) DeleteAllRuns() error                                              { return nil }
 func (m *mockRunSvcDB) DeleteRunsByTask(taskId int64) error                               { return nil }
+func (m *mockRunSvcDB) DeleteRunsByIDs(ids []int64) error                                 { return nil }
 func (m *mockRunSvcDB) CleanOldRuns(days int) (int64, error)                              { return 0, nil }
 func (m *mockRunSvcDB) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error { return nil }
 

@@ -42,6 +42,10 @@ func (m *runServiceDBMock) DeleteRunsByTask(taskId int64) error {
 	m.deletedTasks = append(m.deletedTasks, taskId)
 	return nil
 }
+func (m *runServiceDBMock) DeleteRunsByIDs(ids []int64) error {
+	m.deletedRun = append(m.deletedRun, ids...)
+	return nil
+}
 func (m *runServiceDBMock) CleanOldRuns(days int) (int64, error) { return 0, nil }
 
 func TestRunService_DeleteRun_RemovesLogFile(t *testing.T) {

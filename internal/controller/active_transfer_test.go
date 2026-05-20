@@ -23,6 +23,7 @@ func (m *mockActiveTransferRunSvcDB) UpdateRun(id int64, updateFn func(*service.
 func (m *mockActiveTransferRunSvcDB) DeleteRun(id int64) error                                       { return nil }
 func (m *mockActiveTransferRunSvcDB) DeleteAllRuns() error                                           { return nil }
 func (m *mockActiveTransferRunSvcDB) DeleteRunsByTask(taskId int64) error                            { return nil }
+func (m *mockActiveTransferRunSvcDB) DeleteRunsByIDs(ids []int64) error                              { return nil }
 func (m *mockActiveTransferRunSvcDB) CleanOldRuns(days int) (int64, error)                           { return 0, nil }
 
 func TestActiveTransferController_OverviewAndLists(t *testing.T) {

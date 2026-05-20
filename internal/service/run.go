@@ -45,6 +45,7 @@ type RunServiceInterface interface {
 	DeleteRun(id int64) error
 	DeleteAllRuns() error
 	DeleteRunsByTask(taskId int64) error
+	DeleteRunsByIDs(ids []int64) error
 	CleanOldRuns(days int) (int64, error)
 }
 
@@ -205,17 +206,22 @@ func (s *RunService) CleanOldRuns(days int) (int64, error) {
 		if len(runs) == 0 {
 			break
 		}
+		var idsToDelete []int64
 		for _, run := range runs {
 			startedAt, err := time.Parse(time.RFC3339, run.StartedAt)
 			if err != nil {
 				continue
 			}
 			if startedAt.Before(cutoff) {
-				if err := s.DeleteRun(run.ID); err != nil {
-					return deleted, err
-				}
-				deleted++
+				cleanupRunLog(run)
+				idsToDelete = append(idsToDelete, run.ID)
 			}
+		}
+		if len(idsToDelete) > 0 {
+			if err := s.db.DeleteRunsByIDs(idsToDelete); err != nil {
+				return deleted, err
+			}
+			deleted += int64(len(idsToDelete))
 		}
 		if page*pageSize >= total {
 			break

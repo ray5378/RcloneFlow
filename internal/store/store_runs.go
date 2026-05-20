@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -350,6 +351,26 @@ func (db *DB) vacuum() error {
 		return fmt.Errorf("vacuum: %w", err)
 	}
 	return nil
+}
+
+func (db *DB) DeleteRunsByIDs(ids []int64) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	db.mu.Lock()
+	defer db.mu.Unlock()
+
+	placeholders := make([]string, len(ids))
+	args := make([]interface{}, len(ids))
+	for i, id := range ids {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+	query := fmt.Sprintf("DELETE FROM runs WHERE id IN (%s)", strings.Join(placeholders, ","))
+	if _, err := db.db.Exec(query, args...); err != nil {
+		return err
+	}
+	return db.vacuum()
 }
 
 func (db *DB) DeleteRun(id int64) error {
