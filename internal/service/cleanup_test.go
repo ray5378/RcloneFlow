@@ -212,6 +212,44 @@ func TestRunService_CleanOldRuns_Pagination(t *testing.T) {
 	}
 }
 
+func TestRunService_CleanOldRuns_InvalidStartedAt_DeletesAsFallback(t *testing.T) {
+	mock := &runServiceDBMock{
+		listRunsPages: map[int][]RunRecord{
+			1: {
+				{ID: 1, TaskID: 1, Status: "finished", StartedAt: "corrupted-data"},
+				{ID: 2, TaskID: 1, Status: "finished", StartedAt: ""},
+				{ID: 3, TaskID: 1, Status: "finished", StartedAt: time.Now().AddDate(0, 0, -1).Format(time.RFC3339)},
+			},
+		},
+		listRunsTotal: 3,
+	}
+
+	svc := NewRunService(mock)
+	deleted, err := svc.CleanOldRuns(7)
+	if err != nil {
+		t.Fatalf("CleanOldRuns() error = %v", err)
+	}
+	if deleted != 2 {
+		t.Fatalf("expected 2 deleted (invalid dates + recent), got %d", deleted)
+	}
+	if len(mock.deletedRun) != 2 {
+		t.Fatalf("expected 2 delete calls, got %d", len(mock.deletedRun))
+	}
+	deletedSet := map[int64]bool{}
+	for _, id := range mock.deletedRun {
+		deletedSet[id] = true
+	}
+	if !deletedSet[1] {
+		t.Fatal("expected run 1 (corrupted StartedAt) to be deleted")
+	}
+	if !deletedSet[2] {
+		t.Fatal("expected run 2 (empty StartedAt) to be deleted")
+	}
+	if deletedSet[3] {
+		t.Fatal("expected run 3 (recent) to NOT be deleted")
+	}
+}
+
 func TestCleanupService_Cleanup_RespectsRetention(t *testing.T) {
 	oldDate := time.Now().AddDate(0, 0, -10).Format(time.RFC3339)
 	recentDate := time.Now().AddDate(0, 0, -2).Format(time.RFC3339)

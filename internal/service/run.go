@@ -210,6 +210,11 @@ func (s *RunService) CleanOldRuns(days int) (int64, error) {
 		for _, run := range runs {
 			startedAt, err := time.Parse(time.RFC3339, run.StartedAt)
 			if err != nil {
+				logger.Warn("clean old runs: unparseable StartedAt, deleting as fallback",
+					zap.Int64("run_id", run.ID),
+					zap.String("started_at", run.StartedAt))
+				cleanupRunLog(run)
+				idsToDelete = append(idsToDelete, run.ID)
 				continue
 			}
 			if startedAt.Before(cutoff) {
