@@ -87,6 +87,15 @@ describe('settings.ts', () => {
         body: JSON.stringify({ reset: true })
       })
     })
+
+    it('should throw on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        text: () => Promise.resolve('reset failed')
+      })
+
+      await expect(resetSettings()).rejects.toThrow('reset failed')
+    })
   })
 
   describe('getRemoteOrder', () => {
@@ -129,6 +138,15 @@ describe('settings.ts', () => {
       const result = await getRemoteOrder()
       expect(result).toEqual([])
     })
+
+    it('should throw on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        text: () => Promise.resolve('fetch failed')
+      })
+
+      await expect(getRemoteOrder()).rejects.toThrow('fetch failed')
+    })
   })
 
   describe('saveRemoteOrder', () => {
@@ -145,6 +163,15 @@ describe('settings.ts', () => {
         },
         body: JSON.stringify({ values: { REMOTE_ORDER: 'remote1,remote2' } })
       })
+    })
+
+    it('should throw on failure', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        text: () => Promise.resolve('save order failed')
+      })
+
+      await expect(saveRemoteOrder(['remote1'])).rejects.toThrow('save order failed')
     })
   })
 })

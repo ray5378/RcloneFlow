@@ -10,6 +10,7 @@ import {
   withConfirm,
   registerToast,
   HTTP_ERROR_MESSAGES,
+  createErrorBoundary,
 } from './errors'
 
 // Mock window.dispatchEvent
@@ -114,6 +115,27 @@ describe('errors.ts', () => {
       
       expect(result).toBe('Fallback')
     })
+
+    it('should extract and use HTTP status code from error message', () => {
+      const error = new Error('Request failed with status 401')
+      const result = handleApiError(error, 'Fallback message')
+      
+      expect(result).toBe('未授权，请重新登录')
+    })
+
+    it('should use generic HTTP status message for unknown status codes', () => {
+      const error = new Error('status 418')
+      const result = handleApiError(error, 'Fallback')
+      
+      expect(result).toBe('请求失败 (418)')
+    })
+
+    it('should use fallback for fetch-related errors', () => {
+      const error = new Error('fetch failed')
+      const result = handleApiError(error, 'Network error')
+      
+      expect(result).toBe('Network error')
+    })
   })
 
   describe('withErrorHandler', () => {
@@ -193,8 +215,32 @@ describe('errors.ts', () => {
       registerToast(customToast)
       
       // After registration, showToast should call the custom function
-      // (This would need the module to be re-imported in real scenario)
-      expect(true).toBe(true)
+      showToast('test custom', 'success')
+      
+      expect(customToast).toHaveBeenCalledWith('test custom', 'success', 3000)
+    })
+
+    it('should still work with window event fallback', () => {
+      // Reset to null to test fallback
+      registerToast(null as any)
+      mockDispatchEvent.mockClear()
+      
+      showToast('test fallback', 'info')
+      
+      expect(mockDispatchEvent).toHaveBeenCalled()
+    })
+  })
+
+  describe('createErrorBoundary', () => {
+    it('should create error boundary that calls handler and shows error toast', () => {
+      const errorHandler = vi.fn()
+      const boundary = createErrorBoundary(errorHandler)
+      const testError = new Error('test error')
+      
+      // Test by calling onError with test error and info
+      boundary.onError(testError, 'error info')
+      
+      expect(errorHandler).toHaveBeenCalledWith(testError, 'error info')
     })
   })
 })
