@@ -48,7 +48,7 @@ describe('useError.ts', () => {
     })
 
     it('should log to console when no handler', () => {
-      const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       showToastMessage('hello', 'info')
       expect(logSpy).toHaveBeenCalledWith('[info] hello')
       logSpy.mockRestore()

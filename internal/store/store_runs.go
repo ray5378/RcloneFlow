@@ -282,7 +282,10 @@ func (db *DB) UpdateRun(id int64, fn func(*Run)) error {
 	fn(&r)
 	r.UpdatedAt = time.Now()
 
-	summaryBytes, _ := json.Marshal(r.Summary)
+	summaryBytes, err := json.Marshal(r.Summary)
+	if err != nil {
+		return fmt.Errorf("marshal run summary: %w", err)
+	}
 
 	_, err = db.db.Exec(`
 		UPDATE runs SET status = ?, summary = ?, error = ?, updated_at = ? WHERE id = ?`,
@@ -313,14 +316,18 @@ func (db *DB) UpdateRunStatus(id int64, status, errorMsg string, summary map[str
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	summaryBytes, _ := json.Marshal(summary)
+	summaryBytes, err := json.Marshal(summary)
+	if err != nil {
+		return fmt.Errorf("marshal run summary: %w", err)
+	}
 	finishedAt := time.Now()
 
-	_, err := db.db.Exec(`
+	var execErr error
+	_, execErr = db.db.Exec(`
 		UPDATE runs SET status = ?, summary = ?, error = ?, updated_at = ?, finished_at = ?
 		WHERE id = ?`,
 		status, string(summaryBytes), errorMsg, finishedAt, finishedAt, id)
-	return err
+	return execErr
 }
 
 func (db *DB) UpdateRunProgress(id int64, data float64, detail string) error {

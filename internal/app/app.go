@@ -133,7 +133,14 @@ func Run(cfg *config.Config) error {
 			time.Duration(cfg.GetCleanupInterval())*time.Hour,
 			cfg.GetCleanupRetention(),
 		)
-		go cleanupSvc.Start(ctx)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("goroutine panic", zap.Any("panic", r))
+				}
+			}()
+			cleanupSvc.Start(ctx)
+		}()
 		logger.Info("历史记录清理服务已启动",
 			zap.Int("interval_hours", cfg.GetCleanupInterval()),
 			zap.Int("retention_days", cfg.GetCleanupRetention()))
@@ -146,7 +153,14 @@ func Run(cfg *config.Config) error {
 		logRetention = 7 // 默认7天
 	}
 	logCleanupSvc = service.NewLogCleanupService(logsDir, 24*time.Hour, logRetention) // 每天检查一次
-	go logCleanupSvc.Start(ctx)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		logCleanupSvc.Start(ctx)
+	}()
 
 	// 设置路由
 	mux := http.NewServeMux()

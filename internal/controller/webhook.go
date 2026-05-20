@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 
+	"go.uber.org/zap"
+	"rcloneflow/internal/logger"
 	"rcloneflow/internal/service"
 )
 
@@ -52,7 +54,9 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 		if t, ok := c.taskSvc.GetTask(tid); ok {
 			var opts map[string]any
 			if len(t.Options) > 0 {
-				_ = json.Unmarshal(t.Options, &opts)
+				if err := json.Unmarshal(t.Options, &opts); err != nil {
+					logger.Error("unmarshal task options", zap.Error(err))
+				}
 			}
 			if !shouldTrigger(opts) {
 				WriteJSON(w, 200, map[string]any{"ok": true, "triggered": false, "reason": "webhook_match_not_hit"})

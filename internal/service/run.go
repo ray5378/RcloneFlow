@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"go.uber.org/zap"
+	"rcloneflow/internal/logger"
 )
 
 // RunRecord 运行记录结构。
@@ -80,7 +83,9 @@ func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
 		// 读取旧 summary
 		var old map[string]any
 		if r.Summary != "" {
-			_ = json.Unmarshal([]byte(r.Summary), &old)
+			if err := json.Unmarshal([]byte(r.Summary), &old); err != nil {
+				logger.Error("unmarshal run summary", zap.Error(err))
+			}
 		}
 		if old == nil {
 			old = map[string]any{}

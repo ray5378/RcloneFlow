@@ -183,6 +183,12 @@ func (db *DB) migrate() error {
 				WHERE sort_order = 0;
 			`,
 		},
+	{
+			version: 5,
+			sql: `
+				ALTER TABLE users ADD COLUMN password_changed INTEGER NOT NULL DEFAULT 0;
+			`,
+		},
 	}
 
 	var currentVersion int

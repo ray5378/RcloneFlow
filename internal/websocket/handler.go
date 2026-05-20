@@ -3,7 +3,9 @@ package websocket
 import (
 	"net/http"
 
+	"go.uber.org/zap"
 	"github.com/gorilla/websocket"
+	"rcloneflow/internal/logger"
 )
 
 var upgrader = websocket.Upgrader{
@@ -32,6 +34,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	client := NewClient(h.hub, conn)
 	h.hub.register <- client
-	go client.WritePump()
-	go client.ReadPump()
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		client.WritePump()
+	}()
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		client.ReadPump()
+	}()
 }

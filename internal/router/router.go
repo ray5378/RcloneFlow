@@ -67,6 +67,9 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	// 需要认证的API路由
 	apiMux := http.NewServeMux()
 
+	// 当前用户验证
+	apiMux.HandleFunc("/api/auth/me", r.authCtrl.Me)
+
 	// 修改密码
 	apiMux.HandleFunc("/api/auth/change-password", r.authCtrl.ChangePassword)
 

@@ -1,6 +1,11 @@
 package websocket
 
-import "sync"
+import (
+	"sync"
+
+	"go.uber.org/zap"
+	"rcloneflow/internal/logger"
+)
 
 var (
 	globalHub *Hub
@@ -11,7 +16,14 @@ var (
 func GetHub() *Hub {
 	once.Do(func() {
 		globalHub = NewHub()
-		go globalHub.Run()
+		go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		globalHub.Run()
+	}()
 	})
 	return globalHub
 }

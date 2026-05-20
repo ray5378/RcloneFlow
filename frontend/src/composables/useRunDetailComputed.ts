@@ -1,5 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue'
-import type { FinalSummary } from '../api/run'
+import type { FinalSummary, FinalSummaryFile } from '../api/run'
 import type { Run, RunSummaryPayload } from '../types'
 
 type FinalFilterType = 'all' | 'success' | 'failed' | 'other'
@@ -47,14 +47,14 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   }
 
   const summaryFiles = computed(() => {
-    if (!options?.runDetail) return [] as any[]
-    const detail = options.runDetail.value as any
-    return (getFinalSummary(detail)?.files || []) as any[]
+    if (!options?.runDetail) return [] as FinalSummaryFile[]
+    const detail = options.runDetail.value as Record<string, unknown>
+    return (getFinalSummary(detail)?.files || []) as FinalSummaryFile[]
   })
 
   const detailFiles = computed(() => {
-    if (!options?.detailFiles?.value || !Array.isArray(options.detailFiles.value)) return [] as any[]
-    return options.detailFiles.value as any[]
+    if (!options?.detailFiles?.value || !Array.isArray(options.detailFiles.value)) return [] as FinalSummaryFile[]
+    return options.detailFiles.value as FinalSummaryFile[]
   })
 
   const hasFinalSummaryFiles = computed(() => summaryFiles.value.length > 0)

@@ -9,8 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"rcloneflow/internal/active_transfer"
 	"rcloneflow/internal/adapter"
+	"rcloneflow/internal/logger"
 	runnercli "rcloneflow/internal/runnercli"
 	"rcloneflow/internal/settings"
 	"rcloneflow/internal/store"
@@ -291,7 +294,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 
 	effectiveOptions := map[string]any{}
 	if bs, err := json.Marshal(opts); err == nil {
-		_ = json.Unmarshal(bs, &effectiveOptions)
+		if err := json.Unmarshal(bs, &effectiveOptions); err != nil {
+			logger.Error("unmarshal effective options", zap.Error(err))
+		}
 	}
 	// 合并原始任务 Options（显式配置覆盖默认/推导值，比如 transfers=2 应覆盖默认1）
 	if len(t.Options) > 0 {
@@ -404,6 +409,11 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 				s.activeMgr.SetTransferSlots(run.ID, opts.Transfers)
 			}
 			go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("goroutine panic", zap.Any("panic", r))
+					}
+				}()
 				candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
 				if err != nil {
 					s.activeMgr.SetPreflightResult(runID, err)
@@ -413,6 +423,11 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			}(run.ID, taskID, mode, cfg, src, dst, opts)
 		}
 		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("goroutine panic", zap.Any("panic", r))
+				}
+			}()
 			_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
 		}()
 		return TaskRunResult{Started: true, TaskID: taskID}, nil
@@ -452,6 +467,11 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			s.activeMgr.SetTransferSlots(run.ID, opts.Transfers)
 		}
 		go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("goroutine panic", zap.Any("panic", r))
+				}
+			}()
 			candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
 			if err != nil {
 				s.activeMgr.SetPreflightResult(runID, err)
@@ -461,6 +481,11 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		}(run.ID, taskID, mode, cfg, src, dst, opts)
 	}
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
 		_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
 	}()
 	return TaskRunResult{Started: true, TaskID: taskID}, nil

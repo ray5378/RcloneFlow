@@ -10,7 +10,12 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte("rcloneflow-secret-key-change-in-production")
+var jwtSecret = func() []byte {
+	if s := os.Getenv("JWT_SECRET"); s != "" {
+		return []byte(s)
+	}
+	return []byte("rcloneflow-secret-key-change-in-production")
+}()
 
 // TokenPair 令牌对
 type TokenPair struct {

@@ -33,6 +33,10 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+func isAdminUsername(username string) bool {
+	return strings.EqualFold(username, "admin")
+}
+
 // Register 注册用户
 func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
@@ -43,6 +47,11 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 
 	if req.Username == "" || req.Password == "" {
 		http.Error(w, `{"error":"用户名和密码不能为空"}`, http.StatusBadRequest)
+		return
+	}
+
+	if isAdminUsername(req.Username) {
+		http.Error(w, `{"error":"禁止使用 admin 作为用户名"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -75,8 +84,9 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"accessToken":  tokens.AccessToken,
-		"refreshToken": tokens.RefreshToken,
+		"accessToken":         tokens.AccessToken,
+		"refreshToken":        tokens.RefreshToken,
+		"mustChangePassword":  !user.PasswordChanged,
 		"user": map[string]any{
 			"id":       user.ID,
 			"username": user.Username,
@@ -119,8 +129,9 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"accessToken":  tokens.AccessToken,
-		"refreshToken": tokens.RefreshToken,
+		"accessToken":        tokens.AccessToken,
+		"refreshToken":       tokens.RefreshToken,
+		"mustChangePassword": !user.PasswordChanged,
 		"user": map[string]any{
 			"id":       user.ID,
 			"username": user.Username,
@@ -196,6 +207,14 @@ func (c *AuthController) ChangePassword(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// 如果提供了新用户名，禁止使用 admin
+	if req.Username != "" {
+		if isAdminUsername(req.Username) {
+			http.Error(w, `{"error":"禁止使用 admin 作为用户名"}`, http.StatusBadRequest)
+			return
+		}
+	}
+
 	// 如果提供了新密码，则验证旧密码并更新
 	if req.NewPassword != "" {
 		if req.OldPassword == "" {
@@ -221,6 +240,9 @@ func (c *AuthController) ChangePassword(w http.ResponseWriter, r *http.Request) 
 			http.Error(w, `{"error":"更新密码失败"}`, http.StatusInternalServerError)
 			return
 		}
+
+		// 刷新用户信息
+		user, _ = c.db.GetUserByID(user.ID)
 	}
 
 	// 如果提供了新用户名，则更新用户名
@@ -236,21 +258,48 @@ func (c *AuthController) ChangePassword(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		// 更新localStorage中的用户信息（前端通过重新登录处理）
+		// 刷新用户信息
+		user, _ = c.db.GetUserByID(user.ID)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 
-	finalUsername := req.Username
-	if finalUsername == "" {
-		finalUsername = user.Username
-	}
+	finalUsername := user.Username
 
 	json.NewEncoder(w).Encode(map[string]any{
 		"message": "修改成功",
 		"user": map[string]any{
 			"id":       user.ID,
 			"username": finalUsername,
+		},
+	})
+}
+
+// Me 验证当前用户token并返回用户信息
+func (c *AuthController) Me(w http.ResponseWriter, r *http.Request) {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		http.Error(w, `{"error":"未提供认证token"}`, http.StatusUnauthorized)
+		return
+	}
+
+	claims, err := auth.ValidateToken(strings.TrimPrefix(authHeader, "Bearer "))
+	if err != nil {
+		http.Error(w, `{"error":"token无效"}`, http.StatusUnauthorized)
+		return
+	}
+
+	user, exists := c.db.GetUserByUsername(claims.Username)
+	if !exists {
+		http.Error(w, `{"error":"用户不存在"}`, http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"user": map[string]any{
+			"id":       user.ID,
+			"username": user.Username,
 		},
 	})
 }

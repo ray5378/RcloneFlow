@@ -160,7 +160,10 @@ func (d *RunDAO) Update(id int64, updateFn func(*store.Run)) error {
 
 	updateFn(&r)
 
-	summaryBytes, _ := json.Marshal(r.Summary)
+	summaryBytes, err := json.Marshal(r.Summary)
+	if err != nil {
+		return fmt.Errorf("marshal run summary: %w", err)
+	}
 	_, err = d.db.Exec(`
 		UPDATE runs SET status = ?, summary = ?, error = ?, updated_at = datetime('now'),
 		       finished_at = ?, bytes_transferred = ?, speed = ?
@@ -171,7 +174,10 @@ func (d *RunDAO) Update(id int64, updateFn func(*store.Run)) error {
 
 // UpdateStatus 更新运行状态
 func (d *RunDAO) UpdateStatus(id int64, status, errorMsg string, summary map[string]any) error {
-	summaryBytes, _ := json.Marshal(summary)
+	summaryBytes, err := json.Marshal(summary)
+	if err != nil {
+		return fmt.Errorf("marshal run summary: %w", err)
+	}
 
 	var finishedAt interface{}
 	if status == "finished" || status == "failed" {
@@ -191,11 +197,12 @@ func (d *RunDAO) UpdateStatus(id int64, status, errorMsg string, summary map[str
 		}
 	}
 
-	_, err := d.db.Exec(`
+	var execErr error
+	_, execErr = d.db.Exec(`
 		UPDATE runs SET status = ?, summary = ?, error = ?, finished_at = ?, bytes_transferred = ?, speed = ?
 		WHERE id = ?`,
 		status, string(summaryBytes), errorMsg, finishedAt, bytesTransferred, speed, id)
-	return err
+	return execErr
 }
 
 func formatSpeed(speed float64) string {

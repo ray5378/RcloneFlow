@@ -13,7 +13,9 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
 	"rcloneflow/internal/config"
+	"rcloneflow/internal/logger"
 )
 
 // FsController 文件系统操作控制器（CLI 实现）
@@ -227,7 +229,9 @@ func waitGoneFile(ctx context.Context, fs, remote string) {
 
 func (c *FsController) doMkdir(ctx context.Context, body []byte) (any, error) {
 	var req fileOpReq
-	_ = json.Unmarshal(body, &req)
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("无效的请求格式: %w", err)
+	}
 	fs, p := normalize(req.Fs, req.Remote)
 	_, err := runRclone(ctx, "mkdir", fs+p)
 	return nil, err
@@ -235,7 +239,9 @@ func (c *FsController) doMkdir(ctx context.Context, body []byte) (any, error) {
 
 func (c *FsController) doDeleteFile(ctx context.Context, body []byte) (any, error) {
 	var req fileOpReq
-	_ = json.Unmarshal(body, &req)
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("无效的请求格式: %w", err)
+	}
 	fs, p := normalize(req.Fs, req.Remote)
 	// file delete
 	_, err := runRclone(ctx, "deletefile", fs+p)
@@ -248,7 +254,9 @@ func (c *FsController) doDeleteFile(ctx context.Context, body []byte) (any, erro
 
 func (c *FsController) doPurge(ctx context.Context, body []byte) (any, error) {
 	var req fileOpReq
-	_ = json.Unmarshal(body, &req)
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("无效的请求格式: %w", err)
+	}
 	fs, p := normalize(req.Fs, req.Remote)
 	_, err := runRclone(ctx, "purge", fs+p)
 	return nil, err
@@ -284,7 +292,9 @@ func ensureDir(ctx context.Context, fs, remote string) {
 
 func (c *FsController) doCopyFile(ctx context.Context, body []byte) (any, error) {
 	var req copyMoveFileReq
-	_ = json.Unmarshal(body, &req)
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("无效的请求格式: %w", err)
+	}
 	srcFs, src := normalize(req.SrcFs, req.SrcRemote)
 	dstFs, dst := normalize(req.DstFs, req.DstRemote)
 	src = sanitizePath(src)
@@ -308,7 +318,9 @@ func (c *FsController) doCopyFile(ctx context.Context, body []byte) (any, error)
 
 func (c *FsController) doMoveFile(ctx context.Context, body []byte) (any, error) {
 	var req copyMoveFileReq
-	_ = json.Unmarshal(body, &req)
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("无效的请求格式: %w", err)
+	}
 	srcFs, src := normalize(req.SrcFs, req.SrcRemote)
 	dstFs, dst := normalize(req.DstFs, req.DstRemote)
 	src = sanitizePath(src)
@@ -317,7 +329,14 @@ func (c *FsController) doMoveFile(ctx context.Context, body []byte) (any, error)
 	_, err := runRclone(ctx, "moveto", srcFs+src, dstFs+dst)
 	if err == nil {
 		// step2: ensure old file gone
-		go waitGoneFile(context.Background(), srcFs, src)
+		go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		waitGoneFile(context.Background(), srcFs, src)
+	}()
 		return nil, nil
 	}
 	// retry once for smb duplicate share: strip first segment
@@ -326,7 +345,14 @@ func (c *FsController) doMoveFile(ctx context.Context, body []byte) (any, error)
 		d2 := tryStripFirstSegment(dst)
 		if s2 != src || d2 != dst {
 			if _, err2 := runRclone(ctx, "moveto", srcFs+s2, dstFs+d2); err2 == nil {
-				go waitGoneFile(context.Background(), srcFs, s2)
+				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							logger.Error("goroutine panic", zap.Any("panic", r))
+						}
+					}()
+					waitGoneFile(context.Background(), srcFs, s2)
+				}()
 				return nil, nil
 			} else { err = err2 }
 		}
@@ -335,8 +361,22 @@ func (c *FsController) doMoveFile(ctx context.Context, body []byte) (any, error)
 	if isWebdavMoveError(err) {
 		if _, er2 := runRclone(ctx, "copyto", srcFs+src, dstFs+dst); er2 == nil {
 			_, _ = runRclone(ctx, "deletefile", srcFs+src)
-			go waitVisible(context.Background(), dstFs, dst)
-			go waitGoneFile(context.Background(), srcFs, src)
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("goroutine panic", zap.Any("panic", r))
+					}
+				}()
+				waitVisible(context.Background(), dstFs, dst)
+			}()
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("goroutine panic", zap.Any("panic", r))
+					}
+				}()
+				waitGoneFile(context.Background(), srcFs, src)
+			}()
 			return nil, nil
 		}
 	}
@@ -345,7 +385,9 @@ func (c *FsController) doMoveFile(ctx context.Context, body []byte) (any, error)
 
 func (c *FsController) doCopyDir(ctx context.Context, body []byte) (any, error) {
 	var req copyMoveFileReq
-	_ = json.Unmarshal(body, &req)
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("无效的请求格式: %w", err)
+	}
 	srcFs, src := splitFsRemote(req.SrcFs, req.SrcRemote)
 	dstFs, dst := splitFsRemote(req.DstFs, req.DstRemote)
 	src = sanitizePath(src)
@@ -370,7 +412,9 @@ func (c *FsController) doCopyDir(ctx context.Context, body []byte) (any, error) 
 
 func (c *FsController) doMoveDir(ctx context.Context, body []byte) (any, error) {
 	var req copyMoveFileReq
-	_ = json.Unmarshal(body, &req)
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("无效的请求格式: %w", err)
+	}
 	srcFs, src := splitFsRemote(req.SrcFs, req.SrcRemote)
 	dstFs, dst := splitFsRemote(req.DstFs, req.DstRemote)
 	src = sanitizePath(src)
@@ -380,22 +424,53 @@ func (c *FsController) doMoveDir(ctx context.Context, body []byte) (any, error) 
 	_, err := runRclone(ctx, "move", srcFs+src, dstFs+dst)
 	if err == nil {
 		// match CLI-good behavior: after move, aggressively ensure old src disappears
-		go func(){ deepCleanDir(context.Background(), srcFs, src); waitGoneDir(context.Background(), srcFs, src) }()
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("goroutine panic", zap.Any("panic", r))
+				}
+			}()
+			deepCleanDir(context.Background(), srcFs, src)
+			waitGoneDir(context.Background(), srcFs, src)
+		}()
 		return nil, nil
 	}
 	if strings.Contains(strings.ToLower(err.Error()), "network name not found") || strings.Contains(strings.ToLower(err.Error()), "create filesystem") {
 		s2 := tryStripFirstSegment(src)
 		d2 := tryStripFirstSegment(dst)
 		if s2 != src || d2 != dst { ensureDir(ctx, dstFs, d2); if _, err2 := runRclone(ctx, "move", srcFs+s2, dstFs+d2); err2 == nil {
-			go func(){ deepCleanDir(context.Background(), srcFs, s2); waitGoneDir(context.Background(), srcFs, s2) }()
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("goroutine panic", zap.Any("panic", r))
+					}
+				}()
+				deepCleanDir(context.Background(), srcFs, s2)
+				waitGoneDir(context.Background(), srcFs, s2)
+			}()
 			return nil, nil
 		} else { err = err2 } }
 	}
 	if isWebdavMoveError(err) {
 		if _, er2 := runRclone(ctx, "copy", srcFs+src, dstFs+dst); er2 == nil {
 			_, _ = runRclone(ctx, "purge", srcFs+src)
-			go waitVisible(context.Background(), dstFs, dst)
-			go func(){ deepCleanDir(context.Background(), srcFs, src); waitGoneDir(context.Background(), srcFs, src) }()
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("goroutine panic", zap.Any("panic", r))
+					}
+				}()
+				waitVisible(context.Background(), dstFs, dst)
+			}()
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("goroutine panic", zap.Any("panic", r))
+					}
+				}()
+				deepCleanDir(context.Background(), srcFs, src)
+				waitGoneDir(context.Background(), srcFs, src)
+			}()
 			return nil, nil
 		}
 	}
@@ -404,7 +479,9 @@ func (c *FsController) doMoveDir(ctx context.Context, body []byte) (any, error) 
 
 func (c *FsController) doPublicLink(ctx context.Context, body []byte) (any, error) {
 	var req fileOpReq
-	_ = json.Unmarshal(body, &req)
+	if err := json.Unmarshal(body, &req); err != nil {
+		return nil, fmt.Errorf("无效的请求格式: %w", err)
+	}
 	fs, p := normalize(req.Fs, req.Remote)
 	out, err := runRclone(ctx, "link", fs+p)
 	if err != nil { return nil, err }

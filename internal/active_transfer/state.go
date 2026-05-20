@@ -5,6 +5,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
+	"rcloneflow/internal/logger"
 )
 
 type PersistFunc func(runID int64, snap ActiveTransferSnapshot)
@@ -55,7 +58,14 @@ func (m *Manager) emitPersist(runID int64, snap ActiveTransferSnapshot) {
 	if persist == nil {
 		return
 	}
-	go persist(runID, snap)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		persist(runID, snap)
+	}()
 }
 
 func (m *Manager) flushPendingPersist(runID int64) {
@@ -92,7 +102,14 @@ func (m *Manager) persistSnapshotLockedMode(st *ActiveTransferState, immediate b
 			delete(m.persistTimers, runID)
 		}
 		delete(m.pendingPersist, runID)
-		go m.persist(runID, snap)
+		go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		m.persist(runID, snap)
+	}()
 		return
 	}
 	m.pendingPersist[runID] = snap

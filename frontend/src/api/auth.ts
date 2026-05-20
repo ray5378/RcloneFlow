@@ -1,14 +1,14 @@
 const API_BASE = ''
 
-interface AuthResponse {
+export interface AuthResponse {
   accessToken: string
   refreshToken: string
+  mustChangePassword?: boolean
   user: {
     id: number
     username: string
   }
 }
-
 
 export function setTokens(accessToken: string, refreshToken: string) {
   localStorage.setItem('authToken', accessToken)
@@ -30,8 +30,6 @@ export async function login(username: string, password: string): Promise<AuthRes
   }
 
   const data = await res.json()
-  setTokens(data.accessToken, data.refreshToken)
-  localStorage.setItem('user', JSON.stringify(data.user))
   return data
 }
 
@@ -78,7 +76,16 @@ export function getUser(): { id: number; username: string } | null {
   return user ? JSON.parse(user) : null
 }
 
-export async function changePassword(oldPassword: string, newPassword: string, username?: string): Promise<void> {
+export async function me(): Promise<{ id: number; username: string }> {
+  const res = await fetch('/api/auth/me', {
+    headers: { 'Authorization': `Bearer ${getToken()}` }
+  })
+  if (!res.ok) throw new Error('unauthorized')
+  const data = await res.json()
+  return data.user
+}
+
+export async function changePassword(oldPassword: string, newPassword: string, username?: string): Promise<{ message: string }> {
   const res = await fetch('/api/auth/change-password', {
     method: 'POST',
     headers: {
@@ -92,4 +99,6 @@ export async function changePassword(oldPassword: string, newPassword: string, u
     const error = await res.json().catch(() => ({ error: '修改失败' }))
     throw new Error(error.error || '修改失败')
   }
+
+  return res.json()
 }

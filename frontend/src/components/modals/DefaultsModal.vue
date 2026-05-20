@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { getSettings, saveSettings, resetSettings } from '../../api/settings'
 import { t } from '../../i18n'
 
@@ -17,18 +17,21 @@ const errors = ref<Record<string, string>>({})
 const saveFailed = ref(false)
 const durationRe = /^\s*\d+\s*(ms|s|m|h|d)\s*$/i
 
+let savedTimer: number | null = null
+let saveFailedTimer: number | null = null
+
 function validate() {
   errors.value = {}
   const intFields = ['FINAL_SUMMARY_RETENTION_DAYS', 'CLEANUP_INTERVAL_HOURS', 'WEBHOOK_MAX_FILES']
   for (const k of intFields) {
-    const v = (form.value as any)[k]
+    const v = (form.value as Record<string, string>)[k]
     if (v !== '' && (isNaN(Number(v)) || !Number.isFinite(Number(v)) || Number(v) < 0)) {
       errors.value[k] = t('defaults.errNonNegative')
     }
   }
   const durFields = ['FINISH_WAIT_INTERVAL', 'FINISH_WAIT_TIMEOUT']
   for (const k of durFields) {
-    const v = (form.value as any)[k]
+    const v = (form.value as Record<string, string>)[k]
     if (v && !durationRe.test(String(v))) {
       errors.value[k] = t('defaults.errDuration')
     }
@@ -61,7 +64,7 @@ async function onSave() {
   if (!validate()) return
   const payload: Record<string, string> = {}
   Object.keys(form.value).forEach(k => {
-    const v = (form.value as any)[k]
+    const v = (form.value as Record<string, string>)[k]
     payload[k] = v === undefined || v === null ? '' : String(v)
   })
   saving.value = true
@@ -71,11 +74,13 @@ async function onSave() {
     await load()
     emit('settings-saved', { ...form.value })
     saved.value = true
-    setTimeout(() => { saved.value = false }, 10000)
+    if (savedTimer) clearTimeout(savedTimer)
+    savedTimer = window.setTimeout(() => { saved.value = false }, 10000)
   } catch (e: any) {
     console.error(e)
     saveFailed.value = true
-    setTimeout(() => { saveFailed.value = false }, 3000)
+    if (saveFailedTimer) clearTimeout(saveFailedTimer)
+    saveFailedTimer = window.setTimeout(() => { saveFailed.value = false }, 3000)
   } finally {
     saving.value = false
   }
@@ -96,7 +101,8 @@ async function doConfirmReset() {
     await load()
     emit('settings-saved', { ...form.value })
     saved.value = true
-    setTimeout(() => { saved.value = false }, 10000)
+    if (savedTimer) clearTimeout(savedTimer)
+    savedTimer = window.setTimeout(() => { saved.value = false }, 10000)
   } catch (e: any) {
     alert(e?.message || e)
   } finally {
@@ -106,6 +112,11 @@ async function doConfirmReset() {
 }
 
 onMounted(load)
+
+onUnmounted(() => {
+  if (savedTimer) { clearTimeout(savedTimer); savedTimer = null }
+  if (saveFailedTimer) { clearTimeout(saveFailedTimer); saveFailedTimer = null }
+})
 </script>
 
 <template>

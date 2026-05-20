@@ -109,8 +109,7 @@ describe('auth.ts', () => {
         body: JSON.stringify({ username: 'admin', password: 'admin' })
       })
       expect(result.accessToken).toBe('new-access')
-      expect(getToken()).toBe('new-access')
-      expect(getUser()).toEqual({ id: 1, username: 'admin' })
+      expect(result.user).toEqual({ id: 1, username: 'admin' })
     })
 
     it('should throw on login failure', async () => {

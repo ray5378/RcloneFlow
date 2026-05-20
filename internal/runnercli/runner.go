@@ -319,14 +319,29 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	var consumeWG sync.WaitGroup
 	consumeWG.Add(2)
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
 		defer consumeWG.Done()
 		r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
 	}()
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
 		defer consumeWG.Done()
 		r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
 	}()
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
 		defer func() {
 			r.mu.Lock()
 			delete(r.cancelFns, run.ID)
@@ -401,10 +416,20 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					consumeWG = sync.WaitGroup{}
 					consumeWG.Add(2)
 					go func() {
+						defer func() {
+							if r := recover(); r != nil {
+								logger.Error("goroutine panic", zap.Any("panic", r))
+							}
+						}()
 						defer consumeWG.Done()
 						r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
 					}()
 					go func() {
+						defer func() {
+							if r := recover(); r != nil {
+								logger.Error("goroutine panic", zap.Any("panic", r))
+							}
+						}()
 						defer consumeWG.Done()
 						r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
 					}()
@@ -482,7 +507,14 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				r.activeMgr.RemoveState(run.ID)
 			}
 			// fire webhook for failed run
-			go r.postWebhookIfNeeded(run.ID)
+			go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("goroutine panic", zap.Any("panic", r))
+				}
+			}()
+			r.postWebhookIfNeeded(run.ID)
+		}()
 			r.mu.Lock()
 			delete(r.procs, run.ID)
 			r.mu.Unlock()
@@ -509,7 +541,14 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				if r.activeMgr != nil {
 					r.activeMgr.RemoveState(run.ID)
 				}
-				go r.postWebhookIfNeeded(run.ID)
+				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							logger.Error("goroutine panic", zap.Any("panic", r))
+						}
+					}()
+					r.postWebhookIfNeeded(run.ID)
+				}()
 				r.mu.Lock()
 				delete(r.procs, run.ID)
 				r.mu.Unlock()
@@ -624,7 +663,14 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			r.activeMgr.RemoveState(run.ID)
 		}
 		// fire webhook for successful run
-		go r.postWebhookIfNeeded(run.ID)
+		go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		r.postWebhookIfNeeded(run.ID)
+	}()
 		r.mu.Lock()
 		delete(r.procs, run.ID)
 		r.mu.Unlock()
@@ -871,7 +917,15 @@ func (r *Runner) Stop(runID int64) error {
 
 func wait(cmd *exec.Cmd, d time.Duration) bool {
 	ch := make(chan struct{}, 1)
-	go func() { _ = cmd.Wait(); close(ch) }()
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		_ = cmd.Wait()
+		close(ch)
+	}()
 	select {
 	case <-ch:
 		return true
@@ -1666,6 +1720,11 @@ func spmValue(m []string, i int) string {
 // enrichFilesSizesAsync 异步补全文件大小，不阻塞数据库更新和 webhook
 func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst, cfg string, openlistCASCompatible bool) {
 	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
 		if len(files) == 0 {
 			return
 		}

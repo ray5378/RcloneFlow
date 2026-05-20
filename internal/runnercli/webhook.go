@@ -94,7 +94,9 @@ func (r *Runner) postWebhookIfNeeded(runID int64) {
 	// 解析任务 options
 	var opt map[string]any
 	if len(task.Options) > 0 {
-		_ = json.Unmarshal(task.Options, &opt)
+		if err := json.Unmarshal(task.Options, &opt); err != nil {
+			logger.Error("unmarshal task options", zap.Error(err))
+		}
 	}
 	// 支持多个通知目标：通用 Webhook + 企业微信
 	postURLs := []string{}
@@ -211,7 +213,12 @@ func (r *Runner) postWebhookIfNeeded(runID int64) {
 	// 发送（3 秒超时，最多 3 次）
 	for _, postURL := range postURLs {
 		go func(postURL string) {
-			client := &http.Client{ Timeout: 6 * time.Second }
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("goroutine panic", zap.Any("panic", r))
+				}
+			}()
+			client := &http.Client{Timeout: 6 * time.Second}
 			// 默认 body 为我们自有 schema
 			body, _ := json.Marshal(payload)
 			// 取公共字段
@@ -255,7 +262,11 @@ func (r *Runner) postWebhookIfNeeded(runID int64) {
 					sb.WriteString("> 其他 …\n")
 				}
 				msg := map[string]any{"msgtype": "markdown", "markdown": map[string]string{"content": sb.String()}}
-				body, _ = json.Marshal(msg)
+				if b, err := json.Marshal(msg); err != nil {
+					logger.Error("marshal webhook message", zap.Error(err))
+				} else {
+					body = b
+				}
 			} else {
 				// 通用 Webhook：也发送与企业微信一致的 markdown 格式，但不限制文件数量
 				var sb strings.Builder
@@ -265,7 +276,11 @@ func (r *Runner) postWebhookIfNeeded(runID int64) {
 				sb.WriteString(fmt.Sprintf("> 均速: %s  耗时: %s\n", speedFmt, duration))
 				for _, p := range filesArr { sb.WriteString("> "+ baseName(p) + "\n") }
 				msg := map[string]any{"msgtype": "markdown", "markdown": map[string]string{"content": sb.String()}}
-				body, _ = json.Marshal(msg)
+				if b, err := json.Marshal(msg); err != nil {
+					logger.Error("marshal webhook message", zap.Error(err))
+				} else {
+					body = b
+				}
 			}
 			for i := 0; i < 3; i++ {
 				req, _ := http.NewRequest("POST", postURL, bytes.NewReader(body))

@@ -6,10 +6,11 @@ import (
 )
 
 type User struct {
-	ID        int64     `json:"id"`
-	Username  string    `json:"username"`
-	Password  string    `json:"-"` // 不返回密码
-	CreatedAt time.Time `json:"createdAt"`
+	ID              int64     `json:"id"`
+	Username        string    `json:"username"`
+	Password        string    `json:"-"` // 不返回密码
+	PasswordChanged bool      `json:"passwordChanged"`
+	CreatedAt       time.Time `json:"createdAt"`
 }
 
 type Task struct {

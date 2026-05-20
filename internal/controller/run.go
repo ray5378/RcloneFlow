@@ -15,7 +15,10 @@ import (
 	"strings"
 	"time"
 
+	"go.uber.org/zap"
+
 	"rcloneflow/internal/rclone"
+	"rcloneflow/internal/logger"
 	"rcloneflow/internal/service"
 )
 
@@ -729,7 +732,9 @@ func (c *RunController) HandleRuns(w http.ResponseWriter, r *http.Request) {
 		switch v := any(r.Summary).(type) {
 		case string:
 			if v != "" {
-				_ = json.Unmarshal([]byte(v), &sum)
+				if err := json.Unmarshal([]byte(v), &sum); err != nil {
+					logger.Error("unmarshal run summary for listing", zap.Error(err))
+				}
 			}
 		case map[string]any:
 			sum = v
@@ -768,7 +773,9 @@ func (c *RunController) HandleRunsByTask(w http.ResponseWriter, r *http.Request)
 	for _, run := range runs {
 		var sum map[string]any
 		if run.Summary != "" {
-			_ = json.Unmarshal([]byte(run.Summary), &sum)
+			if err := json.Unmarshal([]byte(run.Summary), &sum); err != nil {
+				logger.Error("unmarshal run summary for task listing", zap.Error(err))
+			}
 		}
 		sum = ensureHistoricalFinalSummary(run, sum)
 		out = append(out, buildLightRunObject(run, sum))
@@ -805,7 +812,9 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		switch v := any(run.Summary).(type) {
 		case string:
 			if v != "" {
-				_ = json.Unmarshal([]byte(v), &sum)
+				if err := json.Unmarshal([]byte(v), &sum); err != nil {
+					logger.Error("unmarshal run summary for status", zap.Error(err))
+				}
 			}
 		case map[string]any:
 			sum = v
@@ -899,7 +908,9 @@ func killRunBySummary(run service.RunRecord) bool {
 		sum = v
 	case string:
 		if v != "" {
-			_ = json.Unmarshal([]byte(v), &sum)
+			if err := json.Unmarshal([]byte(v), &sum); err != nil {
+				logger.Error("unmarshal run summary for kill", zap.Error(err))
+			}
 		}
 	}
 	if sum != nil {

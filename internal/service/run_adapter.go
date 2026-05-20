@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"go.uber.org/zap"
+	"rcloneflow/internal/logger"
 	"rcloneflow/internal/store"
 )
 
@@ -29,7 +31,10 @@ func formatOptTime(t *time.Time) string {
 func toRunRecord(r store.Run) RunRecord {
 	summaryStr := ""
 	if r.Summary != nil {
-		bs, _ := json.Marshal(r.Summary)
+		bs, err := json.Marshal(r.Summary)
+		if err != nil {
+			logger.Error("marshal run summary", zap.Error(err))
+		}
 		summaryStr = string(bs)
 	}
 	finAt := formatOptTime(r.FinishedAt)

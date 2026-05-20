@@ -152,7 +152,10 @@ func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
 func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 	body, _ := io.ReadAll(r.Body)
 	var p settingsPayload
-	_ = json.Unmarshal(body, &p)
+	if err := json.Unmarshal(body, &p); err != nil {
+		http.Error(w, `{"error":"无效的请求格式"}`, http.StatusBadRequest)
+		return
+	}
 	if p.Reset {
 		_ = writeOverrides(map[string]string{})
 		WriteJSON(w, http.StatusOK, map[string]any{"ok": true, "reset": true})

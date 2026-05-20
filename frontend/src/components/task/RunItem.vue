@@ -5,11 +5,12 @@ import { getResolvedTotalCount, getUnifiedProgressText, type TaskProgressLike } 
 import { t } from '../../i18n'
 import type { Run } from '../../types'
 
-interface Summary {
+export interface Summary {
   totalBytes?: number
   transferredBytes?: number
   counts?: { total?: number; copied?: number; deleted?: number; failed?: number; skipped?: number }
   message?: string
+  finalSummary?: Summary
 }
 
 const props = defineProps<{ run: Run; progress?: TaskProgressLike; summary?: Summary }>()
@@ -22,7 +23,7 @@ const triggerText = computed(() => props.run.trigger ? getTriggerText(props.run.
 const startedText = computed(() => formatTime(props.run.startedAt || ''))
 const progressText = computed(() => props.run.status === 'running' ? getProgressText(props.run) : '-')
 const normalizedSummary = computed(() => {
-  const raw = props.summary as any
+  const raw = props.summary
   return raw?.finalSummary && typeof raw.finalSummary === 'object' ? raw.finalSummary : raw
 })
 const summaryTotal = computed(() => {

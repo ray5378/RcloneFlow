@@ -31,7 +31,7 @@ export function showToastMessage(message: string, type: 'error' | 'success' | 'i
   if (globalErrorHandler) {
     globalErrorHandler(message, type)
   } else {
-    console.log(`[${type}] ${message}`)
+    console.error(`[${type}] ${message}`)
   }
 }
 

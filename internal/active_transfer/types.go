@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"sort"
 	"time"
+
+	"go.uber.org/zap"
+	"rcloneflow/internal/logger"
 )
 
 type TrackingMode string
@@ -329,7 +332,9 @@ func normalizedTransferSlots(v int) int {
 func SnapshotEnvelope(snap ActiveTransferSnapshot) map[string]any {
 	b, _ := json.Marshal(snap)
 	var m map[string]any
-	_ = json.Unmarshal(b, &m)
+	if err := json.Unmarshal(b, &m); err != nil {
+		logger.Error("unmarshal snapshot envelope", zap.Error(err))
+	}
 	return map[string]any{"activeTransfer": m}
 }
 

@@ -3,3 +3,7 @@
 {"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T01:28:18.192Z","caller":"logger/logger_test.go:118","msg":"json format test"}
 {"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T01:38:46.415Z","caller":"logger/logger_test.go:118","msg":"json format test"}
 {"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T02:21:46.849Z","caller":"logger/logger_test.go:118","msg":"json format test"}
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T03:02:43.042Z","caller":"logger/logger_test.go:118","msg":"json format test"}
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T03:34:14.247Z","caller":"logger/logger_test.go:118","msg":"json format test"}
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T03:42:46.409Z","caller":"logger/logger_test.go:118","msg":"json format test"}
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T04:11:04.305Z","caller":"logger/logger_test.go:118","msg":"json format test"}

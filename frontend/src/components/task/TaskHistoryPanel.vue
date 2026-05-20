@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import RunItem from './RunItem.vue'
+import RunItem, { type Summary } from './RunItem.vue'
 import type { Run } from '../../types'
 import type { TaskProgressLike } from './progressText'
 import { t } from '../../i18n'
@@ -20,9 +20,10 @@ const props = defineProps<{
 }>()
 
 const displayRuns = computed(() => props.filteredRuns.map(run => {
-  const summary = (run as any)?.summary?.finalSummary && typeof (run as any).summary.finalSummary === 'object'
-    ? (run as any).summary.finalSummary
-    : (run as any)?.summary
+  const summaryPayload = typeof run.summary !== 'string' ? run.summary : undefined
+  const summary = summaryPayload?.finalSummary && typeof summaryPayload.finalSummary === 'object'
+    ? summaryPayload.finalSummary
+    : summaryPayload
   return {
     ...run,
     __title: run.taskName || `${t('runItem.taskFallback')} #${run.taskId}`,
@@ -99,7 +100,7 @@ function pageInfo(page: number, total: number) {
         v-memo="[run.id, run.status, run.startedAt, run.finishedAt, run.bytesTransferred]"
         :run="run"
         :progress="run.status === 'running' ? getRealtimeProgressByRun(run) : undefined"
-        :summary="(run as any).summary"
+        :summary="run.summary as Summary | undefined"
         @click="emit('view-detail', run)"
         @view-detail="emit('view-detail', run)"
         @view-log="emit('view-log', run)"

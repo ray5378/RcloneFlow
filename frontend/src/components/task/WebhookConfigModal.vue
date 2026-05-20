@@ -33,13 +33,29 @@ const emit = defineEmits<{
 }>()
 
 function onTextInput(event: Event, key: 'triggerId' | 'matchText' | 'postUrl' | 'wecomUrl') {
-  const target = event.target as HTMLInputElement
-  emit(`update:${key}` as any, target.value)
+  const value = (event.target as HTMLInputElement).value
+  const eventMap = {
+    triggerId: 'update:triggerId',
+    matchText: 'update:matchText',
+    postUrl: 'update:postUrl',
+    wecomUrl: 'update:wecomUrl',
+  } as const
+  emit(eventMap[key], value)
 }
 
-function onCheckbox(event: Event, key: 'notifyManual' | 'notifySchedule' | 'notifyWebhook' | 'statusSuccess' | 'statusFailed' | 'statusHasTransfer') {
-  const target = event.target as HTMLInputElement
-  emit(`update:${key}` as any, target.checked)
+type CheckboxKey = 'notifyManual' | 'notifySchedule' | 'notifyWebhook' | 'statusSuccess' | 'statusFailed' | 'statusHasTransfer'
+
+function onCheckbox(event: Event, key: CheckboxKey) {
+  const checked = (event.target as HTMLInputElement).checked
+  const eventMap = {
+    notifyManual: 'update:notifyManual',
+    notifySchedule: 'update:notifySchedule',
+    notifyWebhook: 'update:notifyWebhook',
+    statusSuccess: 'update:statusSuccess',
+    statusFailed: 'update:statusFailed',
+    statusHasTransfer: 'update:statusHasTransfer',
+  } as const
+  emit(eventMap[key], checked)
 }
 </script>
 

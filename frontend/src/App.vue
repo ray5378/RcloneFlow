@@ -11,7 +11,7 @@ import { registerToast } from './api/errors'
 
 import * as api from './api'
 import { getSettings } from './api/settings'
-import { isLoggedIn as checkAuth, getUser, logout, changePassword } from './api/auth'
+import { isLoggedIn as checkAuth, getUser, logout, changePassword, me } from './api/auth'
 import { locale, toggleLocale, t } from './i18n'
 
 const { toasts, showToast } = useToastCenter()
@@ -129,11 +129,21 @@ onMounted(async () => {
   if (isLight.value) document.body.classList.add('light')
   const hash = (location.hash || '').replace('#', '')
   if (hash && ['browser', 'tasks'].includes(hash)) currentPage.value = hash
-  isAuth.value = checkAuth()
-  authChecked.value = true
   checkMobile()
   window.addEventListener('resize', checkMobile)
-  if (!isAuth.value) return
+  if (!checkAuth()) {
+    authChecked.value = true
+    return
+  }
+  try {
+    await me()
+  } catch {
+    logout()
+    authChecked.value = true
+    return
+  }
+  isAuth.value = true
+  authChecked.value = true
   try {
     const data = await api.listRemotes()
     version.value = data.version || t('common.unknown')
