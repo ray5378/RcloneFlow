@@ -80,6 +80,7 @@ func (r *Router) Setup(mux *http.ServeMux) {
 
 	// 标签
 	apiMux.HandleFunc("/api/tags", r.tagCtrl.HandleTags)
+	apiMux.HandleFunc("/api/tags/", r.tagCtrl.HandleTagActions)
 
 	// 远程存储相关
 	apiMux.HandleFunc("/api/remotes", r.remoteCtrl.HandleRemotes)

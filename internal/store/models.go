@@ -14,9 +14,10 @@ type User struct {
 }
 
 type Tag struct {
-	ID   int64  `json:"id"`
-	Tag  string `json:"tag"`
-	Type string `json:"type"`
+	ID       int64  `json:"id"`
+	Tag      string `json:"tag"`
+	Type     string `json:"type"`
+	Selected bool   `json:"selected"`
 }
 
 type Task struct {

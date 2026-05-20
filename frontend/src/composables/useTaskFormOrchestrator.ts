@@ -37,10 +37,9 @@ export function useTaskFormOrchestrator(options: {
   parseRcloneCommand: (cmd: string) => ParsedRcloneCommand
   showToast: (message: string, type?: 'info' | 'success' | 'error') => void
 }) {
-  const creatingState = ref<'idle' | 'loading' | 'done'>('idle')
+  const creatingState = ref<'idle' | 'loading'>('idle')
 
   const {
-    handleTaskFormDoneClick,
     validateTaskForm,
     executeTaskFormSubmit,
   } = useTaskFormSubmit({
@@ -64,7 +63,6 @@ export function useTaskFormOrchestrator(options: {
   })
 
   const { runTaskFormFlow } = useTaskFormFlow({
-    handleTaskFormDoneClick,
     validateTaskFormBeforeSubmit,
     executeTaskFormSubmit,
   })
@@ -76,7 +74,6 @@ export function useTaskFormOrchestrator(options: {
 
   return {
     creatingState,
-    handleTaskFormDoneClick,
     validateTaskForm,
     executeTaskFormSubmit,
     validateTaskFormBeforeSubmit,

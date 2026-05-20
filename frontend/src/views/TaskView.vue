@@ -7,6 +7,7 @@ import TaskEditorViewShell from '../components/task/TaskEditorViewShell.vue'
 import ToastCenter from '../components/toast/ToastCenter.vue'
 import ScheduleConfigModal from '../components/task/ScheduleConfigModal.vue'
 import TransferringModal from '../components/task/transferring/TransferringModal.vue'
+import TagManagerModal from '../components/task/TagManagerModal.vue'
 import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatEta } from '../utils/format'
@@ -27,7 +28,7 @@ import { useTaskViewModalBindings } from '../composables/useTaskViewModalBinding
 import { useToastCenter } from '../composables/useToastCenter'
 import { parseRcloneCommand } from '../composables/useTaskCommandParse'
 import { useActiveTransferDetail } from '../composables/useActiveTransferDetail'
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { t } from '../i18n'
 import { useScheduleConfigModal } from '../composables/useScheduleConfigModal'
 
@@ -105,9 +106,44 @@ const {
   jumpToTasksPage,
 } = useTaskListView(tasks)
 
-const { actionTags, keywordTags, reload: reloadTags } = useTaskTags(tasks)
+const {
+  actionTags,
+  keywordTags,
+  selectedKeywordTags,
+  suggestedTags,
+  reload: reloadTags,
+  toggleTag,
+  createManualTag,
+  deleteManualTag,
+} = useTaskTags(tasks)
 
 watch(tasks, () => { reloadTags() }, { deep: true })
+
+const tagManagerVisible = ref(false)
+
+function openTagManager() {
+  tagManagerVisible.value = true
+}
+
+function closeTagManager() {
+  tagManagerVisible.value = false
+}
+
+async function handleCreateTag(tag: string) {
+  await createManualTag(tag)
+}
+
+async function handleSelectTag(tag: string) {
+  await toggleTag(tag, true)
+}
+
+async function handleUnselectTag(tag: string) {
+  await toggleTag(tag, false)
+}
+
+async function handleDeleteTag(tag: string) {
+  await deleteManualTag(tag)
+}
 
 // 5) 运行详情 / 最终总结链
 const {
@@ -495,7 +531,8 @@ function closeTaskEditorModal() {
     :save-singleton="saveSingleton"
     :close-singleton-modal="closeSingletonModal"
     :action-tags="actionTags"
-    :keyword-tags="keywordTags"
+    :selected-keyword-tags="selectedKeywordTags"
+    @open-tag-manager="openTagManager"
   />
 
   <TaskHistoryViewShell
@@ -637,6 +674,18 @@ function closeTaskEditorModal() {
     :format-bytes-per-sec="formatBytesPerSec"
     :format-eta="formatEta"
     @close="closeGlobalStatsModal"
+  />
+
+  <TagManagerModal
+    :visible="tagManagerVisible"
+    :suggested-tags="suggestedTags"
+    :selected-keyword-tags="selectedKeywordTags"
+    :action-tags="actionTags"
+    @close="closeTagManager"
+    @create-tag="handleCreateTag"
+    @select-tag="handleSelectTag"
+    @unselect-tag="handleUnselectTag"
+    @delete-tag="handleDeleteTag"
   />
 
   <!-- 确认删除弹窗 -->

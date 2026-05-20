@@ -49,7 +49,6 @@ export function useTaskFormRuntime(options: {
 
   const {
     creatingState,
-    handleTaskFormDoneClick,
     validateTaskForm,
     executeTaskFormSubmit,
     validateTaskFormBeforeSubmit,
@@ -106,7 +105,6 @@ export function useTaskFormRuntime(options: {
     fillTaskFormForEdit,
     getScheduleByTaskId,
     creatingState,
-    handleTaskFormDoneClick,
     validateTaskForm,
     executeTaskFormSubmit,
     validateTaskFormBeforeSubmit,

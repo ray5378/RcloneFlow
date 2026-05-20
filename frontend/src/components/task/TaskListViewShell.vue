@@ -77,7 +77,7 @@ defineProps<{
   saveSingleton: () => void
   closeSingletonModal: () => void
   actionTags: Tag[]
-  keywordTags: Tag[]
+  selectedKeywordTags: Tag[]
 }>()
 </script>
 
@@ -96,7 +96,7 @@ defineProps<{
     :current-tasks-pages="currentTasksPages"
     :tasks-jump-page="tasksJumpPage"
     :action-tags="actionTags"
-    :keyword-tags="keywordTags"
+    :selected-keyword-tags="selectedKeywordTags"
     :save-task-sort-orders="saveTaskSortOrders"
     @update:search="setTaskSearch"
     @add="goToAddTask"
@@ -113,6 +113,7 @@ defineProps<{
     @next-page="nextTasksPage"
     @update:jump-page="setTasksJumpPageValue"
     @jump-page="jumpToTasksPage"
+    @open-tag-manager="$emit('open-tag-manager')"
   />
 
   <WebhookConfigModal

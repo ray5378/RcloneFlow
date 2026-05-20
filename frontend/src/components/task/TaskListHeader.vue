@@ -8,7 +8,7 @@ defineProps<{
   sorting?: boolean
   savingSort?: boolean
   actionTags: Tag[]
-  keywordTags: Tag[]
+  selectedKeywordTags: Tag[]
 }>()
 
 const emit = defineEmits<{
@@ -17,6 +17,7 @@ const emit = defineEmits<{
   (e: 'toggle-sort'): void
   (e: 'save-sort'): void
   (e: 'cancel-sort'): void
+  (e: 'open-tag-manager'): void
 }>()
 
 const showDropdown = ref(false)
@@ -78,11 +79,11 @@ onUnmounted(() => document.removeEventListener('click', onOutsideClick))
               >{{ t(`taskUI.${tag.tag}`) }}</button>
             </div>
           </div>
-          <div v-if="keywordTags.length" class="dropdown-group">
+          <div v-if="selectedKeywordTags.length" class="dropdown-group">
             <div class="dropdown-label">{{ t('taskUI.tagsKeyword') }}</div>
             <div class="dropdown-tags">
               <button
-                v-for="tag in keywordTags"
+                v-for="tag in selectedKeywordTags"
                 :key="tag.id"
                 class="tag-pill tag-keyword"
                 @click="selectTag(tag.tag)"
@@ -94,6 +95,7 @@ onUnmounted(() => document.removeEventListener('click', onOutsideClick))
           </div>
         </div>
       </div>
+      <button class="ghost small task-header-action-btn" @click="emit('open-tag-manager')">{{ t('taskUI.tagsManage') }}</button>
       <button v-if="!sorting" class="ghost small task-header-action-btn" @click="emit('toggle-sort')">{{ t('taskUI.taskSort') }}</button>
       <template v-else>
         <button class="primary small task-header-action-btn" :disabled="savingSort" @click="emit('save-sort')">{{ t('taskUI.saveSort') }}</button>

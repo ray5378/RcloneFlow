@@ -16,7 +16,7 @@ interface TaskPayload {
 interface UseTaskFormSubmitOptions {
   createForm: Ref<CreateForm>
   editingTask: Ref<Task | null>
-  creatingState: Ref<'idle' | 'loading' | 'done'>
+  creatingState: Ref<'idle' | 'loading'>
   currentModule: Ref<'history' | 'add' | 'tasks'>
   normalizeTaskOptions: (raw: TaskFormOptions | undefined | null) => TaskFormOptions
   loadData: () => Promise<void>
@@ -28,13 +28,6 @@ interface UseTaskFormSubmitOptions {
 }
 
 export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
-  function handleTaskFormDoneClick() {
-    if (options.creatingState.value !== 'done') return false
-    options.creatingState.value = 'idle'
-    options.currentModule.value = 'tasks'
-    return true
-  }
-
   function validateTaskForm() {
     if (!options.createForm.value.name) {
       return t('runtime.enterTaskName')
@@ -77,7 +70,7 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
       'success',
     )
     options.currentModule.value = 'tasks'
-    options.creatingState.value = 'done'
+    options.creatingState.value = 'idle'
   }
 
   function resetTaskFormSubmitState() {
@@ -97,7 +90,6 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
   }
 
   return {
-    handleTaskFormDoneClick,
     validateTaskForm,
     buildTaskPayload,
     submitTaskForm,

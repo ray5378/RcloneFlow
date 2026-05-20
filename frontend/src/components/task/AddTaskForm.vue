@@ -198,9 +198,8 @@ const updateOption: UpdateTaskOption = (key, value) => {
       </div>
 
       <div class="form-actions">
-        <button class="primary" :class="{ 'btn-success': creatingState === 'done' }" :disabled="creatingState === 'loading'" @click="$emit('submit')">
+        <button class="primary" :disabled="creatingState === 'loading'" @click="$emit('submit')">
           <template v-if="creatingState === 'loading'">{{ t('addTask.creating') }}</template>
-          <template v-else-if="creatingState === 'done'">{{ t('addTask.done') }}</template>
           <template v-else-if="editingTask">{{ t('addTask.saveEdit') }}</template>
           <template v-else>{{ t('addTask.createTask') }}</template>
         </button>

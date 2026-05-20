@@ -200,6 +200,10 @@ func (db *DB) migrate() error {
 				);
 			`,
 		},
+		{
+			version: 7,
+			sql:    `ALTER TABLE task_tags ADD COLUMN selected INTEGER NOT NULL DEFAULT 0;`,
+		},
 	}
 
 	var currentVersion int

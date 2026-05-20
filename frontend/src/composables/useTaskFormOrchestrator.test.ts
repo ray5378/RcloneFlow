@@ -35,21 +35,13 @@ describe('useTaskFormOrchestrator', () => {
 
   it('should expose creatingState and methods', () => {
     const opts = makeOptions()
-    const { creatingState, handleTaskFormDoneClick, validateTaskForm, executeTaskFormSubmit, validateTaskFormBeforeSubmit, runTaskFormFlow, createTask } = useTaskFormOrchestrator(opts)
+    const { creatingState, validateTaskForm, executeTaskFormSubmit, validateTaskFormBeforeSubmit, runTaskFormFlow, createTask } = useTaskFormOrchestrator(opts)
     expect(creatingState.value).toBe('idle')
-    expect(typeof handleTaskFormDoneClick).toBe('function')
     expect(typeof validateTaskForm).toBe('function')
     expect(typeof executeTaskFormSubmit).toBe('function')
     expect(typeof validateTaskFormBeforeSubmit).toBe('function')
     expect(typeof runTaskFormFlow).toBe('function')
     expect(typeof createTask).toBe('function')
-  })
-
-  it('should handle done click', () => {
-    const opts = makeOptions()
-    const { handleTaskFormDoneClick, creatingState } = useTaskFormOrchestrator(opts)
-    creatingState.value = 'done'
-    expect(handleTaskFormDoneClick()).toBe(true)
   })
 
   it('should validate form', () => {

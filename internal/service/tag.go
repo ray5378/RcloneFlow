@@ -86,7 +86,6 @@ func (s *TagService) extractTokens(name string) []tokenFreq {
 	return s.extractEnglishTokens(name)
 }
 
-
 func (s *TagService) RecalcTags() error {
 	tasks, err := s.db.ListTasks()
 	if err != nil {
@@ -101,19 +100,32 @@ func (s *TagService) RecalcTags() error {
 		}
 	}
 
-	tagMap := make(map[string]string)
-	tagMap["sync"] = "action"
-	tagMap["copy"] = "action"
-	tagMap["move"] = "action"
+	entries := []store.TagEntry{
+		{Tag: "sync", Type: "action", Selected: true},
+		{Tag: "copy", Type: "action", Selected: true},
+		{Tag: "move", Type: "action", Selected: true},
+	}
 	for token, count := range tokenCounts {
 		if count >= 2 {
-			tagMap[token] = "keyword"
+			entries = append(entries, store.TagEntry{Tag: token, Type: "keyword", Selected: false})
 		}
 	}
 
-	return s.db.ReplaceTags(tagMap)
+	return s.db.MergeTags(entries)
 }
 
 func (s *TagService) ListTags() ([]store.Tag, error) {
 	return s.db.ListTags()
+}
+
+func (s *TagService) SelectTag(tag string, selected bool) error {
+	return s.db.SetTagSelected(tag, selected)
+}
+
+func (s *TagService) CreateManualTag(tag string) error {
+	return s.db.CreateManualTag(tag)
+}
+
+func (s *TagService) DeleteManualTag(tag string) error {
+	return s.db.DeleteManualTag(tag)
 }

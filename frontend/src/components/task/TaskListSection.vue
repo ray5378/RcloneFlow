@@ -25,7 +25,7 @@ const props = defineProps<{
   tasksJumpPage: number | null
   savingSort?: boolean
   actionTags: Tag[]
-  keywordTags: Tag[]
+  selectedKeywordTags: Tag[]
   saveTaskSortOrders: (orders: Record<number, number>, priorityTaskId?: number) => Promise<boolean>
 }>()
 
@@ -45,6 +45,7 @@ const emit = defineEmits<{
   (e: 'next-page'): void
   (e: 'update:jump-page', value: number | null): void
   (e: 'jump-page'): void
+  (e: 'open-tag-manager'): void
 }>()
 
 const sorting = ref(false)
@@ -237,12 +238,13 @@ function handleLastPage() {
       :sorting="sorting"
       :saving-sort="savingSort || savingNow"
       :action-tags="actionTags"
-      :keyword-tags="keywordTags"
+      :selected-keyword-tags="selectedKeywordTags"
       @update:search="emit('update:search', $event)"
       @add="emit('add')"
       @toggle-sort="startSort"
       @save-sort="saveSort"
       @cancel-sort="cancelSort"
+      @open-tag-manager="emit('open-tag-manager')"
     />
 
     <div v-if="sorting" class="sort-hint">{{ t('taskUI.sortAutoSaveHint') }}</div>

@@ -19,7 +19,7 @@ describe('useTaskFormSubmit', () => {
         options: {},
       }),
       editingTask: ref(null),
-      creatingState: ref<'idle' | 'loading' | 'done'>('idle'),
+      creatingState: ref<'idle' | 'loading'>('idle'),
       currentModule: ref<'history' | 'add' | 'tasks'>('tasks'),
       normalizeTaskOptions: vi.fn((raw) => raw || {}),
       loadData: vi.fn().mockResolvedValue(undefined),
@@ -30,23 +30,6 @@ describe('useTaskFormSubmit', () => {
       },
     }
   }
-
-  it('should handle done click when state is done', () => {
-    const opts = makeOptions()
-    opts.creatingState.value = 'done'
-    const { handleTaskFormDoneClick } = useTaskFormSubmit(opts)
-    const result = handleTaskFormDoneClick()
-    expect(result).toBe(true)
-    expect(opts.creatingState.value).toBe('idle')
-    expect(opts.currentModule.value).toBe('tasks')
-  })
-
-  it('should return false when state is not done', () => {
-    const opts = makeOptions()
-    opts.creatingState.value = 'idle'
-    const { handleTaskFormDoneClick } = useTaskFormSubmit(opts)
-    expect(handleTaskFormDoneClick()).toBe(false)
-  })
 
   it('should validate form', () => {
     const opts = makeOptions()
@@ -95,7 +78,7 @@ describe('useTaskFormSubmit', () => {
     expect(opts.loadData).toHaveBeenCalled()
     expect(opts.showToast).toHaveBeenCalledWith('runtime.taskCreateSuccess', 'success')
     expect(opts.currentModule.value).toBe('tasks')
-    expect(opts.creatingState.value).toBe('done')
+    expect(opts.creatingState.value).toBe('idle')
   })
 
   it('should execute task form submit', async () => {
@@ -103,7 +86,7 @@ describe('useTaskFormSubmit', () => {
     const { executeTaskFormSubmit } = useTaskFormSubmit(opts)
     const result = await executeTaskFormSubmit()
     expect(result).toBe('')
-    expect(opts.creatingState.value).toBe('done')
+    expect(opts.creatingState.value).toBe('idle')
   })
 
   it('should handle submit error', async () => {

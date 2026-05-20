@@ -1,5 +1,5 @@
 import { ref, computed, type Ref } from 'vue'
-import { fetchTags, type Tag } from '../api/tags'
+import { fetchTags, selectTag, createTag, deleteTag, type Tag } from '../api/tags'
 import type { Task } from '../types'
 
 export function useTaskTags(_tasks: Ref<Task[]>) {
@@ -8,6 +8,9 @@ export function useTaskTags(_tasks: Ref<Task[]>) {
 
   const actionTags = computed(() => tags.value.filter(t => t.type === 'action'))
   const keywordTags = computed(() => tags.value.filter(t => t.type === 'keyword'))
+
+  const selectedKeywordTags = computed(() => tags.value.filter(t => t.type === 'keyword' && t.selected))
+  const suggestedTags = computed(() => tags.value.filter(t => t.type === 'keyword' && !t.selected))
 
   async function load() {
     loading.value = true
@@ -20,5 +23,31 @@ export function useTaskTags(_tasks: Ref<Task[]>) {
     }
   }
 
-  return { tags, actionTags, keywordTags, loading, reload: load }
+  async function toggleTag(tag: string, selected: boolean) {
+    await selectTag(tag, selected)
+    await load()
+  }
+
+  async function createManualTag(tag: string) {
+    await createTag(tag)
+    await load()
+  }
+
+  async function deleteManualTag(tag: string) {
+    await deleteTag(tag)
+    await load()
+  }
+
+  return {
+    tags,
+    actionTags,
+    keywordTags,
+    selectedKeywordTags,
+    suggestedTags,
+    loading,
+    reload: load,
+    toggleTag,
+    createManualTag,
+    deleteManualTag,
+  }
 }

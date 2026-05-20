@@ -40,7 +40,7 @@ func setupTagTest(t *testing.T) (*TagService, *store.DB) {
 	return svc, db
 }
 
-func TestRecalcTags_KeywordTags(t *testing.T) {
+func TestRecalcTags_ActionTags(t *testing.T) {
 	svc, db := setupTagTest(t)
 	defer db.Close()
 
@@ -49,35 +49,23 @@ func TestRecalcTags_KeywordTags(t *testing.T) {
 	}
 
 	tags, _ := svc.ListTags()
-	tagSet := make(map[string]string)
+	tagSet := make(map[string]bool)
 	for _, tg := range tags {
-		tagSet[tg.Tag] = tg.Type
+		tagSet[tg.Tag] = tg.Selected
 	}
 
-	if tagSet["sync"] != "action" {
-		t.Fatal("missing action tag sync")
+	if !tagSet["sync"] {
+		t.Fatal("action tag sync should be selected")
 	}
-	if tagSet["copy"] != "action" {
-		t.Fatal("missing action tag copy")
+	if !tagSet["copy"] {
+		t.Fatal("action tag copy should be selected")
 	}
-	if tagSet["move"] != "action" {
-		t.Fatal("missing action tag move")
-	}
-	if tagSet["备份"] != "keyword" {
-		t.Fatal("missing keyword tag 备份")
-	}
-	if tagSet["阿里云"] != "keyword" {
-		t.Fatalf("missing keyword tag 阿里云, got tags: %v", tagSet)
-	}
-	if tagSet["backup"] != "keyword" {
-		t.Fatalf("missing keyword tag backup, got tags: %v", tagSet)
-	}
-	if tagSet["nas"] != "keyword" {
-		t.Fatalf("missing keyword tag nas, got tags: %v", tagSet)
+	if !tagSet["move"] {
+		t.Fatal("action tag move should be selected")
 	}
 }
 
-func TestRecalcTags_NoDuplicateShortTokens(t *testing.T) {
+func TestRecalcTags_AutoKeywords(t *testing.T) {
 	svc, db := setupTagTest(t)
 	defer db.Close()
 
@@ -91,23 +79,73 @@ func TestRecalcTags_NoDuplicateShortTokens(t *testing.T) {
 	hasAliyun := false
 	hasNAS := false
 	for _, tg := range tags {
-		if tg.Tag == "备份" {
+		if tg.Tag == "备份" && !tg.Selected {
 			hasBackup = true
 		}
-		if tg.Tag == "阿里云" {
+		if tg.Tag == "阿里云" && !tg.Selected {
 			hasAliyun = true
 		}
-		if tg.Tag == "nas" {
+		if tg.Tag == "nas" && !tg.Selected {
 			hasNAS = true
 		}
 	}
 	if !hasBackup {
-		t.Fatal("expected keyword tag 备份")
+		t.Fatal("expected auto keyword tag 备份 (not selected)")
 	}
 	if !hasAliyun {
-		t.Fatal("expected keyword tag 阿里云")
+		t.Fatal("expected auto keyword tag 阿里云 (not selected)")
 	}
 	if !hasNAS {
-		t.Fatal("expected keyword tag nas")
+		t.Fatal("expected auto keyword tag nas (not selected)")
+	}
+}
+
+func TestSelectTag(t *testing.T) {
+	svc, db := setupTagTest(t)
+	defer db.Close()
+
+	svc.RecalcTags()
+
+	if err := svc.SelectTag("备份", true); err != nil {
+		t.Fatalf("SelectTag: %v", err)
+	}
+
+	tags, _ := svc.ListTags()
+	for _, tg := range tags {
+		if tg.Tag == "备份" && tg.Selected {
+			return
+		}
+	}
+	t.Fatal("备份 should be selected after SelectTag true")
+}
+
+func TestCreateAndDeleteManualTag(t *testing.T) {
+	svc, db := setupTagTest(t)
+	defer db.Close()
+
+	if err := svc.CreateManualTag("我的标签"); err != nil {
+		t.Fatalf("CreateManualTag: %v", err)
+	}
+
+	tags, _ := svc.ListTags()
+	found := false
+	for _, tg := range tags {
+		if tg.Tag == "我的标签" && tg.Selected && tg.Type == "keyword" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("manual tag not found or wrong state")
+	}
+
+	if err := svc.DeleteManualTag("我的标签"); err != nil {
+		t.Fatalf("DeleteManualTag: %v", err)
+	}
+
+	tags, _ = svc.ListTags()
+	for _, tg := range tags {
+		if tg.Tag == "我的标签" {
+			t.Fatal("manual tag should be deleted")
+		}
 	}
 }

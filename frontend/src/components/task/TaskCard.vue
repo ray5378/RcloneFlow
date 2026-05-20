@@ -61,7 +61,7 @@ function isStopped(): boolean {
           <input class="sort-input" type="number" inputmode="numeric" step="1" :value="sortValue ?? ''" @click.stop @input="emit('sortInput', $event)" @keydown.enter.stop.prevent="emit('sortEnter', $event)" />
         </div>
         <strong>{{ task.name }}</strong>
-        <span class="mode-tag list-item-tag">{{ task.mode }}</span>
+        <span class="mode-tag list-item-tag">{{ t('taskUI.' + task.mode) }}</span>
       </div>
 
       <div class="schedule-info">
