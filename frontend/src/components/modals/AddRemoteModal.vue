@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import Modal from './Modal.vue'
-import * as api from '../api'
-import type { Provider, ProviderOption } from '../types'
-import { t, locale } from '../i18n'
+import * as api from '../../api'
+import type { Provider, ProviderOption } from '../../types'
+import { t, locale } from '../../i18n'
 
 const props = defineProps<{
   show: boolean

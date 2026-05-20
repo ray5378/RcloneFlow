@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getSettings, saveSettings, resetSettings } from '../api/settings'
-import { t } from '../i18n'
+import { getSettings, saveSettings, resetSettings } from '../../api/settings'
+import { t } from '../../i18n'
 
 const emit = defineEmits<{
   (e: 'close'): void

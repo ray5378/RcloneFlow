@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { exportTasks, importTasks, clearAllTasks } from '../api/task'
-import { clearAllRuns } from '../api/run'
-import { getTasks } from '../api/task'
-import { getRemotes } from '../api/remote'
-import { t } from '../i18n'
-import { showSuccessToast, showErrorToast } from '../api/errors'
+import { exportTasks, importTasks, clearAllTasks } from '../../api/task'
+import { clearAllRuns } from '../../api/run'
+import { getTasks } from '../../api/task'
+import { getRemotes } from '../../api/remote'
+import { t } from '../../i18n'
+import { showSuccessToast, showErrorToast } from '../../api/errors'
 
 const emit = defineEmits<{
   (e: 'close'): void
