@@ -119,6 +119,47 @@ func TestSelectTag(t *testing.T) {
 	t.Fatal("备份 should be selected after SelectTag true")
 }
 
+func TestRecalcTags_MixedChineseEnglish(t *testing.T) {
+	tmpDir, err := os.MkdirTemp("", "rcloneflow_tag_svc_test_*")
+	if err != nil {
+		t.Fatalf("failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	db, err := store.Open(tmpDir)
+	if err != nil {
+		t.Fatalf("Open() error = %v", err)
+	}
+	defer db.Close()
+
+	svc := NewTagService(db)
+
+	tasks := []store.Task{
+		{Name: "CAS从云盘拉回本地189pro文件夹"},
+		{Name: "CAS从影响拉到本地Local_cas中的STRM-CAS文件夹"},
+	}
+	for _, tk := range tasks {
+		if _, err := db.AddTask(tk); err != nil {
+			t.Fatalf("create task: %v", err)
+		}
+	}
+
+	if err := svc.RecalcTags(); err != nil {
+		t.Fatalf("RecalcTags: %v", err)
+	}
+
+	tags, _ := svc.ListTags()
+	hasCAS := false
+	for _, tg := range tags {
+		if tg.Tag == "cas" && !tg.Selected {
+			hasCAS = true
+		}
+	}
+	if !hasCAS {
+		t.Fatal("expected auto keyword tag cas from mixed Chinese-English names")
+	}
+}
+
 func TestCreateAndDeleteManualTag(t *testing.T) {
 	svc, db := setupTagTest(t)
 	defer db.Close()

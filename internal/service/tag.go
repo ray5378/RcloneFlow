@@ -95,10 +95,20 @@ func (s *TagService) extractEnglishTokens(name string) []tokenFreq {
 }
 
 func (s *TagService) extractTokens(name string) []tokenFreq {
+	tokens := s.extractEnglishTokens(name)
 	if containsChinese(name) {
-		return s.extractChineseTokens(name)
+		seen := make(map[string]bool, len(tokens))
+		for _, t := range tokens {
+			seen[t.token] = true
+		}
+		for _, t := range s.extractChineseTokens(name) {
+			if !seen[t.token] {
+				seen[t.token] = true
+				tokens = append(tokens, t)
+			}
+		}
 	}
-	return s.extractEnglishTokens(name)
+	return tokens
 }
 
 func (s *TagService) RecalcTags() error {
