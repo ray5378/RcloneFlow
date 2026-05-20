@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { getActiveTransfer, getActiveTransferCompleted, getActiveTransferPending } from './activeTransfer'
+import { t } from '../i18n'
 
 const mockFetch = vi.fn()
 globalThis.fetch = mockFetch as any
+
+vi.mock('../i18n', () => ({
+  t: vi.fn((key: string) => key)
+}))
 
 describe('activeTransfer.ts', () => {
   beforeEach(() => {
@@ -46,7 +51,31 @@ describe('activeTransfer.ts', () => {
     it('should throw mapped error for active run not found', async () => {
       mockFetch.mockRejectedValueOnce(new Error('active run not found'))
 
-      await expect(getActiveTransfer(1)).rejects.toThrow()
+      await expect(getActiveTransfer(1)).rejects.toThrow('activeTransfer.errActiveRunNotFound')
+    })
+
+    it('should throw mapped error for active transfer not found', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('active transfer not found'))
+
+      await expect(getActiveTransfer(1)).rejects.toThrow('activeTransfer.errActiveTransferNotFound')
+    })
+
+    it('should throw mapped error for invalid task id', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('invalid task id'))
+
+      await expect(getActiveTransfer(1)).rejects.toThrow('activeTransfer.errInvalidTaskId')
+    })
+
+    it('should re-throw generic error', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('something went wrong'))
+
+      await expect(getActiveTransfer(1)).rejects.toThrow('something went wrong')
+    })
+
+    it('should handle non-Error objects', async () => {
+      mockFetch.mockRejectedValueOnce({ message: 'non-error object' })
+
+      await expect(getActiveTransfer(1)).rejects.toThrow('non-error object')
     })
   })
 
@@ -86,6 +115,11 @@ describe('activeTransfer.ts', () => {
         expect.any(Object)
       )
     })
+
+    it('should throw mapped error', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('active transfer not found'))
+      await expect(getActiveTransferCompleted(1)).rejects.toThrow()
+    })
   })
 
   describe('getActiveTransferPending', () => {
@@ -121,6 +155,11 @@ describe('activeTransfer.ts', () => {
         '/api/tasks/1/active-transfer/pending?offset=10&limit=5',
         expect.any(Object)
       )
+    })
+
+    it('should throw mapped error', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('active transfer not found'))
+      await expect(getActiveTransferPending(1)).rejects.toThrow()
     })
   })
 })
