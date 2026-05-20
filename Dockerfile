@@ -1,7 +1,7 @@
 # Production-oriented Dockerfile
-# 已移除对仓库内 third_party 构建缓存的依赖，避免收尾阶段继续耦合本地临时缓存。
+# Cross-compilation friendly: no QEMU needed for multi-arch builds.
 
-# Stage 1: web build (Vite + Vue)
+# Stage 1: web build (Vite + Vue) - architecture-agnostic
 FROM node:20-alpine AS webbuilder
 WORKDIR /fe
 COPY frontend/package*.json ./
@@ -18,7 +18,7 @@ RUN set -eux; \
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: go build (Alpine)
+# Stage 2: go build (Alpine) - cross-compilation
 FROM golang:1.25-alpine AS gobuilder
 RUN set -eux; \
     alpine_ver=$(grep '^VERSION_ID' /etc/os-release | cut -d= -f2 | cut -d. -f1,2); \
@@ -37,15 +37,14 @@ ARG TARGETARCH
 ENV GOARCH=${TARGETARCH}
 ARG RCLONE_VERSION=v1.73.4
 RUN set -eux; \
-    arch="$(apk --print-arch)"; \
-    case "$arch" in \
-      x86_64) arch=amd64 ;; \
-      aarch64) arch=arm64 ;; \
-      armhf) arch=arm ;; \
-      *) arch=amd64 ;; \
+    case "${TARGETARCH}" in \
+      amd64) rclone_arch=amd64 ;; \
+      arm64) rclone_arch=arm64 ;; \
+      arm) rclone_arch=arm ;; \
+      *) rclone_arch=amd64 ;; \
     esac; \
     ver="${RCLONE_VERSION:-v1.73.4}"; \
-    urls="https://github.com/rclone/rclone/releases/download/${ver}/rclone-${ver}-linux-${arch}.zip https://downloads.rclone.org/${ver}/rclone-${ver}-linux-${arch}.zip"; \
+    urls="https://github.com/rclone/rclone/releases/download/${ver}/rclone-${ver}-linux-${rclone_arch}.zip https://downloads.rclone.org/${ver}/rclone-${ver}-linux-${rclone_arch}.zip"; \
     rm -f /tmp/rclone.zip; \
     for u in $urls; do \
       echo "Trying $u"; \
