@@ -11,7 +11,7 @@ import { registerToast } from './api/errors'
 
 import * as api from './api'
 import { getSettings } from './api/settings'
-import { isLoggedIn as checkAuth, getUser, logout, changePassword, me } from './api/auth'
+import { isLoggedIn as checkAuth, getUser, logout, changePassword, me, hasUsers } from './api/auth'
 import { locale, toggleLocale, t } from './i18n'
 
 const { toasts, showToast } = useToastCenter()
@@ -34,6 +34,7 @@ const version = ref(t('common.loading'))
 const isLight = ref(localStorage.getItem('theme') === 'light')
 const isAuth = ref(false)
 const authChecked = ref(false)
+const hasExistingUsers = ref(false)
 const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
 const showDefaultsModal = ref(false)
@@ -131,6 +132,7 @@ onMounted(async () => {
   if (hash && ['browser', 'tasks'].includes(hash)) currentPage.value = hash
   checkMobile()
   window.addEventListener('resize', checkMobile)
+  hasExistingUsers.value = await hasUsers()
   if (!checkAuth()) {
     authChecked.value = true
     return
@@ -157,7 +159,7 @@ onMounted(async () => {
 <template>
   <div class="app">
     <ToastCenter :toasts="toasts" />
-    <LoginView v-if="authChecked && !isAuth" @success="handleLoginSuccess" />
+    <LoginView v-if="authChecked && !isAuth" :has-existing-users="hasExistingUsers" @success="handleLoginSuccess" />
     <template v-else-if="authChecked && isAuth">
       <header class="header">
         <button v-if="isMobile" class="mobile-menu-btn" @click="showMobileMenu = !showMobileMenu">

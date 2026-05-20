@@ -19,7 +19,6 @@ import (
 	"rcloneflow/internal/websocket"
 
 	"go.uber.org/zap"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type taskServiceSchedulerRunner struct {
@@ -52,10 +51,7 @@ func Run(cfg *config.Config) error {
 		return err
 	}
 
-	// 创建默认管理员账户
-	createDefaultAdmin(db)
-
-	// 启动内置 RC（默认启用，可用 EMBED_RC=false 关闭），仅用于配置/元数据
+	// 初始化 logger
 	maybeStartEmbeddedRC()
 	// 初始化rclone客户端
 	rc := rclone.NewFromEnv()
@@ -175,32 +171,3 @@ func Run(cfg *config.Config) error {
 	return http.ListenAndServe(addr, handler)
 }
 
-// createDefaultAdmin 创建默认管理员账户
-func createDefaultAdmin(db *store.DB) {
-	// 检查数据库中是否已有任何用户
-	users, err := db.ListUsers()
-	if err != nil {
-		logger.Error("检查用户列表失败", zap.Error(err))
-		return
-	}
-
-	// 如果已有用户，不创建默认账户
-	if len(users) > 0 {
-		return
-	}
-
-	// 创建默认管理员
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte("admin"), bcrypt.DefaultCost)
-	if err != nil {
-		logger.Error("创建默认管理员密码失败", zap.Error(err))
-		return
-	}
-
-	_, err = db.CreateUser("admin", string(hashedPassword))
-	if err != nil {
-		logger.Error("创建默认管理员账户失败", zap.Error(err))
-		return
-	}
-
-	logger.Info("已创建默认管理员账户: admin / admin")
-}

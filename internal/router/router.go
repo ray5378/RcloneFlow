@@ -61,7 +61,9 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	mux.HandleFunc("/webhook/", controller.NewWebhookController(r.taskCtrl.Service()).HandleTrigger)
 
 	// 认证相关（公开）
+	mux.HandleFunc("/api/auth/has-users", r.authCtrl.HasUsers)
 	mux.HandleFunc("/api/auth/login", r.authCtrl.Login)
+	mux.HandleFunc("/api/auth/register", r.authCtrl.Register)
 	mux.HandleFunc("/api/auth/refresh", r.authCtrl.Refresh)
 
 	// 需要认证的API路由

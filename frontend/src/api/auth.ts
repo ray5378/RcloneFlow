@@ -3,7 +3,6 @@ const API_BASE = ''
 export interface AuthResponse {
   accessToken: string
   refreshToken: string
-  mustChangePassword?: boolean
   user: {
     id: number
     username: string
@@ -15,38 +14,36 @@ export function setTokens(accessToken: string, refreshToken: string) {
   localStorage.setItem('refreshToken', refreshToken)
 }
 
+export async function hasUsers(): Promise<boolean> {
+  const res = await fetch(`${API_BASE}/api/auth/has-users`)
+  if (!res.ok) return false
+  const data = await res.json()
+  return data.exists === true
+}
+
 export async function login(username: string, password: string): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
   })
-
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: '登录失败' }))
     throw new Error(error.error || '登录失败')
   }
-
-  const data = await res.json()
-  return data
+  return res.json()
 }
 
 export async function register(username: string, password: string): Promise<AuthResponse> {
   const res = await fetch(`${API_BASE}/api/auth/register`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
   })
-
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: '注册失败' }))
     throw new Error(error.error || '注册失败')
   }
-
   const data = await res.json()
   setTokens(data.accessToken, data.refreshToken)
   localStorage.setItem('user', JSON.stringify(data.user))
@@ -94,11 +91,9 @@ export async function changePassword(oldPassword: string, newPassword: string, u
     },
     body: JSON.stringify({ oldPassword, newPassword, username })
   })
-  
   if (!res.ok) {
     const error = await res.json().catch(() => ({ error: '修改失败' }))
     throw new Error(error.error || '修改失败')
   }
-
   return res.json()
 }
