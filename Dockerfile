@@ -32,7 +32,9 @@ ENV GOPROXY=https://goproxy.cn,direct \
 COPY go.mod go.sum ./
 RUN go mod download || (go env -w GOPROXY=https://goproxy.io,direct && go mod download)
 COPY . .
-ENV CGO_ENABLED=1 GOOS=linux GOARCH=amd64
+ENV CGO_ENABLED=1 GOOS=linux
+ARG TARGETARCH
+ENV GOARCH=${TARGETARCH}
 ARG RCLONE_VERSION=v1.73.4
 RUN set -eux; \
     arch="$(apk --print-arch)"; \
