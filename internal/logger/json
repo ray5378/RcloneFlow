@@ -1,0 +1,5 @@
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T00:50:54.207Z","caller":"logger/logger_test.go:118","msg":"json format test"}
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T00:53:07.147Z","caller":"logger/logger_test.go:118","msg":"json format test"}
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T00:54:02.285Z","caller":"logger/logger_test.go:118","msg":"json format test"}
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T00:54:55.584Z","caller":"logger/logger_test.go:118","msg":"json format test"}
+{"level":"\u001b[34mINFO\u001b[0m","time":"2026-05-20T00:56:15.950Z","caller":"logger/logger_test.go:118","msg":"json format test"}

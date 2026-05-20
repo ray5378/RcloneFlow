@@ -95,3 +95,73 @@ func TestLoggerInterface(t *testing.T) {
 	logger.Error("error")
 	logger.Sync()
 }
+
+func TestNewWithStderr(t *testing.T) {
+	logger, err := New("warn", "stderr")
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer logger.Sync()
+
+	if logger == nil {
+		t.Fatal("expected non-nil logger")
+	}
+}
+
+func TestNewWithJSON(t *testing.T) {
+	logger, err := New("debug", "json")
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer logger.Sync()
+
+	logger.Info("json format test")
+}
+
+func TestInit(t *testing.T) {
+	err := Init("info", "stdout")
+	if err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	err = Init("debug", "stdout")
+	if err != nil {
+		t.Fatalf("Init() second call error = %v", err)
+	}
+}
+
+func TestHotSet(t *testing.T) {
+	err := Init("info", "stdout")
+	if err != nil {
+		t.Fatalf("Init() error = %v", err)
+	}
+
+	err = HotSet("debug", "stdout")
+	if err != nil {
+		t.Fatalf("HotSet() error = %v", err)
+	}
+}
+
+func TestGet(t *testing.T) {
+	globalLogger = nil
+	logger := Get()
+	if logger == nil {
+		t.Error("Get() should return default logger when not initialized")
+	}
+
+	Init("info", "stdout")
+	logger = Get()
+	if logger == nil {
+		t.Error("Get() should return logger after Init")
+	}
+}
+
+func TestWithLoggerFields(t *testing.T) {
+	Init("debug", "stdout")
+
+	logger := With(zap.String("key", "value"), zap.Int("count", 42))
+	logger.Debug("debug with fields")
+	logger.Info("info with fields")
+	logger.Warn("warn with fields")
+	logger.Error("error with fields")
+}

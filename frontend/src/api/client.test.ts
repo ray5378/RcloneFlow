@@ -187,3 +187,64 @@ describe('client.ts', () => {
     })
   })
 })
+
+  describe('token refresh', () => {
+    beforeEach(() => {
+      localStorage.setItem('authToken', 'old-token')
+      localStorage.setItem('refreshToken', 'refresh-token')
+    })
+
+    afterEach(() => {
+      localStorage.clear()
+    })
+
+    it('should retry request after token refresh on 401', async () => {
+      let callCount = 0
+      mockFetch.mockImplementation(async () => {
+        callCount++
+        if (callCount === 1) {
+          return {
+            ok: false,
+            status: 401,
+          }
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ data: 'success' }),
+        }
+      })
+
+      const result = await get<{ data: string }>('/api/tasks')
+      
+      expect(callCount).toBeGreaterThanOrEqual(2)
+      expect(result).toEqual({ data: 'success' })
+    })
+
+    it('should throw error when no refresh token on 401', async () => {
+      localStorage.removeItem('refreshToken')
+      
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+      })
+
+      await expect(get('/api/tasks')).rejects.toThrow()
+    })
+  })
+
+  describe('custom headers', () => {
+    it('should merge custom headers with default headers', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+      })
+
+      await get('/api/tasks')
+
+      const callArgs = mockFetch.mock.calls[0]
+      const headers = callArgs[1].headers
+      expect(headers['Content-Type']).toBe('application/json')
+    })
+  })
