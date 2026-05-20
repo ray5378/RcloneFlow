@@ -43,7 +43,7 @@ func TestDecodeRequest(t *testing.T) {
 		Value int    `json:"value"`
 	}
 
-	err := DecodeRequest(req, &result)
+	err := DecodeRequest(httptest.NewRecorder(), req, &result)
 	if err != nil {
 		t.Fatalf("DecodeRequest() error = %v", err)
 	}
@@ -64,7 +64,7 @@ func TestDecodeRequestInvalid(t *testing.T) {
 		Name string `json:"name"`
 	}
 
-	err := DecodeRequest(req, &result)
+	err := DecodeRequest(httptest.NewRecorder(), req, &result)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
 	}

@@ -1,8 +1,11 @@
 package auth
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -14,7 +17,24 @@ var jwtSecret = func() []byte {
 	if s := os.Getenv("JWT_SECRET"); s != "" {
 		return []byte(s)
 	}
-	return []byte("rcloneflow-secret-key-change-in-production")
+	dataDir := os.Getenv("APP_DATA_DIR")
+	if dataDir == "" {
+		dataDir = "./data"
+	}
+	secretFile := filepath.Join(dataDir, ".jwt_secret")
+	if existing, err := os.ReadFile(secretFile); err == nil && len(existing) > 0 {
+		return existing
+	}
+	buf := make([]byte, 32)
+	if _, err := rand.Read(buf); err != nil {
+		panic("failed to generate JWT secret: " + err.Error())
+	}
+	secret := []byte(hex.EncodeToString(buf))
+	_ = os.MkdirAll(dataDir, 0o755)
+	if err := os.WriteFile(secretFile, secret, 0o600); err != nil {
+		panic("failed to persist JWT secret: " + err.Error())
+	}
+	return secret
 }()
 
 // TokenPair 令牌对

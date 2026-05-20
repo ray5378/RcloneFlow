@@ -25,6 +25,28 @@ type FsController struct{}
 
 func NewFsController(_ any) *FsController { return &FsController{} }
 
+func sanitizePath(p string) string {
+	p = strings.TrimSpace(p)
+	for strings.HasPrefix(p, "-") {
+		p = strings.TrimPrefix(p, "-")
+	}
+	p = filepath.ToSlash(p)
+	parts := strings.Split(p, "/")
+	for i, s := range parts {
+		for strings.HasSuffix(s, ":") { s = strings.TrimSuffix(s, ":") }
+		parts[i] = s
+	}
+	return strings.Join(parts, "/")
+}
+
+func sanitizeFsRemote(fs string) string {
+	fs = strings.TrimSpace(fs)
+	for strings.HasPrefix(fs, "-") {
+		fs = strings.TrimPrefix(fs, "-")
+	}
+	return fs
+}
+
 // ---------- Request models ----------
 
 type fileOpReq struct {
@@ -232,7 +254,7 @@ func (c *FsController) doMkdir(ctx context.Context, body []byte) (any, error) {
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, fmt.Errorf("无效的请求格式: %w", err)
 	}
-	fs, p := normalize(req.Fs, req.Remote)
+	fs, p := normalize(sanitizeFsRemote(req.Fs), sanitizePath(req.Remote))
 	_, err := runRclone(ctx, "mkdir", fs+p)
 	return nil, err
 }
@@ -242,7 +264,7 @@ func (c *FsController) doDeleteFile(ctx context.Context, body []byte) (any, erro
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, fmt.Errorf("无效的请求格式: %w", err)
 	}
-	fs, p := normalize(req.Fs, req.Remote)
+	fs, p := normalize(sanitizeFsRemote(req.Fs), sanitizePath(req.Remote))
 	// file delete
 	_, err := runRclone(ctx, "deletefile", fs+p)
 	if err != nil {
@@ -257,7 +279,7 @@ func (c *FsController) doPurge(ctx context.Context, body []byte) (any, error) {
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, fmt.Errorf("无效的请求格式: %w", err)
 	}
-	fs, p := normalize(req.Fs, req.Remote)
+	fs, p := normalize(sanitizeFsRemote(req.Fs), sanitizePath(req.Remote))
 	_, err := runRclone(ctx, "purge", fs+p)
 	return nil, err
 }
@@ -265,23 +287,11 @@ func (c *FsController) doPurge(ctx context.Context, body []byte) (any, error) {
 func parentDir(p string) string {
 	p = filepath.ToSlash(p)
 	if p == "" { return "" }
-	// remove trailing slash to avoid Dir giving parent of empty
 	p = strings.TrimSuffix(p, "/")
 	if p == "" { return "" }
 	d := filepath.ToSlash(filepath.Dir(p))
 	if d == "." { return "" }
 	return d
-}
-
-func sanitizePath(p string) string {
-	p = filepath.ToSlash(p)
-	parts := strings.Split(p, "/")
-	for i, s := range parts {
-		// strip trailing ASCII colon which is invalid on SMB/Windows
-		for strings.HasSuffix(s, ":") { s = strings.TrimSuffix(s, ":") }
-		parts[i] = s
-	}
-	return strings.Join(parts, "/")
 }
 
 func ensureDir(ctx context.Context, fs, remote string) {
@@ -295,10 +305,8 @@ func (c *FsController) doCopyFile(ctx context.Context, body []byte) (any, error)
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, fmt.Errorf("无效的请求格式: %w", err)
 	}
-	srcFs, src := normalize(req.SrcFs, req.SrcRemote)
-	dstFs, dst := normalize(req.DstFs, req.DstRemote)
-	src = sanitizePath(src)
-	dst = sanitizePath(dst)
+	srcFs, src := normalize(sanitizeFsRemote(req.SrcFs), sanitizePath(req.SrcRemote))
+	dstFs, dst := normalize(sanitizeFsRemote(req.DstFs), sanitizePath(req.DstRemote))
 	// ensure parent dir for destination exists
 	ensureDir(ctx, dstFs, parentDir(dst))
 	_, err := runRclone(ctx, "copyto", srcFs+src, dstFs+dst)
@@ -321,10 +329,8 @@ func (c *FsController) doMoveFile(ctx context.Context, body []byte) (any, error)
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, fmt.Errorf("无效的请求格式: %w", err)
 	}
-	srcFs, src := normalize(req.SrcFs, req.SrcRemote)
-	dstFs, dst := normalize(req.DstFs, req.DstRemote)
-	src = sanitizePath(src)
-	dst = sanitizePath(dst)
+	srcFs, src := normalize(sanitizeFsRemote(req.SrcFs), sanitizePath(req.SrcRemote))
+	dstFs, dst := normalize(sanitizeFsRemote(req.DstFs), sanitizePath(req.DstRemote))
 	// first try moveto
 	_, err := runRclone(ctx, "moveto", srcFs+src, dstFs+dst)
 	if err == nil {
@@ -388,10 +394,8 @@ func (c *FsController) doCopyDir(ctx context.Context, body []byte) (any, error) 
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, fmt.Errorf("无效的请求格式: %w", err)
 	}
-	srcFs, src := splitFsRemote(req.SrcFs, req.SrcRemote)
-	dstFs, dst := splitFsRemote(req.DstFs, req.DstRemote)
-	src = sanitizePath(src)
-	dst = sanitizePath(dst)
+	srcFs, src := splitFsRemote(sanitizeFsRemote(req.SrcFs), sanitizePath(req.SrcRemote))
+	dstFs, dst := splitFsRemote(sanitizeFsRemote(req.DstFs), sanitizePath(req.DstRemote))
 	// ensure destination exists
 	ensureDir(ctx, dstFs, dst)
 	_, err := runRclone(ctx, "copy", srcFs+src, dstFs+dst)
@@ -415,10 +419,8 @@ func (c *FsController) doMoveDir(ctx context.Context, body []byte) (any, error) 
 	if err := json.Unmarshal(body, &req); err != nil {
 		return nil, fmt.Errorf("无效的请求格式: %w", err)
 	}
-	srcFs, src := splitFsRemote(req.SrcFs, req.SrcRemote)
-	dstFs, dst := splitFsRemote(req.DstFs, req.DstRemote)
-	src = sanitizePath(src)
-	dst = sanitizePath(dst)
+	srcFs, src := splitFsRemote(sanitizeFsRemote(req.SrcFs), sanitizePath(req.SrcRemote))
+	dstFs, dst := splitFsRemote(sanitizeFsRemote(req.DstFs), sanitizePath(req.DstRemote))
 	// ensure destination exists
 	ensureDir(ctx, dstFs, dst)
 	_, err := runRclone(ctx, "move", srcFs+src, dstFs+dst)

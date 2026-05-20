@@ -1,6 +1,8 @@
 package app
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"os"
@@ -88,12 +90,45 @@ func maybeStartEmbeddedRC() {
 	}
 	addr = strings.TrimPrefix(addr, "http://")
 	user := os.Getenv("RCLONE_RC_USER")
-	if user == "" {
-		user = "rc"
-	}
 	pass := os.Getenv("RCLONE_RC_PASS")
-	if pass == "" {
-		pass = "rcpass"
+	if user == "" || pass == "" {
+		dataDir := os.Getenv("APP_DATA_DIR")
+		if dataDir == "" {
+			dataDir = "./data"
+		}
+		credFile := filepath.Join(dataDir, ".rclone_rc_creds")
+		if b, err := os.ReadFile(credFile); err == nil {
+			parts := strings.SplitN(strings.TrimSpace(string(b)), ":", 2)
+			if len(parts) == 2 {
+				if user == "" {
+					user = parts[0]
+				}
+				if pass == "" {
+					pass = parts[1]
+				}
+			}
+		}
+		if user == "" || pass == "" {
+			buf := make([]byte, 16)
+			if _, err := rand.Read(buf); err != nil {
+				logger.Error("generate rclone RC credentials failed", zap.Error(err))
+				return
+			}
+			if user == "" {
+				user = "rc-" + hex.EncodeToString(buf[:8])
+			}
+			if pass == "" {
+				if _, err := rand.Read(buf); err != nil {
+					logger.Error("generate rclone RC password failed", zap.Error(err))
+					return
+				}
+				pass = hex.EncodeToString(buf)
+			}
+			_ = os.MkdirAll(dataDir, 0o755)
+			if err := os.WriteFile(credFile, []byte(user+":"+pass), 0o600); err != nil {
+				logger.Warn("persist rclone RC credentials failed", zap.Error(err))
+			}
+		}
 	}
 	cfg := ensureConfigPath()
 	if err := startEmbeddedRC(addr, user, pass, cfg, 10*time.Second); err != nil {

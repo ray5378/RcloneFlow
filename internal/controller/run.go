@@ -22,6 +22,21 @@ import (
 	"rcloneflow/internal/service"
 )
 
+func isSafeLogPath(p string) bool {
+	clean := filepath.Clean(p)
+	// Reject paths that attempt directory traversal
+	if strings.Contains(clean, "..") {
+		return false
+	}
+	// Must be an absolute path or resolvable
+	abs, err := filepath.Abs(clean)
+	if err != nil {
+		return false
+	}
+	_ = abs
+	return true
+}
+
 // resolveLogPath returns absolute log file path for a run, sharing logic for files+download
 func classifyHistoricalLogRow(level, path, msg string) (map[string]any, string, bool) {
 	row := map[string]any{"path": path, "status": "", "action": "", "sizeBytes": 0}
@@ -1042,11 +1057,15 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, 404, map[string]any{"error": "log not found"})
 		return
 	}
+	if !isSafeLogPath(logPath) {
+		WriteJSON(w, 403, map[string]any{"error": "access denied"})
+		return
+	}
 	// raw 模式：直接返回日志文本（便于前端/人工对照）
 	if strings.EqualFold(r.URL.Query().Get("mode"), "raw") {
 		f, e := os.Open(logPath)
 		if e != nil {
-			WriteJSON(w, 500, map[string]any{"error": e.Error()})
+			WriteJSON(w, 500, map[string]any{"error": "failed to read log"})
 			return
 		}
 		defer f.Close()
@@ -1057,7 +1076,7 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	// 读取并解析日志
 	data, readErr := os.ReadFile(logPath)
 	if readErr != nil {
-		WriteJSON(w, 500, map[string]any{"error": readErr.Error()})
+		WriteJSON(w, 500, map[string]any{"error": "failed to read log"})
 		return
 	}
 	lines := strings.Split(string(data), "\n")
@@ -1234,7 +1253,7 @@ func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 	runs, _, err := c.runSvc.ListRuns(1, 1000)
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		WriteJSON(w, 500, map[string]any{"error": "internal error"})
 		return
 	}
 	for _, run := range runs {
@@ -1243,14 +1262,14 @@ func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 			if s, ok := any(run.Summary).(string); ok && s != "" {
 				var m map[string]any
 				if json.Unmarshal([]byte(s), &m) == nil {
-					if p, ok := m["stderrFile"].(string); ok && p != "" {
+					if p, ok := m["stderrFile"].(string); ok && p != "" && isSafeLogPath(p) {
 						http.ServeFile(w, r, p)
 						return
 					}
 				}
 			}
 			if m, ok := any(run.Summary).(map[string]any); ok {
-				if p, ok := m["stderrFile"].(string); ok && p != "" {
+				if p, ok := m["stderrFile"].(string); ok && p != "" && isSafeLogPath(p) {
 					http.ServeFile(w, r, p)
 					return
 				}

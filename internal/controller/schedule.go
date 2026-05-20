@@ -37,7 +37,7 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 			Spec    string `json:"spec"`
 			Enabled bool   `json:"enabled"`
 		}
-		if err := DecodeRequest(r, &req); err != nil {
+		if err := DecodeRequest(w, r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}
@@ -76,7 +76,7 @@ func (c *ScheduleController) HandleSchedules(w http.ResponseWriter, r *http.Requ
 			Enabled bool   `json:"enabled"`
 			Spec    string `json:"spec"`
 		}
-		if err := DecodeRequest(r, &req); err != nil {
+		if err := DecodeRequest(w, r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}

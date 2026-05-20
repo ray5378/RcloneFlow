@@ -2,9 +2,11 @@ package controller
 
 import (
 	"bytes"
+	"crypto/subtle"
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -13,23 +15,35 @@ import (
 	"rcloneflow/internal/service"
 )
 
-// WebhookController 处理无需鉴权的外部触发
+// WebhookController 处理外部触发
 type WebhookController struct {
 	taskSvc *service.TaskService
+	secret  string
 }
 
 func NewWebhookController(taskSvc *service.TaskService) *WebhookController {
-	return &WebhookController{taskSvc: taskSvc}
+	return &WebhookController{taskSvc: taskSvc, secret: os.Getenv("WEBHOOK_SECRET")}
 }
 
-// HandleTrigger 外部 webhook 触发任务（无需秘钥）
+// HandleTrigger 外部 webhook 触发任务
 // 支持两种方式：
 // 1) 直接按任务ID触发：/webhook/{taskId}
 // 2) 按自定义ID匹配任务 options.webhookId：/webhook/{customId}
+// 如果设置了 WEBHOOK_SECRET 环境变量，则必须通过 query 参数 ?secret=xxx 或 Header X-Webhook-Secret 提供
 func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
+	}
+	if c.secret != "" {
+		provided := r.URL.Query().Get("secret")
+		if provided == "" {
+			provided = r.Header.Get("X-Webhook-Secret")
+		}
+		if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(c.secret)) != 1 {
+			WriteJSON(w, 401, map[string]any{"error": "unauthorized"})
+			return
+		}
 	}
 	id := strings.Trim(strings.TrimPrefix(r.URL.Path, "/webhook/"), "/")
 	if id == "" {
@@ -64,7 +78,7 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 			}
 			result, err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook")
 			if err != nil {
-				WriteJSON(w, 500, map[string]any{"error": err.Error()})
+				WriteJSON(w, 500, map[string]any{"error": "internal error"})
 				return
 			}
 			WriteJSON(w, 200, result)
@@ -74,10 +88,10 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// 否则：按自定义 webhookId 匹配（无密钥）
+	// 否则：按自定义 webhookId 匹配
 	tasks, err := c.taskSvc.ListTasks()
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		WriteJSON(w, 500, map[string]any{"error": "internal error"})
 		return
 	}
 	for _, t := range tasks {
@@ -98,7 +112,7 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 		}
 		result, err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook")
 		if err != nil {
-			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			WriteJSON(w, 500, map[string]any{"error": "internal error"})
 			return
 		}
 		WriteJSON(w, 200, result)

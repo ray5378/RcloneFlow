@@ -42,7 +42,7 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			Type       string         `json:"type"`
 			Parameters map[string]any `json:"parameters"`
 		}
-		if err := DecodeRequest(r, &req); err != nil {
+		if err := DecodeRequest(w, r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}
@@ -58,7 +58,7 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			Type       string         `json:"type"`
 			Parameters map[string]any `json:"parameters"`
 		}
-		if err := DecodeRequest(r, &req); err != nil {
+		if err := DecodeRequest(w, r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}
@@ -97,7 +97,7 @@ func (c *RemoteController) HandleRemoteTest(w http.ResponseWriter, r *http.Reque
 	var req struct {
 		Name string `json:"name"`
 	}
-	if err := DecodeRequest(r, &req); err != nil {
+	if err := DecodeRequest(w, r, &req); err != nil {
 		WriteJSON(w, 400, map[string]any{"error": err.Error()})
 		return
 	}

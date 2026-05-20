@@ -49,7 +49,7 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPost:
 		var req store.Task
-		if err := DecodeRequest(r, &req); err != nil {
+		if err := DecodeRequest(w, r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}
@@ -69,7 +69,7 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 			ID   int64      `json:"id"`
 			Task store.Task `json:"task"`
 		}
-		if err := DecodeRequest(r, &req); err != nil {
+		if err := DecodeRequest(w, r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}
@@ -90,7 +90,7 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 			Orders         map[int64]int64 `json:"orders"`
 			PriorityTaskID int64           `json:"priorityTaskId"`
 		}
-		if err := DecodeRequest(r, &req); err != nil {
+		if err := DecodeRequest(w, r, &req); err != nil {
 			WriteJSON(w, 400, map[string]any{"error": "invalid body"})
 			return
 		}
