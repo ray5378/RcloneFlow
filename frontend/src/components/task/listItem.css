@@ -146,3 +146,12 @@
 .list-item-actions-spaced {
   margin-top: 8px;
 }
+
+@media (max-width: 768px) {
+  .list-item-name strong {
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    word-break: break-word;
+  }
+}
