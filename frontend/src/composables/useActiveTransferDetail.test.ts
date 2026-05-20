@@ -544,4 +544,178 @@ describe('useActiveTransferDetail', () => {
 
     unmount()
   })
+
+  it('backfills pending page 1 from page 2 when items move to currentFiles', async () => {
+    const overview = {
+      runId: 91,
+      taskId: 12,
+      trackingMode: 'normal',
+      summary: {
+        trackingMode: 'normal',
+        completedCount: 0,
+        pendingCount: 15,
+        totalCount: 15,
+        percentage: 0,
+        bytes: 0,
+        totalBytes: 1500,
+        speed: 10,
+        eta: 150,
+      },
+      currentFile: { name: 'file-1', path: 'file-1', status: 'in_progress', order: 1 },
+      currentFiles: [{ name: 'file-1', path: 'file-1', status: 'in_progress', order: 1 }],
+      degraded: false,
+    }
+    getActiveTransfer.mockResolvedValueOnce(overview)
+    getActiveTransferCompleted.mockResolvedValueOnce({ total: 0, items: [] })
+    getActiveTransferPending.mockResolvedValueOnce({
+      total: 15,
+      items: Array.from({ length: 20 }, (_, idx) => ({
+        name: `file-${idx + 1}`,
+        path: `file-${idx + 1}`,
+        status: idx === 0 ? 'in_progress' : 'pending',
+        order: idx + 1,
+      })),
+    })
+
+    const { api, unmount } = await mountActiveTransferDetail()
+
+    api.openActiveTransfer(12)
+    await flushPromises()
+
+    expect(api.activeTransferPendingPage.value).toBe(1)
+    expect(api.activeTransferPendingItems.value).toHaveLength(10)
+    expect(api.activeTransferPendingItems.value.map(item => item.name)).toEqual([
+      'file-2', 'file-3', 'file-4', 'file-5', 'file-6',
+      'file-7', 'file-8', 'file-9', 'file-10', 'file-11',
+    ])
+
+    unmount()
+  })
+
+  it('calculates pendingTotalPages based on filtered items count', async () => {
+    const overview = {
+      runId: 92,
+      taskId: 13,
+      trackingMode: 'normal',
+      summary: {
+        trackingMode: 'normal',
+        completedCount: 0,
+        pendingCount: 15,
+        totalCount: 15,
+        percentage: 0,
+        bytes: 0,
+        totalBytes: 1500,
+        speed: 10,
+        eta: 150,
+      },
+      currentFile: null,
+      currentFiles: [
+        { name: 'file-1', path: 'file-1', status: 'in_progress', order: 1 },
+        { name: 'file-2', path: 'file-2', status: 'in_progress', order: 2 },
+        { name: 'file-3', path: 'file-3', status: 'in_progress', order: 3 },
+      ],
+      degraded: false,
+    }
+    getActiveTransfer.mockResolvedValueOnce(overview)
+    getActiveTransferCompleted.mockResolvedValueOnce({ total: 0, items: [] })
+    getActiveTransferPending.mockResolvedValueOnce({
+      total: 15,
+      items: Array.from({ length: 20 }, (_, idx) => ({
+        name: `file-${idx + 1}`,
+        path: `file-${idx + 1}`,
+        status: idx < 3 ? 'in_progress' : 'pending',
+        order: idx + 1,
+      })),
+    })
+
+    const { api, unmount } = await mountActiveTransferDetail()
+
+    api.openActiveTransfer(13)
+    await flushPromises()
+
+    expect(api.activeTransferPendingTotalPages.value).toBe(2)
+    expect(api.activeTransferPendingItems.value).toHaveLength(10)
+    expect(api.activeTransferPendingItems.value.map(item => item.name)).toEqual([
+      'file-4', 'file-5', 'file-6', 'file-7', 'file-8',
+      'file-9', 'file-10', 'file-11', 'file-12', 'file-13',
+    ])
+
+    unmount()
+  })
+
+  it('shifts pending items from page 2 to page 1 via websocket snapshot', async () => {
+    const overview = {
+      runId: 93,
+      taskId: 14,
+      trackingMode: 'normal',
+      summary: {
+        trackingMode: 'normal',
+        completedCount: 0,
+        pendingCount: 15,
+        totalCount: 15,
+        percentage: 0,
+        bytes: 0,
+        totalBytes: 1500,
+        speed: 10,
+        eta: 150,
+      },
+      currentFile: null,
+      currentFiles: [],
+      degraded: false,
+    }
+    getActiveTransfer.mockResolvedValueOnce(overview)
+    getActiveTransferCompleted.mockResolvedValueOnce({ total: 0, items: [] })
+    getActiveTransferPending.mockResolvedValueOnce({
+      total: 15,
+      items: Array.from({ length: 15 }, (_, idx) => ({
+        name: `pending-${idx + 1}`,
+        path: `pending-${idx + 1}`,
+        status: 'pending',
+        order: idx + 1,
+      })),
+    })
+
+    const { api, unmount } = await mountActiveTransferDetail()
+
+    api.openActiveTransfer(14)
+    await flushPromises()
+
+    expect(api.activeTransferPendingItems.value).toHaveLength(10)
+    expect(api.activeTransferPendingItems.value.map(item => item.name)).toEqual([
+      'pending-1', 'pending-2', 'pending-3', 'pending-4', 'pending-5',
+      'pending-6', 'pending-7', 'pending-8', 'pending-9', 'pending-10',
+    ])
+
+    listeners.get('active_transfer_snapshot')?.({
+      run_id: 93,
+      task_id: 14,
+      snapshot: {
+        runId: 93,
+        taskId: 14,
+        trackingMode: 'normal',
+        totalCount: 15,
+        completedCount: 0,
+        pendingCount: 14,
+        currentFile: { name: 'pending-1', path: 'pending-1', status: 'in_progress', order: 1 },
+        currentFiles: [{ name: 'pending-1', path: 'pending-1', status: 'in_progress', order: 1 }],
+        completed: [],
+        pending: Array.from({ length: 14 }, (_, idx) => ({
+          name: `pending-${idx + 1}`,
+          path: `pending-${idx + 1}`,
+          status: idx === 0 ? 'in_progress' : 'pending',
+          order: idx + 1,
+        })),
+        degraded: false,
+      },
+    })
+    await Promise.resolve()
+
+    expect(api.activeTransferPendingItems.value).toHaveLength(10)
+    expect(api.activeTransferPendingItems.value.map(item => item.name)).toEqual([
+      'pending-2', 'pending-3', 'pending-4', 'pending-5', 'pending-6',
+      'pending-7', 'pending-8', 'pending-9', 'pending-10', 'pending-11',
+    ])
+
+    unmount()
+  })
 })
