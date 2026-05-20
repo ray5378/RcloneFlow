@@ -3,7 +3,6 @@ package service
 import (
 	"strings"
 	"unicode"
-	"unicode/utf8"
 
 	"rcloneflow/internal/store"
 )
@@ -59,19 +58,35 @@ func (s *TagService) extractChineseTokens(name string) []tokenFreq {
 
 func (s *TagService) extractEnglishTokens(name string) []tokenFreq {
 	seen := make(map[string]bool)
-	processed := name
-	for _, sep := range []string{"-", "_", ".", ":", "/", "\\", "\t"} {
-		processed = strings.ReplaceAll(processed, sep, " ")
-	}
-	parts := strings.Fields(processed)
-	for _, p := range parts {
-		clean := strings.TrimFunc(p, func(r rune) bool {
-			return !unicode.IsLetter(r) && !unicode.IsDigit(r)
-		})
-		if utf8.RuneCountInString(clean) >= 3 {
-			seen[strings.ToLower(clean)] = true
+	lower := strings.ToLower(name)
+
+	i := 0
+	for i < len(lower) {
+		r := rune(lower[i])
+		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+			i++
+			continue
+		}
+
+		start := i
+		for i < len(lower) {
+			r := rune(lower[i])
+			if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+				break
+			}
+			i++
+		}
+
+		word := lower[start:i]
+		if len(word) >= 3 {
+			for w := 3; w <= len(word); w++ {
+				for s := 0; s+w <= len(word); s++ {
+					seen[word[s:s+w]] = true
+				}
+			}
 		}
 	}
+
 	result := make([]tokenFreq, 0, len(seen))
 	for t := range seen {
 		result = append(result, tokenFreq{token: t, count: 1})
