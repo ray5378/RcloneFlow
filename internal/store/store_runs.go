@@ -342,28 +342,44 @@ func (db *DB) UpdateRunProgress(id int64, data float64, detail string) error {
 	return err
 }
 
+func (db *DB) vacuum() error {
+	if _, err := db.db.Exec("PRAGMA wal_checkpoint(TRUNCATE)"); err != nil {
+		return fmt.Errorf("wal_checkpoint: %w", err)
+	}
+	if _, err := db.db.Exec("VACUUM"); err != nil {
+		return fmt.Errorf("vacuum: %w", err)
+	}
+	return nil
+}
+
 func (db *DB) DeleteRun(id int64) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	_, err := db.db.Exec("DELETE FROM runs WHERE id = ?", id)
-	return err
+	if _, err := db.db.Exec("DELETE FROM runs WHERE id = ?", id); err != nil {
+		return err
+	}
+	return db.vacuum()
 }
 
 func (db *DB) DeleteAllRuns() error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	_, err := db.db.Exec("DELETE FROM runs")
-	return err
+	if _, err := db.db.Exec("DELETE FROM runs"); err != nil {
+		return err
+	}
+	return db.vacuum()
 }
 
 func (db *DB) DeleteRunsByTask(taskId int64) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	_, err := db.db.Exec("DELETE FROM runs WHERE task_id = ?", taskId)
-	return err
+	if _, err := db.db.Exec("DELETE FROM runs WHERE task_id = ?", taskId); err != nil {
+		return err
+	}
+	return db.vacuum()
 }
 
 func (db *DB) CleanOldRuns(days int) (int, error) {
@@ -375,5 +391,10 @@ func (db *DB) CleanOldRuns(days int) (int, error) {
 		return 0, err
 	}
 	n, _ := result.RowsAffected()
+	if n > 0 {
+		if vacuumErr := db.vacuum(); vacuumErr != nil {
+			return int(n), vacuumErr
+		}
+	}
 	return int(n), nil
 }
