@@ -286,3 +286,61 @@ func TestMoveDir(t *testing.T) {
 		t.Fatalf("MoveDir() error = %v", err)
 	}
 }
+
+func TestGetConfig(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/config/get" {
+			t.Errorf("expected /config/get, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"type": "local",
+			"key":  "value",
+		})
+	}))
+	defer server.Close()
+
+	cfg := &RcloneConfig{BaseURL: server.URL}
+	client := NewRcloneClient(cfg)
+
+	config, err := client.GetConfig(context.Background(), "testremote")
+	if err != nil {
+		t.Fatalf("GetConfig() error = %v", err)
+	}
+
+	if config["type"] != "local" {
+		t.Errorf("expected config type local, got %v", config["type"])
+	}
+}
+
+func TestGetProviders(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/config/providers" {
+			t.Errorf("expected /config/providers, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"providers": []map[string]any{
+				{"Name": "local"},
+				{"Name": "s3"},
+			},
+		})
+	}))
+	defer server.Close()
+
+	cfg := &RcloneConfig{BaseURL: server.URL}
+	client := NewRcloneClient(cfg)
+
+	providers, err := client.GetProviders(context.Background())
+	if err != nil {
+		t.Fatalf("GetProviders() error = %v", err)
+	}
+
+	if len(providers) != 2 {
+		t.Errorf("expected 2 providers, got %d", len(providers))
+	}
+
+	if providers[0].Name != "local" {
+		t.Errorf("expected first provider local, got %s", providers[0].Name)
+	}
+}
