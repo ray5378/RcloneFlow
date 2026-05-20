@@ -356,8 +356,11 @@ func TestBuildCandidateFiles_EndToEnd_RealTask10IncludeCASAndCASAliasSkip(t *tes
 			t.Fatalf("BuildCandidateFiles err: %v", err)
 		}
 	})
-	if len(items) != 1 || !strings.Contains(items[0].Path, "第 11 集") {
-		t.Fatalf("expected only unmatched .cas file to remain, got %v", items)
+	if len(items) != 2 {
+		t.Fatalf("expected 2 .cas files in CAS mode (all candidates retained with sizes), got %v", items)
+	}
+	if !strings.Contains(items[0].Path, "第 10 集") || !strings.Contains(items[1].Path, "第 11 集") {
+		t.Fatalf("expected both .cas files, got %v", items)
 	}
 	joined := strings.Join(calls, "\n")
 	if !strings.Contains(joined, "lsjson src: --config cfg.conf --files-only --recursive --include *.cas --ignore-case") {
@@ -366,8 +369,9 @@ func TestBuildCandidateFiles_EndToEnd_RealTask10IncludeCASAndCASAliasSkip(t *tes
 	if !strings.Contains(joined, "lsjson dst: --config cfg.conf --files-only --recursive --include *.cas --ignore-case") {
 		t.Fatalf("dest lsjson should carry include cas flags, calls=%s", joined)
 	}
-	if !strings.Contains(joined, "check src: dst: --config cfg.conf --combined - --one-way --include *.cas --ignore-case") {
-		t.Fatalf("check should carry include cas flags, calls=%s", joined)
+	// CAS mode skips refineCandidatesByCheck to retain all candidates with sizes
+	if strings.Contains(joined, "check src:") {
+		t.Fatalf("CAS mode should not call rclone check (candidates retained from lsjson), calls=%s", joined)
 	}
 }
 

@@ -82,7 +82,7 @@ func BuildCandidateFiles(ctx context.Context, cfg, src, dst string, opts *adapte
 			SizeBytes: size,
 		})
 	}
-	if shouldCheckExisting(opts, dst) {
+	if shouldCheckExisting(opts, dst) && !(opts != nil && opts.OpenlistCasCompatible) {
 		if refined, ok := refineCandidatesByCheck(ctx, cr, cfg, src, dst, opts, items); ok {
 			return refined, nil
 		}
