@@ -56,34 +56,35 @@ func (s *TagService) extractChineseTokens(name string) []tokenFreq {
 	return result
 }
 
+func isASCIILetterOrDigit(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9')
+}
+
 func (s *TagService) extractEnglishTokens(name string) []tokenFreq {
 	seen := make(map[string]bool)
 	lower := strings.ToLower(name)
+	runes := []rune(lower)
 
 	i := 0
-	for i < len(lower) {
-		r := rune(lower[i])
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+	for i < len(runes) {
+		r := runes[i]
+		if !isASCIILetterOrDigit(r) {
 			i++
 			continue
 		}
 
 		start := i
-		for i < len(lower) {
-			r := rune(lower[i])
-			if !unicode.IsLetter(r) && !unicode.IsDigit(r) {
+		for i < len(runes) {
+			r := runes[i]
+			if !isASCIILetterOrDigit(r) {
 				break
 			}
 			i++
 		}
 
-		word := lower[start:i]
+		word := string(runes[start:i])
 		if len(word) >= 3 {
-			for w := 3; w <= len(word); w++ {
-				for s := 0; s+w <= len(word); s++ {
-					seen[word[s:s+w]] = true
-				}
-			}
+			seen[word] = true
 		}
 	}
 
