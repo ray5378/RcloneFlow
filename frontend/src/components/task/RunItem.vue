@@ -133,10 +133,7 @@ function getProgressText(run: Run): string {
 </template>
 
 <style scoped>
-@import './listItemBase.css';
-@import './listItemMeta.css';
-@import './listItemActions.css';
-@import './listItemSpacing.css';
+@import './listItem.css';
 
 .run-item { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .name { gap: 6px; }

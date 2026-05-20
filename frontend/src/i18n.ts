@@ -40,8 +40,3 @@ export function t(key: I18nKey, params?: Record<string, any>, fallback?: string)
   }
   return result
 }
-
-// 过渡兼容：旧代码还能继续跑，逐步迁移到 t(key)
-export function yn(zhText: string, enText: string): string {
-  return locale.value === 'zh' ? zhText : enText
-}

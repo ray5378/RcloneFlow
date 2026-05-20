@@ -19,7 +19,7 @@ COPY frontend/ ./
 RUN npm run build
 
 # Stage 2: go build (Alpine)
-FROM golang:1.25-alpine AS gobuilder
+FROM golang:1.23-alpine AS gobuilder
 RUN set -eux; \
     alpine_ver=$(grep '^VERSION_ID' /etc/os-release | cut -d= -f2 | cut -d. -f1,2); \
     echo "https://dl-cdn.alpinelinux.org/alpine/v${alpine_ver}/main" > /etc/apk/repositories; \

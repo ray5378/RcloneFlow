@@ -114,10 +114,7 @@ function isStopped(): boolean {
 </template>
 
 <style scoped>
-@import './listItemBase.css';
-@import './listItemMeta.css';
-@import './listItemActions.css';
-@import './listItemSpacing.css';
+@import './listItem.css';
 
 .task-card { padding: 14px 18px; }
 .task-card.active { background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.34); }

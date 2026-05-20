@@ -57,11 +57,11 @@ jobs:
         run: |
           go test -coverprofile=coverage.out ./...
           go tool cover -func=coverage.out | grep total
-          # Check coverage threshold (69%)
+          # Check coverage threshold (70%)
           COVERAGE=$(go tool cover -func=coverage.out | grep total | grep -oE '[0-9]+\.[0-9]+')
           echo "Go coverage: ${COVERAGE}%"
-          if [ "$(echo "${COVERAGE} < 69.0" | awk '{print ($1 < 69.0)}')" = "1" ]; then
-            echo "Go coverage ${COVERAGE}% is below 69% threshold" >&2
+          if [ "$(echo "${COVERAGE} < 70.0" | awk '{print ($1 < 70.0)}')" = "1" ]; then
+            echo "Go coverage ${COVERAGE}% is below 70% threshold" >&2
             exit 1
           fi
 
@@ -81,8 +81,8 @@ jobs:
           # Extract the 4th column from the "All files" line in the coverage table
           COVERAGE=$(awk '/All files/ {gsub(/[[:space:]]*\|[[:space:]]*/, "|"); split($0, cols, "|"); print cols[5]}' /tmp/frontend-test.log | grep -oE '[0-9]+\.[0-9]+' || echo "0")
           echo "Frontend lines coverage: ${COVERAGE}%"
-          if [ "$(echo "${COVERAGE} < 69.0" | awk '{print ($1 < 69.0)}')" = "1" ]; then
-            echo "Frontend coverage ${COVERAGE}% is below 69% threshold" >&2
+          if [ "$(echo "${COVERAGE} < 70.0" | awk '{print ($1 < 70.0)}')" = "1" ]; then
+            echo "Frontend coverage ${COVERAGE}% is below 70% threshold" >&2
             exit 1
           fi
 

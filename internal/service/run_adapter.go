@@ -132,6 +132,7 @@ func (a *storeRunAdapter) DeleteRunsByTask(taskId int64) error {
 }
 
 func (a *storeRunAdapter) CleanOldRuns(days int) (int64, error) {
-	return a.db.CleanOldRuns(days)
+	deleted, err := a.db.CleanOldRuns(days)
+	return int64(deleted), err
 }
 

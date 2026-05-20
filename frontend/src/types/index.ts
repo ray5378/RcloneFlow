@@ -144,9 +144,9 @@ export interface Schedule {
   createdAt: string
 }
 
-export type { ActiveRun }
-
 import type { ActiveRun, FinalSummary, RunSummaryProgress } from '../api/run'
+
+export type { ActiveRun }
 
 export interface RunSummaryPayload {
   /**

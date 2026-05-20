@@ -10,6 +10,7 @@ import (
 	"rcloneflow/internal/config"
 	"rcloneflow/internal/controller"
 	"rcloneflow/internal/logger"
+	"rcloneflow/internal/middleware"
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/router"
 	"rcloneflow/internal/scheduler"
@@ -152,25 +153,12 @@ func Run(cfg *config.Config) error {
 	r.Setup(mux)
 
 	// 添加中间件
-	handler := withCORS(mux)
+	handler := middleware.CORS(mux)
 
 	// 启动服务器
 	addr := cfg.GetServerAddr()
 	logger.Info("服务监听中", zap.String("addr", addr))
 	return http.ListenAndServe(addr, handler)
-}
-
-// withCORS CORS中间件
-func withCORS(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-		w.Header().Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
-		if r.Method == http.MethodOptions {
-			return
-		}
-		next.ServeHTTP(w, r)
-	})
 }
 
 // createDefaultAdmin 创建默认管理员账户
