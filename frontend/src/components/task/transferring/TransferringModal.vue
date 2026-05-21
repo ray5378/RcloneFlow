@@ -30,7 +30,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'refresh'): void
   (e: 'prev-completed-page'): void
   (e: 'next-completed-page'): void
   (e: 'jump-completed-page'): void
@@ -48,7 +47,6 @@ const emit = defineEmits<{
       <div class="modal-header">
         <h3>{{ t('activeTransfer.title') }}</h3>
         <div class="actions">
-          <button class="ghost small" @click="emit('refresh')">{{ t('activeTransfer.refresh') }}</button>
           <button class="close-btn" @click="emit('close')">×</button>
         </div>
       </div>

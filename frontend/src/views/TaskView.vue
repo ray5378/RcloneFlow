@@ -653,7 +653,6 @@ function closeTaskEditorModal() {
     :loading="activeTransferLoading"
     :error="activeTransferError"
     @close="closeActiveTransfer"
-    @refresh="refreshActiveTransfer"
     @prev-completed-page="prevActiveTransferCompletedPage"
     @next-completed-page="nextActiveTransferCompletedPage"
     @jump-completed-page="jumpActiveTransferCompletedPage"
