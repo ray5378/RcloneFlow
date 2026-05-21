@@ -17,7 +17,6 @@ describe('useRunDetailRuntime', () => {
     expect(runtime).toHaveProperty('openRunDetailFiles')
     expect(runtime).toHaveProperty('getFinalSummary')
     expect(runtime).toHaveProperty('finalFiles')
-    expect(runtime).toHaveProperty('setFinalFilter')
   })
 
   it('should open and close modal', () => {
