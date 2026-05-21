@@ -73,6 +73,11 @@ func (s *RunService) ListActiveRuns() ([]RunRecord, error) {
 	return s.db.ListActiveRuns()
 }
 
+// GetRun 获取指定运行记录
+func (s *RunService) GetRun(id int64) (RunRecord, error) {
+	return s.db.GetRun(id)
+}
+
 // GetActiveRunByTaskID 获取任务当前运行中的记录
 func (s *RunService) GetActiveRunByTaskID(taskID int64) (RunRecord, error) {
 	return s.db.GetActiveRunByTaskID(taskID)
