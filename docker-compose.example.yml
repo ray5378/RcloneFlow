@@ -18,6 +18,9 @@ services:
       - RCLONE_RC_PASS=rcpass
       # 日志级别：debug|info|warn|error
       - LOG_LEVEL=info
+      # 运行时用户（匹配宿主机 UID/GID 以解决卷权限问题）
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
     volumes:
       - ./data:/app/data
     ports:

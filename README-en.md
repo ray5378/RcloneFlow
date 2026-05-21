@@ -87,6 +87,9 @@ services:
       - RCLONE_RC_PASS=rcpass
       # Log level: debug|info|warn|error
       - LOG_LEVEL=info
+      # Runtime user/group (match host UID/GID for volume permissions)
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
     volumes:
       - ./data:/app/data
     ports:
