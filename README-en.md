@@ -73,8 +73,8 @@ RcloneFlow is a Web UI for rclone with built-in rclone, supporting file sync, st
 services:
   rcloneflow:
     image: ray5378/rcloneflow:latest
-    platform: linux/amd64
     container_name: rcloneflow
+    network_mode: host
     environment:
       - TZ=Asia/Shanghai
       - APP_ADDR=:17870
@@ -92,8 +92,6 @@ services:
       - PGID=${PGID:-1000}
     volumes:
       - ./data:/app/data
-    ports:
-      - "17870:17870"
     restart: always
 ```
 
@@ -104,11 +102,6 @@ Place your rclone config file at `./data/rclone.conf`
 ### Access UI
 
 Open browser: `http://<serverIP>:17870`
-
-### Default Credentials
-
-- Username: `admin`
-- Password: `admin`
 
 ## Interface
 

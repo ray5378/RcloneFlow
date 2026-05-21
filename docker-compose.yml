@@ -1,11 +1,8 @@
 services:
   rcloneflow:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: rcloneflow:local
-    platform: linux/amd64
+    image: ray5378/rcloneflow:latest
     container_name: rcloneflow
+    network_mode: host
     environment:
       - TZ=Asia/Shanghai
       - APP_ADDR=:17870
@@ -19,7 +16,5 @@ services:
       - PGID=${PGID:-1000}
     volumes:
       - ./app/data:/app/data
-    ports:
-      - 17870:17870
     restart: always
 networks: {}

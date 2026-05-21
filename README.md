@@ -57,12 +57,9 @@ RcloneFlow 是 rclone 的 Web 管理界面，内置 rclone，支持文件同步�
 ```yaml
 services:
   rcloneflow:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: rcloneflow:local
-    platform: linux/amd64
+    image: ray5378/rcloneflow:latest
     container_name: rcloneflow
+    network_mode: host
     environment:
       - TZ=Asia/Shanghai
       - APP_ADDR=:17870
@@ -76,16 +73,8 @@ services:
       - PGID=${PGID:-1000}
     volumes:
       - ./app/data:/app/data
-    ports:
-      - 17870:17870
     restart: always
 networks: {}
-```
-
-如果你需要直接验证当前源码修复，建议使用：
-
-```bash
-docker compose up -d --build
 ```
 
 ### 配置 rclone
@@ -95,11 +84,6 @@ docker compose up -d --build
 ### 访问界面
 
 打开浏览器访问 `http://<服务器IP>:17870`
-
-### 默认账号
-
-- 用户名：`admin`
-- 密码：`admin`
 
 ## 界面说明
 
