@@ -2,14 +2,6 @@
 
 [English](./README-en.md) | 中文
 
-**RcloneFlow = Rclone + Web UI**
-
-RcloneFlow 是 rclone 的 Web 管理界面，内置 rclone，支持文件同步、存储管理、定时调度、Webhook 等功能。
-
-**当前版本：v1.0.0**
-
-> 当前仓库分支策略：只保留 `dev`（开发）与 `master`（稳定）两个分支；当前发布标签仅保留 `v1.0.0`。
-
 ## 主要功能
 
 ### 📂 存储管理
