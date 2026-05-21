@@ -144,7 +144,7 @@ func TestPostWebhookIfNeeded_HasTransferFilter(t *testing.T) {
         t.Fatalf("AddRun() error = %v", err)
       }
 
-      r := New(db)
+      r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{})
       r.postWebhookIfNeeded(run.ID)
 
       if tt.wantPosts > 0 {
@@ -353,7 +353,7 @@ func TestPostWebhookIfNeeded_GetTaskError(t *testing.T) {
     t.Fatalf("DeleteTask() error = %v", err)
   }
 
-  r := New(db)
+  r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{})
   r.postWebhookIfNeeded(run.ID)
 }
 
@@ -379,7 +379,7 @@ func TestPostWebhookIfNeeded_NoWebhookURL(t *testing.T) {
     t.Fatalf("AddRun() error = %v", err)
   }
 
-  r := New(db)
+  r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{})
   r.postWebhookIfNeeded(run.ID)
 }
 
@@ -414,7 +414,7 @@ func TestPostWebhookIfNeeded_WebhookFailure(t *testing.T) {
     t.Fatalf("AddRun() error = %v", err)
   }
 
-  r := New(db)
+  r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{})
   r.postWebhookIfNeeded(run.ID)
   time.Sleep(500 * time.Millisecond)
 }
@@ -460,7 +460,7 @@ func TestPostWebhookIfNeeded_WecomURL(t *testing.T) {
     t.Fatalf("AddRun() error = %v", err)
   }
 
-  r := New(db)
+  r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{})
   r.postWebhookIfNeeded(run.ID)
 
   select {
@@ -512,7 +512,7 @@ func TestPostWebhookIfNeeded_SkippedForWrongTrigger(t *testing.T) {
     t.Fatalf("AddRun() error = %v", err)
   }
 
-  r := New(db)
+  r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{})
   r.postWebhookIfNeeded(run.ID)
   time.Sleep(300 * time.Millisecond)
 

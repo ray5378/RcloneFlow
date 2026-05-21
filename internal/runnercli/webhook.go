@@ -81,12 +81,12 @@ func baseName(p string) string {
 // postWebhookIfNeeded 读取任务 options，若满足条件则发送 Webhook 通知（3 秒超时，最多 3 次重试）
 func (r *Runner) postWebhookIfNeeded(runID int64) {
 	// 取 run 与 task
-	run, err := r.db.GetRun(runID)
+	run, err := r.updater.GetRun(runID)
 	if err != nil {
 		logger.Warn("webhook: get run failed", zap.Error(err), zap.Int64("runID", runID))
 		return
 	}
-	task, ok := r.db.GetTask(run.TaskID)
+	task, ok := r.updater.GetTask(run.TaskID)
 	if !ok {
 		logger.Warn("webhook: get task failed", zap.Int64("taskID", run.TaskID))
 		return

@@ -211,7 +211,7 @@ func TestConsume_CASNoticeIncrementsCompletedFiles(t *testing.T) {
 		t.Fatalf("AddRun() error = %v", err)
 	}
 
-	r := New(db)
+	r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{})
 	r.casVerifier = func(cfg, dst, rel string) (bool, error) { return true, nil }
 	r.casVerifyDelays = nil
 	fp := &fileProgress{m: map[string]*fileProg{}}
@@ -266,7 +266,7 @@ func TestConsume_JSONWrappedFileProgressUpdatesActiveTransfer(t *testing.T) {
 
 	mgr := active_transfer.NewManager()
 	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeNormal, []active_transfer.TransferCandidateFile{{Path: "a/file1.mkv", Name: "file1.mkv", SizeBytes: 100}})
-	r := New(db, mgr)
+	r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{}, mgr)
 	fp := &fileProgress{m: map[string]*fileProg{}}
 	outFile, err := os.CreateTemp(tmpDir, "consume-json-log-*.log")
 	if err != nil {
@@ -320,7 +320,7 @@ func TestConsume_JSONErrorObjectNotFoundMarksCASMatchedInActiveTransfer(t *testi
 
 	mgr := active_transfer.NewManager()
 	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeCAS, []active_transfer.TransferCandidateFile{{Path: "a/file1.mkv", Name: "file1.mkv", SizeBytes: 100}})
-	r := New(db, mgr)
+	r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{}, mgr)
 	called := 0
 	r.casVerifier = func(cfg, dst, rel string) (bool, error) { called++; return true, nil }
 	r.casVerifyDelays = nil
@@ -385,7 +385,7 @@ func TestConsume_JSONErrorObjectNotFoundAppendsRuntimeExclude(t *testing.T) {
 
 	mgr := active_transfer.NewManager()
 	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeCAS, []active_transfer.TransferCandidateFile{{Path: "a/file1.mkv", Name: "file1.mkv", SizeBytes: 100}})
-	r := New(db, mgr)
+	r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{}, mgr)
 	r.casVerifier = func(cfg, dst, rel string) (bool, error) { return true, nil }
 	r.casVerifyDelays = nil
 	fp := &fileProgress{m: map[string]*fileProg{}}
@@ -443,7 +443,7 @@ func TestStart_CASManagedRetries_AllCASMatchedFinishesWithoutRestart(t *testing.
 		t.Fatalf("AddRun() error = %v", err)
 	}
 
-	r := New(db)
+	r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{})
 	r.casVerifier = func(cfg, dst, rel string) (bool, error) { return true, nil }
 	r.casVerifyDelays = nil
 
@@ -512,7 +512,7 @@ func TestStart_CASManagedRetries_RealFailureRestartsNextAttempt(t *testing.T) {
 		t.Fatalf("AddRun() error = %v", err)
 	}
 
-	r := New(db)
+	r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{})
 	r.casVerifier = func(cfg, dst, rel string) (bool, error) { return true, nil }
 	r.casVerifyDelays = nil
 
@@ -561,7 +561,7 @@ func TestConsume_JSONErrorObjectNotFoundWithoutCASStaysFailed(t *testing.T) {
 
 	mgr := active_transfer.NewManager()
 	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeCAS, []active_transfer.TransferCandidateFile{{Path: "a/file1.mkv", Name: "file1.mkv", SizeBytes: 100}})
-	r := New(db, mgr)
+	r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{}, mgr)
 	r.casVerifier = func(cfg, dst, rel string) (bool, error) { return false, nil }
 	r.casVerifyDelays = nil
 	fp := &fileProgress{m: map[string]*fileProg{}}
@@ -622,7 +622,7 @@ func TestConsume_JSONStatsTransferringUpdatesCurrentFile(t *testing.T) {
 
 	mgr := active_transfer.NewManager()
 	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeNormal, []active_transfer.TransferCandidateFile{{Path: "电视剧/国产剧/风过留痕 (2026)/Season 1/风过留痕 - S01E01 - 第 1 集.mkv", Name: "风过留痕 - S01E01 - 第 1 集.mkv", SizeBytes: 1545914693}})
-	r := New(db, mgr)
+	r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{}, mgr)
 	fp := &fileProgress{m: map[string]*fileProg{}}
 	outFile, err := os.CreateTemp(tmpDir, "consume-json-stats-log-*.log")
 	if err != nil {
@@ -703,7 +703,7 @@ func TestConsume_MoveDeletedDoesNotMarkActiveTransferDeleted(t *testing.T) {
 
 	mgr := active_transfer.NewManager()
 	mgr.InitState(run.ID, task.ID, active_transfer.TrackingModeNormal, []active_transfer.TransferCandidateFile{{Path: "a.mp4", Name: "a.mp4"}})
-	r := New(db, mgr)
+	r := New(&StoreDBAdapter{DB: db}, &WSBroadcaster{}, mgr)
 	fp := &fileProgress{m: map[string]*fileProg{}}
 	outFile, err := os.CreateTemp(tmpDir, "consume-log-*.log")
 	if err != nil {

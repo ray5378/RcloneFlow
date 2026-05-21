@@ -25,7 +25,7 @@ import (
 	"rcloneflow/internal/config"
 	"rcloneflow/internal/logger"
 	"rcloneflow/internal/store"
-	"rcloneflow/internal/websocket"
+	
 )
 
 // Runner manages CLI transfers with progress/logs and stop control.
@@ -33,14 +33,15 @@ type Runner struct {
 	mu              sync.Mutex
 	procs           map[int64]*exec.Cmd
 	cancelFns       map[int64]context.CancelFunc
-	db              *store.DB
+	updater         RunUpdater
+	broadcaster     EventBroadcaster
 	activeMgr       *active_transfer.Manager
 	casVerifier     func(cfg, dst, rel string) (bool, error)
 	casVerifyDelays []time.Duration
 	casExcludeMu    sync.Mutex
 }
 
-func New(db *store.DB, activeMgr ...*active_transfer.Manager) *Runner {
+func New(updater RunUpdater, broadcaster EventBroadcaster, activeMgr ...*active_transfer.Manager) *Runner {
 	var mgr *active_transfer.Manager
 	if len(activeMgr) > 0 {
 		mgr = activeMgr[0]
@@ -48,7 +49,8 @@ func New(db *store.DB, activeMgr ...*active_transfer.Manager) *Runner {
 	return &Runner{
 		procs:           map[int64]*exec.Cmd{},
 		cancelFns:       map[int64]context.CancelFunc{},
-		db:              db,
+		updater:         updater,
+		broadcaster:     broadcaster,
 		activeMgr:       mgr,
 		casVerifier:     defaultCASFileExists,
 		casVerifyDelays: []time.Duration{0, 2 * time.Second, 3 * time.Second, 5 * time.Second, 8 * time.Second},
@@ -255,7 +257,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 
 	// Mandatory preflight: sequential pagination by top-level dirs to stabilize totals
 	if b, c, e := sizeOfPaged(&adapter.CmdRunner{}, cfg, src, effOpt); e == nil {
-		_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+		_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
 			if rr.Summary == nil {
 				rr.Summary = map[string]any{}
 			}
@@ -287,7 +289,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	r.mu.Lock()
 	r.procs[run.ID] = cmd
 	r.mu.Unlock()
-	_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+	_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
 		if rr.Summary == nil {
 			rr.Summary = map[string]any{}
 		}
@@ -379,7 +381,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 							}
 						}
 					}
-					_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+					_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
 						if rr.Summary == nil {
 							rr.Summary = map[string]any{}
 						}
@@ -438,7 +440,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				}
 			}
 			if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) {
-				_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+				_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
 				rr.Status = "failed"
 				if rr.Summary == nil {
 					rr.Summary = map[string]any{}
@@ -500,7 +502,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
 				rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": humanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
 			})
-			websocket.Broadcast("run_status", map[string]any{
+			r.broadcaster.Broadcast("run_status", map[string]any{
 				"run_id": run.ID,
 				"status": "failed",
 			})
@@ -524,7 +526,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		}
 		if casCompat != nil {
 			if postErr := casCompat.ApplyPostActions(cfg, src, dst, originalCmdName); postErr != nil {
-				_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+				_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
 					rr.Status = "failed"
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
@@ -535,7 +537,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
 					rr.Error = postErr.Error()
 				})
-				websocket.Broadcast("run_status", map[string]any{
+				r.broadcaster.Broadcast("run_status", map[string]any{
 					"run_id": run.ID,
 					"status": "failed",
 				})
@@ -586,7 +588,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				}
 			}
 		}
-		_ = r.db.UpdateRun(run.ID, func(rr *store.Run) {
+		_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
 			rr.Status = "finished"
 			if rr.Summary == nil {
 				rr.Summary = map[string]any{}
@@ -656,7 +658,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			rr.Summary["finalSummary"] = finalSummary
 
 		})
-		websocket.Broadcast("run_status", map[string]any{
+		r.broadcaster.Broadcast("run_status", map[string]any{
 			"run_id": run.ID,
 			"status": "finished",
 		})
@@ -1111,7 +1113,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						}
 						currentFiles = append(currentFiles, currentFile)
 						if i == 0 {
-							_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+							_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 								if rr.Summary == nil {
 									rr.Summary = map[string]any{}
 								}
@@ -1120,7 +1122,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						}
 					}
 					if len(currentFiles) > 0 {
-						_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+						_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 							if rr.Summary == nil {
 								rr.Summary = map[string]any{}
 							}
@@ -1168,7 +1170,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					}
 				}
 				recomputeProgressPct(prog)
-				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+				_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
 					}
@@ -1209,7 +1211,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						rr.Speed = fmt.Sprintf("%d B/s", int64(sp))
 					}
 				})
-				websocket.Broadcast("run_progress", map[string]any{
+				r.broadcaster.Broadcast("run_progress", map[string]any{
 					"run_id":         runID,
 					"bytes":          prog["bytes"],
 					"total":          prog["totalBytes"],
@@ -1251,7 +1253,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				}
 			}
 				recomputeProgressPct(prog)
-			_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+			_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 				if rr.Summary == nil {
 					rr.Summary = map[string]any{}
 				}
@@ -1290,7 +1292,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					rr.Summary["files"] = fp.snapshot(100)
 				}
 			})
-			websocket.Broadcast("run_progress", map[string]any{
+			r.broadcaster.Broadcast("run_progress", map[string]any{
 				"run_id":         runID,
 				"bytes":          prog["bytes"],
 				"total":          prog["totalBytes"],
@@ -1307,7 +1309,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 		if wantParse {
 			if prog, ok := parseOneLineProgress(line); ok {
 				recomputeProgressPct(prog)
-				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+				_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
 					}
@@ -1339,7 +1341,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						rr.Summary["files"] = fp.snapshot(100)
 					}
 				})
-				websocket.Broadcast("run_progress", map[string]any{
+				r.broadcaster.Broadcast("run_progress", map[string]any{
 					"run_id":         runID,
 					"bytes":          prog["bytes"],
 					"total":          prog["totalBytes"],
@@ -1374,14 +1376,14 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					}
 					marked = true
 				}
-				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+				_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
 					}
 					rr.Summary["progressLine"] = line
 				})
 				if marked {
-					_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+					_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 						if rr.Summary == nil {
 							rr.Summary = map[string]any{}
 						}
@@ -1442,7 +1444,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						r.appendCASExclude(excludeFrom, path)
 						_, _ = out.WriteString(fmt.Sprintf("NOTICE : %s: CAS compatible match after source cleanup (%s)\n", path, msg))
 						marked = true
-						_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+						_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 							if rr.Summary == nil {
 								rr.Summary = map[string]any{}
 							}
@@ -1487,7 +1489,7 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				}
 			}
 			if marked {
-				_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+				_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
 					}
@@ -1774,7 +1776,7 @@ func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst,
 			}
 		}
 		// 补全完成后，更新数据库中的 finalSummary
-		_ = r.db.UpdateRun(runID, func(rr *store.Run) {
+		_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 			if rr == nil || rr.Summary == nil {
 				return
 			}

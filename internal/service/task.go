@@ -456,7 +456,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 					logger.Error("goroutine panic", zap.Any("panic", r))
 				}
 			}()
-			_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+			_ = runnercli.New(&runnercli.StoreDBAdapter{DB: s.db}, &runnercli.WSBroadcaster{}, s.activeMgr).Start(context.Background(), *run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
 		}()
 		return TaskRunResult{Started: true, TaskID: taskID}, nil
 	}
@@ -514,7 +514,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 				logger.Error("goroutine panic", zap.Any("panic", r))
 			}
 		}()
-		_ = runnercli.New(s.db, s.activeMgr).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
+		_ = runnercli.New(&runnercli.StoreDBAdapter{DB: s.db}, &runnercli.WSBroadcaster{}, s.activeMgr).Start(context.Background(), run, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath)
 	}()
 	return TaskRunResult{Started: true, TaskID: taskID}, nil
 }
