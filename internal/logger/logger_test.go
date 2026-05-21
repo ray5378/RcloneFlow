@@ -109,6 +109,11 @@ func TestNewWithStderr(t *testing.T) {
 }
 
 func TestNewWithJSON(t *testing.T) {
+	tmpDir := t.TempDir()
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
 	logger, err := New("debug", "json")
 	if err != nil {
 		t.Fatalf("New() error = %v", err)

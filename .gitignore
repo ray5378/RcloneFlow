@@ -45,6 +45,9 @@ frontend/node_modules/
 frontend/coverage/
 web/
 
+# Test artifacts (do not commit)
+internal/logger/json
+
 # Local build acceleration caches (keep locally, do not commit)
 third_party/docker/
 third_party/npm-cache/
