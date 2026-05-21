@@ -358,6 +358,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			outW.Close()
 			errW.Close()
 			consumeWG.Wait()
+			_ = stderrFile.Sync()
 			stderrFile.Close()
 			if err == nil && (cmd.ProcessState == nil || cmd.ProcessState.Success()) {
 				break
