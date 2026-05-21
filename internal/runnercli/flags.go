@@ -229,3 +229,48 @@ func toKebab(s string) string {
 	}
 	return strings.ToLower(strings.ReplaceAll(s, " ", "-"))
 }
+
+func addFilterFlags(args []string, opts map[string]any, fastListFlag bool) []string {
+	if opts == nil {
+		return args
+	}
+	pass := []string{"include", "exclude", "filter", "filterFrom", "includeFrom", "excludeFrom", "filesFrom", "minSize", "maxSize", "minAge", "maxAge", "fastList"}
+	for _, k := range pass {
+		if v, ok := opts[k]; ok {
+			flag := ""
+			switch k {
+			case "include":
+				flag = "--include"
+			case "exclude":
+				flag = "--exclude"
+			case "filter":
+				flag = "--filter"
+			case "filterFrom":
+				flag = "--filter-from"
+			case "includeFrom":
+				flag = "--include-from"
+			case "excludeFrom":
+				flag = "--exclude-from"
+			case "filesFrom":
+				flag = "--files-from"
+			case "minSize":
+				flag = "--min-size"
+			case "maxSize":
+				flag = "--max-size"
+			case "minAge":
+				flag = "--min-age"
+			case "maxAge":
+				flag = "--max-age"
+			case "fastList":
+				if fastListFlag {
+					if s := strings.ToLower(fmt.Sprint(v)); s == "true" || s == "1" {
+						args = append(args, "--fast-list")
+					}
+				}
+				continue
+			}
+			args = append(args, flag, fmt.Sprint(v))
+		}
+	}
+	return args
+}

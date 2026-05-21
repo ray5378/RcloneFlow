@@ -14,6 +14,7 @@ import (
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
+	"rcloneflow/internal/util"
 )
 
 // TaskController 任务控制器
@@ -303,7 +304,7 @@ func (c *TaskController) buildActiveRunItems() ([]map[string]any, error) {
 				dur = 0
 			}
 			item["runRecord"].(map[string]any)["durationSeconds"] = dur
-			item["runRecord"].(map[string]any)["durationText"] = humanDuration(dur)
+			item["runRecord"].(map[string]any)["durationText"] = util.HumanDuration(dur)
 		}
 		items = append(items, item)
 	}

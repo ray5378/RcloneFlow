@@ -12,6 +12,7 @@ import (
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
+	"rcloneflow/internal/util"
 )
 
 func setupRunTestDB(t *testing.T) *store.DB {
@@ -255,7 +256,7 @@ func TestHumanDuration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
-			assert.Equal(t, tt.want, humanDuration(tt.seconds))
+			assert.Equal(t, tt.want, util.HumanDuration(tt.seconds))
 		})
 	}
 }
@@ -278,10 +279,10 @@ func TestAbs64(t *testing.T) {
 }
 
 func TestHumanDuration_Controller(t *testing.T) {
-	assert.Equal(t, "0秒", humanDuration(0))
-	assert.Equal(t, "1秒", humanDuration(1))
-	assert.Equal(t, "1分", humanDuration(60))
-	assert.Equal(t, "1小时", humanDuration(3600))
+	assert.Equal(t, "0秒", util.HumanDuration(0))
+	assert.Equal(t, "1秒", util.HumanDuration(1))
+	assert.Equal(t, "1分", util.HumanDuration(60))
+	assert.Equal(t, "1小时", util.HumanDuration(3600))
 }
 
 func TestRunController_HandleRunStatus_NotFound(t *testing.T) {

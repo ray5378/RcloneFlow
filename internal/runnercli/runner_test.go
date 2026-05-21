@@ -11,6 +11,7 @@ import (
 
 	"rcloneflow/internal/active_transfer"
 	"rcloneflow/internal/store"
+	"rcloneflow/internal/util"
 )
 
 func TestBuildArgs_ForceJSONLog(t *testing.T) {
@@ -931,8 +932,8 @@ func TestHumanDuration(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.want, func(t *testing.T) {
-			if got := humanDuration(tt.seconds); got != tt.want {
-				t.Errorf("humanDuration(%d) = %q, want %q", tt.seconds, got, tt.want)
+			if got := util.HumanDuration(tt.seconds); got != tt.want {
+				t.Errorf("util.HumanDuration(%d) = %q, want %q", tt.seconds, got, tt.want)
 			}
 		})
 	}
