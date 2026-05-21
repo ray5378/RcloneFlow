@@ -10,7 +10,6 @@ import (
 
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/logger"
-	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/store"
 
 	"github.com/robfig/cron/v3"
@@ -46,7 +45,7 @@ func (s *Scheduler) RemoveSchedule(id int64) {
 }
 
 // New 创建调度器（默认使用 RC 运行器，保持向后兼容）
-func New(db *store.DB, rc *rclone.Client) *Scheduler {
+func New(db *store.DB, rc *adapter.RcloneClient) *Scheduler {
 	return &Scheduler{
 		cron:    cron.New(cron.WithSeconds()),
 		db:      db,
@@ -68,7 +67,7 @@ func NewWithRunner(db *store.DB, runner Runner) *Scheduler {
 // taskRunner 任务运行器实现
 type taskRunner struct {
 	db *store.DB
-	rc *rclone.Client
+	rc *adapter.RcloneClient
 }
 
 func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) error {
@@ -85,7 +84,9 @@ func (r *taskRunner) RunTask(ctx context.Context, taskID int64, trigger string) 
 		}
 	}
 
-	_, err := r.rc.RunTask(ctx, t.ID, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, trigger, opts)
+	src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
+	dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
+	_, err := r.rc.StartJob(ctx, t.Mode, src, dst, opts)
 	if err != nil {
 		r.db.AddRun(store.Run{
 			TaskID:       taskID,

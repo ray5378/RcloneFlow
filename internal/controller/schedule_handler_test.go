@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"rcloneflow/internal/rclone"
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/scheduler"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
@@ -44,7 +44,7 @@ func setupScheduleController(t *testing.T) *ScheduleController {
 	})
 	require.NoError(t, err)
 	
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	scheduleSvc := service.NewScheduleService(db)
 	sched := scheduler.New(db, rc)
 	return NewScheduleController(scheduleSvc, sched)

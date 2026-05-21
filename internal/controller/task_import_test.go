@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"rcloneflow/internal/rclone"
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
 )
@@ -32,7 +32,7 @@ func newTestTaskController(t *testing.T) (*TaskController, string) {
 	taskSvc := service.NewTaskService(db, nil)
 	scheduleSvc := service.NewScheduleService(db)
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 
 	ctrl := NewTaskController(taskSvc, scheduleSvc, runSvc, rc)
 	return ctrl, tmpDir

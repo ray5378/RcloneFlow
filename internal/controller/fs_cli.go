@@ -82,20 +82,14 @@ func (c *FsController) wrap(w http.ResponseWriter, r *http.Request, fn func(cont
 	body, _ := io.ReadAll(r.Body)
 	resp, err := fn(r.Context(), body)
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		WriteJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
 		return
 	}
 	if resp == nil {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+		WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 		return
 	}
-	writeJSON(w, http.StatusOK, resp)
-}
-
-func writeJSON(w http.ResponseWriter, code int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(v)
+	WriteJSON(w, http.StatusOK, resp)
 }
 
 // normalize path for CLI: ensure fs like "remote:" and remote path relative (no leading "/")

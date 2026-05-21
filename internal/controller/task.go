@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"rcloneflow/internal/rclone"
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
 )
@@ -21,13 +21,13 @@ type TaskController struct {
 	taskSvc     *service.TaskService
 	scheduleSvc *service.ScheduleService
 	runSvc      *service.RunService
-	rc          *rclone.Client
+	rc          *adapter.RcloneClient
 }
 
 func (c *TaskController) Service() *service.TaskService { return c.taskSvc }
 
 // NewTaskController 创建任务控制器
-func NewTaskController(taskSvc *service.TaskService, scheduleSvc *service.ScheduleService, runSvc *service.RunService, rc *rclone.Client) *TaskController {
+func NewTaskController(taskSvc *service.TaskService, scheduleSvc *service.ScheduleService, runSvc *service.RunService, rc *adapter.RcloneClient) *TaskController {
 	return &TaskController{
 		taskSvc:     taskSvc,
 		scheduleSvc: scheduleSvc,
@@ -389,7 +389,11 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 							remotesSkipped++
 							continue
 						}
-						if err := c.rc.CreateRemote(r.Context(), name, typ, params); err != nil {
+						if err := c.rc.CreateRemote(r.Context(), &adapter.CreateRemoteRequest{
+							Name:       name,
+							Type:       typ,
+							Parameters: params,
+						}); err != nil {
 							remoteErrors = append(remoteErrors, fmt.Sprintf("%s(%s): %s", name, typ, err.Error()))
 							remotesSkipped++
 						} else {
@@ -400,7 +404,11 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 					}
 					continue
 				}
-				if err := c.rc.CreateRemote(r.Context(), name, typ, params); err != nil {
+				if err := c.rc.CreateRemote(r.Context(), &adapter.CreateRemoteRequest{
+					Name:       name,
+					Type:       typ,
+					Parameters: params,
+				}); err != nil {
 					remoteErrors = append(remoteErrors, fmt.Sprintf("%s(%s): %s", name, typ, err.Error()))
 					remotesSkipped++
 				} else {

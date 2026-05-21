@@ -142,7 +142,7 @@ func TestIsWebdavMoveError(t *testing.T) {
 
 func TestWriteJSON_FsCli(t *testing.T) {
 	rec := httptest.NewRecorder()
-	writeJSON(rec, 200, map[string]any{"ok": true})
+	WriteJSON(rec, 200, map[string]any{"ok": true})
 	assert.Equal(t, 200, rec.Code)
 	assert.Equal(t, "application/json", rec.Header().Get("Content-Type"))
 	assert.Contains(t, rec.Body.String(), `"ok":true`)

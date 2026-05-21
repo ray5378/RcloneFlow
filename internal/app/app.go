@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"rcloneflow/internal/active_transfer"
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/config"
 	"rcloneflow/internal/controller"
 	"rcloneflow/internal/logger"
-	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/router"
 	"rcloneflow/internal/scheduler"
 	"rcloneflow/internal/service"
@@ -53,7 +53,7 @@ func Run(cfg *config.Config) error {
 	// 初始化 logger
 	maybeStartEmbeddedRC()
 	// 初始化rclone客户端
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 
 	// 清空所有运行状态（容器重启后恢复，防止单例模式误判）
 	if err := db.ClearAllRunningStatus(); err != nil {
@@ -77,7 +77,7 @@ func Run(cfg *config.Config) error {
 			"snapshot": snap,
 		})
 	})
-	taskSvc := service.NewTaskService(db, rc, activeMgr)
+	taskSvc := service.NewTaskService(db, activeMgr)
 	scheduleSvc := service.NewScheduleService(db)
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
 

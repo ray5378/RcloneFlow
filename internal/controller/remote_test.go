@@ -9,11 +9,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"rcloneflow/internal/rclone"
+	"rcloneflow/internal/adapter"
 )
 
 func TestRemoteController_Healthz(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/healthz", nil)
@@ -28,7 +28,7 @@ func TestRemoteController_Healthz(t *testing.T) {
 }
 
 func TestRemoteController_HandleRemotes_GET(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/remotes", nil)
@@ -40,7 +40,7 @@ func TestRemoteController_HandleRemotes_GET(t *testing.T) {
 }
 
 func TestRemoteController_HandleRemotes_POST_InvalidJSON(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/remotes", bytes.NewReader([]byte("{bad")))
@@ -52,7 +52,7 @@ func TestRemoteController_HandleRemotes_POST_InvalidJSON(t *testing.T) {
 }
 
 func TestRemoteController_HandleRemotes_PUT_InvalidJSON(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodPut, "/api/remotes", bytes.NewReader([]byte("{bad")))
@@ -64,7 +64,7 @@ func TestRemoteController_HandleRemotes_PUT_InvalidJSON(t *testing.T) {
 }
 
 func TestRemoteController_HandleRemotes_MethodNotAllowed(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/remotes", nil)
@@ -75,7 +75,7 @@ func TestRemoteController_HandleRemotes_MethodNotAllowed(t *testing.T) {
 }
 
 func TestRemoteController_HandleRemoteConfig_EmptyName(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/remotes/config/", nil)
@@ -86,7 +86,7 @@ func TestRemoteController_HandleRemoteConfig_EmptyName(t *testing.T) {
 }
 
 func TestRemoteController_HandleRemoteConfig(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/remotes/config/myRemote", nil)
@@ -98,7 +98,7 @@ func TestRemoteController_HandleRemoteConfig(t *testing.T) {
 }
 
 func TestRemoteController_HandleRemoteTest(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/remotes/test", bytes.NewReader([]byte(`{"name":"myRemote"}`)))
@@ -110,7 +110,7 @@ func TestRemoteController_HandleRemoteTest(t *testing.T) {
 }
 
 func TestRemoteController_HandleProviders(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/providers", nil)
@@ -121,7 +121,7 @@ func TestRemoteController_HandleProviders(t *testing.T) {
 }
 
 func TestRemoteController_HandleConfigDump(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/config/dump", nil)
@@ -132,7 +132,7 @@ func TestRemoteController_HandleConfigDump(t *testing.T) {
 }
 
 func TestRemoteController_HandleConfigActions_POST(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/config/test", bytes.NewReader([]byte(`{"name":"test","type":"s3"}`)))
@@ -145,7 +145,7 @@ func TestRemoteController_HandleConfigActions_POST(t *testing.T) {
 }
 
 func TestRemoteController_HandleConfigActions_DELETE(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodDelete, "/api/config/testRemote", nil)
@@ -156,7 +156,7 @@ func TestRemoteController_HandleConfigActions_DELETE(t *testing.T) {
 }
 
 func TestRemoteController_HandleUsage(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/usage?remote=myRemote", nil)
@@ -167,7 +167,7 @@ func TestRemoteController_HandleUsage(t *testing.T) {
 }
 
 func TestRemoteController_HandleFsInfo(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/fsinfo?remote=myRemote", nil)
@@ -178,13 +178,13 @@ func TestRemoteController_HandleFsInfo(t *testing.T) {
 }
 
 func TestRemoteController_RcloneClient(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 	assert.NotNil(t, c.RcloneClient())
 }
 
 func TestRemoteController_RunTask(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewRemoteController(rc)
 	// Just verify the method exists and returns the client
 	assert.NotNil(t, c.RcloneClient())

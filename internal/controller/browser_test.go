@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"rcloneflow/internal/rclone"
+	"rcloneflow/internal/adapter"
 )
 
 func TestBrowserController_HandleList(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewBrowserController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/browser/list?remote=myRemote&path=/some/path", nil)
@@ -22,7 +22,7 @@ func TestBrowserController_HandleList(t *testing.T) {
 }
 
 func TestBrowserController_HandleList_EmptyPath(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewBrowserController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/browser/list?remote=myRemote", nil)
@@ -33,7 +33,7 @@ func TestBrowserController_HandleList_EmptyPath(t *testing.T) {
 }
 
 func TestBrowserController_HandleList_DotPath(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewBrowserController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/browser/list?remote=myRemote&path=.", nil)
@@ -44,7 +44,7 @@ func TestBrowserController_HandleList_DotPath(t *testing.T) {
 }
 
 func TestBrowserController_HandleList_WhitespacePath(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewBrowserController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/browser/list?remote=myRemote&path=%20", nil)
@@ -55,7 +55,7 @@ func TestBrowserController_HandleList_WhitespacePath(t *testing.T) {
 }
 
 func TestBrowserController_HandleList_WithLeadingSlash(t *testing.T) {
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	c := NewBrowserController(rc)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/browser/list?remote=myRemote&path=/folder/", nil)

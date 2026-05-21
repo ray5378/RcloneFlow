@@ -17,7 +17,7 @@ import (
 
 	"go.uber.org/zap"
 
-	"rcloneflow/internal/rclone"
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/logger"
 	"rcloneflow/internal/service"
 )
@@ -782,11 +782,11 @@ func (c *RunController) resolveLogPath(run service.RunRecord) (string, bool) {
 // RunController 运行记录控制器
 type RunController struct {
 	runSvc *service.RunService
-	rc     *rclone.Client
+	rc     *adapter.RcloneClient
 }
 
 // NewRunController 创建运行记录控制器
-func NewRunController(runSvc *service.RunService, rc *rclone.Client) *RunController {
+func NewRunController(runSvc *service.RunService, rc *adapter.RcloneClient) *RunController {
 	return &RunController{
 		runSvc: runSvc,
 		rc:     rc,
@@ -922,6 +922,23 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	WriteJSON(w, 404, map[string]any{"error": "run not found"})
+}
+
+// HandleRunStopCLI POST /api/runs/{id}/stop
+func (c *RunController) HandleRunStopCLI(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(405)
+		return
+	}
+	idStr := strings.TrimPrefix(r.URL.Path, "/api/runs/")
+	idStr = strings.TrimSuffix(idStr, "/stop")
+	id, _ := strconv.ParseInt(strings.Trim(idStr, "/"), 10, 64)
+	if id <= 0 {
+		WriteJSON(w, 400, map[string]any{"error": "invalid id"})
+		return
+	}
+	c.runSvc.UpdateRunStatus(id, map[string]any{"finished": true, "success": false, "error": "stopped by user"})
+	WriteJSON(w, 200, map[string]any{"stopped": true})
 }
 
 // HandleRunKillCLI 强制终止指定 run（优先内部 runner；否则按 PID 逐级信号）

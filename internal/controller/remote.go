@@ -6,16 +6,15 @@ import (
 	"strings"
 
 	"rcloneflow/internal/adapter"
-	"rcloneflow/internal/rclone"
 )
 
 // RemoteController 远程存储控制器
 type RemoteController struct {
-	rc *rclone.Client
+	rc *adapter.RcloneClient
 }
 
 // NewRemoteController 创建远程存储控制器
-func NewRemoteController(rc *rclone.Client) *RemoteController {
+func NewRemoteController(rc *adapter.RcloneClient) *RemoteController {
 	return &RemoteController{rc: rc}
 }
 
@@ -33,7 +32,11 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
-		version, _ := c.rc.Version(r.Context())
+		versionResp, _ := c.rc.Version(r.Context())
+		version := ""
+		if versionResp != nil {
+			version = versionResp.Version
+		}
 		WriteJSON(w, 200, map[string]any{"remotes": remotes, "version": version})
 
 	case http.MethodPost:
@@ -46,7 +49,11 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}
-		if err := c.rc.CreateRemote(r.Context(), req.Name, req.Type, req.Parameters); err != nil {
+		if err := c.rc.CreateRemote(r.Context(), &adapter.CreateRemoteRequest{
+			Name:       req.Name,
+			Type:       req.Type,
+			Parameters: req.Parameters,
+		}); err != nil {
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
@@ -62,7 +69,11 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			WriteJSON(w, 400, map[string]any{"error": err.Error()})
 			return
 		}
-		if err := c.rc.CreateRemote(r.Context(), req.Name, req.Type, req.Parameters); err != nil {
+		if err := c.rc.CreateRemote(r.Context(), &adapter.CreateRemoteRequest{
+			Name:       req.Name,
+			Type:       req.Type,
+			Parameters: req.Parameters,
+		}); err != nil {
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
@@ -106,7 +117,18 @@ func (c *RemoteController) HandleRemoteTest(w http.ResponseWriter, r *http.Reque
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
 	}
-	WriteJSON(w, 200, map[string]any{"ok": true, "count": len(items)})
+	result := make([]map[string]any, len(items))
+	for i, item := range items {
+		result[i] = map[string]any{
+			"Name":     item.Name,
+			"Path":     item.Path,
+			"IsDir":    item.IsDir,
+			"MimeType": item.MimeType,
+			"ModTime":  item.ModTime,
+			"Size":     item.Size,
+		}
+	}
+	WriteJSON(w, 200, map[string]any{"ok": true, "count": len(result)})
 }
 
 // HandleProviders 获取所有存储提供商
@@ -120,7 +142,18 @@ func (c *RemoteController) HandleProviders(w http.ResponseWriter, r *http.Reques
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
 	}
-	WriteJSON(w, 200, map[string]any{"providers": providers})
+	result := make([]map[string]any, len(providers))
+	for i, p := range providers {
+		result[i] = map[string]any{
+			"Name":      p.Name,
+			"Hangul":    p.Hangul,
+			"Prefix":    p.Prefix,
+			"OpenURL":   p.OpenURL,
+			"HashTypes": p.HashTypes,
+			"Options":   p.Options,
+		}
+	}
+	WriteJSON(w, 200, map[string]any{"providers": result})
 }
 
 // HandleConfigDump 获取所有存储配置
@@ -134,7 +167,7 @@ func (c *RemoteController) HandleConfigDump(w http.ResponseWriter, r *http.Reque
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
 	}
-	WriteJSON(w, 200, config)
+	WriteJSON(w, 200, map[string]any{"config": config})
 }
 
 // HandleConfigActions 获取/删除单个存储配置
@@ -173,10 +206,15 @@ func (c *RemoteController) HandleUsage(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, 400, map[string]any{"error": "fs parameter required"})
 		return
 	}
-	usage, err := c.rc.GetUsage(r.Context(), fs)
+	about, err := c.rc.GetUsage(r.Context(), fs)
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
+	}
+	usage := map[string]any{
+		"used":  about.Used,
+		"free":  about.Free,
+		"total": about.Used + about.Free,
 	}
 	WriteJSON(w, 200, usage)
 }
@@ -197,15 +235,25 @@ func (c *RemoteController) HandleFsInfo(w http.ResponseWriter, r *http.Request) 
 		WriteJSON(w, 500, map[string]any{"error": err.Error()})
 		return
 	}
-	WriteJSON(w, 200, info)
+	result := map[string]any{
+		"name":      info.Name,
+		"precision": info.Precision,
+		"root":      info.Root,
+	}
+	if info.Features != nil {
+		result["features"] = info.Features
+	}
+	WriteJSON(w, 200, result)
 }
 
 // RcloneClient 获取rclone客户端（供其他控制器使用）
-func (c *RemoteController) RcloneClient() *rclone.Client {
+func (c *RemoteController) RcloneClient() *adapter.RcloneClient {
 	return c.rc
 }
 
 // RunTask 运行任务
 func (c *RemoteController) RunTask(ctx context.Context, taskID int64, mode, srcRemote, srcPath, dstRemote, dstPath, trigger string, opts *adapter.TaskOptions) (int64, error) {
-	return c.rc.RunTask(ctx, taskID, mode, srcRemote, srcPath, dstRemote, dstPath, trigger, opts)
+	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
+	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
+	return c.rc.StartJob(ctx, mode, src, dst, opts)
 }

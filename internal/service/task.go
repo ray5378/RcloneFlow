@@ -22,18 +22,17 @@ import (
 // TaskService 任务服务层
 type TaskService struct {
 	db        *store.DB
-	runner    adapter.TaskRunner
 	activeMgr *active_transfer.Manager
 	tagSvc    *TagService
 }
 
 // NewTaskService 创建任务服务
-func NewTaskService(db *store.DB, runner adapter.TaskRunner, activeMgr ...*active_transfer.Manager) *TaskService {
+func NewTaskService(db *store.DB, activeMgr ...*active_transfer.Manager) *TaskService {
 	var mgr *active_transfer.Manager
 	if len(activeMgr) > 0 {
 		mgr = activeMgr[0]
 	}
-	return &TaskService{db: db, runner: runner, activeMgr: mgr}
+	return &TaskService{db: db, activeMgr: mgr}
 }
 
 func (s *TaskService) SetTagService(svc *TagService) {

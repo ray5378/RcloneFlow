@@ -9,7 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"rcloneflow/internal/rclone"
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
 )
@@ -29,7 +29,7 @@ func setupRunTestDB(t *testing.T) *store.DB {
 func setupRunController(t *testing.T) *RunController {
 	t.Helper()
 	db := setupRunTestDB(t)
-	rc := rclone.NewFromEnv()
+	rc := adapter.NewRcloneClient(nil)
 	runAdapter := service.NewStoreRunAdapter(db)
 	runSvc := service.NewRunService(runAdapter)
 	return NewRunController(runSvc, rc)
