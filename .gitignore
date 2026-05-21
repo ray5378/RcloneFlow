@@ -53,3 +53,6 @@ third_party/docker/
 third_party/npm-cache/
 third_party/go-mod-cache/
 third_party/apk-cache/
+
+# Server private key
+mykey
