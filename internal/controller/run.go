@@ -171,41 +171,69 @@ func enrichRowMapSizesFromFinalSummary(rowMaps []map[string]any, summary map[str
 	if summary == nil {
 		return
 	}
-	fs, ok := summary["finalSummary"].(map[string]any)
-	if !ok || fs == nil {
-		return
-	}
-	files, ok := fs["files"].(any)
-	if !ok || files == nil {
-		return
-	}
-	var fileList []map[string]any
-	switch v := files.(type) {
-	case []map[string]any:
-		fileList = v
-	case []any:
-		for _, f := range v {
-			if fm, ok := f.(map[string]any); ok {
-				fileList = append(fileList, fm)
+	sizeMap := make(map[string]int64)
+
+	// 优先从 activeTransfer.completed（实时持久化的已完成列表，包含源端大小
+	completed, ok := summary["completed"].(any)
+	if ok && completed != nil {
+		var completedList []map[string]any
+		switch v := completed.(type) {
+		case []map[string]any:
+			completedList = v
+		case []any:
+			for _, f := range v {
+				if fm, ok := f.(map[string]any); ok {
+					completedList = append(completedList, fm)
+				}
 			}
 		}
-	default:
-		return
-	}
-	if len(fileList) == 0 {
-		return
-	}
-	sizeMap := make(map[string]int64, len(fileList))
-	for _, f := range fileList {
-		path := strings.ReplaceAll(fmt.Sprint(f["path"]), "\\", "/")
-		if path == "" {
-			continue
-		}
-		sz := anyToInt64(f["sizeBytes"])
-		if sz > 0 {
-			sizeMap[path] = sz
+		for _, f := range completedList {
+			path := strings.ReplaceAll(fmt.Sprint(f["path"]), "\\", "/")
+			if path == "" {
+				continue
+			}
+			sz := anyToInt64(f["sizeBytes"])
+			if sz > 0 {
+				sizeMap[path] = sz
+			}
 		}
 	}
+
+	// 如果没有找到，再回退到 finalSummary.files
+	if len(sizeMap) == 0 {
+		fs, ok := summary["finalSummary"].(map[string]any)
+		if !ok || fs == nil {
+			return
+		}
+		files, ok := fs["files"].(any)
+		if !ok || files == nil {
+			return
+		}
+		var fileList []map[string]any
+		switch v := files.(type) {
+		case []map[string]any:
+			fileList = v
+		case []any:
+			for _, f := range v {
+				if fm, ok := f.(map[string]any); ok {
+					fileList = append(fileList, fm)
+				}
+			}
+		default:
+			return
+		}
+		for _, f := range fileList {
+			path := strings.ReplaceAll(fmt.Sprint(f["path"]), "\\", "/")
+			if path == "" {
+				continue
+			}
+			sz := anyToInt64(f["sizeBytes"])
+			if sz > 0 {
+				sizeMap[path] = sz
+			}
+		}
+	}
+
 	if len(sizeMap) == 0 {
 		return
 	}
