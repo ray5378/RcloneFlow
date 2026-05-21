@@ -104,40 +104,13 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
 
-      - name: Build and push (amd64)
+      - name: Build and push (multi-arch)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          platforms: linux/amd64
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
-      - name: Generate arm64 tags
-        id: arm64tags
-        run: |
-          TAGS=$(echo "${{ steps.meta.outputs.tags }}" | sed 's/$/-arm64/' | tr '\n' ',')
-          echo "tags=${TAGS%,}" >> $GITHUB_OUTPUT
-
-      - name: Build and push (arm64)
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          platforms: linux/arm64
-          tags: ${{ steps.arm64tags.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-
-      - name: Merge manifests
-        run: |
-          echo '${{ steps.meta.outputs.json }}' | jq -r '.tags[]' | while read -r TAG; do
-            ARM64_TAG="${TAG}-arm64"
-            echo "Merging ${TAG} + ${ARM64_TAG} → ${TAG}"
-            docker buildx imagetools create \
-              --tag "${TAG}" \
-              "${TAG}" \
-              "${ARM64_TAG}"
-          done
