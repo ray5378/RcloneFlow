@@ -2,13 +2,6 @@
 
 [English](./README-en.md) | [中文](./README.md)
 
-**RcloneFlow = Rclone + Web UI**
-
-RcloneFlow is a Web UI for rclone with built-in rclone, supporting file sync, storage management, scheduling, Webhook and more.
-
-**Current Version: v1.0.0**
-
-> Current branch policy: only `dev` (development) and `master` (stable) are kept. The current release tag is only `v1.0.0`.
 
 ## Features
 
