@@ -10,6 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
 )
 
@@ -27,7 +28,7 @@ func setupAuthTestDB(t *testing.T) *store.DB {
 
 func TestAuthController_Register_Success(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	body := `{"username":"testuser","password":"testpass123"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(body)))
@@ -48,7 +49,7 @@ func TestAuthController_Register_Success(t *testing.T) {
 
 func TestAuthController_Register_Duplicate(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	body := `{"username":"dupuser","password":"pass123"}`
 	req1 := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(body)))
@@ -67,7 +68,7 @@ func TestAuthController_Register_Duplicate(t *testing.T) {
 
 func TestAuthController_Register_EmptyFields(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	tests := []struct {
 		name string
@@ -90,7 +91,7 @@ func TestAuthController_Register_EmptyFields(t *testing.T) {
 
 func TestAuthController_Register_InvalidJSON(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte("{bad")))
 	req.Header.Set("Content-Type", "application/json")
@@ -101,7 +102,7 @@ func TestAuthController_Register_InvalidJSON(t *testing.T) {
 
 func TestAuthController_Login_Success(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	regBody := `{"username":"loginuser","password":"loginpass123"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody)))
@@ -126,7 +127,7 @@ func TestAuthController_Login_Success(t *testing.T) {
 
 func TestAuthController_Login_WrongPassword(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	regBody := `{"username":"pwduser","password":"correctpass"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody)))
@@ -145,7 +146,7 @@ func TestAuthController_Login_WrongPassword(t *testing.T) {
 
 func TestAuthController_Login_UserNotFound(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	loginBody := `{"username":"nonexistent","password":"pass"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewReader([]byte(loginBody)))
@@ -157,7 +158,7 @@ func TestAuthController_Login_UserNotFound(t *testing.T) {
 
 func TestAuthController_Login_EmptyFields(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	tests := []struct {
 		name string
@@ -179,7 +180,7 @@ func TestAuthController_Login_EmptyFields(t *testing.T) {
 
 func TestAuthController_Refresh_Success(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	regBody := `{"username":"refreshuser","password":"refreshpass"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody)))
@@ -208,7 +209,7 @@ func TestAuthController_Refresh_Success(t *testing.T) {
 
 func TestAuthController_Refresh_EmptyToken(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	refBody := `{"refreshToken":""}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader([]byte(refBody)))
@@ -220,7 +221,7 @@ func TestAuthController_Refresh_EmptyToken(t *testing.T) {
 
 func TestAuthController_Refresh_InvalidToken(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	refBody := `{"refreshToken":"invalid.token.here"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/refresh", bytes.NewReader([]byte(refBody)))
@@ -232,7 +233,7 @@ func TestAuthController_Refresh_InvalidToken(t *testing.T) {
 
 func TestAuthController_ChangePassword_Success(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	regBody := `{"username":"chgpass","password":"oldpass123"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody)))
@@ -261,7 +262,7 @@ func TestAuthController_ChangePassword_Success(t *testing.T) {
 
 func TestAuthController_ChangePassword_WrongOldPassword(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	regBody := `{"username":"wrongold","password":"correctold"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody)))
@@ -286,7 +287,7 @@ func TestAuthController_ChangePassword_WrongOldPassword(t *testing.T) {
 
 func TestAuthController_ChangePassword_MissingOldPassword(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	regBody := `{"username":"missold","password":"pass123"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody)))
@@ -311,7 +312,7 @@ func TestAuthController_ChangePassword_MissingOldPassword(t *testing.T) {
 
 func TestAuthController_ChangePassword_NoAuthHeader(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	chgBody := `{"oldPassword":"old","newPassword":"new"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", bytes.NewReader([]byte(chgBody)))
@@ -323,7 +324,7 @@ func TestAuthController_ChangePassword_NoAuthHeader(t *testing.T) {
 
 func TestAuthController_ChangePassword_InvalidToken(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	chgBody := `{"oldPassword":"old","newPassword":"new"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/change-password", bytes.NewReader([]byte(chgBody)))
@@ -336,7 +337,7 @@ func TestAuthController_ChangePassword_InvalidToken(t *testing.T) {
 
 func TestAuthController_ChangePassword_UpdateUsername(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	regBody := `{"username":"oldname","password":"pass123"}`
 	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody)))
@@ -366,7 +367,7 @@ func TestAuthController_ChangePassword_UpdateUsername(t *testing.T) {
 
 func TestAuthController_ChangePassword_UsernameTaken(t *testing.T) {
 	db := setupAuthTestDB(t)
-	ctrl := NewAuthController(db)
+	ctrl := NewAuthController(service.NewAuthService(db))
 
 	regBody1 := `{"username":"user1","password":"pass123"}`
 	req1 := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody1)))
