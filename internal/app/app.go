@@ -10,7 +10,6 @@ import (
 	"rcloneflow/internal/config"
 	"rcloneflow/internal/controller"
 	"rcloneflow/internal/logger"
-	"rcloneflow/internal/middleware"
 	"rcloneflow/internal/rclone"
 	"rcloneflow/internal/router"
 	"rcloneflow/internal/scheduler"
@@ -170,12 +169,9 @@ func Run(cfg *config.Config) error {
 	mux := http.NewServeMux()
 	r.Setup(mux)
 
-	// 添加中间件
-	handler := middleware.CORS(mux)
-
 	// 启动服务器
 	addr := cfg.GetServerAddr()
 	logger.Info("服务监听中", zap.String("addr", addr))
-	return http.ListenAndServe(addr, handler)
+	return http.ListenAndServe(addr, mux)
 }
 

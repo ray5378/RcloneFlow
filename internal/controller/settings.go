@@ -31,7 +31,6 @@ type settingsResponse struct {
 	Webdav   map[string]map[string]string `json:"webdav"`
 	Webhook  map[string]map[string]string `json:"webhook"`
 	Remote   map[string]map[string]string `json:"remote"`
-	CORS     map[string]map[string]string `json:"cors"`
 	Stored   map[string]string            `json:"stored"`
 	Meta     map[string]string            `json:"meta"`
 }
@@ -53,7 +52,6 @@ func defaultsMap() map[string]string {
 		"WEBHOOK_MAX_FILES":              "0",
 		"RUNNING_HINT_DEBUG_ENABLED":     "false",
 		"REMOTE_ORDER":                   "",
-		"CORS_ALLOWED_ORIGINS":           "",
 		"WEBHOOK_SECRET":                 "",
 	}
 }
@@ -146,9 +144,6 @@ func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
 		},
 		Remote: map[string]map[string]string{
 			"REMOTE_ORDER": {"effective": eff("REMOTE_ORDER"), "default": ""},
-		},
-		CORS: map[string]map[string]string{
-			"CORS_ALLOWED_ORIGINS": {"effective": eff("CORS_ALLOWED_ORIGINS"), "default": defs["CORS_ALLOWED_ORIGINS"]},
 		},
 		Stored: over,
 		Meta:   map[string]string{"APP_DATA_DIR": os.Getenv("APP_DATA_DIR"), "settingsPath": settingsPath()},
