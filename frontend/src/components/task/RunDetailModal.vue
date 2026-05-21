@@ -16,7 +16,6 @@ const props = defineProps<{
   finalCountAll: number
   finalCountSuccess: number
   finalCountFailed: number
-  finalCountOther: number
   pagedRunFiles: any[]
   runFilesTotal: number
   runFilesPage: number
@@ -25,7 +24,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void
-  (e: 'set-final-filter', value: 'all' | 'success' | 'failed' | 'other'): void
   (e: 'prev-files-page'): void
   (e: 'next-files-page'): void
 }>()
@@ -82,21 +80,17 @@ const activeFilesTotal = computed(() => Math.max(0, Number(props.runFilesTotal) 
           <div class="summary-box" v-if="props.getFinalSummary(props.runDetail)">
             <div class="summary-title">{{ t('modal.summaryStats') }}</div>
             <div class="summary-grid">
-              <div class="summary-cell clickable" @click="emit('set-final-filter', 'all')">
+              <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.total') }}</div>
                 <div class="summary-val">{{ finalCountAll }}</div>
               </div>
-              <div class="summary-cell clickable" @click="emit('set-final-filter', 'success')">
+              <div class="summary-cell">
                 <div class="summary-key">{{ getSuccessLabel(props.runDetail.taskMode) }}</div>
                 <div class="summary-val">{{ finalCountSuccess }}</div>
               </div>
-              <div class="summary-cell clickable" @click="emit('set-final-filter', 'failed')">
+              <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.failed') }}</div>
                 <div class="summary-val error-text">{{ finalCountFailed }}</div>
-              </div>
-              <div class="summary-cell clickable" @click="emit('set-final-filter', 'other')">
-                <div class="summary-key">{{ t('modal.other') }}</div>
-                <div class="summary-val">{{ finalCountOther }}</div>
               </div>
               <div class="summary-cell">
                 <div class="summary-key">{{ t('modal.transferredBytes') }}</div>

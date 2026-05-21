@@ -147,24 +147,22 @@ async function handleDeleteTag(tag: string) {
 
 // 5) 运行详情 / 最终总结链
 const {
-  showDetailModal,
-  runDetail,
-  openRunDetailModal,
-  closeRunDetailModal,
-  runFilesTotal,
-  runFilesPage,
-  openRunDetailFiles,
-  pagedRunFiles,
-  totalRunFilesPages,
-  goPrevFilesPage,
-  goNextFilesPage,
-  getFinalSummary: getFinalSummaryFromComposable,
-  finalCountAll,
-  finalCountSuccess,
-  finalCountFailed,
-  finalCountOther,
-  setFinalFilter,
-} = useRunDetailRuntime({ runApi })
+    showDetailModal,
+    runDetail,
+    openRunDetailModal,
+    closeRunDetailModal,
+    runFilesTotal,
+    runFilesPage,
+    openRunDetailFiles,
+    pagedRunFiles,
+    totalRunFilesPages,
+    goPrevFilesPage,
+    goNextFilesPage,
+    getFinalSummary: getFinalSummaryFromComposable,
+    finalCountAll,
+    finalCountSuccess,
+    finalCountFailed,
+  } = useRunDetailRuntime({ runApi })
 
 // 6) 主数据加载与进度相关派生
 const {
@@ -560,7 +558,6 @@ function closeTaskEditorModal() {
     :final-count-all="finalCountAll"
     :final-count-success="finalCountSuccess"
     :final-count-failed="finalCountFailed"
-    :final-count-other="finalCountOther"
     :paged-run-files="pagedRunFiles"
     :run-files-total="runFilesTotal"
     :run-files-page="runFilesPage"
@@ -576,7 +573,6 @@ function closeTaskEditorModal() {
     :open-run-log="openRunLog"
     :clear-run="clearRun"
     :close-run-detail="closeRunDetail"
-    :set-final-filter="setFinalFilter"
     :go-prev-files-page="goPrevFilesPage"
     :go-next-files-page="goNextFilesPage"
     :show-log-modal="showLogModal"

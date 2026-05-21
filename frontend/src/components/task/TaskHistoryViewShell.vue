@@ -27,7 +27,6 @@ defineProps<{
   finalCountAll: number
   finalCountSuccess: number
   finalCountFailed: number
-  finalCountOther: number
   pagedRunFiles: any[]
   runFilesTotal: number
   runFilesPage: number
@@ -43,7 +42,6 @@ defineProps<{
   openRunLog: (run: Run) => void
   clearRun: (run: number) => void
   closeRunDetail: () => void
-  setFinalFilter: (filter: string) => void
   goPrevFilesPage: () => void
   goNextFilesPage: () => void
   showLogModal: boolean
@@ -82,7 +80,6 @@ defineProps<{
     :final-count-all="finalCountAll"
     :final-count-success="finalCountSuccess"
     :final-count-failed="finalCountFailed"
-    :final-count-other="finalCountOther"
     :paged-run-files="pagedRunFiles"
     :run-files-total="runFilesTotal"
     :run-files-page="runFilesPage"
@@ -98,7 +95,6 @@ defineProps<{
     @view-log="openRunLog"
     @clear-run="clearRun"
     @close-detail="closeRunDetail"
-    @set-final-filter="setFinalFilter"
     @prev-files-page="goPrevFilesPage"
     @next-files-page="goNextFilesPage"
   />

@@ -2,14 +2,11 @@ import { computed, ref, watch, type Ref } from 'vue'
 import type { FinalSummary, FinalSummaryFile } from '../api/run'
 import type { Run, RunSummaryPayload } from '../types'
 
-type FinalFilterType = 'all' | 'success' | 'failed' | 'other'
-
 interface UseRunDetailComputedOptions {
   runDetail?: Ref<any>
   detailFiles?: Ref<any[]>
   finalFilesPage?: Ref<number>
   finalFilesPageSize?: Ref<number>
-  currentFinalFilter?: Ref<FinalFilterType>
 }
 
 export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
@@ -72,7 +69,6 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
       copied: Number(counts?.copied || 0),
       deleted: Number(counts?.deleted || 0),
       failed: Number(counts?.failed || 0),
-      skipped: Number(counts?.skipped || 0),
     }
   }
 
@@ -84,23 +80,8 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
       : counts.copied + counts.deleted
   })
   const finalCountFailed = computed(() => getSummaryCounts(options?.runDetail?.value).failed)
-  const finalCountOther = computed(() => getSummaryCounts(options?.runDetail?.value).skipped)
 
-  const currentFinalFilter = options?.currentFinalFilter ?? ref<FinalFilterType>('all')
-  function setFinalFilter(filter: FinalFilterType) {
-    currentFinalFilter.value = filter
-    finalFilesPage.value = 1
-    finalFilesJump.value = null
-  }
-
-  const finalFilteredFiles = computed(() => {
-    if (currentFinalFilter.value === 'success') return finalFiles.value.filter(it => (it.status || '') === 'success')
-    if (currentFinalFilter.value === 'failed') return finalFiles.value.filter(it => (it.status || '') === 'failed')
-    if (currentFinalFilter.value === 'other') return finalFiles.value.filter(it => (it.status || '') === 'skipped')
-    return finalFiles.value
-  })
-
-  const finalFilesTotal = computed(() => finalFilteredFiles.value.length)
+  const finalFilesTotal = computed(() => finalFiles.value.length)
   const totalFinalFilesPages = computed(() => {
     const pageSize = finalFilesPageSize.value || 1
     return Math.max(1, Math.ceil((finalFilesTotal.value || 0) / pageSize))
@@ -109,7 +90,7 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
     const page = finalFilesPage.value || 1
     const pageSize = finalFilesPageSize.value || 1
     const start = (page - 1) * pageSize
-    return finalFilteredFiles.value.slice(start, start + pageSize)
+    return finalFiles.value.slice(start, start + pageSize)
   })
 
   const finalFilesJump = ref<number | null>(null)
@@ -121,7 +102,6 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   }
 
   watch(() => options?.runDetail?.value?.id, () => {
-    currentFinalFilter.value = 'all'
     finalFilesPage.value = 1
     finalFilesJump.value = null
   }, { immediate: true })
@@ -151,10 +131,6 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
     finalCountAll,
     finalCountSuccess,
     finalCountFailed,
-    finalCountOther,
-    currentFinalFilter,
-    setFinalFilter,
-    finalFilteredFiles,
     finalFilesTotal,
     totalFinalFilesPages,
     pagedFinalFiles,

@@ -15,7 +15,7 @@ defineProps<{
   filteredRuns: Run[]
   getRunProgressFromSummary: (run: Run) => TaskProgressLike | null
   getRealtimeProgressByRun: (run: Run) => TaskProgressLike | null
-  getFinalSummary: (run: Run) => any
+  getFinalSummary: (run: any) => any
   showDetailModal: boolean
   runDetail: any
   getStatusClass: (status: string) => string
@@ -27,7 +27,6 @@ defineProps<{
   finalCountAll: number
   finalCountSuccess: number
   finalCountFailed: number
-  finalCountOther: number
   pagedRunFiles: any[]
   runFilesTotal: number
   runFilesPage: number
@@ -46,7 +45,6 @@ const emit = defineEmits<{
   (e: 'view-log', run: Run): void
   (e: 'clear-run', runId: number): void
   (e: 'close-detail'): void
-  (e: 'set-final-filter', value: 'all' | 'success' | 'failed' | 'other'): void
   (e: 'prev-files-page'): void
   (e: 'next-files-page'): void
 }>()
@@ -89,13 +87,11 @@ const emit = defineEmits<{
     :final-count-all="finalCountAll"
     :final-count-success="finalCountSuccess"
     :final-count-failed="finalCountFailed"
-    :final-count-other="finalCountOther"
     :paged-run-files="pagedRunFiles"
     :run-files-total="runFilesTotal"
     :run-files-page="runFilesPage"
     :total-run-files-pages="totalRunFilesPages"
     @close="emit('close-detail')"
-    @set-final-filter="emit('set-final-filter', $event)"
     @prev-files-page="emit('prev-files-page')"
     @next-files-page="emit('next-files-page')"
   />

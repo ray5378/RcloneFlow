@@ -13,8 +13,6 @@ export function useRunDetailRuntime(options: {
     closeRunDetailModal,
   } = useRunDetailState()
 
-  const currentFinalFilter = ref<'all' | 'success' | 'failed' | 'other'>('all')
-
   const {
     runFiles,
     runFilesPage,
@@ -24,7 +22,7 @@ export function useRunDetailRuntime(options: {
     totalRunFilesPages,
     goPrevFilesPage,
     goNextFilesPage,
-  } = useRunDetailFiles({ runDetail, currentFinalFilter, runApi: options.runApi })
+  } = useRunDetailFiles({ runDetail, runApi: options.runApi })
 
   const {
     getFinalSummary,
@@ -33,8 +31,6 @@ export function useRunDetailRuntime(options: {
     finalCountAll,
     finalCountSuccess,
     finalCountFailed,
-    finalCountOther,
-    setFinalFilter,
     finalFilesPage,
     finalFilesTotal,
     totalFinalFilesPages,
@@ -43,7 +39,7 @@ export function useRunDetailRuntime(options: {
     goPrevFinalFilesPage,
     goNextFinalFilesPage,
     jumpFinalFilesPage,
-  } = useRunDetailComputed({ runDetail, detailFiles: runFiles, currentFinalFilter })
+  } = useRunDetailComputed({ runDetail, detailFiles: runFiles })
 
   const runFilesTotal = computed(() => visibleRunFiles.value.length)
 
@@ -65,8 +61,6 @@ export function useRunDetailRuntime(options: {
     finalCountAll,
     finalCountSuccess,
     finalCountFailed,
-    finalCountOther,
-    setFinalFilter,
     finalFilesPage,
     finalFilesTotal,
     totalFinalFilesPages,

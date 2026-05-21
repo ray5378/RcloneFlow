@@ -1,14 +1,12 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import type { RunFileRow } from '../api/run'
 
-type FinalFilterType = 'all' | 'success' | 'failed' | 'other'
 type RunFileKind = 'success' | 'failed' | 'skipped' | 'deleted' | 'unknown'
 
 interface UseRunDetailFilesOptions {
   runDetail: Ref<any>
-  currentFinalFilter?: Ref<FinalFilterType>
   runApi: {
-    getFiles: (runId: number, offset: number, limit: number, filter?: FinalFilterType) => Promise<{ items?: any[]; total?: number }>
+    getFiles: (runId: number, offset: number, limit: number) => Promise<{ items?: any[]; total?: number }>
   }
 }
 
@@ -41,9 +39,8 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
       if (!options.runDetail.value?.id) return
       const page = runFilesPage.value || 1
       const pageSize = runFilesPageSize.value || 1
-      const filter = options.currentFinalFilter?.value || 'all'
       const offset = (page - 1) * pageSize
-      const res = await options.runApi.getFiles(options.runDetail.value.id, offset, pageSize, filter)
+      const res = await options.runApi.getFiles(options.runDetail.value.id, offset, pageSize)
       runFiles.value = res.items || []
       runFilesTotal.value = res.total || 0
     } catch (e) {
@@ -63,11 +60,6 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
 
   const pagedRunFiles = computed(() => visibleRunFiles.value)
   const totalRunFilesPages = computed(() => Math.max(1, Math.ceil((runFilesTotal.value || 0) / runFilesPageSize.value)))
-
-  watch(() => options.currentFinalFilter?.value, () => {
-    runFilesPage.value = 1
-    void reloadRunFiles()
-  })
 
   watch(() => options.runDetail.value?.id, () => {
     resetRunFiles()
