@@ -8,9 +8,7 @@ import (
 	"time"
 
 	"rcloneflow/internal/auth"
-	"rcloneflow/internal/store"
-
-	"golang.org/x/crypto/bcrypt"
+	"rcloneflow/internal/service"
 )
 
 type rateLimiter struct {
@@ -47,12 +45,12 @@ func (rl *rateLimiter) allow(key string) bool {
 
 // AuthController 认证控制器
 type AuthController struct {
-	db *store.DB
+	authSvc *service.AuthService
 }
 
 // NewAuthController 创建认证控制器
-func NewAuthController(db *store.DB) *AuthController {
-	return &AuthController{db: db}
+func NewAuthController(authSvc *service.AuthService) *AuthController {
+	return &AuthController{authSvc: authSvc}
 }
 
 // RegisterRequest 注册请求
@@ -69,7 +67,7 @@ type LoginRequest struct {
 
 // HasUsers 检查是否存在用户
 func (c *AuthController) HasUsers(w http.ResponseWriter, r *http.Request) {
-	users, err := c.db.ListUsers()
+	exists, err := c.authSvc.HasUsers()
 	if err != nil {
 		WriteJSON(w, 500, map[string]any{"error": "internal error"})
 		return
@@ -77,7 +75,7 @@ func (c *AuthController) HasUsers(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"exists": len(users) > 0,
+		"exists": exists,
 	})
 }
 
@@ -89,40 +87,18 @@ func (c *AuthController) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
-		WriteJSON(w, 400, map[string]any{"error": "username and password required"})
-		return
-	}
-
-	if len(req.Password) < 6 {
-		WriteJSON(w, 400, map[string]any{"error": "password must be at least 6 characters"})
-		return
-	}
-
-	// 检查用户是否已存在
-	if _, exists := c.db.GetUserByUsername(req.Username); exists {
-		WriteJSON(w, 409, map[string]any{"error": "用户名已存在"})
-		return
-	}
-
-	// 密码加密
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	user, tokens, err := c.authSvc.Register(req.Username, req.Password)
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": "internal error"})
-		return
-	}
-
-	// 创建用户
-	user, err := c.db.CreateUser(req.Username, string(hashedPassword))
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": "internal error"})
-		return
-	}
-
-	// 生成token对
-	tokens, err := auth.GenerateTokenPair(user.ID, user.Username)
-	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": "internal error"})
+		switch err.Error() {
+		case "username and password required":
+			WriteJSON(w, 400, map[string]any{"error": "username and password required"})
+		case "password must be at least 6 characters":
+			WriteJSON(w, 400, map[string]any{"error": "password must be at least 6 characters"})
+		case "用户名已存在":
+			WriteJSON(w, 409, map[string]any{"error": "用户名已存在"})
+		default:
+			WriteJSON(w, 500, map[string]any{"error": "internal error"})
+		}
 		return
 	}
 
@@ -151,28 +127,16 @@ func (c *AuthController) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Username == "" || req.Password == "" {
-		WriteJSON(w, 400, map[string]any{"error": "username and password required"})
-		return
-	}
-
-	// 查找用户
-	user, exists := c.db.GetUserByUsername(req.Username)
-	if !exists {
-		WriteJSON(w, 401, map[string]any{"error": "用户名或密码错误"})
-		return
-	}
-
-	// 验证密码
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		WriteJSON(w, 401, map[string]any{"error": "用户名或密码错误"})
-		return
-	}
-
-	// 生成token对
-	tokens, err := auth.GenerateTokenPair(user.ID, user.Username)
+	user, tokens, err := c.authSvc.Login(req.Username, req.Password)
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": "internal error"})
+		switch err.Error() {
+		case "username and password required":
+			WriteJSON(w, 400, map[string]any{"error": "username and password required"})
+		case "用户名或密码错误":
+			WriteJSON(w, 401, map[string]any{"error": "用户名或密码错误"})
+		default:
+			WriteJSON(w, 500, map[string]any{"error": "internal error"})
+		}
 		return
 	}
 
@@ -200,15 +164,16 @@ func (c *AuthController) Refresh(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.RefreshToken == "" {
-		WriteJSON(w, 400, map[string]any{"error": "refreshToken required"})
-		return
-	}
-
-	// 使用刷新令牌获取新的令牌对
-	tokens, err := auth.RefreshTokens(req.RefreshToken)
+	tokens, err := c.authSvc.RefreshToken(req.RefreshToken)
 	if err != nil {
-		WriteJSON(w, 401, map[string]any{"error": "invalid or expired refreshToken"})
+		switch err.Error() {
+		case "refreshToken required":
+			WriteJSON(w, 400, map[string]any{"error": "refreshToken required"})
+		case "invalid or expired refreshToken":
+			WriteJSON(w, 401, map[string]any{"error": "invalid or expired refreshToken"})
+		default:
+			WriteJSON(w, 500, map[string]any{"error": "internal error"})
+		}
 		return
 	}
 
@@ -249,72 +214,38 @@ func (c *AuthController) ChangePassword(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// 获取用户信息
-	user, exists := c.db.GetUserByUsername(claims.Username)
+	user, exists := c.authSvc.GetUserByUsername(claims.Username)
 	if !exists {
 		WriteJSON(w, 404, map[string]any{"error": "user not found"})
 		return
 	}
 
-	// 如果提供了新密码，则验证旧密码并更新
-	if req.NewPassword != "" {
-		if req.OldPassword == "" {
+	// 调用服务层修改配置
+	updatedUser, err := c.authSvc.ChangeProfile(user.ID, req.OldPassword, req.NewPassword, req.Username)
+	if err != nil {
+		switch err.Error() {
+		case "请提供旧密码":
 			WriteJSON(w, 400, map[string]any{"error": "请提供旧密码"})
-			return
-		}
-		if len(req.NewPassword) < 6 {
+		case "password must be at least 6 characters":
 			WriteJSON(w, 400, map[string]any{"error": "password must be at least 6 characters"})
-			return
-		}
-
-		// 验证旧密码
-		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.OldPassword)); err != nil {
+		case "旧密码错误":
 			WriteJSON(w, 401, map[string]any{"error": "旧密码错误"})
-			return
-		}
-
-		// 加密新密码
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
-		if err != nil {
-			WriteJSON(w, 500, map[string]any{"error": "internal error"})
-			return
-		}
-
-		// 更新密码
-		if err := c.db.UpdatePassword(user.ID, string(hashedPassword)); err != nil {
-			WriteJSON(w, 500, map[string]any{"error": "internal error"})
-			return
-		}
-
-		// 刷新用户信息
-		user, _ = c.db.GetUserByID(user.ID)
-	}
-
-	// 如果提供了新用户名，则更新用户名
-	if req.Username != "" && req.Username != user.Username {
-		// 检查新用户名是否已被占用
-		if existingUser, exists := c.db.GetUserByUsername(req.Username); exists && existingUser.ID != user.ID {
+		case "用户名已被占用":
 			WriteJSON(w, 409, map[string]any{"error": "用户名已被占用"})
-			return
-		}
-
-		if err := c.db.UpdateUsername(user.ID, req.Username); err != nil {
+		case "user not found":
+			WriteJSON(w, 404, map[string]any{"error": "user not found"})
+		default:
 			WriteJSON(w, 500, map[string]any{"error": "internal error"})
-			return
 		}
-
-		// 刷新用户信息
-		user, _ = c.db.GetUserByID(user.ID)
+		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-
-	finalUsername := user.Username
-
 	json.NewEncoder(w).Encode(map[string]any{
 		"message": "修改成功",
 		"user": map[string]any{
-			"id":       user.ID,
-			"username": finalUsername,
+			"id":       updatedUser.ID,
+			"username": updatedUser.Username,
 		},
 	})
 }
@@ -333,7 +264,7 @@ func (c *AuthController) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, exists := c.db.GetUserByUsername(claims.Username)
+	user, exists := c.authSvc.GetUserByUsername(claims.Username)
 	if !exists {
 		WriteJSON(w, 404, map[string]any{"error": "user not found"})
 		return

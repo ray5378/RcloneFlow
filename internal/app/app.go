@@ -98,7 +98,8 @@ func Run(cfg *config.Config) error {
 	scheduleCtrl := controller.NewScheduleController(scheduleSvc, sched)
 	runCtrl := controller.NewRunController(runSvc, rc)
 	fsCtrl := controller.NewFsController(rc)
-	authCtrl := controller.NewAuthController(db)
+	authSvc := service.NewAuthService(db)
+	authCtrl := controller.NewAuthController(authSvc)
 
 	// 标签服务
 	tagSvc := service.NewTagService(db)
