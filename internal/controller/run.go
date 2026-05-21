@@ -167,6 +167,59 @@ func isCASCompatibleRunSummary(sum map[string]any) bool {
 	return false
 }
 
+func enrichRowMapSizesFromFinalSummary(rowMaps []map[string]any, summary map[string]any) {
+	if summary == nil {
+		return
+	}
+	fs, ok := summary["finalSummary"].(map[string]any)
+	if !ok || fs == nil {
+		return
+	}
+	files, ok := fs["files"].(any)
+	if !ok || files == nil {
+		return
+	}
+	var fileList []map[string]any
+	switch v := files.(type) {
+	case []map[string]any:
+		fileList = v
+	case []any:
+		for _, f := range v {
+			if fm, ok := f.(map[string]any); ok {
+				fileList = append(fileList, fm)
+			}
+		}
+	default:
+		return
+	}
+	if len(fileList) == 0 {
+		return
+	}
+	sizeMap := make(map[string]int64, len(fileList))
+	for _, f := range fileList {
+		path := strings.ReplaceAll(fmt.Sprint(f["path"]), "\\", "/")
+		if path == "" {
+			continue
+		}
+		sz := anyToInt64(f["sizeBytes"])
+		if sz > 0 {
+			sizeMap[path] = sz
+		}
+	}
+	if len(sizeMap) == 0 {
+		return
+	}
+	for _, rm := range rowMaps {
+		if anyToInt64(rm["sizeBytes"]) > 0 {
+			continue
+		}
+		path := strings.ReplaceAll(fmt.Sprint(rm["path"]), "\\", "/")
+		if enriched, ok := sizeMap[path]; ok && enriched > 0 {
+			rm["sizeBytes"] = enriched
+		}
+	}
+}
+
 func isCASObjectNotFoundFailureRow(path, msg string) bool {
 	path = strings.TrimSpace(path)
 	msg = strings.ToLower(strings.TrimSpace(msg))
@@ -982,6 +1035,7 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	var logPath string
 	moveMode := false
 	openlistCASCompatible := false
+	var runSummary map[string]any
 	for _, run := range runs {
 		if run.ID != id {
 			continue
@@ -1007,6 +1061,13 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
+		if run.Summary != "" {
+			var parsed map[string]any
+			if json.Unmarshal([]byte(run.Summary), &parsed) == nil {
+				runSummary = parsed
+			}
+		}
+
 		if logPath == "" {
 			// 尝试新目录结构：logs/<任务名-MMDD>/<HHMM>.log
 			base := "/app/data/logs"
@@ -1118,6 +1179,7 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	if openlistCASCompatible {
 		rowMaps = filterCASHistoricalDetailRows(rowMaps)
+		enrichRowMapSizesFromFinalSummary(rowMaps, runSummary)
 	}
 	rows := make([]Row, 0, len(rowMaps))
 	for _, rowMap := range rowMaps {
