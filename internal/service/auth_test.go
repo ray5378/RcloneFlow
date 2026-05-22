@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -92,8 +93,8 @@ func TestAuthService_Register_Duplicate(t *testing.T) {
 	if err == nil {
 		t.Fatal("second Register() should fail for duplicate username")
 	}
-	if err.Error() != "用户名已存在" {
-		t.Errorf("Error = %q, want %q", err.Error(), "用户名已存在")
+	if !errors.Is(err, ErrAuthUserExists) {
+		t.Errorf("Error = %v, want ErrAuthUserExists", err)
 	}
 }
 
@@ -105,8 +106,8 @@ func TestAuthService_Register_ShortPassword(t *testing.T) {
 	if err == nil {
 		t.Fatal("Register() should fail for short password")
 	}
-	if err.Error() != "password must be at least 6 characters" {
-		t.Errorf("Error = %q, want %q", err.Error(), "password must be at least 6 characters")
+	if !errors.Is(err, ErrAuthPasswordTooShort) {
+		t.Errorf("Error = %v, want ErrAuthPasswordTooShort", err)
 	}
 }
 
@@ -162,8 +163,8 @@ func TestAuthService_Login_WrongPassword(t *testing.T) {
 	if err == nil {
 		t.Fatal("Login() should fail for wrong password")
 	}
-	if err.Error() != "用户名或密码错误" {
-		t.Errorf("Error = %q, want %q", err.Error(), "用户名或密码错误")
+	if !errors.Is(err, ErrAuthInvalidCredential) {
+		t.Errorf("Error = %v, want ErrAuthInvalidCredential", err)
 	}
 }
 
@@ -173,10 +174,10 @@ func TestAuthService_Login_UserNotFound(t *testing.T) {
 
 	_, _, err := svc.Login("nonexistent", "password123")
 	if err == nil {
-		t.Fatal("Login() should fail for non-existent user")
+		t.Fatal("Login() should fail for nonexistent user")
 	}
-	if err.Error() != "用户名或密码错误" {
-		t.Errorf("Error = %q, want %q", err.Error(), "用户名或密码错误")
+	if !errors.Is(err, ErrAuthInvalidCredential) {
+		t.Errorf("Error = %v, want ErrAuthInvalidCredential", err)
 	}
 }
 
@@ -212,8 +213,8 @@ func TestAuthService_RefreshToken_Invalid(t *testing.T) {
 	if err == nil {
 		t.Fatal("RefreshToken() should fail for invalid token")
 	}
-	if err.Error() != "invalid or expired refreshToken" {
-		t.Errorf("Error = %q, want %q", err.Error(), "invalid or expired refreshToken")
+	if !errors.Is(err, ErrAuthRefreshInvalid) {
+		t.Errorf("Error = %v, want ErrAuthRefreshInvalid", err)
 	}
 }
 
@@ -322,8 +323,8 @@ func TestAuthService_ChangeProfile_WrongOldPassword(t *testing.T) {
 	if err == nil {
 		t.Fatal("ChangeProfile() should fail for wrong old password")
 	}
-	if err.Error() != "旧密码错误" {
-		t.Errorf("Error = %q, want %q", err.Error(), "旧密码错误")
+	if !errors.Is(err, ErrAuthOldPasswordWrong) {
+		t.Errorf("Error = %v, want ErrAuthOldPasswordWrong", err)
 	}
 }
 
@@ -345,8 +346,8 @@ func TestAuthService_ChangeProfile_MissingOldPassword(t *testing.T) {
 	if err == nil {
 		t.Fatal("ChangeProfile() should fail when old password is missing")
 	}
-	if err.Error() != "请提供旧密码" {
-		t.Errorf("Error = %q, want %q", err.Error(), "请提供旧密码")
+	if !errors.Is(err, ErrAuthOldPasswordEmpty) {
+		t.Errorf("Error = %v, want ErrAuthOldPasswordEmpty", err)
 	}
 }
 
@@ -372,8 +373,8 @@ func TestAuthService_ChangeProfile_DuplicateUsername(t *testing.T) {
 	if err == nil {
 		t.Fatal("ChangeProfile() should fail for duplicate username")
 	}
-	if err.Error() != "用户名已被占用" {
-		t.Errorf("Error = %q, want %q", err.Error(), "用户名已被占用")
+	if !errors.Is(err, ErrAuthUsernameTaken) {
+		t.Errorf("Error = %v, want ErrAuthUsernameTaken", err)
 	}
 }
 
@@ -405,7 +406,7 @@ func TestAuthService_RefreshToken_Empty(t *testing.T) {
 	if err == nil {
 		t.Fatal("RefreshToken() should fail for empty token")
 	}
-	if err.Error() != "refreshToken required" {
-		t.Errorf("Error = %q, want %q", err.Error(), "refreshToken required")
+	if !errors.Is(err, ErrAuthRefreshRequired) {
+		t.Errorf("Error = %v, want ErrAuthRefreshRequired", err)
 	}
 }

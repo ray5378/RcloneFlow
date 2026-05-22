@@ -3,7 +3,10 @@ package app
 import (
 	"context"
 	"net/http"
+	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"rcloneflow/internal/active_transfer"
@@ -170,9 +173,39 @@ func Run(cfg *config.Config) error {
 	mux := http.NewServeMux()
 	r.Setup(mux)
 
-	// 启动服务器
 	addr := cfg.GetServerAddr()
-	logger.Info("服务监听中", zap.String("addr", addr))
-	return http.ListenAndServe(addr, mux)
+	srv := &http.Server{
+		Addr:         addr,
+		Handler:      mux,
+		ReadTimeout:  30 * time.Second,
+		WriteTimeout: 60 * time.Second,
+		IdleTimeout:  120 * time.Second,
+	}
+
+	// 启动服务器
+	go func() {
+		logger.Info("服务监听中", zap.String("addr", addr))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Error("服务器启动失败", zap.Error(err))
+		}
+	}()
+
+	// 等待关闭信号
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	sig := <-quit
+	logger.Info("收到关闭信号，开始优雅关闭", zap.String("signal", sig.String()))
+
+	cancel()
+	logger.Info("已通知后台服务停止")
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Error("服务器关闭失败", zap.Error(err))
+		return err
+	}
+	logger.Info("服务器已安全关闭")
+	return nil
 }
 

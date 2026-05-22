@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"rcloneflow/internal/config"
 )
 
 type TransferSettings struct {
@@ -30,10 +32,7 @@ func defaults() TransferSettings {
 }
 
 func dataDir() string {
-	d := os.Getenv("APP_DATA_DIR")
-	if d == "" {
-		d = "./data"
-	}
+	d := config.DataDir()
 	_ = os.MkdirAll(d, 0o755)
 	return d
 }

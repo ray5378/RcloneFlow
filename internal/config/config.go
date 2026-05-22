@@ -237,6 +237,15 @@ func (c *Config) GetDataDir() string {
 	return c.Storage.DataDir
 }
 
+// DataDir 返回数据目录路径（可用于不持有 Config 对象的场景），默认 "./data"。
+func DataDir() string {
+	dir := os.Getenv("APP_DATA_DIR")
+	if dir == "" {
+		return "./data"
+	}
+	return dir
+}
+
 // GetLogLevel 返回日志级别
 func (c *Config) GetLogLevel() string {
 	return c.Log.Level

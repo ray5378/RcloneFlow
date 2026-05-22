@@ -77,10 +77,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}
 	originalCmdName := cmdName
 	// Resolve config path
-	dataDir := os.Getenv("APP_DATA_DIR")
-	if dataDir == "" {
-		dataDir = "./data"
-	}
+	dataDir := config.DataDir()
 	cfg := os.Getenv("RCLONE_CONFIG")
 	if cfg == "" {
 		cfg = filepath.Join(dataDir, "rclone.conf")
@@ -220,10 +217,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		missingCfg = "[runner] warn: config not found: " + cfg + "\n"
 	}
 
-	logsBase := os.Getenv("APP_DATA_DIR")
-	if logsBase == "" {
-		logsBase = "./data"
-	}
+	logsBase := config.DataDir()
 	logsDir := filepath.Join(logsBase, "logs")
 	_ = os.MkdirAll(logsDir, 0o755)
 	// 日志目录与文件：logs/<任务名-MMDD>/<HHMM>.log（stdout 也合并写入该文件）

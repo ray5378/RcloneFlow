@@ -47,6 +47,7 @@ func (m *runServiceDBMock) DeleteRunsByIDs(ids []int64) error {
 	return nil
 }
 func (m *runServiceDBMock) CleanOldRuns(days int) (int64, error) { return 0, nil }
+func (m *runServiceDBMock) Vacuum() error                         { return nil }
 
 func TestRunService_DeleteRun_RemovesLogFile(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "rcloneflow_runsvc_*")

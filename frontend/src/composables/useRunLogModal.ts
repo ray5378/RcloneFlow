@@ -17,15 +17,8 @@ export function useRunLogModal() {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       })
       if (!resp.ok) {
-        const fallback = await fetch(`/api/runs/${run.id}/log?auth=${token}`)
-        if (!fallback.ok) {
-          const txt = await fallback.text()
-          logContent.value = `${t('modal.loadFailed')} ${fallback.status} ${txt}`
-          return
-        }
-        const buf2 = await fallback.arrayBuffer()
-        const dec2 = new TextDecoder('utf-8')
-        logContent.value = dec2.decode(buf2)
+        const txt = await resp.text()
+        logContent.value = `${t('modal.loadFailed')} ${resp.status} ${txt}`
         return
       }
       const buf = await resp.arrayBuffer()

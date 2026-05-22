@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"rcloneflow/internal/active_transfer"
+	"rcloneflow/internal/config"
 	"rcloneflow/internal/logger"
 	"rcloneflow/internal/store"
 )
@@ -255,10 +256,7 @@ func (s *TaskService) DeleteTask(id int64) error {
 		}
 	}
 
-	logsBase := os.Getenv("APP_DATA_DIR")
-	if logsBase == "" {
-		logsBase = "./data"
-	}
+	logsBase := config.DataDir()
 	logsDir := filepath.Join(logsBase, "logs")
 	trimmedName := strings.TrimSpace(task.Name)
 	if trimmedName != "" {

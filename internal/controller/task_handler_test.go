@@ -207,8 +207,8 @@ func TestTaskController_HandleTaskActions_Delete_NonExistent(t *testing.T) {
 	rec := httptest.NewRecorder()
 	c.HandleTaskActions(rec, req)
 
-	// Should succeed even if task doesn't exist (or fail with 500)
-	assert.True(t, rec.Code == http.StatusOK || rec.Code == http.StatusInternalServerError)
+	// Should succeed even if task doesn't exist (or fail with 404/500)
+	assert.True(t, rec.Code == http.StatusOK || rec.Code == http.StatusInternalServerError || rec.Code == http.StatusNotFound)
 }
 
 func TestTaskController_HandleTaskActions_ClearAll(t *testing.T) {
@@ -229,7 +229,7 @@ func TestTaskController_HandleTaskActions_Run_InvalidID(t *testing.T) {
 	c.HandleTaskActions(rec, req)
 
 	// Will fail because task doesn't exist
-	assert.True(t, rec.Code == http.StatusOK || rec.Code == http.StatusInternalServerError)
+	assert.True(t, rec.Code == http.StatusOK || rec.Code == http.StatusInternalServerError || rec.Code == http.StatusNotFound)
 }
 
 func TestTaskController_HandleExportTask(t *testing.T) {

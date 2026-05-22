@@ -47,6 +47,7 @@ type RunServiceInterface interface {
 	DeleteRunsByTask(taskId int64) error
 	DeleteRunsByIDs(ids []int64) error
 	CleanOldRuns(days int) (int64, error)
+	Vacuum() error
 }
 
 // RunService 运行记录服务层
@@ -236,5 +237,9 @@ func (s *RunService) CleanOldRuns(days int) (int64, error) {
 		page++
 	}
 	return deleted, nil
+}
+
+func (s *RunService) Vacuum() error {
+	return s.db.Vacuum()
 }
 

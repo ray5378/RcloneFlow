@@ -12,6 +12,7 @@ import (
 
 	"rcloneflow/internal/active_transfer"
 	"rcloneflow/internal/adapter"
+	"rcloneflow/internal/config"
 	"rcloneflow/internal/logger"
 	"rcloneflow/internal/runnercli"
 	"rcloneflow/internal/settings"
@@ -131,11 +132,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			}
 			cfg := os.Getenv("RCLONE_CONFIG")
 			if cfg == "" {
-				dataDir := os.Getenv("APP_DATA_DIR")
-				if dataDir == "" {
-					dataDir = "./data"
-				}
-				cfg = filepath.Join(dataDir, "rclone.conf")
+				cfg = filepath.Join(config.DataDir(), "rclone.conf")
 			}
 			src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
 			dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
@@ -187,11 +184,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		}
 		cfg := os.Getenv("RCLONE_CONFIG")
 		if cfg == "" {
-			dataDir := os.Getenv("APP_DATA_DIR")
-			if dataDir == "" {
-				dataDir = "./data"
-			}
-			cfg = filepath.Join(dataDir, "rclone.conf")
+			cfg = filepath.Join(config.DataDir(), "rclone.conf")
 		}
 		src := t.SourceRemote + ":" + strings.TrimPrefix(t.SourcePath, "/")
 		dst := t.TargetRemote + ":" + strings.TrimPrefix(t.TargetPath, "/")
