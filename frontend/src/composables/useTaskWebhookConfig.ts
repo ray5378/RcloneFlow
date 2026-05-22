@@ -20,6 +20,16 @@ export function useTaskWebhookConfig(options: {
     wecomUrl: '',
   })
 
+  function generateSecret(): string {
+    const arr = new Uint8Array(16)
+    crypto.getRandomValues(arr)
+    return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('')
+  }
+
+  function regenerateWebhookSecret() {
+    webhookForm.value.webhookSecret = generateSecret()
+  }
+
   function setWebhook(task: any) {
     webhookForm.value.taskId = task.id
     try {
@@ -29,7 +39,7 @@ export function useTaskWebhookConfig(options: {
       webhookForm.value.wecomUrl = opts?.wecomPostUrl || ''
       webhookForm.value.triggerId = opts?.webhookId || ''
       webhookForm.value.matchText = opts?.webhookMatchText || ''
-      webhookForm.value.webhookSecret = opts?.webhookSecret || ''
+      webhookForm.value.webhookSecret = opts?.webhookSecret || generateSecret()
       const n = opts?.webhookNotifyOn || {}
       webhookForm.value.notify = {
         manual: !!n.manual,
