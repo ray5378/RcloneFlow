@@ -13,6 +13,7 @@ import (
 
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/logger"
+	"rcloneflow/internal/runnercli"
 	"rcloneflow/internal/service"
 )
 
@@ -227,6 +228,7 @@ func (c *RunController) HandleTaskKill(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, 404, map[string]any{"error": "no runs for task"})
 		return
 	}
+	runnercli.CancelRun(candidate.ID)
 	if killRunBySummary(*candidate) {
 		WriteJSON(w, 200, map[string]any{"killed": true, "runId": candidate.ID})
 		return

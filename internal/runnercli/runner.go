@@ -23,7 +23,6 @@ import (
 	"rcloneflow/internal/logger"
 	"rcloneflow/internal/store"
 	"rcloneflow/internal/util"
-
 )
 
 // Runner manages CLI transfers with progress/logs and stop control.
@@ -67,6 +66,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	r.mu.Lock()
 	r.cancelFns[run.ID] = runCancel
 	r.mu.Unlock()
+	registerCancelFn(run.ID, runCancel)
 
 	runner := &adapter.CmdRunner{}
 	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
@@ -433,87 +433,88 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			}
 			if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) {
 				_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
-				rr.Status = "failed"
-				if rr.Summary == nil {
-					rr.Summary = map[string]any{}
-				}
-				rr.Summary["finished"] = true
-				rr.Summary["success"] = false
-				fin := time.Now().Local()
-				rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
-				// 冻结最终总结（失败态）
-				finalSummary := map[string]any{}
-				var start time.Time
-				if s, ok := rr.Summary["startedAt"].(string); ok {
-					if t, e := time.Parse(time.RFC3339, s); e == nil {
-						start = t
+					rr.Status = "failed"
+					if rr.Summary == nil {
+						rr.Summary = map[string]any{}
 					}
-				}
-				if !start.IsZero() {
-					finalSummary["startAt"] = start.Format(time.RFC3339)
-				}
-				finalSummary["finishedAt"] = fin.Format(time.RFC3339)
-				durSec := int64(0)
-				if !start.IsZero() {
-					durSec = int64(fin.Sub(start).Seconds())
-				}
-				if durSec < 0 {
-					durSec = 0
-				}
-				finalSummary["durationSec"] = durSec
-				finalSummary["durationText"] = util.HumanDuration(durSec)
-				finalSummary["result"] = "failed"
-				// 体量/均速：失败态 finalSummary 也只从 progress 读取
-				var prog map[string]any
-				if p, ok := rr.Summary["progress"].(map[string]any); ok {
-					prog = p
-				}
-				var bytes, total int64
-				if prog != nil {
-					if v, ok := prog["bytes"].(float64); ok {
-						bytes = int64(v)
+					rr.Summary["finished"] = true
+					rr.Summary["success"] = false
+					fin := time.Now().Local()
+					rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
+					// 冻结最终总结（失败态）
+					finalSummary := map[string]any{}
+					var start time.Time
+					if s, ok := rr.Summary["startedAt"].(string); ok {
+						if t, e := time.Parse(time.RFC3339, s); e == nil {
+							start = t
+						}
 					}
-					if v, ok := prog["totalBytes"].(float64); ok {
-						total = int64(v)
+					if !start.IsZero() {
+						finalSummary["startAt"] = start.Format(time.RFC3339)
 					}
+					finalSummary["finishedAt"] = fin.Format(time.RFC3339)
+					durSec := int64(0)
+					if !start.IsZero() {
+						durSec = int64(fin.Sub(start).Seconds())
+					}
+					if durSec < 0 {
+						durSec = 0
+					}
+					finalSummary["durationSec"] = durSec
+					finalSummary["durationText"] = util.HumanDuration(durSec)
+					finalSummary["result"] = "failed"
+					// 体量/均速：失败态 finalSummary 也只从 progress 读取
+					var prog map[string]any
+					if p, ok := rr.Summary["progress"].(map[string]any); ok {
+						prog = p
+					}
+					var bytes, total int64
+					if prog != nil {
+						if v, ok := prog["bytes"].(float64); ok {
+							bytes = int64(v)
+						}
+						if v, ok := prog["totalBytes"].(float64); ok {
+							total = int64(v)
+						}
+					}
+					finalSummary["transferredBytes"] = bytes
+					finalSummary["totalBytes"] = total
+					avg := int64(0)
+					if durSec > 0 {
+						avg = bytes / durSec
+					}
+					finalSummary["avgSpeedBps"] = avg
+					// 文件明细（从 stderrFile 解析）
+					files := []map[string]any{}
+					counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
+					if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
+						files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
+					}
+					// 异步补全文件大小，不阻塞状态更新
+					r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
+					rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": util.HumanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
+				})
+				r.broadcaster.Broadcast("run_status", map[string]any{
+					"run_id": run.ID,
+					"status": "failed",
+				})
+				if r.activeMgr != nil {
+					r.activeMgr.RemoveState(run.ID)
 				}
-				finalSummary["transferredBytes"] = bytes
-				finalSummary["totalBytes"] = total
-				avg := int64(0)
-				if durSec > 0 {
-					avg = bytes / durSec
-				}
-				finalSummary["avgSpeedBps"] = avg
-				// 文件明细（从 stderrFile 解析）
-				files := []map[string]any{}
-				counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
-				if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
-					files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
-				}
-				// 异步补全文件大小，不阻塞状态更新
-				r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
-				rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": util.HumanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
-			})
-			r.broadcaster.Broadcast("run_status", map[string]any{
-				"run_id": run.ID,
-				"status": "failed",
-			})
-			if r.activeMgr != nil {
-				r.activeMgr.RemoveState(run.ID)
-			}
-			// fire webhook for failed run
-			go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("goroutine panic", zap.Any("panic", r))
-				}
-			}()
-			r.postWebhookIfNeeded(run.ID)
-		}()
-			r.mu.Lock()
-			delete(r.procs, run.ID)
-			r.mu.Unlock()
-			return
+				// fire webhook for failed run
+				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							logger.Error("goroutine panic", zap.Any("panic", r))
+						}
+					}()
+					r.postWebhookIfNeeded(run.ID)
+				}()
+				r.mu.Lock()
+				delete(r.procs, run.ID)
+				r.mu.Unlock()
+				unregisterCancelFn(run.ID)
+				return
 			}
 		}
 		if runCtx.Err() != nil {
@@ -537,6 +538,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			r.mu.Lock()
 			delete(r.procs, run.ID)
 			r.mu.Unlock()
+			unregisterCancelFn(run.ID)
 			return
 		}
 		if casCompat != nil {
@@ -570,6 +572,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				r.mu.Lock()
 				delete(r.procs, run.ID)
 				r.mu.Unlock()
+				unregisterCancelFn(run.ID)
 				return
 			}
 		}
@@ -682,20 +685,19 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		}
 		// fire webhook for successful run
 		go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.Error("goroutine panic", zap.Any("panic", r))
-			}
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("goroutine panic", zap.Any("panic", r))
+				}
+			}()
+			r.postWebhookIfNeeded(run.ID)
 		}()
-		r.postWebhookIfNeeded(run.ID)
-	}()
 		r.mu.Lock()
 		delete(r.procs, run.ID)
 		r.mu.Unlock()
 	}()
 	return nil
 }
-
 
 func (r *Runner) Stop(runID int64) error {
 	// Cancel context first to signal retry loops to abort
