@@ -71,18 +71,9 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 	}
 	b, e := os.ReadFile(logPath)
 	if e != nil {
-		logger.Debug("buildFinalSummaryFilesFromLog read error", zap.String("path", logPath), zap.Error(e))
 		return files, counts
 	}
 	lines := strings.Split(string(b), "\n")
-	logger.Debug("buildFinalSummaryFilesFromLog lines", zap.String("path", logPath), zap.Int("totalLines", len(lines)), zap.String("openlistCAS", fmt.Sprint(openlistCASCompatible)))
-	sampleCount := 5
-	if len(lines) < sampleCount {
-		sampleCount = len(lines)
-	}
-	for i := 0; i < sampleCount; i++ {
-		logger.Debug("buildFinalSummaryFilesFromLog sample", zap.Int("idx", i), zap.String("line", truncateStr(lines[i], 500)))
-	}
 	sizes := map[string]int64{}
 	for _, ln := range lines {
 		if m := fileLineRe.FindStringSubmatch(ln); len(m) > 0 {
@@ -96,30 +87,50 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 		}
 	}
 	casMatchedPaths := map[string]struct{}{}
-	segCount := 0
-	parsedCount := 0
-	classifiedCount := 0
 	for _, ln := range lines {
+		parsed := false
 		for _, seg := range logutil.SplitLogSegments(ln) {
-			segCount++
 			at, level, path, msg, ok := logutil.ParseLogSegment(seg)
 			if !ok {
 				continue
 			}
-			parsedCount++
 			row, bucket, ok := classifyRunLogRow(level, path, msg, sizes, openlistCASCompatible)
 			if !ok {
 				continue
 			}
-			classifiedCount++
 			row["at"] = at
 			if bucket == "copied" && strings.EqualFold(anyString(row["action"]), "CAS Matched") {
 				casMatchedPaths[strings.TrimSpace(anyString(row["path"]))] = struct{}{}
 			}
 			files = append(files, row)
+			parsed = true
+		}
+		if !parsed {
+			// 文本解析失败，尝试解析原始 JSON 行（非 CAS 链路用）
+			var rec map[string]any
+			if json.Unmarshal([]byte(ln), &rec) == nil {
+				// 跳过 stats/progress 行
+				if _, hasStats := rec["stats"]; hasStats {
+					continue
+				}
+				msg, _ := rec["msg"].(string)
+				obj, _ := rec["object"].(string)
+				level, _ := rec["level"].(string)
+				if msg != "" && obj != "" {
+					row, bucket, ok := classifyRunLogRow(level, obj, msg, sizes, openlistCASCompatible)
+					if ok {
+						if at, ok := rec["time"].(string); ok {
+							row["at"] = at
+						}
+						if bucket == "copied" && strings.EqualFold(anyString(row["action"]), "CAS Matched") {
+							casMatchedPaths[strings.TrimSpace(anyString(row["path"]))] = struct{}{}
+						}
+						files = append(files, row)
+					}
+				}
+			}
 		}
 	}
-	logger.Debug("buildFinalSummaryFilesFromLog parsed", zap.Int("segments", segCount), zap.Int("parsed", parsedCount), zap.Int("classified", classifiedCount))
 	filtered := make([]map[string]any, 0, len(files))
 	for _, row := range files {
 		action := strings.ToLower(strings.TrimSpace(anyString(row["action"])))
@@ -147,7 +158,6 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 		}
 	}
 	counts["total"] = counts["copied"] + counts["deleted"] + counts["failed"] + counts["skipped"]
-	logger.Debug("buildFinalSummaryFilesFromLog final", zap.Int("copied", counts["copied"]), zap.Int("deleted", counts["deleted"]), zap.Int("failed", counts["failed"]), zap.Int("skipped", counts["skipped"]), zap.Int("total", counts["total"]), zap.Int("files", len(filtered)))
 	if moveMode {
 		return mergeMoveRows(filtered)
 	}
@@ -215,11 +225,4 @@ func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst,
 			}
 		})
 	}()
-}
-
-func truncateStr(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
 }
