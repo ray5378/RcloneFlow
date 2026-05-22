@@ -60,7 +60,7 @@ func TestTaskImport_ImportsTasksWithoutConflicts(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/import", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
-	ctrl.HandleTaskActions(w, req)
+	ctrl.HandleImportTask(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
@@ -111,7 +111,7 @@ func TestTaskImport_SkipsConflictingTasks(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/import", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
-	ctrl.HandleTaskActions(w, req)
+	ctrl.HandleImportTask(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
@@ -162,7 +162,7 @@ func TestTaskImport_OverwritesConflictingTasks(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/import", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
-	ctrl.HandleTaskActions(w, req)
+	ctrl.HandleImportTask(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
@@ -199,7 +199,7 @@ func TestTaskImport_InvalidPayload(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/import", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
-	ctrl.HandleTaskActions(w, req)
+	ctrl.HandleImportTask(w, req)
 
 	if w.Code != 500 {
 		t.Errorf("expected status 500 for missing tasks, got %d", w.Code)
@@ -219,7 +219,7 @@ func TestTaskImport_EmptyTasksArray(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/import", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
-	ctrl.HandleTaskActions(w, req)
+	ctrl.HandleImportTask(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
@@ -276,7 +276,7 @@ func TestTaskImport_WithSchedules(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/import", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
-	ctrl.HandleTaskActions(w, req)
+	ctrl.HandleImportTask(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
@@ -323,7 +323,7 @@ func TestTaskImport_RcloneConfigIncluded(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/import", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
-	ctrl.HandleTaskActions(w, req)
+	ctrl.HandleImportTask(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
@@ -383,7 +383,7 @@ func TestTaskImport_RcloneConfigSkipsExisting(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/import", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 
-	ctrl.HandleTaskActions(w, req)
+	ctrl.HandleImportTask(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())
@@ -419,7 +419,7 @@ func TestTaskExport_IncludesRcloneConfig(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/export", nil)
 	w := httptest.NewRecorder()
 
-	ctrl.HandleTaskActions(w, req)
+	ctrl.HandleExportTask(w, req)
 
 	if w.Code != 200 {
 		t.Fatalf("expected status 200, got %d: %s", w.Code, w.Body.String())

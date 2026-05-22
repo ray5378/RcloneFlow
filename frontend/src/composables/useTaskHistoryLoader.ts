@@ -83,7 +83,7 @@ export function useTaskHistoryLoader(options: UseTaskHistoryLoaderOptions) {
           await refreshTaskHistoryRuns()
         }
       } catch (err) {
-        console.error(err)
+        throw err
       } finally {
         scheduleNextHistoryRefresh()
       }
@@ -99,13 +99,13 @@ export function useTaskHistoryLoader(options: UseTaskHistoryLoaderOptions) {
     options.jumpPage.value = 1
     options.historyFilterTaskId.value = taskId
     options.currentModule.value = 'history'
-    refreshTaskHistoryRuns().catch(console.error)
+    refreshTaskHistoryRuns().catch(() => {})
     startHistoryRefreshLoop(1500)
   }
 
   watch([options.currentModule, options.historyFilterTaskId], ([module, taskId]) => {
     if (module === 'history' && taskId !== null) {
-      refreshTaskHistoryRuns().catch(console.error)
+      refreshTaskHistoryRuns().catch(() => {})
       startHistoryRefreshLoop(1500)
       return
     }

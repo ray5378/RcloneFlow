@@ -16,12 +16,9 @@ describe('useError.ts', () => {
   })
 
   describe('handleError', () => {
-    it('should log error to console', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    it('should not throw when no handler is set', () => {
       const err = new Error('test error')
-      handleError(err, { module: 'Test', operation: 'testOp' })
-      expect(consoleSpy).toHaveBeenCalled()
-      consoleSpy.mockRestore()
+      expect(() => handleError(err, { module: 'Test', operation: 'testOp' })).not.toThrow()
     })
 
     it('should call global error handler when set', () => {
@@ -47,11 +44,8 @@ describe('useError.ts', () => {
       expect(handler).toHaveBeenCalledWith('hello', 'success')
     })
 
-    it('should log to console when no handler', () => {
-      const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      showToastMessage('hello', 'info')
-      expect(logSpy).toHaveBeenCalledWith('[info] hello')
-      logSpy.mockRestore()
+    it('should not throw when no handler is set', () => {
+      expect(() => showToastMessage('hello', 'info')).not.toThrow()
     })
   })
 
@@ -97,10 +91,8 @@ describe('useError.ts', () => {
     })
 
     it('should return undefined on error without fallback', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const result = await withErrorHandling(() => Promise.reject(new Error('fail')))
       expect(result).toBeUndefined()
-      consoleSpy.mockRestore()
     })
   })
 })

@@ -30,7 +30,7 @@ export function useTaskPathBrowse(options: UseTaskPathBrowseOptions) {
       sourcePathOptions.value = data.items || []
       sourceCurrentPath.value = path
     } catch (e) {
-      console.error(e)
+      throw e
     }
   }
 
@@ -40,7 +40,7 @@ export function useTaskPathBrowse(options: UseTaskPathBrowseOptions) {
       targetPathOptions.value = data.items || []
       targetCurrentPath.value = path
     } catch (e) {
-      console.error(e)
+      throw e
     }
   }
 

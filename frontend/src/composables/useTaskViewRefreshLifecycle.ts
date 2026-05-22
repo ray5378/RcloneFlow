@@ -40,7 +40,7 @@ export function useTaskViewRefreshLifecycle(options: {
           await options.loadActiveRuns()
         }
       } catch (err) {
-        console.error(err)
+        throw err
       } finally {
         scheduleNextActivePoll()
       }
@@ -55,11 +55,11 @@ export function useTaskViewRefreshLifecycle(options: {
     watch(options.currentModule, (next) => {
       if (next === 'tasks') {
         Promise.all([
-          Promise.resolve(options.loadData()).catch(console.error),
-          options.loadActiveRuns().catch(console.error),
-        ]).catch(console.error)
+          Promise.resolve(options.loadData()).catch(() => {}),
+          options.loadActiveRuns().catch(() => {}),
+        ]).catch(() => {})
         setTimeout(() => {
-          options.loadActiveRuns().catch(console.error)
+          options.loadActiveRuns().catch(() => {})
         }, 300)
         restartActivePollLoop(1500)
       } else {
@@ -75,9 +75,9 @@ export function useTaskViewRefreshLifecycle(options: {
 
   onMounted(() => {
     Promise.all([
-      Promise.resolve(options.loadData()).catch(console.error),
-      options.loadActiveRuns().catch(console.error),
-    ]).catch(console.error)
+      Promise.resolve(options.loadData()).catch(() => {}),
+      options.loadActiveRuns().catch(() => {}),
+    ]).catch(() => {})
     options.setupRealtimeSync?.()
 
     restartActivePollLoop(1500)

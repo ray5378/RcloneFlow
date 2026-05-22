@@ -3,7 +3,14 @@ import { useTaskSingletonConfig } from './useTaskSingletonConfig'
 import { useRunLogModal } from './useRunLogModal'
 import { useTaskViewUi } from './useTaskViewUi'
 import { useRunDisplayHelpers } from './useRunDisplayHelpers'
-import { useTaskScheduleDisplay } from './useTaskScheduleDisplay'
+
+function formatScheduleSpec(spec: string): string {
+  if (!spec) return ''
+  const parts = spec.split('|')
+  if (parts.length !== 5) return spec
+  const [minute, hour, day, month, week] = parts
+  return `${minute} ${hour} ${day} ${month} ${week}`
+}
 
 export function useTaskViewAuxRuntime(options: {
   loadData: () => Promise<void>
@@ -59,8 +66,6 @@ export function useTaskViewAuxRuntime(options: {
   } = useRunDisplayHelpers({
     getFinalSummary: options.getFinalSummary,
   })
-
-  const { formatScheduleSpec } = useTaskScheduleDisplay()
 
   return {
     showWebhookModal,

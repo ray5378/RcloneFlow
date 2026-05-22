@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"rcloneflow/internal/logutil"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/util"
 )
@@ -35,7 +36,7 @@ func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[str
 		if l == "" {
 			continue
 		}
-		for _, seg := range splitHistoricalLogSegments(l) {
+		for _, seg := range logutil.SplitLogSegments(l) {
 			m := re.FindStringSubmatch(seg)
 			if len(m) == 0 {
 				continue

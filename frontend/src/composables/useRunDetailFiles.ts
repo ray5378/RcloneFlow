@@ -44,7 +44,7 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
       runFiles.value = res.items || []
       runFilesTotal.value = res.total || 0
     } catch (e) {
-      console.error(e)
+      throw e
     }
   }
 

@@ -12,6 +12,7 @@ import (
 	stdiostrconv "strconv"
 	"strings"
 	"time"
+"rcloneflow/internal/logutil"
 )
 
 func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
@@ -151,8 +152,8 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 	}
 	rowMaps := make([]map[string]any, 0, 200)
 	for _, ln := range lines {
-		for _, seg := range splitHistoricalLogSegments(ln) {
-			at, level, path, msg, ok := parseHistoricalLogSegment(seg)
+		for _, seg := range logutil.SplitLogSegments(ln) {
+			at, level, path, msg, ok := logutil.ParseLogSegment(seg)
 			if !ok {
 				continue
 			}

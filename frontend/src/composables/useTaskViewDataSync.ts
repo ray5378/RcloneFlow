@@ -158,7 +158,6 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
       }
       scheduleTasksSnapshotWrite()
     } catch (e) {
-      console.error(e)
       if (!options.tasks.value || options.tasks.value.length === 0) {
         const snap = restoreTasksSnapshot()
         if (Array.isArray(snap)) options.tasks.value = snap
@@ -207,7 +206,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
       })
       replaceActiveRuns(list)
     } catch (e) {
-      console.error(e)
+      throw e
     }
   }
 
@@ -216,7 +215,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
       const stats = await api.getGlobalStats()
       options.globalStats.value = stats || {}
     } catch (e) {
-      console.error(e)
+      throw e
     }
   }
 
@@ -229,7 +228,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     if (activeRunsReloadTimer) return
     activeRunsReloadTimer = window.setTimeout(() => {
       activeRunsReloadTimer = null
-      loadActiveRuns().catch(console.error)
+      loadActiveRuns().catch(() => {})
     }, delay)
   }
 
@@ -237,7 +236,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     if (dataReloadTimer) return
     dataReloadTimer = window.setTimeout(() => {
       dataReloadTimer = null
-      loadData().catch(console.error)
+      loadData().catch(() => {})
     }, delay)
   }
 
@@ -341,9 +340,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
 
     const offRunStatus = onWsMessage('run_status', () => {
       Promise.all([
-        loadActiveRuns().catch(console.error),
-        loadData().catch(console.error),
-      ]).catch(console.error)
+        loadActiveRuns().catch(() => {}),
+        loadData().catch(() => {}),
+      ]).catch(() => {})
     })
 
     cleanupRealtime = () => {

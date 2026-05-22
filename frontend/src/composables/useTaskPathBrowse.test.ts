@@ -35,7 +35,7 @@ describe('useTaskPathBrowse', () => {
     const opts = makeOptions()
     opts.listPath.mockRejectedValueOnce(new Error('failed'))
     const { loadSourcePath } = useTaskPathBrowse(opts)
-    await loadSourcePath('remote', '/test')
+    await expect(loadSourcePath('remote', '/test')).rejects.toThrow('failed')
   })
 
   it('should reset browse state', () => {

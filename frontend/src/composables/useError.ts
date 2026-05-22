@@ -18,20 +18,14 @@ export function handleError(err: any, context: ErrorContext = {}): void {
     ? t('runtime.operationFailed').replace('{operation}', context.operation).replace('{message}', err?.message || err)
     : err?.message || String(err)
 
-  console.error(`[${context.module || 'Unknown'}] ${context.operation}:`, err)
-
   if (globalErrorHandler) {
     globalErrorHandler(message, 'error')
-  } else {
-    console.error(message)
   }
 }
 
 export function showToastMessage(message: string, type: 'error' | 'success' | 'info' | 'warning' = 'error'): void {
   if (globalErrorHandler) {
     globalErrorHandler(message, type)
-  } else {
-    console.error(`[${type}] ${message}`)
   }
 }
 

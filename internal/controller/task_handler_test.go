@@ -232,23 +232,23 @@ func TestTaskController_HandleTaskActions_Run_InvalidID(t *testing.T) {
 	assert.True(t, rec.Code == http.StatusOK || rec.Code == http.StatusInternalServerError)
 }
 
-func TestTaskController_HandleTaskActions_Export(t *testing.T) {
+func TestTaskController_HandleExportTask(t *testing.T) {
 	c := setupTaskController(t)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/tasks/export", nil)
 	rec := httptest.NewRecorder()
-	c.HandleTaskActions(rec, req)
+	c.HandleExportTask(rec, req)
 
 	assert.True(t, rec.Code == http.StatusOK || rec.Code == http.StatusInternalServerError)
 }
 
-func TestTaskController_HandleTaskActions_Import_InvalidJSON(t *testing.T) {
+func TestTaskController_HandleImportTask_InvalidJSON(t *testing.T) {
 	c := setupTaskController(t)
 
 	req := httptest.NewRequest(http.MethodPost, "/api/tasks/import", bytes.NewReader([]byte("{bad")))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	c.HandleTaskActions(rec, req)
+	c.HandleImportTask(rec, req)
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }

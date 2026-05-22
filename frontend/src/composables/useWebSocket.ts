@@ -69,8 +69,7 @@ function connectGlobal() {
     scheduleReconnect()
   }
 
-  ws.onerror = (err) => {
-    console.error('WebSocket error:', err)
+  ws.onerror = (_err) => {
   }
 
   ws.onmessage = (event) => {
@@ -79,7 +78,7 @@ function connectGlobal() {
       lastMessage.value = msg
       notifyMessage(msg)
     } catch (e) {
-      console.error('Failed to parse WebSocket message:', e)
+      throw e
     }
   }
 }

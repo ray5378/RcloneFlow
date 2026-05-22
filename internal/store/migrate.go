@@ -45,10 +45,8 @@ func InitDB(dir, dsn string) (*sql.DB, error) {
 }
 
 // RunMigrations 运行数据库迁移
-// 当前使用内联迁移（见 store.go 中的 migrate() 方法）
+// 当前使用 store.go 中的内联迁移方案，在 InitDB 初始化时直接执行 DDL
 func RunMigrations(db *sql.DB, migrationsDir string) error {
-	// TODO: 集成 goose 迁移工具
-	// 当前使用 store.go 中的内联迁移
 	return nil
 }
 

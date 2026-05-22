@@ -108,6 +108,8 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	// 任务管理
 	apiMux.HandleFunc("/api/tasks/bootstrap", r.taskCtrl.HandleBootstrap)
 	apiMux.HandleFunc("/api/tasks", r.taskCtrl.HandleTasks)
+	apiMux.HandleFunc("/api/tasks/export", r.taskCtrl.HandleExportTask)
+	apiMux.HandleFunc("/api/tasks/import", r.taskCtrl.HandleImportTask)
 	apiMux.HandleFunc("/api/tasks/", func(w http.ResponseWriter, req *http.Request) {
 		if strings.HasSuffix(req.URL.Path, "/active-transfer/completed") {
 			r.activeTransferCtrl.HandleCompleted(w, req)

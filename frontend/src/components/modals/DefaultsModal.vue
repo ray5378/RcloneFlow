@@ -77,7 +77,6 @@ async function onSave() {
     if (savedTimer) clearTimeout(savedTimer)
     savedTimer = window.setTimeout(() => { saved.value = false }, 10000)
   } catch (e: any) {
-    console.error(e)
     saveFailed.value = true
     if (saveFailedTimer) clearTimeout(saveFailedTimer)
     saveFailedTimer = window.setTimeout(() => { saveFailed.value = false }, 3000)

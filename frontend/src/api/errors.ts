@@ -167,7 +167,6 @@ export function createErrorBoundary(
 ) {
   return {
     onError(error: Error, errorInfo: string) {
-      console.error('[Error Boundary]', error, errorInfo)
       errorHandler(error, errorInfo)
       showErrorToast(parseErrorMessage(error))
     }

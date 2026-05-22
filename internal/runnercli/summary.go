@@ -11,6 +11,7 @@ import (
 	"go.uber.org/zap"
 	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/logger"
+	"rcloneflow/internal/logutil"
 	"rcloneflow/internal/store"
 )
 
@@ -87,8 +88,8 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 	}
 	casMatchedPaths := map[string]struct{}{}
 	for _, ln := range lines {
-		for _, seg := range splitRunLogSegments(ln) {
-			at, level, path, msg, ok := parseRunLogSegment(seg)
+		for _, seg := range logutil.SplitLogSegments(ln) {
+			at, level, path, msg, ok := logutil.ParseLogSegment(seg)
 			if !ok {
 				continue
 			}

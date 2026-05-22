@@ -57,10 +57,10 @@ export function useTaskRunActions(options: UseTaskRunActionsOptions) {
         await options.loadData()
         await options.loadActiveRuns?.()
         // fire-and-forget delayed polls — no timer reference needed; cannot leak after completion
-        setTimeout(() => { options.loadActiveRuns?.().catch(console.error) }, 300)
-        setTimeout(() => { options.loadActiveRuns?.().catch(console.error) }, 1200)
+        setTimeout(() => { options.loadActiveRuns?.().catch(() => {}) }, 300)
+        setTimeout(() => { options.loadActiveRuns?.().catch(() => {}) }, 1200)
       } catch (e) {
-        console.error(e)
+        throw e
       }
       setTimeout(() => {
         if (runningTaskId.value === taskId) {

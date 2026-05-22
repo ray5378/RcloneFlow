@@ -1,8 +1,13 @@
 import { describe, it, expect } from 'vitest'
-import { useTaskScheduleDisplay } from './useTaskScheduleDisplay'
+import { useTaskViewAuxRuntime } from './useTaskViewAuxRuntime'
 
 describe('useTaskScheduleDisplay', () => {
-  const { formatScheduleSpec } = useTaskScheduleDisplay()
+  const { formatScheduleSpec } = useTaskViewAuxRuntime({
+    loadData: async () => {},
+    showToast: () => {},
+    taskApi: {},
+    getFinalSummary: () => ({}),
+  })
 
   it('should handle empty spec', () => {
     expect(formatScheduleSpec('')).toBe('')

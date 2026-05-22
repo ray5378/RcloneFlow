@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"rcloneflow/internal/adapter"
+	"rcloneflow/internal/logutil"
 	"rcloneflow/internal/store"
 )
 
@@ -294,7 +295,7 @@ func analyzeCASAttemptLogSegment(path string, startOffset int64, openlistCASComp
 			}
 			continue
 		}
-		at, level, p, msg, ok := parseRunLogSegment(line)
+		at, level, p, msg, ok := logutil.ParseLogSegment(line)
 		_ = at
 		if !ok {
 			continue

@@ -93,9 +93,6 @@ async function apiRequest<T>(
     if (response.status === 204) { return {} as T }
     return await response.json()
   } catch (error) {
-    if (error instanceof Error && error.message !== '未授权') {
-      console.error(`[API] ${options.method || 'GET'} ${url} failed:`, error)
-    }
     throw error
   }
 }

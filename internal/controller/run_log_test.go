@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"rcloneflow/internal/logutil"
 	"rcloneflow/internal/service"
 )
 
@@ -21,7 +22,7 @@ func TestSplitHistoricalLogSegments(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			segs := splitHistoricalLogSegments(tt.input)
+			segs := logutil.SplitLogSegments(tt.input)
 			assert.Len(t, segs, tt.want)
 		})
 	}

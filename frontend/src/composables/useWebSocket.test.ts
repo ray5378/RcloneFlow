@@ -50,15 +50,12 @@ describe('useWebSocket.ts', () => {
       expect(ws.lastMessage.value).toEqual({ type: 'test', data: { value: 42 } })
     })
 
-    it('should ignore invalid JSON messages', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    it('should throw on invalid JSON messages', () => {
       const ws = useWebSocket()
       ws.connect()
       wsInstance.onopen()
 
-      wsInstance.onmessage({ data: 'not json' })
-      expect(consoleSpy).toHaveBeenCalled()
-      consoleSpy.mockRestore()
+      expect(() => wsInstance.onmessage({ data: 'not json' })).toThrow()
     })
 
     it('should not send when disconnected', () => {
