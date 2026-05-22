@@ -71,9 +71,18 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 	}
 	b, e := os.ReadFile(logPath)
 	if e != nil {
+		logger.Debug("buildFinalSummaryFilesFromLog read error", zap.String("path", logPath), zap.Error(e))
 		return files, counts
 	}
 	lines := strings.Split(string(b), "\n")
+	logger.Debug("buildFinalSummaryFilesFromLog lines", zap.String("path", logPath), zap.Int("totalLines", len(lines)), zap.String("openlistCAS", fmt.Sprint(openlistCASCompatible)))
+	sampleCount := 5
+	if len(lines) < sampleCount {
+		sampleCount = len(lines)
+	}
+	for i := 0; i < sampleCount; i++ {
+		logger.Debug("buildFinalSummaryFilesFromLog sample", zap.Int("idx", i), zap.String("line", truncateStr(lines[i], 500)))
+	}
 	sizes := map[string]int64{}
 	for _, ln := range lines {
 		if m := fileLineRe.FindStringSubmatch(ln); len(m) > 0 {
@@ -87,16 +96,22 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 		}
 	}
 	casMatchedPaths := map[string]struct{}{}
+	segCount := 0
+	parsedCount := 0
+	classifiedCount := 0
 	for _, ln := range lines {
 		for _, seg := range logutil.SplitLogSegments(ln) {
+			segCount++
 			at, level, path, msg, ok := logutil.ParseLogSegment(seg)
 			if !ok {
 				continue
 			}
+			parsedCount++
 			row, bucket, ok := classifyRunLogRow(level, path, msg, sizes, openlistCASCompatible)
 			if !ok {
 				continue
 			}
+			classifiedCount++
 			row["at"] = at
 			if bucket == "copied" && strings.EqualFold(anyString(row["action"]), "CAS Matched") {
 				casMatchedPaths[strings.TrimSpace(anyString(row["path"]))] = struct{}{}
@@ -104,6 +119,7 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 			files = append(files, row)
 		}
 	}
+	logger.Debug("buildFinalSummaryFilesFromLog parsed", zap.Int("segments", segCount), zap.Int("parsed", parsedCount), zap.Int("classified", classifiedCount))
 	filtered := make([]map[string]any, 0, len(files))
 	for _, row := range files {
 		action := strings.ToLower(strings.TrimSpace(anyString(row["action"])))
@@ -131,6 +147,7 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 		}
 	}
 	counts["total"] = counts["copied"] + counts["deleted"] + counts["failed"] + counts["skipped"]
+	logger.Debug("buildFinalSummaryFilesFromLog final", zap.Int("copied", counts["copied"]), zap.Int("deleted", counts["deleted"]), zap.Int("failed", counts["failed"]), zap.Int("skipped", counts["skipped"]), zap.Int("total", counts["total"]), zap.Int("files", len(filtered)))
 	if moveMode {
 		return mergeMoveRows(filtered)
 	}
@@ -198,4 +215,11 @@ func (r *Runner) enrichFilesSizesAsync(runID int64, files []map[string]any, dst,
 			}
 		})
 	}()
+}
+
+func truncateStr(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }

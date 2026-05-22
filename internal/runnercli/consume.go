@@ -203,8 +203,8 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 				continue
 			}
 		}
-		if len(line) > 0 {
-			_, _ = out.WriteString(sanitizeRunLogLine(line, openlistCASCompatible) + "\n")
+		if len(parsedLine) > 0 {
+			_, _ = out.WriteString(sanitizeRunLogLine(parsedLine, openlistCASCompatible) + "\n")
 		}
 		line = parsedLine
 		// 2) statsRe 文本解析（优先于 parseOneLineProgress）
