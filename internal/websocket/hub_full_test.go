@@ -206,3 +206,73 @@ func TestBroadcast_Global(t *testing.T) {
 	// Broadcast should not panic
 	Broadcast("test", map[string]any{"msg": "hello"})
 }
+
+func TestHubStop(t *testing.T) {
+	h := NewHub()
+	done := make(chan struct{})
+	go func() {
+		h.Run()
+		close(done)
+	}()
+
+	c := &Client{hub: h, send: make(chan []byte, 1)}
+	h.register <- c
+	time.Sleep(20 * time.Millisecond)
+
+	if h.ClientCount() != 1 {
+		t.Fatalf("expected 1 client, got %d", h.ClientCount())
+	}
+
+	h.Stop()
+	select {
+	case <-done:
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("Run() did not return after Stop()")
+	}
+
+	// Second Stop should be a no-op
+	h.Stop()
+
+	// Client send channel should be closed after hub stops
+	select {
+	case _, ok := <-c.send:
+		if ok {
+			t.Error("expected send channel to be closed")
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("send channel was not closed")
+	}
+}
+
+func TestInitHub(t *testing.T) {
+	h := NewHub()
+	InitHub(h)
+	time.Sleep(20 * time.Millisecond)
+	if GetHub() != h {
+		t.Error("InitHub should set global hub")
+	}
+	h.Stop()
+}
+
+func TestResetHubForTest(t *testing.T) {
+	h1 := NewHub()
+	ResetHubForTest(h1)
+	if GetHub() != h1 {
+		t.Fatal("ResetHubForTest should set the hub")
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	h2 := NewHub()
+	ResetHubForTest(h2)
+	if GetHub() != h2 {
+		t.Fatal("ResetHubForTest should replace the hub")
+	}
+	time.Sleep(20 * time.Millisecond)
+
+	ResetHubForTest(nil)
+	if GetHub() == nil {
+		t.Fatal("GetHub should still return non-nil after ResetHubForTest(nil)")
+	}
+
+	GetHub().Stop()
+}
