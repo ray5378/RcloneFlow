@@ -527,6 +527,56 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				rr.Summary["success"] = false
 				fin := time.Now().Local()
 				rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
+				finalSummary := map[string]any{}
+				var start time.Time
+				if s, ok := rr.Summary["startedAt"].(string); ok {
+					if t, e := time.Parse(time.RFC3339, s); e == nil {
+						start = t
+					}
+				}
+				if !start.IsZero() {
+					finalSummary["startAt"] = start.Format(time.RFC3339)
+				}
+				finalSummary["finishedAt"] = fin.Format(time.RFC3339)
+				durSec := int64(0)
+				if !start.IsZero() {
+					durSec = int64(fin.Sub(start).Seconds())
+				}
+				if durSec < 0 {
+					durSec = 0
+				}
+				finalSummary["durationSec"] = durSec
+				finalSummary["durationText"] = util.HumanDuration(durSec)
+				finalSummary["result"] = "stopped"
+				var prog map[string]any
+				if p, ok := rr.Summary["progress"].(map[string]any); ok {
+					prog = p
+				}
+				var bytes, total int64
+				if prog != nil {
+					if v, ok := prog["bytes"].(float64); ok {
+						bytes = int64(v)
+					}
+					if v, ok := prog["totalBytes"].(float64); ok {
+						total = int64(v)
+					}
+				}
+				finalSummary["transferredBytes"] = bytes
+				finalSummary["totalBytes"] = total
+				avg := int64(0)
+				if durSec > 0 {
+					avg = bytes / durSec
+				}
+				finalSummary["avgSpeedBps"] = avg
+				files := []map[string]any{}
+				counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
+				if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
+					files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
+				}
+				r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
+				finalSummary["counts"] = counts
+				finalSummary["files"] = files
+				rr.Summary["finalSummary"] = finalSummary
 			})
 			r.broadcaster.Broadcast("run_status", map[string]any{
 				"run_id": run.ID,
