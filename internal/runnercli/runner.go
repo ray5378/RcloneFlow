@@ -272,6 +272,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	if missingCfg != "" {
 		_, _ = stderrFile.WriteString(missingCfg)
 	}
+	attemptLogOffset, _ := stderrFile.Seek(0, io.SeekCurrent)
 	cmd.Stdout = outW
 	cmd.Stderr = errW
 	if err := cmd.Start(); err != nil {
@@ -345,7 +346,6 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				_ = os.Remove(casCompat.ExcludeFrom)
 			}
 		}()
-		attemptLogOffset, _ := stderrFile.Seek(0, io.SeekCurrent)
 		attempt := 1
 		for {
 			err := cmd.Wait()
