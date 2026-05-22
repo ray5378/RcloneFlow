@@ -59,7 +59,7 @@ export function useTaskWebhookConfig(options: {
       webhookForm.value.matchText = ''
       webhookForm.value.notify = { manual: false, schedule: false, webhook: false }
       webhookForm.value.status = { success: true, failed: true, hasTransfer: false }
-      webhookForm.value.webhookSecret = ''
+      webhookForm.value.webhookSecret = generateSecret()
     }
     showWebhookModal.value = true
   }
@@ -171,5 +171,6 @@ export function useTaskWebhookConfig(options: {
     setWebhook,
     saveWebhook,
     testWebhook,
+    regenerateWebhookSecret,
   }
 }

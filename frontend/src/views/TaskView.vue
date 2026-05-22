@@ -223,6 +223,7 @@ const {
   setWebhook,
   saveWebhook,
   testWebhook,
+  regenerateWebhookSecret,
   showSingletonModal,
   singletonForm,
   setSingletonMode,
@@ -524,6 +525,7 @@ function closeTaskEditorModal() {
     :set-webhook-status-has-transfer="setWebhookStatusHasTransfer"
     :save-webhook="saveWebhook"
     :test-webhook="testWebhook"
+    :regenerate-webhook-secret="regenerateWebhookSecret"
     :close-webhook-modal="closeWebhookModal"
     :show-singleton-modal="showSingletonModal"
     :singleton-form="singletonForm"

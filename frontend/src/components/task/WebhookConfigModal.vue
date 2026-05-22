@@ -32,6 +32,7 @@ const emit = defineEmits<{
   (e: 'update:statusSuccess', value: boolean): void
   (e: 'update:statusFailed', value: boolean): void
   (e: 'update:statusHasTransfer', value: boolean): void
+  (e: 'regenerate'): void
 }>()
 
 function onTextInput(event: Event, key: 'triggerId' | 'matchText' | 'webhookSecret' | 'postUrl' | 'wecomUrl') {
@@ -81,7 +82,10 @@ function onCheckbox(event: Event, key: CheckboxKey) {
         </div>
         <div class="detail-item full-width">
           <label>{{ t('webhookModal.secret') }}</label>
-          <input :value="webhookSecret" type="password" :placeholder="t('webhookModal.secretPlaceholder')" @input="onTextInput($event, 'webhookSecret')" />
+          <div class="secret-row">
+            <input :value="webhookSecret" type="text" :placeholder="t('webhookModal.secretPlaceholder')" @input="onTextInput($event, 'webhookSecret')" />
+            <button class="ghost small" type="button" @click="emit('regenerate')">{{ t('webhookModal.regenerateSecret') }}</button>
+          </div>
           <p class="hint">{{ t('webhookModal.secretHint') }}</p>
         </div>
         <div class="detail-item full-width">
@@ -146,5 +150,13 @@ function onCheckbox(event: Event, key: CheckboxKey) {
 .trigger-opt input {
   width: 16px;
   height: 16px;
+}
+.secret-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.secret-row input {
+  flex: 1;
 }
 </style>

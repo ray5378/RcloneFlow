@@ -24,6 +24,7 @@ export function useTaskViewAuxRuntime(options: {
     setWebhook,
     saveWebhook,
     testWebhook,
+    regenerateWebhookSecret,
   } = useTaskWebhookConfig({
     loadData: options.loadData,
     showToast: options.showToast,
@@ -73,6 +74,7 @@ export function useTaskViewAuxRuntime(options: {
     setWebhook,
     saveWebhook,
     testWebhook,
+    regenerateWebhookSecret,
     showSingletonModal,
     singletonForm,
     setSingletonMode,

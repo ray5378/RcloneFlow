@@ -72,6 +72,7 @@ defineProps<{
   setWebhookStatusHasTransfer: (value: boolean) => void
   saveWebhook: () => void
   testWebhook: () => void
+  regenerateWebhookSecret: () => void
   closeWebhookModal: () => void
   showSingletonModal: boolean
   singletonForm: SingletonFormState | null
@@ -145,6 +146,7 @@ defineProps<{
     @update:status-has-transfer="setWebhookStatusHasTransfer"
     @save="saveWebhook"
     @test="testWebhook"
+    @regenerate="regenerateWebhookSecret"
     @close="closeWebhookModal"
   />
 

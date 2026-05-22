@@ -50,19 +50,21 @@ func readSettingsWebhookSecret() string {
 // 支持两种方式：
 // 1) 直接按任务ID触发：/webhook/{taskId}
 // 2) 按自定义ID匹配任务 options.webhookId：/webhook/{customId}
-// 如果设置了 WEBHOOK_SECRET 环境变量，则必须通过 query 参数 ?secret=xxx 或 Header X-Webhook-Secret 提供
+// 安全密钥：每个任务必须设置 webhookSecret，外部请求需通过 ?secret=xxx 或 X-Webhook-Secret 头提供
+// 全局 WEBHOOK_SECRET 作为可选的服务级网关，独立于任务级密钥
 func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet && r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	secret := readSettingsWebhookSecret()
-	if secret != "" {
-		provided := r.URL.Query().Get("secret")
-		if provided == "" {
-			provided = r.Header.Get("X-Webhook-Secret")
-		}
-		if provided == "" || subtle.ConstantTimeCompare([]byte(provided), []byte(secret)) != 1 {
+	// 全局服务级密钥（可选，独立于任务密钥）
+	globalSecret := readSettingsWebhookSecret()
+	providedSecret := r.URL.Query().Get("secret")
+	if providedSecret == "" {
+		providedSecret = r.Header.Get("X-Webhook-Secret")
+	}
+	if globalSecret != "" {
+		if providedSecret == "" || subtle.ConstantTimeCompare([]byte(providedSecret), []byte(globalSecret)) != 1 {
 			WriteJSON(w, 401, map[string]any{"error": "unauthorized"})
 			return
 		}
@@ -77,12 +79,25 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 	r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 	bodyText := string(bodyBytes)
 
-	shouldTrigger := func(opts map[string]any) bool {
+	// shouldTrigger 先验证任务密钥，再验证匹配字段
+	shouldTrigger := func(opts map[string]any) (bool, string) {
+		taskSecret := strings.TrimSpace(toString(opts["webhookSecret"]))
+		if taskSecret == "" {
+			return false, "secret_not_set"
+		}
+		if globalSecret == "" {
+			if providedSecret == "" || subtle.ConstantTimeCompare([]byte(providedSecret), []byte(taskSecret)) != 1 {
+				return false, "secret_mismatch"
+			}
+		}
 		matchText := strings.TrimSpace(toString(opts["webhookMatchText"]))
 		if matchText == "" {
-			return true
+			return true, ""
 		}
-		return strings.Contains(bodyText, matchText)
+		if !strings.Contains(bodyText, matchText) {
+			return false, "webhook_match_not_hit"
+		}
+		return true, ""
 	}
 
 	// 优先：数字则按任务ID直接触发
@@ -94,8 +109,13 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 					logger.Error("unmarshal task options", zap.Error(err))
 				}
 			}
-			if !shouldTrigger(opts) {
-				WriteJSON(w, 200, map[string]any{"ok": true, "triggered": false, "reason": "webhook_match_not_hit"})
+			ok, reason := shouldTrigger(opts)
+			if !ok {
+				if reason == "secret_not_set" || reason == "secret_mismatch" {
+					WriteJSON(w, 401, map[string]any{"error": "unauthorized"})
+				} else {
+					WriteJSON(w, 200, map[string]any{"ok": true, "triggered": false, "reason": reason})
+				}
 				return
 			}
 			result, err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook")
@@ -128,8 +148,13 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 		if wid == "" || wid != id {
 			continue
 		}
-		if !shouldTrigger(opts) {
-			WriteJSON(w, 200, map[string]any{"ok": true, "triggered": false, "reason": "webhook_match_not_hit"})
+		ok, reason := shouldTrigger(opts)
+		if !ok {
+			if reason == "secret_not_set" || reason == "secret_mismatch" {
+				WriteJSON(w, 401, map[string]any{"error": "unauthorized"})
+			} else {
+				WriteJSON(w, 200, map[string]any{"ok": true, "triggered": false, "reason": reason})
+			}
 			return
 		}
 		result, err := c.taskSvc.RunTask(r.Context(), t.ID, "webhook")
