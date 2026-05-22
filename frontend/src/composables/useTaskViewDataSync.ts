@@ -240,6 +240,15 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     }, delay)
   }
 
+  function scheduleActiveRunsReloadStaged() {
+    ;[500, 2000].forEach(delay => {
+      window.setTimeout(() => {
+        if (activeRunsReloadTimer) return
+        loadActiveRuns().catch(() => {})
+      }, delay)
+    })
+  }
+
   function setupRealtimeSync() {
     if (realtimeInitialized) return
     realtimeInitialized = true
@@ -247,6 +256,12 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     const wsClient = useWebSocket({
       onMessage: (msg) => {
         if (msg.type === 'run_status' && msg.data) {
+          const status = msg.data.status
+          if (status && status !== 'running') {
+            options.activeRuns.value = options.activeRuns.value.filter(
+              r => r.runRecord?.id !== msg.data.run_id
+            )
+          }
           if (options.currentModule?.value === 'history') {
             const idx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
             if (idx !== -1) {
@@ -254,6 +269,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
             }
           }
           scheduleActiveRunsReload(0)
+          scheduleActiveRunsReloadStaged()
           scheduleDataReload(0)
         } else if (msg.type === 'run_progress' && msg.data) {
           const idx = options.activeRuns.value.findIndex(r => r.runRecord?.id === msg.data.run_id)

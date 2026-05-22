@@ -36,6 +36,7 @@ describe('useRunDisplayHelpers', () => {
     expect(getStatusClass('finished')).toBe('success')
     expect(getStatusClass('failed')).toBe('failed')
     expect(getStatusClass('skipped')).toBe('skipped')
+    expect(getStatusClass('stopped')).toBe('stopped')
     expect(getStatusClass('unknown')).toBe('')
   })
 
@@ -45,6 +46,7 @@ describe('useRunDisplayHelpers', () => {
     expect(getStatusText('finished')).toBe('runtime.statusFinished')
     expect(getStatusText('failed')).toBe('runtime.statusFailed')
     expect(getStatusText('skipped')).toBe('runtime.statusSkipped')
+    expect(getStatusText('stopped')).toBe('runtime.statusStopped')
     expect(getStatusText('unknown')).toBe('unknown')
   })
 

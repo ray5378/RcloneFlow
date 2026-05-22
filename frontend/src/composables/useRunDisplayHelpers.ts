@@ -43,6 +43,7 @@ export function useRunDisplayHelpers(options: {
       case 'finished': return 'success'
       case 'failed': return 'failed'
       case 'skipped': return 'skipped'
+      case 'stopped': return 'stopped'
       default: return ''
     }
   }
@@ -53,6 +54,7 @@ export function useRunDisplayHelpers(options: {
       case 'finished': return t('runtime.statusFinished')
       case 'failed': return t('runtime.statusFailed')
       case 'skipped': return t('runtime.statusSkipped')
+      case 'stopped': return t('runtime.statusStopped')
       default: return status
     }
   }

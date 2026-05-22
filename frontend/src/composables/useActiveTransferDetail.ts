@@ -129,11 +129,7 @@ export function useActiveTransferDetail() {
   const error = ref('')
 
   const completedTotalPages = computed(() => Math.max(1, Math.ceil(Math.max(completedTotal.value, 0) / PAGE_SIZE)))
-  const pendingTotalPages = computed(() => {
-    const currentKeys = new Set((currentFiles.value || []).map(item => item.path || item.name).filter(Boolean))
-    const filtered = currentKeys.size ? rawPendingItems.value.filter(item => !currentKeys.has(item.path || item.name)) : rawPendingItems.value
-    return Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
-  })
+  const pendingTotalPages = computed(() => Math.max(1, Math.ceil(pendingTotal.value / PAGE_SIZE)))
 
   function shouldHandleRunMessage(incomingRunId: any, incomingTaskId?: any) {
     return visible.value && (
@@ -367,6 +363,16 @@ export function useActiveTransferDetail() {
 
   const offRunStatus = onWsMessage('run_status', (data) => {
     if (shouldHandleRunMessage(data?.run_id) && data?.status !== 'running') {
+      summary.value = null
+      currentFile.value = null
+      currentFiles.value = []
+      completedItems.value = []
+      pendingItems.value = []
+      rawPendingItems.value = []
+      completedTotal.value = 0
+      pendingTotal.value = 0
+      degraded.value = false
+      error.value = ''
       void refresh(true)
     }
   })

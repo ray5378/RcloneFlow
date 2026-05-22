@@ -593,6 +593,7 @@ export default {
     statusFinished: 'Finished',
     statusFailed: 'Failed',
     statusSkipped: 'Skipped',
+    statusStopped: 'Stopped',
     preparing: 'Preparing',
     transferred: 'Transferred',
     speed: 'Speed',

@@ -593,6 +593,7 @@ export default {
     statusFinished: '已完成',
     statusFailed: '失败',
     statusSkipped: '已跳过',
+    statusStopped: '手动停止',
     preparing: '准备中',
     transferred: '已传',
     speed: '速度',

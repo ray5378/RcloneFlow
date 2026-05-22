@@ -592,7 +592,7 @@ describe('useActiveTransferDetail', () => {
     unmount()
   })
 
-  it('calculates pendingTotalPages based on filtered items count', async () => {
+  it('calculates pendingTotalPages based on API total not local filtered items', async () => {
     const overview = {
       runId: 92,
       taskId: 13,
@@ -715,6 +715,110 @@ describe('useActiveTransferDetail', () => {
       'pending-2', 'pending-3', 'pending-4', 'pending-5', 'pending-6',
       'pending-7', 'pending-8', 'pending-9', 'pending-10', 'pending-11',
     ])
+
+    unmount()
+  })
+
+  it('clears transfer state when run_status indicates non-running', async () => {
+    const overview = {
+      runId: 101,
+      taskId: 20,
+      trackingMode: 'normal',
+      summary: {
+        trackingMode: 'normal',
+        completedCount: 5,
+        pendingCount: 3,
+        totalCount: 8,
+        percentage: 50,
+        bytes: 500,
+        totalBytes: 1000,
+        speed: 10,
+        eta: 50,
+      },
+      currentFile: { name: 'current-file', path: 'current-file', status: 'in_progress', order: 1 },
+      currentFiles: [{ name: 'current-file', path: 'current-file', status: 'in_progress', order: 1 }],
+      degraded: false,
+    }
+    getActiveTransfer.mockResolvedValueOnce(overview)
+    getActiveTransferCompleted.mockResolvedValueOnce({
+      total: 5,
+      items: Array.from({ length: 5 }, (_, idx) => ({
+        name: `done-${idx}`,
+        path: `done-${idx}`,
+        status: 'copied',
+        order: idx + 1,
+      })),
+    })
+    getActiveTransferPending.mockResolvedValueOnce({
+      total: 3,
+      items: Array.from({ length: 3 }, (_, idx) => ({
+        name: `pending-${idx}`,
+        path: `pending-${idx}`,
+        status: 'pending',
+        order: idx + 6,
+      })),
+    })
+
+    const { api, unmount } = await mountActiveTransferDetail()
+
+    api.openActiveTransfer(20)
+    await flushPromises()
+
+    expect(api.activeTransferSummary.value).not.toBeNull()
+    expect(api.activeTransferPendingTotal.value).toBe(3)
+
+    listeners.get('run_status')?.({ run_id: 101, task_id: 20, status: 'stopped' })
+    await flushPromises()
+
+    expect(api.activeTransferSummary.value).toBeNull()
+    expect(api.activeTransferPendingTotal.value).toBe(0)
+    expect(api.activeTransferPendingItems.value).toHaveLength(0)
+    expect(api.activeTransferCompletedItems.value).toHaveLength(0)
+    expect(api.activeTransferCurrentFiles.value).toHaveLength(0)
+    expect(api.activeTransferPendingTotalPages.value).toBe(1)
+
+    unmount()
+  })
+
+  it('uses API pendingTotal for pendingTotalPages even when local items differ', async () => {
+    const overview = {
+      runId: 102,
+      taskId: 21,
+      trackingMode: 'normal',
+      summary: {
+        trackingMode: 'normal',
+        completedCount: 0,
+        pendingCount: 45,
+        totalCount: 45,
+        percentage: 0,
+        bytes: 0,
+        totalBytes: 4500,
+        speed: 0,
+        eta: 0,
+      },
+      currentFile: null,
+      currentFiles: [],
+      degraded: false,
+    }
+    getActiveTransfer.mockResolvedValueOnce(overview)
+    getActiveTransferCompleted.mockResolvedValueOnce({ total: 0, items: [] })
+    getActiveTransferPending.mockResolvedValueOnce({
+      total: 45,
+      items: Array.from({ length: 10 }, (_, idx) => ({
+        name: `pending-${idx + 1}`,
+        path: `pending-${idx + 1}`,
+        status: 'pending',
+        order: idx + 1,
+      })),
+    })
+
+    const { api, unmount } = await mountActiveTransferDetail()
+
+    api.openActiveTransfer(21)
+    await flushPromises()
+
+    expect(api.activeTransferPendingTotal.value).toBe(45)
+    expect(api.activeTransferPendingTotalPages.value).toBe(5)
 
     unmount()
   })
