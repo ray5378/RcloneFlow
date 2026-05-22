@@ -255,6 +255,7 @@ export default {
     failed: 'Failed',
     skipped: 'Skipped',
     running: 'Running',
+    stopped: 'Stopped',
     schedule: 'Schedule',
     manual: 'Manual',
     taskFallback: 'Task',

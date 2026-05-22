@@ -218,8 +218,7 @@ export function useActiveTransferDetail() {
       rawPendingItems.value = sortPendingItems(pending.items || [])
       const currentKeys = new Set((currentFiles.value || []).map(item => item.path || item.name).filter(Boolean))
       const filteredPending = currentKeys.size ? rawPendingItems.value.filter(item => !currentKeys.has(item.path || item.name)) : rawPendingItems.value
-      const startIdx = Math.max(0, (pendingPage.value - 1) * PAGE_SIZE)
-      pendingItems.value = filteredPending.slice(startIdx, startIdx + PAGE_SIZE)
+      pendingItems.value = filteredPending.slice(0, PAGE_SIZE)
       completedTotal.value = completed.total || 0
       pendingTotal.value = pending.total || 0
       if (completedPage.value > completedTotalPages.value) {

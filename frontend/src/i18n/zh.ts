@@ -255,6 +255,7 @@ export default {
     failed: '失败',
     skipped: '跳过',
     running: '运行中',
+    stopped: '手动停止',
     schedule: '定时',
     manual: '手动',
     taskFallback: '任务',

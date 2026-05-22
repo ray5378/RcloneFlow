@@ -54,6 +54,7 @@ function getStatusClass(status: string) {
     case 'failed': return 'danger'
     case 'skipped': return 'warning'
     case 'running': return 'info'
+    case 'stopped': return 'info'
     default: return ''
   }
 }
@@ -64,6 +65,7 @@ function getStatusText(status: string) {
     failed: t('runItem.failed'),
     skipped: t('runItem.skipped'),
     running: t('runItem.running'),
+    stopped: t('runItem.stopped'),
   }
   return map[status] || status
 }
