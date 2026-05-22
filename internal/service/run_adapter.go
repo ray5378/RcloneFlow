@@ -145,3 +145,7 @@ func (a *storeRunAdapter) CleanOldRuns(days int) (int64, error) {
 	return int64(deleted), err
 }
 
+func (a *storeRunAdapter) Vacuum() error {
+	return a.db.Vacuum()
+}
+

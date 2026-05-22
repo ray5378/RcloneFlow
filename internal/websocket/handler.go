@@ -8,11 +8,13 @@ import (
 	"rcloneflow/internal/logger"
 )
 
+// CheckOrigin 允许所有来源：本服务前后端部署在同一容器/主机内，
+// WebSocket 升级请求不携带 cookie（JWT 在 Authorization header），不存在 CSRF 风险。
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true // Allow all origins for now
+		return true
 	},
 }
 

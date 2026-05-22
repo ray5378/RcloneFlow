@@ -97,4 +97,8 @@ func (s *CleanupService) cleanup() {
 			zap.Int64("deleted", deleted),
 			zap.Int("retention_days", s.retention))
 	}
+
+	if err := s.runSvc.Vacuum(); err != nil {
+		logger.Error("数据库VACUUM失败", zap.Error(err))
+	}
 }

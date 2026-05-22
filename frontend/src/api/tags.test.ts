@@ -7,7 +7,7 @@ vi.mock('./auth', () => ({
 
 describe('fetchTags', () => {
   it('should return tags from API', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
+    globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ tags: [{ id: 1, tag: 'sync', type: 'action' }, { id: 2, tag: '备份', type: 'keyword' }] })
     } as Response)

@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"math"
 	"net/http"
 	"strconv"
@@ -42,7 +41,8 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		tasks, err := c.taskSvc.ListTasks()
 		if err != nil {
-			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			msg, code := mapServiceError(err)
+			WriteJSON(w, code, map[string]any{"error": msg})
 			return
 		}
 		WriteJSON(w, 200, tasks)
@@ -50,16 +50,13 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var req store.Task
 		if err := DecodeRequest(w, r, &req); err != nil {
-			WriteJSON(w, 400, map[string]any{"error": err.Error()})
+			WriteJSON(w, 400, map[string]any{"error": "invalid request"})
 			return
 		}
 		t, err := c.taskSvc.CreateTask(req)
 		if err != nil {
-			if errors.Is(err, service.ErrTaskNameExists) {
-				WriteJSON(w, 409, map[string]any{"error": err.Error()})
-				return
-			}
-			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			msg, code := mapServiceError(err)
+			WriteJSON(w, code, map[string]any{"error": msg})
 			return
 		}
 		WriteJSON(w, 200, t)
@@ -70,15 +67,12 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 			Task store.Task `json:"task"`
 		}
 		if err := DecodeRequest(w, r, &req); err != nil {
-			WriteJSON(w, 400, map[string]any{"error": err.Error()})
+			WriteJSON(w, 400, map[string]any{"error": "invalid request"})
 			return
 		}
 		if err := c.taskSvc.UpdateTask(req.ID, req.Task); err != nil {
-			if errors.Is(err, service.ErrTaskNameExists) {
-				WriteJSON(w, 409, map[string]any{"error": err.Error()})
-				return
-			}
-			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			msg, code := mapServiceError(err)
+			WriteJSON(w, code, map[string]any{"error": msg})
 			return
 		}
 		WriteJSON(w, 200, nil)
@@ -96,11 +90,8 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(req.Orders) > 0 {
 			if err := c.taskSvc.UpdateTaskSortOrders(req.Orders, req.PriorityTaskID); err != nil {
-				if errors.Is(err, service.ErrTaskNotFound) {
-					WriteJSON(w, 404, map[string]any{"error": err.Error()})
-					return
-				}
-				WriteJSON(w, 500, map[string]any{"error": err.Error()})
+				msg, code := mapServiceError(err)
+				WriteJSON(w, code, map[string]any{"error": msg})
 				return
 			}
 			WriteJSON(w, 200, map[string]any{"ok": true})
@@ -111,7 +102,8 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := c.taskSvc.UpdateTaskOptions(req.ID, req.Options); err != nil {
-			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			msg, code := mapServiceError(err)
+			WriteJSON(w, code, map[string]any{"error": msg})
 			return
 		}
 		WriteJSON(w, 200, map[string]any{"ok": true})
@@ -130,12 +122,14 @@ func (c *TaskController) HandleBootstrap(w http.ResponseWriter, r *http.Request)
 
 	tasks, err := c.taskSvc.ListTasks()
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		msg, code := mapServiceError(err)
+		WriteJSON(w, code, map[string]any{"error": msg})
 		return
 	}
 	activeRuns, err := c.buildActiveRunItems()
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		msg, code := mapServiceError(err)
+		WriteJSON(w, code, map[string]any{"error": msg})
 		return
 	}
 	WriteJSON(w, 200, map[string]any{
@@ -316,7 +310,8 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 
 	if p == "clear" && r.Method == http.MethodDelete {
 		if err := c.taskSvc.ClearAllTasks(); err != nil {
-			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			msg, code := mapServiceError(err)
+			WriteJSON(w, code, map[string]any{"error": msg})
 			return
 		}
 		WriteJSON(w, 200, map[string]any{"ok": true})
@@ -331,7 +326,8 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		if err := c.taskSvc.DeleteTask(id); err != nil {
-			WriteJSON(w, 500, map[string]any{"error": err.Error()})
+			msg, code := mapServiceError(err)
+			WriteJSON(w, code, map[string]any{"error": msg})
 			return
 		}
 		WriteJSON(w, 200, map[string]any{"deleted": true})
@@ -348,7 +344,8 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 
 	result, err := c.RunTask(r.Context(), id, "manual")
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		msg, code := mapServiceError(err)
+		WriteJSON(w, code, map[string]any{"error": msg})
 		return
 	}
 	WriteJSON(w, 200, result)

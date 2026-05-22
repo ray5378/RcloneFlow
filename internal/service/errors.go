@@ -3,15 +3,19 @@ package service
 import "errors"
 
 var (
-	// ErrTaskNotFound 任务未找到
-	ErrTaskNotFound = errors.New("task not found")
+	ErrTaskNotFound      = errors.New("task not found")
+	ErrTaskNameExists    = errors.New("task name already exists")
+	ErrScheduleNotFound  = errors.New("schedule not found")
+	ErrRunNotFound       = errors.New("run not found")
 
-	// ErrTaskNameExists 任务名已存在
-	ErrTaskNameExists = errors.New("task name already exists")
-
-	// ErrScheduleNotFound 定时任务未找到
-	ErrScheduleNotFound = errors.New("schedule not found")
-
-	// ErrRunNotFound 运行记录未找到
-	ErrRunNotFound = errors.New("run not found")
+	ErrAuthEmptyCredentials  = errors.New("username and password required")
+	ErrAuthPasswordTooShort  = errors.New("password must be at least 6 characters")
+	ErrAuthUserExists        = errors.New("username already exists")
+	ErrAuthInvalidCredential = errors.New("invalid username or password")
+	ErrAuthRefreshRequired   = errors.New("refreshToken required")
+	ErrAuthRefreshInvalid    = errors.New("invalid or expired refreshToken")
+	ErrAuthOldPasswordEmpty  = errors.New("old password required")
+	ErrAuthOldPasswordWrong  = errors.New("old password is incorrect")
+	ErrAuthUsernameTaken     = errors.New("username is already taken")
+	ErrAuthUserNotFound      = errors.New("user not found")
 )

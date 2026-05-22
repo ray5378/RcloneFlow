@@ -14,6 +14,7 @@ type Hub struct {
 	register   chan *Client
 	unregister chan *Client
 	mu         sync.RWMutex
+	done       chan struct{}
 }
 
 // Client represents a WebSocket client connection
@@ -36,6 +37,16 @@ func NewHub() *Hub {
 		broadcast:  make(chan []byte, 256),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		done:       make(chan struct{}),
+	}
+}
+
+func (h *Hub) Stop() {
+	select {
+	case <-h.done:
+		return
+	default:
+		close(h.done)
 	}
 }
 
@@ -56,6 +67,14 @@ func (h *Hub) removeClient(client *Client) {
 func (h *Hub) Run() {
 	for {
 		select {
+		case <-h.done:
+			h.mu.Lock()
+			for client := range h.clients {
+				delete(h.clients, client)
+				close(client.send)
+			}
+			h.mu.Unlock()
+			return
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true

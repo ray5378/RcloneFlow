@@ -43,7 +43,7 @@ export async function getRemoteOrder(): Promise<string[]> {
   const data = await res.json()
   const order = data.remote?.REMOTE_ORDER?.effective || ''
   if (!order) return []
-  return order.split(',').map(s => s.trim()).filter(Boolean)
+  return order.split(',').map((s: string) => s.trim()).filter(Boolean)
 }
 
 export async function saveRemoteOrder(order: string[]): Promise<void> {

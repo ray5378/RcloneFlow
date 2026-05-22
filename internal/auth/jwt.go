@@ -11,16 +11,17 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"rcloneflow/internal/config"
 )
 
+// jwtSecret 在包初始化时生成或读取。
+// panic 可接受：Linux 下 crypto/rand.Read 走 /dev/urandom 不会失败；
+// 若真的失败说明系统 CSPRNG 不可用，后续所有认证都不可工作，立即终止是正确的。
 var jwtSecret = func() []byte {
 	if s := os.Getenv("JWT_SECRET"); s != "" {
 		return []byte(s)
 	}
-	dataDir := os.Getenv("APP_DATA_DIR")
-	if dataDir == "" {
-		dataDir = "./data"
-	}
+	dataDir := config.DataDir()
 	secretFile := filepath.Join(dataDir, ".jwt_secret")
 	if existing, err := os.ReadFile(secretFile); err == nil && len(existing) > 0 {
 		return existing

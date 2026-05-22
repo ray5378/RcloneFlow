@@ -42,6 +42,8 @@ const emit = defineEmits<{
   'source-click': [item: PathBrowseItem]
   'target-arrow': [item: PathBrowseItem]
   'target-click': [item: PathBrowseItem]
+  'source-breadcrumb-click': [path: string]
+  'target-breadcrumb-click': [path: string]
   'submit': []
 }>()
 

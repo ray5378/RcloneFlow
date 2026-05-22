@@ -44,7 +44,8 @@ func (s *Scheduler) RemoveSchedule(id int64) {
 	}
 }
 
-// New 创建调度器（默认使用 RC 运行器，保持向后兼容）
+// New 创建调度器（默认使用 RC 运行器）。
+// 生产环境应使用 NewWithRunner 以通过 CLI Runner 产出 stderr 日志文件。
 func New(db *store.DB, rc *adapter.RcloneClient) *Scheduler {
 	return &Scheduler{
 		cron:    cron.New(cron.WithSeconds()),

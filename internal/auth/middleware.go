@@ -15,16 +15,9 @@ const usernameKey contextKey = "username"
 // JWTMiddleware JWT认证中间件
 func JWTMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// 兼容 GET 请求带 ?auth=token 的方式（用于下载和浏览器直开 GET 接口）
 		tok := ""
-		if r.Method == http.MethodGet {
-			if q := r.URL.Query().Get("auth"); q != "" {
-				tok = q
-			}
-		}
-		// 优先 Authorization 头
 		authHeader := r.Header.Get("Authorization")
-		if tok == "" && authHeader != "" {
+		if authHeader != "" {
 			parts := strings.SplitN(authHeader, " ", 2)
 			if len(parts) == 2 && parts[0] == "Bearer" {
 				tok = parts[1]
@@ -35,14 +28,12 @@ func JWTMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// 验证token
 		claims, err := ValidateToken(tok)
 		if err != nil {
 			http.Error(w, `{"error":"token无效或已过期"}`, http.StatusUnauthorized)
 			return
 		}
 
-		// 将用户信息存入context
 		ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
 		ctx = context.WithValue(ctx, usernameKey, claims.Username)
 		next.ServeHTTP(w, r.WithContext(ctx))

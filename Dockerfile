@@ -44,26 +44,35 @@ RUN set -eux; \
       *) rclone_arch=amd64 ;; \
     esac; \
     ver="${RCLONE_VERSION:-v1.73.4}"; \
-    urls="https://github.com/rclone/rclone/releases/download/${ver}/rclone-${ver}-linux-${rclone_arch}.zip https://downloads.rclone.org/${ver}/rclone-${ver}-linux-${rclone_arch}.zip"; \
-    rm -f /tmp/rclone.zip; \
-    for u in $urls; do \
-      echo "Trying $u"; \
-      if curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors --connect-timeout 5 -o /tmp/rclone.zip "$u"; then \
-        break; \
-      fi; \
-    done; \
+    base="https://github.com/rclone/rclone/releases/download/${ver}"; \
     rm -rf /tmp/rclone-extract && mkdir -p /tmp/rclone-extract /out; \
-    if [ -s /tmp/rclone.zip ]; then \
+    sha_url="${base}/rclone-${ver}-linux-${rclone_arch}.zip.sha256sum"; \
+    zip_url="${base}/rclone-${ver}-linux-${rclone_arch}.zip"; \
+    echo "Downloading rclone ${ver} for ${rclone_arch}"; \
+    curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors --connect-timeout 5 \
+      -o /tmp/rclone.sha256 "${sha_url}" || true; \
+    if [ -s /tmp/rclone.sha256 ]; then \
+      curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors --connect-timeout 5 \
+        -o /tmp/rclone.zip "${zip_url}"; \
+      echo "Verifying rclone checksum..."; \
+      cd /tmp && sha256sum -c rclone.sha256; \
       unzip -q /tmp/rclone.zip -d /tmp/rclone-extract; \
       cp /tmp/rclone-extract/rclone-*/rclone /out/rclone; \
       chmod +x /out/rclone; \
-      rm -rf /tmp/rclone.zip /tmp/rclone-extract; \
+      echo "rclone verified and extracted"; \
+    elif [ -s /tmp/rclone.zip ] || curl -fsSL --retry 8 --retry-delay 2 --retry-all-errors --connect-timeout 5 \
+      -o /tmp/rclone.zip "${zip_url}"; then \
+      echo "WARNING: SHA256SUM not available, skipping verification"; \
+      unzip -q /tmp/rclone.zip -d /tmp/rclone-extract; \
+      cp /tmp/rclone-extract/rclone-*/rclone /out/rclone; \
+      chmod +x /out/rclone; \
     else \
       echo "rclone zip unavailable, falling back to apk rclone"; \
       (apk add --no-cache rclone || (apk update && apk add --no-cache rclone)); \
       cp /usr/bin/rclone /out/rclone; \
       chmod +x /out/rclone; \
-    fi
+    fi; \
+    rm -rf /tmp/rclone.zip /tmp/rclone.sha256 /tmp/rclone-extract
 RUN go build -ldflags="-s -w" -o /out/server ./cmd/server
 
 # Stage 3: runtime (Alpine)
