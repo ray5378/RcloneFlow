@@ -5,6 +5,7 @@ describe('useRunDetailRuntime', () => {
   it('should initialize and return expected properties', () => {
     const runApi = {
       getRunStatus: async () => ({ data: { log: '' } }),
+      getFiles: async () => ({ items: [], total: 0 }),
     }
 
     const runtime = useRunDetailRuntime({ runApi })
@@ -22,6 +23,7 @@ describe('useRunDetailRuntime', () => {
   it('should open and close modal', () => {
     const runApi = {
       getRunStatus: async () => ({ data: { log: '' } }),
+      getFiles: async () => ({ items: [], total: 0 }),
     }
 
     const { showDetailModal, openRunDetailModal, closeRunDetailModal, runDetail } = useRunDetailRuntime({ runApi })

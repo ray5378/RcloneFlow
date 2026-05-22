@@ -2,6 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { ref } from 'vue'
 import { useTaskViewDataSync } from './useTaskViewDataSync'
 
+vi.mock('../api', () => ({
+  getGlobalStats: vi.fn().mockResolvedValue({}),
+}))
+
 describe('useTaskViewDataSync', () => {
   const createOptions = () => ({
     tasks: ref([]),

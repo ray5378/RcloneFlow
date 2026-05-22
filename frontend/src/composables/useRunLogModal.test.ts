@@ -31,27 +31,17 @@ describe('useRunLogModal', () => {
     expect(logContent.value).toBe('log data')
   })
 
-  it('should handle fetch failure with fallback', async () => {
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({
-        ok: true,
-        arrayBuffer: () => new TextEncoder().encode('log content').buffer,
-      })
+  it('should handle fetch failure with error message', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 500,
+      text: () => 'error',
+    })
 
     const { logContent, openRunLog } = useRunLogModal()
     await openRunLog({ id: 1 })
-    expect(logContent.value).toBe('log content')
-  })
-
-  it('should handle fallback failure', async () => {
-    global.fetch = vi.fn()
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: false, status: 500, text: () => 'error' })
-
-    const { logContent, openRunLog } = useRunLogModal()
-    await openRunLog({ id: 2 })
     expect(logContent.value).toContain('modal.loadFailed')
+    expect(logContent.value).toContain('500')
   })
 
   it('should handle network error', async () => {
