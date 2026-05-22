@@ -162,8 +162,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		if maxCASAttempts < 1 {
 			maxCASAttempts = 1
 		}
-		args = forceFlagValue(args, "--retries", "1")
-		args = forceFlagValue(args, "--low-level-retries", "1")
+		args = forceFlagValue(args, "--retries", "0")
+		args = forceFlagValue(args, "--low-level-retries", "0")
 	}
 	// 强制启用 JSON 日志：作为系统默认行为，不再提供任务级开关。
 	args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
@@ -521,6 +521,29 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			r.mu.Unlock()
 			return
 			}
+		}
+		if runCtx.Err() != nil {
+			_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
+				rr.Status = "stopped"
+				if rr.Summary == nil {
+					rr.Summary = map[string]any{}
+				}
+				rr.Summary["finished"] = true
+				rr.Summary["success"] = false
+				fin := time.Now().Local()
+				rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
+			})
+			r.broadcaster.Broadcast("run_status", map[string]any{
+				"run_id": run.ID,
+				"status": "stopped",
+			})
+			if r.activeMgr != nil {
+				r.activeMgr.RemoveState(run.ID)
+			}
+			r.mu.Lock()
+			delete(r.procs, run.ID)
+			r.mu.Unlock()
+			return
 		}
 		if casCompat != nil {
 			if postErr := casCompat.ApplyPostActions(cfg, src, dst, originalCmdName); postErr != nil {

@@ -473,8 +473,8 @@ func TestStart_CASManagedRetries_AllCASMatchedFinishesWithoutRestart(t *testing.
 	if copyRuns != 1 {
 		t.Fatalf("copy runs=%d, want 1; calls=%v", copyRuns, calls)
 	}
-	if !containsCallArg(calls, "--retries 1") {
-		t.Fatalf("expected cas-managed retries to force --retries 1, calls=%v", calls)
+	if !containsCallArg(calls, "--retries 0") {
+		t.Fatalf("expected cas-managed retries to force --retries 0, calls=%v", calls)
 	}
 }
 
