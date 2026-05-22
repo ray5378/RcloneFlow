@@ -76,6 +76,7 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 	lines := strings.Split(string(b), "\n")
 	sizes := map[string]int64{}
 	for _, ln := range lines {
+		// 1) 从文本格式的 fileLineRe 提取（老版本逻辑）
 		if m := fileLineRe.FindStringSubmatch(ln); len(m) > 0 {
 			name := strings.TrimSpace(m[1])
 			var tb float64
@@ -83,6 +84,19 @@ func buildFinalSummaryFilesFromLog(logPath string, openlistCASCompatible bool, m
 			total := int64(tb * unitToMul(m[5]))
 			if total > 0 {
 				sizes[name] = total
+			}
+		}
+		// 2) 从原始 JSON 行提取 size 数据（新增，用于非 CAS 链路）
+		var rec map[string]any
+		if json.Unmarshal([]byte(ln), &rec) == nil {
+			if obj, ok := rec["object"].(string); ok && obj != "" {
+				// 先看有没有直接的 size 字段
+				if sz, ok := rec["size"]; ok {
+					if szF, ok := sz.(float64); ok && szF > 0 {
+						sizes[strings.TrimSpace(obj)] = int64(szF)
+					}
+				}
+				// 或者看 stats 下面的 transferring 的 size（不过一般单独的行里有 object 和 size）
 			}
 		}
 	}
