@@ -39,7 +39,7 @@ export function useTaskWebhookConfig(options: {
       webhookForm.value.wecomUrl = opts?.wecomPostUrl || ''
       webhookForm.value.triggerId = opts?.webhookId || ''
       webhookForm.value.matchText = opts?.webhookMatchText || ''
-      webhookForm.value.webhookSecret = opts?.webhookSecret || generateSecret()
+      webhookForm.value.webhookSecret = opts?.webhookSecret || ''
       const n = opts?.webhookNotifyOn || {}
       webhookForm.value.notify = {
         manual: !!n.manual,
@@ -59,7 +59,7 @@ export function useTaskWebhookConfig(options: {
       webhookForm.value.matchText = ''
       webhookForm.value.notify = { manual: false, schedule: false, webhook: false }
       webhookForm.value.status = { success: true, failed: true, hasTransfer: false }
-      webhookForm.value.webhookSecret = generateSecret()
+      webhookForm.value.webhookSecret = ''
     }
     showWebhookModal.value = true
   }

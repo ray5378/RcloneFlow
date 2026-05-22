@@ -82,12 +82,11 @@ func (c *WebhookController) HandleTrigger(w http.ResponseWriter, r *http.Request
 	// shouldTrigger 先验证任务密钥，再验证匹配字段
 	shouldTrigger := func(opts map[string]any) (bool, string) {
 		taskSecret := strings.TrimSpace(toString(opts["webhookSecret"]))
-		if taskSecret == "" {
-			return false, "secret_not_set"
-		}
-		if globalSecret == "" {
-			if providedSecret == "" || subtle.ConstantTimeCompare([]byte(providedSecret), []byte(taskSecret)) != 1 {
-				return false, "secret_mismatch"
+		if taskSecret != "" {
+			if globalSecret == "" {
+				if providedSecret == "" || subtle.ConstantTimeCompare([]byte(providedSecret), []byte(taskSecret)) != 1 {
+					return false, "secret_mismatch"
+				}
 			}
 		}
 		matchText := strings.TrimSpace(toString(opts["webhookMatchText"]))
