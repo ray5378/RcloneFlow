@@ -25,6 +25,12 @@ var loginLimiter = &rateLimiter{
 	window:   5 * time.Minute,
 }
 
+func resetLoginLimiter() {
+	loginLimiter.mu.Lock()
+	loginLimiter.attempts = make(map[string][]time.Time)
+	loginLimiter.mu.Unlock()
+}
+
 func (rl *rateLimiter) allow(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()

@@ -101,6 +101,7 @@ func TestAuthController_Register_InvalidJSON(t *testing.T) {
 }
 
 func TestAuthController_Login_Success(t *testing.T) {
+	resetLoginLimiter()
 	db := setupAuthTestDB(t)
 	ctrl := NewAuthController(service.NewAuthService(db))
 
@@ -126,6 +127,7 @@ func TestAuthController_Login_Success(t *testing.T) {
 }
 
 func TestAuthController_Login_WrongPassword(t *testing.T) {
+	resetLoginLimiter()
 	db := setupAuthTestDB(t)
 	ctrl := NewAuthController(service.NewAuthService(db))
 
@@ -145,6 +147,7 @@ func TestAuthController_Login_WrongPassword(t *testing.T) {
 }
 
 func TestAuthController_Login_UserNotFound(t *testing.T) {
+	resetLoginLimiter()
 	db := setupAuthTestDB(t)
 	ctrl := NewAuthController(service.NewAuthService(db))
 
@@ -157,6 +160,7 @@ func TestAuthController_Login_UserNotFound(t *testing.T) {
 }
 
 func TestAuthController_Login_EmptyFields(t *testing.T) {
+	resetLoginLimiter()
 	db := setupAuthTestDB(t)
 	ctrl := NewAuthController(service.NewAuthService(db))
 

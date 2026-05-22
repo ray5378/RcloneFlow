@@ -36,16 +36,32 @@ func ParseLogSegment(seg string) (at, level, path, msg string, ok bool) {
 	}
 	var rec map[string]any
 	if json.Unmarshal([]byte(strings.TrimSpace(seg)), &rec) == nil {
-		level = strings.ToUpper(strings.TrimSpace(fmt.Sprint(rec["level"])))
-		msg = strings.TrimSpace(fmt.Sprint(rec["msg"]))
-		path = strings.TrimSpace(fmt.Sprint(rec["object"]))
-		at = strings.TrimSpace(fmt.Sprint(rec["time"]))
+		level = upperOrEmpty(rec, "level")
+		msg = strOrEmpty(rec, "msg")
+		path = strOrEmpty(rec, "object")
+		at = strOrEmpty(rec, "time")
 		if at == "" {
-			at = strings.TrimSpace(fmt.Sprint(rec["timestamp"]))
+			at = strOrEmpty(rec, "timestamp")
 		}
 		if msg != "" {
 			return at, level, path, msg, true
 		}
 	}
 	return "", "", "", "", false
+}
+
+func strOrEmpty(m map[string]any, key string) string {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(v))
+}
+
+func upperOrEmpty(m map[string]any, key string) string {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return ""
+	}
+	return strings.ToUpper(strings.TrimSpace(fmt.Sprint(v)))
 }
