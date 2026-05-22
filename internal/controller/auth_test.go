@@ -365,6 +365,39 @@ func TestAuthController_ChangePassword_UpdateUsername(t *testing.T) {
 	assert.Equal(t, "newname", user["username"])
 }
 
+func TestMapAuthError(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantCode   int
+		wantMsg    string
+	}{
+		{"empty credentials", service.ErrAuthEmptyCredentials, 400, "username and password required"},
+		{"password too short", service.ErrAuthPasswordTooShort, 400, "password must be at least 6 characters"},
+		{"user exists", service.ErrAuthUserExists, 409, "用户名已存在"},
+		{"invalid credential", service.ErrAuthInvalidCredential, 401, "用户名或密码错误"},
+		{"refresh required", service.ErrAuthRefreshRequired, 400, "refreshToken required"},
+		{"refresh invalid", service.ErrAuthRefreshInvalid, 401, "invalid or expired refreshToken"},
+		{"old password empty", service.ErrAuthOldPasswordEmpty, 400, "请提供旧密码"},
+		{"old password wrong", service.ErrAuthOldPasswordWrong, 401, "旧密码错误"},
+		{"username taken", service.ErrAuthUsernameTaken, 409, "用户名已被占用"},
+		{"user not found", service.ErrAuthUserNotFound, 404, "user not found"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			code, msg := mapAuthError(tt.err)
+			assert.Equal(t, tt.wantCode, code)
+			assert.Equal(t, tt.wantMsg, msg)
+		})
+	}
+}
+
+func TestMapAuthError_Default(t *testing.T) {
+	code, msg := mapAuthError(assert.AnError)
+	assert.Equal(t, 500, code)
+	assert.Equal(t, "internal error", msg)
+}
+
 func TestAuthController_ChangePassword_UsernameTaken(t *testing.T) {
 	db := setupAuthTestDB(t)
 	ctrl := NewAuthController(service.NewAuthService(db))

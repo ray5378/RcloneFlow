@@ -1,10 +1,13 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"rcloneflow/internal/service"
 )
 
 func TestWriteJSON(t *testing.T) {
@@ -67,5 +70,40 @@ func TestDecodeRequestInvalid(t *testing.T) {
 	err := DecodeRequest(httptest.NewRecorder(), req, &result)
 	if err == nil {
 		t.Error("expected error for invalid JSON")
+	}
+}
+
+func TestMapServiceError(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		wantCode int
+		wantMsg  string
+	}{
+		{"task not found", service.ErrTaskNotFound, 404, "task not found"},
+		{"task name exists", service.ErrTaskNameExists, 409, "task name already exists"},
+		{"schedule not found", service.ErrScheduleNotFound, 404, "schedule not found"},
+		{"run not found", service.ErrRunNotFound, 404, "run not found"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			msg, code := mapServiceError(tt.err)
+			if msg != tt.wantMsg {
+				t.Errorf("msg = %q, want %q", msg, tt.wantMsg)
+			}
+			if code != tt.wantCode {
+				t.Errorf("code = %d, want %d", code, tt.wantCode)
+			}
+		})
+	}
+}
+
+func TestMapServiceError_Default(t *testing.T) {
+	msg, code := mapServiceError(errors.New("unknown error"))
+	if msg != "internal error" {
+		t.Errorf("msg = %q, want \"internal error\"", msg)
+	}
+	if code != 500 {
+		t.Errorf("code = %d, want 500", code)
 	}
 }
