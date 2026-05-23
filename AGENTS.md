@@ -10,7 +10,7 @@ RcloneFlow = rclone + Web UI。Go (Gin) 后端 + Vue 3 / TypeScript / Vite 前�
 
 ### 后端
 ```bash
-go build -o server ./cmd/server   # 编译
+go build -ldflags="-X rcloneflow/internal/version.CommitHash=$(git rev-parse --short HEAD)" -o server ./cmd/server   # 编译
 ./server                           # 运行（读取 config.yaml 或环境变量）
 ```
 
@@ -26,7 +26,7 @@ npm run test    # vitest 运行（happy-dom，覆盖 src/api/）
 ### Docker
 ```bash
 docker compose up -d --build       # 完整构建 + 启动
-docker build --no-cache -t ray5378/rcloneflow:dev .
+docker build --build-arg GIT_HASH=$(git rev-parse --short HEAD) --no-cache -t ray5378/rcloneflow:dev .
 ```
 
 ### CI (GitHub Actions)

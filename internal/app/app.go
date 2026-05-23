@@ -120,8 +120,11 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 	}
 	tagCtrl := controller.NewTagController(tagSvc)
 
+	// 版本信息
+	versionCtrl := controller.NewVersionController(rc)
+
 	// 初始化路由
-	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, cfg.GetStaticDir())
+	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl, cfg.GetStaticDir())
 
 	// 注入 settings → cleanup 重排钩子（在声明服务之后再赋值）
 	var cleanupSvc *service.CleanupService

@@ -7,7 +7,6 @@ import * as api from '../api'
 import type { RemoteTestState, FileItem } from '../types'
 
 defineProps<{
-  version: string
 }>()
 
 const emit = defineEmits<{

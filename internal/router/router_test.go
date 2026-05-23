@@ -131,7 +131,7 @@ func TestStaticFileHandler_LargeFile(t *testing.T) {
 }
 
 func TestRouter_New(t *testing.T) {
-	r := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, "/static")
+	r := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, "/static")
 	assert.NotNil(t, r)
 	assert.Equal(t, "/static", r.staticDir)
 }
@@ -158,12 +158,13 @@ func setupRouterTest(t *testing.T) *Router {
 	authCtrl := controller.NewAuthController(authSvc)
 	activeTransferCtrl := controller.NewActiveTransferController(nil, runSvc)
 	tagCtrl := controller.NewTagController(service.NewTagService(db))
+	versionCtrl := controller.NewVersionController(rc)
 
 	staticDir := filepath.Join(tmpDir, "web")
 	os.MkdirAll(staticDir, 0755)
 	os.WriteFile(filepath.Join(staticDir, "index.html"), []byte("RcloneFlow UI"), 0644)
 
-	return New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, staticDir)
+	return New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl, staticDir)
 }
 
 func TestRouter_Setup_Healthz(t *testing.T) {

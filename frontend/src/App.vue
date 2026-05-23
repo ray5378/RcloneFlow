@@ -12,6 +12,7 @@ import { registerToast } from './api/errors'
 import * as api from './api'
 import { getSettings } from './api/settings'
 import { isLoggedIn as checkAuth, getUser, logout, changePassword, me, hasUsers } from './api/auth'
+import { getVersion } from './api/version'
 import { locale, toggleLocale, t } from './i18n'
 
 const { toasts, showToast } = useToastCenter()
@@ -30,7 +31,6 @@ onUnmounted(() => { toastCleanup?.() })
 
 const currentPage = ref(localStorage.getItem('currentPage') || (location.hash.replace('#', '') || 'browser'))
 const taskViewKey = ref(0)
-const version = ref(t('common.loading'))
 const isLight = ref(localStorage.getItem('theme') === 'light')
 const isAuth = ref(false)
 const authChecked = ref(false)
@@ -39,6 +39,8 @@ const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
 const showDefaultsModal = ref(false)
 const showTaskManagerModal = ref(false)
+const showVersionModal = ref(false)
+const versionInfo = ref<{ commitHash: string; rcloneVersion: string } | null>(null)
 const showMobileMenu = ref(false)
 
 const user = getUser()
@@ -86,12 +88,6 @@ function handleDefaultsSaved(_values: Record<string, string>) {
 
 async function handleLoginSuccess() {
   isAuth.value = true
-  try {
-    const data = await api.listRemotes()
-    version.value = data.version || t('common.unknown')
-  } catch {
-    version.value = t('common.offline')
-  }
   await loadRuntimeSettings()
 }
 
@@ -126,6 +122,16 @@ function openGitHub() {
   window.open('https://github.com/ray5378/RcloneFlow/tree/master', '_blank')
 }
 
+async function openVersionModal() {
+  showVersionModal.value = true
+  versionInfo.value = null
+  try {
+    versionInfo.value = await getVersion()
+  } catch {
+    versionInfo.value = { commitHash: '-', rcloneVersion: '-' }
+  }
+}
+
 onMounted(async () => {
   if (isLight.value) document.body.classList.add('light')
   const hash = (location.hash || '').replace('#', '')
@@ -146,12 +152,6 @@ onMounted(async () => {
   }
   isAuth.value = true
   authChecked.value = true
-  try {
-    const data = await api.listRemotes()
-    version.value = data.version || t('common.unknown')
-  } catch {
-    version.value = t('common.offline')
-  }
   await loadRuntimeSettings()
 })
 </script>
@@ -166,7 +166,7 @@ onMounted(async () => {
           <span v-if="!showMobileMenu">☰</span>
           <span v-else>✕</span>
         </button>
-        <div class="header-brand">RcloneFlow <small>{{ version }}</small></div>
+        <div class="header-brand">RcloneFlow</div>
         <nav v-if="!isMobile" class="header-nav">
           <button v-for="(page, key) in pages" :key="key" :class="{ active: currentPage === key }" @click="switchPage(key)">
             <span class="nav-icon">{{ page.icon }}</span>
@@ -200,7 +200,7 @@ onMounted(async () => {
       </transition>
 
       <main class="main">
-        <BrowserView v-if="currentPage === 'browser'" :version="version" />
+        <BrowserView v-if="currentPage === 'browser'" />
         <TaskView v-if="currentPage === 'tasks'" :key="taskViewKey" />
       </main>
 
@@ -234,6 +234,11 @@ onMounted(async () => {
             <div class="settings-item" @click="showTaskManagerModal = true">
               <span class="settings-icon">📦</span>
               <span class="settings-text">{{ t('settings.taskManager') }}</span>
+              <span class="settings-arrow">›</span>
+            </div>
+            <div class="settings-item" @click="openVersionModal">
+              <span class="settings-icon">ℹ️</span>
+              <span class="settings-text">{{ t('settings.version') }}</span>
               <span class="settings-arrow">›</span>
             </div>
             <div class="settings-item" @click="openGitHub">
@@ -283,6 +288,28 @@ onMounted(async () => {
 
       <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal = false" @settings-saved="handleDefaultsSaved" />
       <TaskManagerModal v-if="showTaskManagerModal" @close="showTaskManagerModal = false" @refresh="taskViewKey++" />
+
+      <div v-if="showVersionModal" class="modal-overlay" @click.self="showVersionModal = false">
+        <div class="modal-content settings-modal">
+          <div class="modal-header">
+            <h3>{{ t('version.title') }}</h3>
+            <button class="close-btn" @click="showVersionModal = false">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="version-field">
+              <label>{{ t('version.commitHash') }}</label>
+              <code>{{ versionInfo?.commitHash ?? t('common.loading') }}</code>
+            </div>
+            <div class="version-field">
+              <label>{{ t('version.rcloneVersion') }}</label>
+              <code>{{ versionInfo?.rcloneVersion ?? t('common.loading') }}</code>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="primary" @click="showVersionModal = false">{{ t('modal.close') }}</button>
+          </div>
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -332,7 +359,7 @@ onMounted(async () => {
 .modal-footer .primary { background: #64b5f6; border: none; color: #fff; }
 body.light .app { background: #f5f7fb; color: #1a1a1a; }
 body.light .header { background: rgba(255,255,255,.86); border-bottom-color: #e6e8ec; }
-body.light .header-brand small, body.light .version-info, body.light .field-item label, body.light .settings-arrow { color: #666; }
+body.light .field-item label, body.light .settings-arrow { color: #666; }
 body.light .header-nav button { color: #555; }
 body.light .settings-btn { border-color: #ddd; color: #444; }
 body.light .settings-btn:hover, body.light .settings-item:hover { border-color: #64b5f6; }
@@ -352,5 +379,9 @@ body.light .modal-footer .ghost { border-color: #ddd; color: #666; }
 .toast.error { background: #ef4444; color: #fff; }
 .toast.warning { background: #f59e0b; color: #fff; }
 @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+.version-field { margin-bottom: 16px; }
+.version-field label { display: block; font-size: 13px; color: #888; margin-bottom: 6px; }
+.version-field code { display: block; padding: 10px 12px; border: 1px solid #333; border-radius: 8px; background: #252525; color: #e0e0e0; font-size: 14px; font-family: monospace; }
+body.light .version-field label { color: #666; }
+body.light .version-field code { background: #f5f5f5; border-color: #ddd; color: #1a1a1a; }
 </style>
-tyle>

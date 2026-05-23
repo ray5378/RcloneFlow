@@ -22,6 +22,7 @@ type Router struct {
 	authCtrl           *controller.AuthController
 	activeTransferCtrl *controller.ActiveTransferController
 	tagCtrl            *controller.TagController
+	versionCtrl        *controller.VersionController
 	staticDir          string
 }
 
@@ -36,6 +37,7 @@ func New(
 	authCtrl *controller.AuthController,
 	activeTransferCtrl *controller.ActiveTransferController,
 	tagCtrl *controller.TagController,
+	versionCtrl *controller.VersionController,
 	staticDir string,
 ) *Router {
 	return &Router{
@@ -48,6 +50,7 @@ func New(
 		authCtrl:           authCtrl,
 		activeTransferCtrl: activeTransferCtrl,
 		tagCtrl:            tagCtrl,
+		versionCtrl:        versionCtrl,
 		staticDir:          staticDir,
 	}
 }
@@ -138,6 +141,9 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/runs", r.runCtrl.HandleRuns)
 	apiMux.HandleFunc("/api/runs/active", r.runCtrl.HandleActiveRuns)
 	apiMux.HandleFunc("/api/stats/global", r.runCtrl.HandleGlobalStats)
+
+	// 版本信息
+	apiMux.HandleFunc("/api/version", r.versionCtrl.HandleVersion)
 
 	// 设置中心
 	apiMux.HandleFunc("/api/settings", controller.NewSettingsController().HandleSettings)

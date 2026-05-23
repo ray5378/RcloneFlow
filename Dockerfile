@@ -34,6 +34,7 @@ COPY . .
 ENV CGO_ENABLED=1 GOOS=linux
 ARG TARGETARCH
 ENV GOARCH=${TARGETARCH}
+ARG GIT_HASH=unknown
 ARG RCLONE_VERSION=v1.73.4
 RUN set -eux; \
     case "${TARGETARCH}" in \
@@ -72,7 +73,7 @@ RUN set -eux; \
       chmod +x /out/rclone; \
     fi; \
     rm -rf /tmp/rclone.zip /tmp/rclone.sha256 /tmp/rclone-extract
-RUN go build -ldflags="-s -w" -o /out/server ./cmd/server
+RUN go build -ldflags="-X rcloneflow/internal/version.CommitHash=${GIT_HASH} -s -w" -o /out/server ./cmd/server
 
 # Stage 3: runtime (Alpine)
 FROM alpine:3.19

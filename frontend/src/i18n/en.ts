@@ -23,8 +23,14 @@ export default {
     lightMode: 'Light mode',
     defaults: 'Defaults',
     taskManager: 'Task Manager',
+    version: 'Version',
     star: 'Give the project a Star',
     logout: 'Sign out',
+  },
+  version: {
+    title: 'Version Info',
+    commitHash: 'Build Version',
+    rcloneVersion: 'Rclone Version',
   },
   browser: {
     title: 'Storage',

@@ -23,8 +23,14 @@ export default {
     lightMode: '浅色模式',
     defaults: '默认配置',
     taskManager: '任务管理',
+    version: '版本号',
     star: '给项目点个 Star',
     logout: '退出登录',
+  },
+  version: {
+    title: '版本信息',
+    commitHash: '项目版本',
+    rcloneVersion: 'Rclone 版本',
   },
   browser: {
     title: '存储管理',

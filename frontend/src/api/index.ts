@@ -45,3 +45,7 @@ export { login, register, logout, getToken, isLoggedIn, getUser, changePassword 
 
 // ============ Settings API ============
 export { getSettings, saveSettings, resetSettings, getRemoteOrder, saveRemoteOrder } from './settings'
+
+// ============ Version API ============
+export { getVersion } from './version'
+export type { VersionInfo } from './version'
