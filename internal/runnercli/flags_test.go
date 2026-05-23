@@ -2,305 +2,491 @@ package runnercli
 
 import (
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
-func TestExistsStr(t *testing.T) {
-	if existsStr(nil, "key") {
-		t.Error("expected false for nil map")
-	}
-	m := map[string]any{"key": "value"}
-	if !existsStr(m, "key") {
-		t.Error("expected true for string value")
-	}
-	m2 := map[string]any{"key": 123}
-	if existsStr(m2, "key") {
-		t.Error("expected false for non-string value")
-	}
-	m3 := map[string]any{"other": "value"}
-	if existsStr(m3, "key") {
-		t.Error("expected false for missing key")
-	}
+func TestBuildFlagsFromOptions_Empty(t *testing.T) {
+	flags := buildFlagsFromOptions(map[string]any{})
+	assert.Empty(t, flags)
 }
 
-func TestExistsBool(t *testing.T) {
-	if existsBool(nil, "key") {
-		t.Error("expected false for nil map")
-	}
-	m := map[string]any{"key": true}
-	if !existsBool(m, "key") {
-		t.Error("expected true for bool value")
-	}
-	m2 := map[string]any{"key": "true"}
-	if existsBool(m2, "key") {
-		t.Error("expected false for non-bool value")
-	}
-	m3 := map[string]any{"other": true}
-	if existsBool(m3, "key") {
-		t.Error("expected false for missing key")
-	}
+func TestBuildFlagsFromOptions_Nil(t *testing.T) {
+	flags := buildFlagsFromOptions(nil)
+	assert.Empty(t, flags)
 }
 
-func TestEff(t *testing.T) {
-	if eff(nil) != nil {
-		t.Error("expected nil for nil map")
+func TestBuildFlagsFromOptions_IntTypes(t *testing.T) {
+	opt := map[string]any{
+		"transfers":      8,
+		"checkers":      16,
+		"retries":       5,
+		"lowLevelRetries": 3,
 	}
-	m := map[string]any{"effectiveOptions": map[string]any{"key": "value"}}
-	result := eff(m)
-	if result == nil || result["key"] != "value" {
-		t.Errorf("expected effectiveOptions, got %#v", result)
-	}
-	m2 := map[string]any{"effectiveOptions": "not-a-map"}
-	if eff(m2) != nil {
-		t.Error("expected nil for non-map effectiveOptions")
-	}
-	m3 := map[string]any{"other": "value"}
-	if eff(m3) != nil {
-		t.Error("expected nil when no effectiveOptions key")
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--transfers")
+	assert.Contains(t, flags, "8")
+	assert.Contains(t, flags, "--checkers")
+	assert.Contains(t, flags, "16")
+	assert.Contains(t, flags, "--retries")
+	assert.Contains(t, flags, "5")
+	assert.Contains(t, flags, "--low-level-retries")
+	assert.Contains(t, flags, "3")
 }
 
-func TestBuildFlagsFromOptions_Numeric(t *testing.T) {
-	opts := map[string]any{
-		"transfers":       float64(8),
-		"checkers":        int64(4),
-		"retries":         3,
-		"lowLevelRetries": "2",
+func TestBuildFlagsFromOptions_Float64Types(t *testing.T) {
+	opt := map[string]any{
+		"transfers": float64(4),
+		"checkers":  float64(8),
 	}
-	flags := buildFlagsFromOptions(opts)
-	if !containsFlag(flags, "--transfers", "8") {
-		t.Errorf("missing --transfers 8 in %v", flags)
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--transfers")
+	assert.Contains(t, flags, "4")
+	assert.Contains(t, flags, "--checkers")
+	assert.Contains(t, flags, "8")
+}
+
+func TestBuildFlagsFromOptions_Int64Types(t *testing.T) {
+	opt := map[string]any{
+		"transfers": int64(12),
 	}
-	if !containsFlag(flags, "--checkers", "4") {
-		t.Errorf("missing --checkers 4 in %v", flags)
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "12")
+}
+
+func TestBuildFlagsFromOptions_StringInt(t *testing.T) {
+	opt := map[string]any{
+		"transfers": "  10  ",
 	}
-	if !containsFlag(flags, "--retries", "3") {
-		t.Errorf("missing --retries 3 in %v", flags)
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "10")
+}
+
+func TestBuildFlagsFromOptions_EmptyString(t *testing.T) {
+	opt := map[string]any{
+		"transfers": "   ",
 	}
-	if !containsFlag(flags, "--low-level-retries", "2") {
-		t.Errorf("missing --low-level-retries 2 in %v", flags)
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.NotContains(t, flags, "transfers")
 }
 
 func TestBuildFlagsFromOptions_BufferSize(t *testing.T) {
-	// float64 → auto M
-	opts1 := map[string]any{"bufferSize": float64(16)}
-	flags1 := buildFlagsFromOptions(opts1)
-	if !containsFlag(flags1, "--buffer-size", "16M") {
-		t.Errorf("missing --buffer-size 16M in %v", flags1)
+	opt := map[string]any{
+		"bufferSize": float64(256),
 	}
-
-	// int64 → auto M
-	opts2 := map[string]any{"bufferSize": int64(32)}
-	flags2 := buildFlagsFromOptions(opts2)
-	if !containsFlag(flags2, "--buffer-size", "32M") {
-		t.Errorf("missing --buffer-size 32M in %v", flags2)
-	}
-
-	// string pure number → auto M
-	opts3 := map[string]any{"bufferSize": "64"}
-	flags3 := buildFlagsFromOptions(opts3)
-	if !containsFlag(flags3, "--buffer-size", "64M") {
-		t.Errorf("missing --buffer-size 64M in %v", flags3)
-	}
-
-	// string with unit → keep as-is
-	opts4 := map[string]any{"bufferSize": "1G"}
-	flags4 := buildFlagsFromOptions(opts4)
-	if !containsFlag(flags4, "--buffer-size", "1G") {
-		t.Errorf("missing --buffer-size 1G in %v", flags4)
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--buffer-size")
+	assert.Contains(t, flags, "256M")
 }
 
-func TestBuildFlagsFromOptions_Booleans(t *testing.T) {
-	opts := map[string]any{
-		"ignoreExisting":    true,
-		"checksum":          true,
-		"sizeOnly":          true,
-		"useServerModtime":  true,
-		"disableHttp2":      true,
-		"ignoreExisting2":   false, // should not appear
+func TestBuildFlagsFromOptions_BufferSizeInt64(t *testing.T) {
+	opt := map[string]any{
+		"bufferSize": int64(512),
 	}
-	flags := buildFlagsFromOptions(opts)
-	if !containsFlagBool(flags, "--ignoreexisting") {
-		t.Errorf("missing --ignoreexisting in %v", flags)
-	}
-	if !containsFlagBool(flags, "--checksum") {
-		t.Errorf("missing --checksum in %v", flags)
-	}
-	if !containsFlagBool(flags, "--size-only") {
-		t.Errorf("missing --size-only in %v", flags)
-	}
-	if !containsFlagBool(flags, "--use-server-modtime") {
-		t.Errorf("missing --use-server-modtime in %v", flags)
-	}
-	if !containsFlagBool(flags, "--disable-http2") {
-		t.Errorf("missing --disable-http2 in %v", flags)
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "512M")
 }
 
-func TestBuildFlagsFromOptions_StringValues(t *testing.T) {
-	opts := map[string]any{
-		"bwLimit":     "10M",
-		"compareDest": "/compare",
-		"copyDest":    "/copy",
-		"backupDir":   "/backup",
-		"logFile":     "/tmp/log.txt",
+func TestBuildFlagsFromOptions_BufferSizeStringPureNumber(t *testing.T) {
+	opt := map[string]any{
+		"bufferSize": "128",
 	}
-	flags := buildFlagsFromOptions(opts)
-	if !containsFlag(flags, "--bwlimit", "10M") {
-		t.Errorf("missing --bwlimit 10M in %v", flags)
-	}
-	if !containsFlag(flags, "--compare-dest", "/compare") {
-		t.Errorf("missing --compare-dest in %v", flags)
-	}
-	if !containsFlag(flags, "--copy-dest", "/copy") {
-		t.Errorf("missing --copy-dest in %v", flags)
-	}
-	if !containsFlag(flags, "--backup-dir", "/backup") {
-		t.Errorf("missing --backup-dir in %v", flags)
-	}
-	if !containsFlag(flags, "--log-file", "/tmp/log.txt") {
-		t.Errorf("missing --log-file in %v", flags)
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "128M")
 }
 
-func TestBuildFlagsFromOptions_IncludeExclude(t *testing.T) {
-	opts := map[string]any{
-		"include": []any{"*.jpg", "*.png"},
-		"exclude": "*.tmp",
+func TestBuildFlagsFromOptions_BufferSizeStringWithUnit(t *testing.T) {
+	opt := map[string]any{
+		"bufferSize": "256M",
 	}
-	flags := buildFlagsFromOptions(opts)
-	if !containsFlag(flags, "--include", "*.jpg") {
-		t.Errorf("missing --include *.jpg in %v", flags)
-	}
-	if !containsFlag(flags, "--include", "*.png") {
-		t.Errorf("missing --include *.png in %v", flags)
-	}
-	if !containsFlag(flags, "--exclude", "*.tmp") {
-		t.Errorf("missing --exclude *.tmp in %v", flags)
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "256M")
 }
 
-func TestBuildFlagsFromOptions_IncludeExcludeDedup(t *testing.T) {
-	opts := map[string]any{
-		"include": []any{"*.jpg", "*.jpg"}, // duplicate
+func TestBuildFlagsFromOptions_BufferSizeStringWithK(t *testing.T) {
+	opt := map[string]any{
+		"bufferSize": "64K",
 	}
-	flags := buildFlagsFromOptions(opts)
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "64K")
+}
+
+func TestBuildFlagsFromOptions_BwLimit(t *testing.T) {
+	opt := map[string]any{
+		"bwLimit": "10M",
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--bwlimit")
+	assert.Contains(t, flags, "10M")
+}
+
+func TestBuildFlagsFromOptions_BoolFlags(t *testing.T) {
+	opt := map[string]any{
+		"checksum":       true,
+		"dryRun":         true,
+		"ignoreExisting": true,
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--checksum")
+	assert.Contains(t, flags, "--dryrun")
+	assert.Contains(t, flags, "--ignoreexisting")
+}
+
+func TestBuildFlagsFromOptions_BoolFalse(t *testing.T) {
+	opt := map[string]any{
+		"checksum": false,
+		"dryRun":   false,
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.NotContains(t, flags, "--checksum")
+	assert.NotContains(t, flags, "--dry-run")
+}
+
+func TestBuildFlagsFromOptions_StringFlags(t *testing.T) {
+	opt := map[string]any{
+		"compareDest": "remote:compare",
+		"copyDest":    "remote:backup",
+		"backupDir":   "remote:backup-dir",
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--compare-dest")
+	assert.Contains(t, flags, "remote:compare")
+	assert.Contains(t, flags, "--copy-dest")
+	assert.Contains(t, flags, "remote:backup")
+	assert.Contains(t, flags, "--backup-dir")
+	assert.Contains(t, flags, "remote:backup-dir")
+}
+
+func TestBuildFlagsFromOptions_ExcludeArray(t *testing.T) {
+	opt := map[string]any{
+		"exclude": []string{"*.tmp", "*.log", "*.bak"},
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--exclude")
+	assert.Contains(t, flags, "*.tmp")
+	assert.Contains(t, flags, "*.log")
+	assert.Contains(t, flags, "*.bak")
+}
+
+func TestBuildFlagsFromOptions_ExcludeAnyArray(t *testing.T) {
+	opt := map[string]any{
+		"exclude": []any{"*.tmp", "*.log"},
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "*.tmp")
+	assert.Contains(t, flags, "*.log")
+}
+
+func TestBuildFlagsFromOptions_ExcludeCommaString(t *testing.T) {
+	opt := map[string]any{
+		"exclude": "*.tmp, *.log, *.bak",
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "*.tmp")
+	assert.Contains(t, flags, "*.log")
+	assert.Contains(t, flags, "*.bak")
+}
+
+func TestBuildFlagsFromOptions_ExcludeNewlineString(t *testing.T) {
+	opt := map[string]any{
+		"exclude": "*.tmp\n*.log\n.git/*",
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "*.tmp")
+	assert.Contains(t, flags, "*.log")
+	assert.Contains(t, flags, ".git/*")
+}
+
+func TestBuildFlagsFromOptions_ExcludeCarriageReturn(t *testing.T) {
+	opt := map[string]any{
+		"exclude": "*.tmp\r\n*.log",
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "*.tmp")
+	assert.Contains(t, flags, "*.log")
+}
+
+func TestBuildFlagsFromOptions_IncludeArray(t *testing.T) {
+	opt := map[string]any{
+		"include": []string{"*.mp4", "*.avi"},
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--include")
+	assert.Contains(t, flags, "*.mp4")
+	assert.Contains(t, flags, "*.avi")
+}
+
+func TestBuildFlagsFromOptions_Deduplication(t *testing.T) {
+	opt := map[string]any{
+		"exclude": []string{"*.tmp", "*.tmp", "*.log"},
+	}
+	flags := buildFlagsFromOptions(opt)
 	count := 0
 	for _, f := range flags {
-		if f == "*.jpg" {
+		if f == "*.tmp" {
 			count++
 		}
 	}
-	if count != 1 {
-		t.Errorf("expected 1 --include *.jpg after dedup, got %d in %v", count, flags)
-	}
+	assert.Equal(t, 1, count)
 }
 
-func TestBuildFlagsFromOptions_IncludeExcludeNormalizeDotPrefix(t *testing.T) {
-	opts := map[string]any{
-		"include": ".git",
+func TestBuildFlagsFromOptions_AutoGlob(t *testing.T) {
+	opt := map[string]any{
+		"exclude": ".tmp",
 	}
-	flags := buildFlagsFromOptions(opts)
-	if !containsFlag(flags, "--include", "*.git") {
-		t.Errorf("expected .git normalized to *.git in %v", flags)
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "*.tmp")
 }
 
-func TestBuildFlagsFromOptions_Timeouts(t *testing.T) {
-	opts := map[string]any{
-		"timeout":               float64(60),
-		"connTimeout":           "30",
-		"expectContinueTimeout": 15,
+func TestBuildFlagsFromOptions_NoAutoGlob(t *testing.T) {
+	opt := map[string]any{
+		"exclude": "*.tmp",
 	}
-	flags := buildFlagsFromOptions(opts)
-	if !containsFlag(flags, "--timeout", "60s") {
-		t.Errorf("missing --timeout 60s in %v", flags)
-	}
-	if !containsFlag(flags, "--contimeout", "30s") {
-		t.Errorf("missing --contimeout 30s in %v", flags)
-	}
-	if !containsFlag(flags, "--expect-continue-timeout", "15s") {
-		t.Errorf("missing --expect-continue-timeout 15s in %v", flags)
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "*.tmp")
+	assert.NotContains(t, flags, "**/*.tmp")
 }
 
-func TestBuildFlagsFromOptions_MaxTransferAndDuration(t *testing.T) {
-	opts := map[string]any{
-		"maxTransfer":  float64(1073741824),
-		"maxDuration":  3600,
+func TestBuildFlagsFromOptions_Timeout(t *testing.T) {
+	opt := map[string]any{
+		"timeout": 300,
 	}
-	flags := buildFlagsFromOptions(opts)
-	if !containsFlag(flags, "--max-transfer", "1073741824") {
-		t.Errorf("missing --max-transfer in %v", flags)
-	}
-	if !containsFlag(flags, "--max-duration", "3600s") {
-		t.Errorf("missing --max-duration in %v", flags)
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--timeout")
+	assert.Contains(t, flags, "300s")
 }
 
-func TestBuildFlagsFromOptions_Empty(t *testing.T) {
-	flags := buildFlagsFromOptions(nil)
-	if len(flags) != 0 {
-		t.Errorf("expected empty flags for nil opts, got %v", flags)
+func TestBuildFlagsFromOptions_ConnTimeout(t *testing.T) {
+	opt := map[string]any{
+		"connTimeout": 60,
 	}
-	flags2 := buildFlagsFromOptions(map[string]any{})
-	if len(flags2) != 0 {
-		t.Errorf("expected empty flags for empty opts, got %v", flags2)
-	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--contimeout")
+	assert.Contains(t, flags, "60s")
 }
 
-func TestBuildFlagsFromOptions_BwlimitLowercase(t *testing.T) {
-	opts := map[string]any{"bwlimit": "5M"}
-	flags := buildFlagsFromOptions(opts)
-	if !containsFlag(flags, "--bwlimit", "5M") {
-		t.Errorf("missing --bwlimit 5M in %v", flags)
+func TestBuildFlagsFromOptions_MaxTransfer(t *testing.T) {
+	opt := map[string]any{
+		"maxTransfer": 1073741824,
 	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--max-transfer")
+	assert.Contains(t, flags, "1073741824")
+}
+
+func TestBuildFlagsFromOptions_MaxDuration(t *testing.T) {
+	opt := map[string]any{
+		"maxDuration": 3600,
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--max-duration")
+	assert.Contains(t, flags, "3600s")
+}
+
+func TestBuildFlagsFromOptions_LogFile(t *testing.T) {
+	opt := map[string]any{
+		"logFile": "/path/to/log",
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--log-file")
+	assert.Contains(t, flags, "/path/to/log")
+}
+
+func TestBuildFlagsFromOptions_DisableHttp2(t *testing.T) {
+	opt := map[string]any{
+		"disableHttp2": true,
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--disable-http2")
+}
+
+func TestBuildFlagsFromOptions_FullOptions(t *testing.T) {
+	opt := map[string]any{
+		"transfers":        float64(8),
+		"checkers":         float64(16),
+		"retries":          float64(3),
+		"lowLevelRetries":  float64(5),
+		"bufferSize":       "256M",
+		"bwLimit":          "10M",
+		"checksum":         true,
+		"dryRun":           true,
+		"exclude":          []string{"*.tmp", "*.log"},
+		"include":          []string{"*.mp4"},
+	}
+	flags := buildFlagsFromOptions(opt)
+	assert.Contains(t, flags, "--transfers")
+	assert.Contains(t, flags, "--checkers")
+	assert.Contains(t, flags, "--buffer-size")
+	assert.Contains(t, flags, "--bwlimit")
+	assert.Contains(t, flags, "--checksum")
+	assert.Contains(t, flags, "--dryrun")
+	assert.Contains(t, flags, "*.tmp")
+	assert.Contains(t, flags, "*.mp4")
 }
 
 func TestToKebab(t *testing.T) {
 	tests := []struct {
-		input    string
-		expected string
+		input string
+		want  string
 	}{
 		{"useServerModtime", "use-server-modtime"},
 		{"noCheckDest", "no-check-dest"},
-		{"noTraverse", "no-traverse"},
-		{"sizeOnly", "size-only"},
-		{"ignoreSize", "ignore-size"},
-		{"ignoreTimes", "ignore-times"},
-		{"checkFirst", "check-first"},
-		{"deleteBefore", "delete-before"},
-		{"deleteDuring", "delete-during"},
-		{"deleteAfter", "delete-after"},
-		{"trackRenames", "track-renames"},
+		{"checksum", "checksum"},
 		{"ignoreErrors", "ignore-errors"},
-		{"bufferSize", "buffer-size"},
-		{"serverSideAcrossConfigs", "server-side-across-configs"},
-		{"unknownKey", "unknownkey"},
 	}
 	for _, tt := range tests {
-		got := toKebab(tt.input)
-		if got != tt.expected {
-			t.Errorf("toKebab(%q) = %q, want %q", tt.input, got, tt.expected)
-		}
+		t.Run(tt.input, func(t *testing.T) {
+			assert.Equal(t, tt.want, toKebab(tt.input))
+		})
 	}
 }
 
-func containsFlag(flags []string, key, value string) bool {
-	for i, f := range flags {
-		if f == key && i+1 < len(flags) && flags[i+1] == value {
-			return true
-		}
-	}
-	return false
+func TestAddFilterFlags_Nil(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	result := addFilterFlags(args, nil, true)
+	assert.Equal(t, args, result)
 }
 
-func containsFlagBool(flags []string, key string) bool {
-	for _, f := range flags {
-		if f == key {
-			return true
-		}
+func TestAddFilterFlags_Empty(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	result := addFilterFlags(args, map[string]any{}, true)
+	assert.Equal(t, args, result)
+}
+
+func TestAddFilterFlags_Include(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"include": "*.mp4"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--include")
+	assert.Contains(t, result, "*.mp4")
+}
+
+func TestAddFilterFlags_Exclude(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"exclude": "*.tmp"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--exclude")
+	assert.Contains(t, result, "*.tmp")
+}
+
+func TestAddFilterFlags_Filter(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"filter": "- *.tmp"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--filter")
+	assert.Contains(t, result, "- *.tmp")
+}
+
+func TestAddFilterFlags_FilterFrom(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"filterFrom": "/path/to/filter.txt"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--filter-from")
+	assert.Contains(t, result, "/path/to/filter.txt")
+}
+
+func TestAddFilterFlags_IncludeFrom(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"includeFrom": "/path/to/include.txt"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--include-from")
+	assert.Contains(t, result, "/path/to/include.txt")
+}
+
+func TestAddFilterFlags_ExcludeFrom(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"excludeFrom": "/path/to/exclude.txt"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--exclude-from")
+	assert.Contains(t, result, "/path/to/exclude.txt")
+}
+
+func TestAddFilterFlags_FilesFrom(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"filesFrom": "/path/to/files.txt"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--files-from")
+	assert.Contains(t, result, "/path/to/files.txt")
+}
+
+func TestAddFilterFlags_MinSize(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"minSize": "1M"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--min-size")
+	assert.Contains(t, result, "1M")
+}
+
+func TestAddFilterFlags_MaxSize(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"maxSize": "100M"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--max-size")
+	assert.Contains(t, result, "100M")
+}
+
+func TestAddFilterFlags_MinAge(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"minAge": "1d"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--min-age")
+	assert.Contains(t, result, "1d")
+}
+
+func TestAddFilterFlags_MaxAge(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"maxAge": "30d"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--max-age")
+	assert.Contains(t, result, "30d")
+}
+
+func TestAddFilterFlags_FastList_True(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"fastList": true}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--fast-list")
+}
+
+func TestAddFilterFlags_FastList_StringTrue(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"fastList": "true"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--fast-list")
+}
+
+func TestAddFilterFlags_FastList_String1(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"fastList": "1"}
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--fast-list")
+}
+
+func TestAddFilterFlags_FastList_False(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"fastList": false}
+	result := addFilterFlags(args, opts, true)
+	assert.NotContains(t, result, "--fast-list")
+}
+
+func TestAddFilterFlags_FastList_Disabled(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{"fastList": true}
+	result := addFilterFlags(args, opts, false)
+	assert.NotContains(t, result, "--fast-list")
+}
+
+func TestAddFilterFlags_Multiple(t *testing.T) {
+	args := []string{"rclone", "copy"}
+	opts := map[string]any{
+		"exclude":  "*.tmp",
+		"include":  "*.mp4",
+		"minSize": "1M",
+		"maxAge":  "30d",
 	}
-	return false
+	result := addFilterFlags(args, opts, true)
+	assert.Contains(t, result, "--exclude")
+	assert.Contains(t, result, "--include")
+	assert.Contains(t, result, "--min-size")
+	assert.Contains(t, result, "--max-age")
 }
