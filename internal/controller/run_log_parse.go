@@ -40,6 +40,10 @@ func classifyHistoricalLogRow(level, path, msg string) (map[string]any, string, 
 		row["status"] = "success"
 		row["action"] = "Renamed"
 		return row, "copied", true
+	case strings.Contains(low, "moved"):
+		row["status"] = "success"
+		row["action"] = "Moved"
+		return row, "copied", true
 	case strings.Contains(low, "deleted") || strings.Contains(low, "removed"):
 		row["status"] = "success"
 		row["action"] = "Deleted"
