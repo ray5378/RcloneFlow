@@ -256,9 +256,12 @@ func TestEnrichRowMapSizesFromFinalSummary_CompletedAsListOfAny(t *testing.T) {
 }
 
 func TestIsCASAttemptObjectNotFoundSummaryRow_True(t *testing.T) {
-	assert.True(t, isCASAttemptObjectNotFoundSummaryRow("attempt 1/file.txt", "object not found"))
+	assert.True(t, isCASAttemptObjectNotFoundSummaryRow("Attempt 1/3 failed with 5 errors and", "object not found"))
+	assert.True(t, isCASAttemptObjectNotFoundSummaryRow("<nil>", "Attempt 1/1 failed with 2 errors and: object not found"))
+	assert.True(t, isCASAttemptObjectNotFoundSummaryRow("<nil>", "Attempt 1/1 failed with 2 errors and: permission denied"))
 }
 
 func TestIsCASAttemptObjectNotFoundSummaryRow_False(t *testing.T) {
 	assert.False(t, isCASAttemptObjectNotFoundSummaryRow("file.txt", "permission denied"))
+	assert.False(t, isCASAttemptObjectNotFoundSummaryRow("file.txt", "object not found"))
 }

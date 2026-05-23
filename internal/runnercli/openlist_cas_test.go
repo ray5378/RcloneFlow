@@ -104,6 +104,12 @@ func TestClassifyRunLogRow_FailedToCopySummaryIgnored(t *testing.T) {
 	if row, bucket, ok := classifyRunLogRow("ERROR", "Failed to copy", "object not found", nil, true); ok || row != nil || bucket != "" {
 		t.Fatalf("expected Failed to copy summary to be ignored, got row=%v bucket=%q ok=%v", row, bucket, ok)
 	}
+	if row, bucket, ok := classifyRunLogRow("ERROR", "Failed to copy with 2 errors", "last error was: permission denied", nil, true); ok || row != nil || bucket != "" {
+		t.Fatalf("expected Failed to copy summary with non-object-not-found error to be ignored, got row=%v bucket=%q ok=%v", row, bucket, ok)
+	}
+	if row, bucket, ok := classifyRunLogRow("ERROR", "Failed to copy", "permission denied", nil, true); ok || row != nil || bucket != "" {
+		t.Fatalf("expected Failed to copy summary with permission denied to be ignored, got row=%v bucket=%q ok=%v", row, bucket, ok)
+	}
 }
 
 func TestClassifyRunLogRow_MultipleAttemptVariantsIgnored(t *testing.T) {
@@ -116,6 +122,8 @@ func TestClassifyRunLogRow_MultipleAttemptVariantsIgnored(t *testing.T) {
 		{"<nil>", "Attempt 3/3 failed with 5 errors and: object not found"},
 		{"Attempt 1/1 failed with 2 errors and", "object not found"},
 		{"Attempt 2/3 failed with 1 errors and", "object not found"},
+		{"<nil>", "Attempt 1/1 failed with 2 errors and: permission denied"},
+		{"Attempt 1/3 failed with 1 errors and", "permission denied"},
 	}
 	for _, v := range variants {
 		if row, bucket, ok := classifyRunLogRow("ERROR", v.path, v.msg, nil, true); ok || row != nil || bucket != "" {

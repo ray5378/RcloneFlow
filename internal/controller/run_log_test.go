@@ -84,7 +84,9 @@ func TestIsCASAttemptObjectNotFoundSummaryRow(t *testing.T) {
 		msg  string
 		want bool
 	}{
-		{"CAS check", "attempt 1: object not found", true},
+		{"CAS check", "attempt 1 failed with 2 errors and: object not found", true},
+		{"Attempt 1/3 failed with 5 errors and", "object not found", true},
+		{"<nil>", "Attempt 1/1 failed with 2 errors and: object not found", true},
 		{"something", "error", false},
 		{"", "", false},
 	}
@@ -101,8 +103,10 @@ func TestIsCASRunObjectNotFoundSummaryRow(t *testing.T) {
 		msg  string
 		want bool
 	}{
-		{"failed to copy", "object not found", true},
-		{"failed to copy with retry", "last error was: object not found", true},
+		{"Failed to copy", "object not found", true},
+		{"Failed to copy with 2 errors", "last error was: object not found", true},
+		{"Failed to copy with 3 errors", "last error was: permission denied", true},
+		{"Failed to copy", "permission denied", true},
 		{"summary", "all good", false},
 		{"", "", false},
 	}

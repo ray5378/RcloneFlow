@@ -123,35 +123,26 @@ func isCASObjectNotFoundFailureRow(path, msg string) bool {
 }
 
 func isCASAttemptObjectNotFoundSummaryRow(path, msg string) bool {
-	path = strings.ToLower(strings.TrimSpace(path))
-	msg = strings.ToLower(strings.TrimSpace(msg))
-	combined := strings.TrimSpace(path + " " + msg)
-	if combined == "" || !strings.Contains(combined, "object not found") {
-		return false
-	}
-	if strings.HasPrefix(msg, "attempt ") {
+	path = strings.TrimSpace(path)
+	msg = strings.TrimSpace(msg)
+	lowPath := strings.ToLower(path)
+	lowMsg := strings.ToLower(msg)
+	if strings.HasPrefix(lowPath, "attempt ") && strings.Contains(lowPath, " failed with ") {
 		return true
 	}
-	if strings.HasPrefix(path, "attempt ") {
+	if strings.HasPrefix(lowMsg, "attempt ") && strings.Contains(lowMsg, " failed with ") {
 		return true
 	}
-	if path == "<nil>" && strings.Contains(msg, "attempt ") {
+	if strings.ToLower(strings.TrimSpace(path)) == "<nil>" && strings.Contains(lowMsg, "attempt ") && strings.Contains(lowMsg, " failed with ") {
 		return true
 	}
 	return false
 }
 
 func isCASRunObjectNotFoundSummaryRow(path, msg string) bool {
-	path = strings.TrimSpace(path)
-	msg = strings.ToLower(strings.TrimSpace(msg))
-	lowPath := strings.ToLower(path)
-	if path == "" && msg == "" {
-		return false
-	}
-	if strings.HasPrefix(lowPath, "failed to copy with ") && strings.Contains(msg, "last error was: object not found") {
-		return true
-	}
-	if lowPath == "failed to copy" && msg == "object not found" {
+	p := strings.TrimSpace(path)
+	lowP := strings.ToLower(p)
+	if lowP == "failed to copy" || strings.HasPrefix(lowP, "failed to copy with ") {
 		return true
 	}
 	return false

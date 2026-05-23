@@ -71,24 +71,30 @@ func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlist
 	}
 }
 
-func isAttemptObjectNotFoundSummary(path, msg string) bool {
+func isAttemptSummary(path, msg string) bool {
 	pathTrim := strings.TrimSpace(path)
 	msgTrim := strings.TrimSpace(msg)
-	lowMsg := strings.ToLower(msgTrim)
-	if strings.HasPrefix(pathTrim, "Attempt ") && strings.Contains(lowMsg, "object not found") {
+	if strings.HasPrefix(pathTrim, "Attempt ") && strings.Contains(pathTrim, " failed with ") {
 		return true
 	}
-	if strings.HasPrefix(msgTrim, "Attempt ") && strings.Contains(lowMsg, "object not found") {
+	if strings.HasPrefix(msgTrim, "Attempt ") && strings.Contains(msgTrim, " failed with ") {
 		return true
 	}
 	return false
 }
 
-func isRunObjectNotFoundSummary(path, msg string) bool {
+func isFailedToCopySummary(path, msg string) bool {
 	p := strings.TrimSpace(path)
-	if !strings.EqualFold(p, "Failed to copy with 2 errors") && !strings.HasPrefix(p, "Failed to copy with ") && !strings.EqualFold(p, "Failed to copy") {
-		return false
+	if strings.EqualFold(p, "Failed to copy") || strings.HasPrefix(p, "Failed to copy with ") {
+		return true
 	}
-	low := strings.ToLower(strings.TrimSpace(msg))
-	return strings.Contains(low, "object not found")
+	return false
+}
+
+func isAttemptObjectNotFoundSummary(path, msg string) bool {
+	return isAttemptSummary(path, msg)
+}
+
+func isRunObjectNotFoundSummary(path, msg string) bool {
+	return isFailedToCopySummary(path, msg)
 }
