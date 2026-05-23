@@ -74,13 +74,11 @@ RUN set -eux; \
     fi; \
     rm -rf /tmp/rclone.zip /tmp/rclone.sha256 /tmp/rclone-extract
 RUN hash="${GIT_HASH:-unknown}"; \
-    if [ "$hash" = "unknown" ] && [ -d .git ]; then \
-      hash="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"; \
+    if [ "$hash" = "unknown" ] && command -v git >/dev/null 2>&1 && [ -d .git ]; then \
+      hash="$(git rev-parse --short=7 HEAD 2>/dev/null || echo unknown)"; \
     fi; \
-    if [ "$hash" != "unknown" ]; then \
-      sed -i "s/var CommitHash = \"unknown\"/var CommitHash = \"${hash}\"/" /app/internal/version/version.go; \
-    fi; \
-    go build -buildvcs=false -ldflags="-s -w" -o /out/server ./cmd/server
+    echo "Building with CommitHash=${hash}"; \
+    go build -buildvcs=false -ldflags="-s -w -X rcloneflow/internal/version.CommitHash=${hash}" -o /out/server ./cmd/server
 
 # Stage 3: runtime (Alpine)
 FROM alpine:3.19

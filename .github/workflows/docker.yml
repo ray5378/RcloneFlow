@@ -104,6 +104,10 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
 
+      - name: Extract short hash
+        id: hash
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push (multi-arch)
         uses: docker/build-push-action@v6
         with:
@@ -112,5 +116,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_HASH=${{ steps.hash.outputs.short }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
