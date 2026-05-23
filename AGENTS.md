@@ -10,7 +10,7 @@ RcloneFlow = rclone + Web UI。Go (Gin) 后端 + Vue 3 / TypeScript / Vite 前�
 
 ### 后端
 ```bash
-go build -ldflags="-X rcloneflow/internal/version.CommitHash=$(git rev-parse --short HEAD)" -o server ./cmd/server   # 编译
+go build -o server ./cmd/server   # 编译（自动嵌入 git hash）
 ./server                           # 运行（读取 config.yaml 或环境变量）
 ```
 
@@ -25,8 +25,8 @@ npm run test    # vitest 运行（happy-dom，覆盖 src/api/）
 
 ### Docker
 ```bash
-docker compose up -d --build       # 完整构建 + 启动
-docker build --build-arg GIT_HASH=$(git rev-parse --short HEAD) --no-cache -t ray5378/rcloneflow:dev .
+docker compose up -d --build       # 完整构建 + 启动（自动嵌入 git hash）
+docker build --no-cache -t ray5378/rcloneflow:dev .
 ```
 
 ### CI (GitHub Actions)
@@ -98,6 +98,9 @@ web/                        → 前端构建产物（自动生成，已 gitignor
 
 ### Docker 镜像
 运行时镜像基于 Alpine 3.19，安装了 `bash`、`busybox`、`curl`、`wget`、`sqlite-libs`。需要提取文件时可直接 `docker exec`。
+
+### 构建哈希自动嵌入
+Go 编译时通过 `internal/version.CommitHash` 嵌入 git hash。Docker 构建自动从 `.git/refs/heads/*` 获取；本地构建由 `init()` 回退到 `git rev-parse`。无需手动传参。
 
 ### 不要挂载覆盖 `/app/web`
 覆盖 `/app/web` 的卷挂载会隐藏内置前端。

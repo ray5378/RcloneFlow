@@ -2,6 +2,8 @@ services:
   rcloneflow:
     image: ray5378/rcloneflow:latest
     container_name: rcloneflow
+    build:
+      context: .
     network_mode: host
     environment:
       - TZ=Asia/Shanghai

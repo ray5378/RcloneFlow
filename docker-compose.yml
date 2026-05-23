@@ -3,6 +3,8 @@ services:
     image: ray5378/rcloneflow:latest
     container_name: rcloneflow
     network_mode: host
+    build:
+      context: .
     environment:
       - TZ=Asia/Shanghai
       - APP_ADDR=:17870

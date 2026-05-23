@@ -45,8 +45,12 @@ frontend/node_modules/
 frontend/coverage/
 web/
 
-# Git
+# Git — 仅保留 refs/heads/* + HEAD（~50B），排除 objects（6MB+），供 git rev-parse 自动获取哈希
 .git/
+!.git/HEAD
+!.git/refs/heads/*
+!.git/packed-refs
+!.git/config
 .gitignore
 .github/
 
