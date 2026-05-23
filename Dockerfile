@@ -35,7 +35,7 @@ ENV CGO_ENABLED=1 GOOS=linux
 ARG TARGETARCH
 ENV GOARCH=${TARGETARCH}
 ARG GIT_HASH=unknown
-ARG RCLONE_VERSION=v1.73.4
+ARG RCLONE_VERSION=v1.74.2
 RUN set -eux; \
     case "${TARGETARCH}" in \
       amd64) rclone_arch=amd64 ;; \
@@ -43,7 +43,7 @@ RUN set -eux; \
       arm) rclone_arch=arm ;; \
       *) rclone_arch=amd64 ;; \
     esac; \
-    ver="${RCLONE_VERSION:-v1.73.4}"; \
+    ver="${RCLONE_VERSION:-v1.74.2}"; \
     base="https://github.com/rclone/rclone/releases/download/${ver}"; \
     rm -rf /tmp/rclone-extract && mkdir -p /tmp/rclone-extract /out; \
     sha_url="${base}/rclone-${ver}-linux-${rclone_arch}.zip.sha256sum"; \
