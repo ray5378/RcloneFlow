@@ -1,5 +1,5 @@
 import type { Ref } from 'vue'
-import type { CreateForm, TaskFormOptions, TaskMode } from '../components/task/types'
+import type { CreateForm, TaskFormOptions, TaskMode, BisyncOptions } from '../components/task/types'
 import type { Task } from '../types'
 import { t } from '../i18n'
 
@@ -11,6 +11,7 @@ interface TaskPayload {
   targetRemote: string
   targetPath: string
   options: TaskFormOptions
+  bisyncOptions?: BisyncOptions
 }
 
 interface UseTaskFormSubmitOptions {
@@ -39,7 +40,7 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
   }
 
   function buildTaskPayload(): TaskPayload {
-    return {
+    const payload: TaskPayload = {
       name: options.createForm.value.name,
       mode: options.createForm.value.mode,
       sourceRemote: options.createForm.value.sourceRemote,
@@ -48,6 +49,10 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
       targetPath: options.createForm.value.targetPath,
       options: options.normalizeTaskOptions(options.createForm.value.options),
     }
+    if (options.createForm.value.mode === 'bisync' && options.createForm.value.bisyncOptions) {
+      payload.bisyncOptions = options.createForm.value.bisyncOptions
+    }
+    return payload
   }
 
   async function submitTaskForm() {

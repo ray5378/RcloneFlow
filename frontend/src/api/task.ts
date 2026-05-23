@@ -40,6 +40,21 @@ export async function updateTaskOptions(taskId: number, options: Record<string, 
   return patch('/api/tasks', { id: taskId, options })
 }
 
+/** 更新任务 bisyncOptions */
+export async function updateTaskBisyncOptions(taskId: number, bisyncOptions: Record<string, any>): Promise<void> {
+  return patch('/api/tasks', { id: taskId, bisyncOptions })
+}
+
+/** 获取任务 bisync 文件列表 */
+export async function getBisyncFiles(taskId: number): Promise<{ files: string[] }> {
+  return get<{ files: string[] }>(`/api/tasks/${taskId}/bisync/files`)
+}
+
+/** 删除 bisync 文件 */
+export async function deleteBisyncFile(taskId: number, fileName: string): Promise<void> {
+  return del(`/api/tasks/${taskId}/bisync/files/${encodeURIComponent(fileName)}`)
+}
+
 /** 批量保存任务排序 */
 export async function updateTaskSortOrders(orders: Record<number, number>, priorityTaskId?: number): Promise<void> {
   return patch('/api/tasks', { orders, priorityTaskId })

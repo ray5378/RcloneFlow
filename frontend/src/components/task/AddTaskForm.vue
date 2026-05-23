@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { CreateForm, PathBreadcrumb, PathBrowseItem, TaskFormOptions, TaskFormOptionValue, UpdateTaskOption } from './types'
+import type { CreateForm, PathBreadcrumb, PathBrowseItem, TaskFormOptions, TaskFormOptionValue, UpdateTaskOption, BisyncOptions } from './types'
 import type { Task } from '../../types'
 import AdvancedTransferSection from './AdvancedTransferSection.vue'
 import AdvancedFilterSection from './AdvancedFilterSection.vue'
@@ -45,6 +45,7 @@ const emit = defineEmits<{
   'source-breadcrumb-click': [path: string]
   'target-breadcrumb-click': [path: string]
   'submit': []
+  'open-bisync-config': []
 }>()
 
 const commandModeModel = computed({
@@ -105,11 +106,17 @@ const updateOption: UpdateTaskOption = (key, value) => {
       </div>
       <div class="field-item">
         <label>{{ t('addTask.mode') }}</label>
-        <select v-model="createForm.mode">
-          <option value="copy">{{ t('addTask.copy') }} (copy)</option>
-          <option value="sync">{{ t('addTask.sync') }} (sync)</option>
-          <option value="move">{{ t('addTask.move') }} (move)</option>
-        </select>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <select v-model="createForm.mode" style="flex: 1;">
+            <option value="copy">{{ t('addTask.copy') }} (copy)</option>
+            <option value="sync">{{ t('addTask.sync') }} (sync)</option>
+            <option value="move">{{ t('addTask.move') }} (move)</option>
+            <option value="bisync">{{ t('addTask.bisync') }} (bisync)</option>
+          </select>
+          <button v-if="createForm.mode === 'bisync'" type="button" class="ghost small" @click="$emit('open-bisync-config')">
+            {{ t('addTask.bisyncConfig') }}
+          </button>
+        </div>
       </div>
       <div class="field-item">
         <label>{{ t('addTask.sourceStorage') }} <span style="color: #dc2626">*</span></label>

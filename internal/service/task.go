@@ -82,6 +82,16 @@ func (s *TaskService) UpdateTask(id int64, task store.Task) error {
 	if len(task.Options) > 0 {
 		merged.Options = task.Options
 	}
+	if len(task.BisyncOptions) > 0 {
+		merged.BisyncOptions = task.BisyncOptions
+	}
+
+	// 如果任务名更改了，或者从 bisync 模式切换到其他模式，需要清理旧的 bisync 目录
+	if (strings.TrimSpace(task.Name) != "" && strings.TrimSpace(task.Name) != cur.Name) ||
+		(strings.TrimSpace(task.Mode) != "" && strings.ToLower(task.Mode) != "bisync" && strings.ToLower(cur.Mode) == "bisync") {
+		s.cleanupBisyncDir(cur.Name)
+	}
+
 	if err := s.ensureTaskNameUnique(merged.Name, id); err != nil {
 		return err
 	}
@@ -230,6 +240,50 @@ func (s *TaskService) UpdateTaskOptions(id int64, opts map[string]any) error {
 	return s.db.UpdateTask(id, t)
 }
 
+func (s *TaskService) UpdateTaskBisyncOptions(id int64, bisyncOpts map[string]any) error {
+	t, ok := s.db.GetTask(id)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	b, err := json.Marshal(bisyncOpts)
+	if err != nil {
+		return err
+	}
+	t.BisyncOptions = b
+	return s.db.UpdateTask(id, t)
+}
+
+func (s *TaskService) GetBisyncFiles(taskName string) ([]string, error) {
+	trimmedName := strings.TrimSpace(taskName)
+	if trimmedName == "" {
+		return []string{}, nil
+	}
+	bisyncDir := filepath.Join(config.DataDir(), "bisync", trimmedName)
+	entries, err := os.ReadDir(bisyncDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			files = append(files, entry.Name())
+		}
+	}
+	return files, nil
+}
+
+func (s *TaskService) DeleteBisyncFile(taskName, fileName string) error {
+	trimmedName := strings.TrimSpace(taskName)
+	if trimmedName == "" {
+		return nil
+	}
+	filePath := filepath.Join(config.DataDir(), "bisync", trimmedName, fileName)
+	return os.Remove(filePath)
+}
+
 func (s *TaskService) DeleteTask(id int64) error {
 	task, ok := s.db.GetTask(id)
 	if !ok {
@@ -268,6 +322,9 @@ func (s *TaskService) DeleteTask(id int64) error {
 		}
 	}
 
+	// 清理 bisync 目录
+	s.cleanupBisyncDir(task.Name)
+
 	if err := s.db.DeleteRunsByTask(id); err != nil {
 		return err
 	}
@@ -277,6 +334,15 @@ func (s *TaskService) DeleteTask(id int64) error {
 		s.recalcTags()
 	}
 	return err
+}
+
+func (s *TaskService) cleanupBisyncDir(taskName string) {
+	trimmedName := strings.TrimSpace(taskName)
+	if trimmedName == "" {
+		return
+	}
+	bisyncDir := filepath.Join(config.DataDir(), "bisync", trimmedName)
+	_ = os.RemoveAll(bisyncDir)
 }
 
 func (s *TaskService) GetTask(id int64) (store.Task, bool) {

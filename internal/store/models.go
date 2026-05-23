@@ -21,16 +21,32 @@ type Tag struct {
 }
 
 type Task struct {
-	ID           int64           `json:"id"`
-	Name         string          `json:"name"`
-	Mode         string          `json:"mode"`
-	SourceRemote string          `json:"sourceRemote"`
-	SourcePath   string          `json:"sourcePath"`
-	TargetRemote string          `json:"targetRemote"`
-	TargetPath   string          `json:"targetPath"`
-	Options      json.RawMessage `json:"options,omitempty"`
-	SortOrder    int64           `json:"sortOrder"`
-	CreatedAt    time.Time       `json:"createdAt"`
+	ID            int64           `json:"id"`
+	Name          string          `json:"name"`
+	Mode          string          `json:"mode"`
+	SourceRemote  string          `json:"sourceRemote"`
+	SourcePath    string          `json:"sourcePath"`
+	TargetRemote  string          `json:"targetRemote"`
+	TargetPath    string          `json:"targetPath"`
+	Options       json.RawMessage `json:"options,omitempty"`
+	BisyncOptions json.RawMessage `json:"bisyncOptions,omitempty"`
+	SortOrder     int64           `json:"sortOrder"`
+	CreatedAt     time.Time       `json:"createdAt"`
+}
+
+type BisyncOptions struct {
+	Compare            string `json:"compare"`
+	MaxDelete          string `json:"maxDelete"`
+	CheckAccess        bool   `json:"checkAccess"`
+	CheckFilename      string `json:"checkFilename"`
+	ConflictResolve    string `json:"conflictResolve"`
+	ConflictLoser      string `json:"conflictLoser"`
+	ConflictSuffix     string `json:"conflictSuffix"`
+	BackupDir1         string `json:"backupDir1"`
+	BackupDir2         string `json:"backupDir2"`
+	CreateEmptySrcDirs bool   `json:"createEmptySrcDirs"`
+	RemoveEmptyDirs    bool   `json:"removeEmptyDirs"`
+	Recover            bool   `json:"recover"`
 }
 
 type Schedule struct {

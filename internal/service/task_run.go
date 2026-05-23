@@ -56,6 +56,14 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		}
 	}
 
+	// 解析 bisyncOptions
+	bisyncOptions := map[string]any{}
+	if len(t.BisyncOptions) > 0 {
+		if err := json.Unmarshal(t.BisyncOptions, &bisyncOptions); err != nil {
+			logger.Error("unmarshal bisync options", zap.Error(err))
+		}
+	}
+
 	streamingEnabled := true
 	if v, ok := effectiveOptions["enableStreaming"].(bool); ok {
 		streamingEnabled = v
@@ -79,6 +87,7 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		Summary: map[string]any{
 			"streamingEnabled": streamingEnabled,
 			"effectiveOptions": effectiveOptions,
+			"bisyncOptions":    bisyncOptions,
 		},
 		TaskName:     t.Name,
 		TaskMode:     t.Mode,

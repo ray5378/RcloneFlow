@@ -41,6 +41,7 @@ export function useTaskFormRuntime(options: {
     commandText,
     editingTask,
     showAdvancedOptions,
+    showBisyncModal,
     resetTaskFormForCreate,
     fillTaskFormForEdit,
   } = useTaskFormState()
@@ -101,6 +102,7 @@ export function useTaskFormRuntime(options: {
     commandText,
     editingTask,
     showAdvancedOptions,
+    showBisyncModal,
     resetTaskFormForCreate,
     fillTaskFormForEdit,
     getScheduleByTaskId,

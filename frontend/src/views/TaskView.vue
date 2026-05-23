@@ -8,6 +8,7 @@ import ToastCenter from '../components/toast/ToastCenter.vue'
 import ScheduleConfigModal from '../components/task/ScheduleConfigModal.vue'
 import TransferringModal from '../components/task/transferring/TransferringModal.vue'
 import TagManagerModal from '../components/task/TagManagerModal.vue'
+import BisyncConfigModal from '../components/task/BisyncConfigModal.vue'
 import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatEta } from '../utils/format'
@@ -281,6 +282,7 @@ const {
   commandText,
   editingTask,
   showAdvancedOptions,
+  showBisyncModal,
   resetTaskFormForCreate,
   fillTaskFormForEdit,
   getScheduleByTaskId,
@@ -474,6 +476,20 @@ function closeTaskEditorModal() {
   )
 }
 
+// Bisync 配置弹窗处理
+function openBisyncConfigModal() {
+  showBisyncModal.value = true
+}
+
+function closeBisyncConfigModal() {
+  showBisyncModal.value = false
+}
+
+function saveBisyncConfig(bisyncOptions: any) {
+  createForm.value.bisyncOptions = bisyncOptions
+  closeBisyncConfigModal()
+}
+
 </script>
 
 
@@ -622,6 +638,7 @@ function closeTaskEditorModal() {
     :on-target-click="onTargetClick"
     :create-task="createTask"
     :close-editor-modal="closeTaskEditorModal"
+    @open-bisync-config="openBisyncConfigModal"
   />
 
   <ScheduleConfigModal
@@ -694,6 +711,17 @@ function closeTaskEditorModal() {
     :message="confirmModal.message"
     @close="closeConfirm"
     @confirm="confirmAndClose"
+  />
+
+  <!-- Bisync 配置弹窗 -->
+  <BisyncConfigModal
+    :visible="showBisyncModal"
+    :model-value="createForm.bisyncOptions || {}"
+    :task-id="editingTask?.id"
+    :task-name="createForm.name"
+    @update:model-value="(val) => { createForm.bisyncOptions = val }"
+    @save="saveBisyncConfig"
+    @close="closeBisyncConfigModal"
   />
 </template>
 

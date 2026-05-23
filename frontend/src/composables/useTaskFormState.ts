@@ -1,10 +1,10 @@
 import { ref } from 'vue'
-import type { CreateForm, TaskFormOptions, TaskMode } from '../components/task/types'
+import type { CreateForm, TaskFormOptions, TaskMode, BisyncOptions } from '../components/task/types'
 import type { Task } from '../types'
 import { useTaskFormNormalize } from './useTaskFormNormalize'
 
 function normalizeTaskMode(mode: string): TaskMode {
-  return mode === 'sync' || mode === 'move' || mode === 'copy' ? mode : 'copy'
+  return mode === 'sync' || mode === 'move' || mode === 'copy' || mode === 'bisync' ? mode : 'copy'
 }
 
 export function useTaskFormState() {
@@ -17,18 +17,21 @@ export function useTaskFormState() {
     targetRemote: '',
     targetPath: '',
     options: { enableStreaming: true } as TaskFormOptions,
+    bisyncOptions: {} as BisyncOptions,
   })
 
   const commandMode = ref(false)
   const commandText = ref('')
   const editingTask = ref<Task | null>(null)
   const showAdvancedOptions = ref(false)
+  const showBisyncModal = ref(false)
 
   function resetTaskFormForCreate() {
     editingTask.value = null
     commandMode.value = false
     commandText.value = ''
     showAdvancedOptions.value = false
+    showBisyncModal.value = false
     createForm.value = {
       name: '',
       mode: 'copy',
@@ -37,6 +40,7 @@ export function useTaskFormState() {
       targetRemote: '',
       targetPath: '',
       options: { enableStreaming: true },
+      bisyncOptions: {} as BisyncOptions,
     }
   }
 
@@ -45,6 +49,7 @@ export function useTaskFormState() {
     commandMode.value = false
     commandText.value = ''
     showAdvancedOptions.value = false
+    showBisyncModal.value = false
 
     createForm.value = {
       name: task.name,
@@ -54,6 +59,7 @@ export function useTaskFormState() {
       targetRemote: task.targetRemote,
       targetPath: task.targetPath || '',
       options: normalizeTaskOptionsForForm(task.options as TaskFormOptions | undefined),
+      bisyncOptions: (task.bisyncOptions || {}) as BisyncOptions,
     }
   }
 
@@ -63,6 +69,7 @@ export function useTaskFormState() {
     commandText,
     editingTask,
     showAdvancedOptions,
+    showBisyncModal,
     resetTaskFormForCreate,
     fillTaskFormForEdit,
   }
