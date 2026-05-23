@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 
 	"rcloneflow/internal/app"
@@ -8,16 +9,19 @@ import (
 )
 
 func main() {
-	// 加载配置
+	if err := RunMain(); err != nil {
+		os.Stderr.WriteString(err.Error() + "\n")
+		os.Exit(1)
+	}
+}
+
+func RunMain() error {
 	cfg, err := config.Load("")
 	if err != nil {
-		os.Stderr.WriteString("配置加载失败: " + err.Error() + "\n")
-		os.Exit(1)
+		return fmt.Errorf("配置加载失败: %w", err)
 	}
-
-	// 启动服务
 	if err := app.Run(cfg); err != nil {
-		os.Stderr.WriteString("启动失败: " + err.Error() + "\n")
-		os.Exit(1)
+		return fmt.Errorf("启动失败: %w", err)
 	}
+	return nil
 }

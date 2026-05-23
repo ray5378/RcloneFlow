@@ -6,10 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"rcloneflow/internal/auth"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
 )
@@ -431,4 +433,134 @@ func TestAuthController_ChangePassword_UsernameTaken(t *testing.T) {
 	ctrl.ChangePassword(rec3, req3)
 	assert.Equal(t, http.StatusConflict, rec3.Code)
 	assert.Contains(t, rec3.Body.String(), "用户名已被占用")
+}
+
+func TestAuthController_HasUsers_NoUsers(t *testing.T) {
+	db := setupAuthTestDB(t)
+	ctrl := NewAuthController(service.NewAuthService(db))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/has-users", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HasUsers(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]any
+	err := json.Unmarshal(rec.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, false, resp["exists"])
+}
+
+func TestAuthController_HasUsers_WithUsers(t *testing.T) {
+	db := setupAuthTestDB(t)
+	ctrl := NewAuthController(service.NewAuthService(db))
+
+	regBody := `{"username":"testuser","password":"testpass123"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody)))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	ctrl.Register(rec, req)
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/auth/has-users", nil)
+	rec2 := httptest.NewRecorder()
+	ctrl.HasUsers(rec2, req2)
+
+	assert.Equal(t, http.StatusOK, rec2.Code)
+	var resp map[string]any
+	err := json.Unmarshal(rec2.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, true, resp["exists"])
+}
+
+func TestAuthController_Me_Success(t *testing.T) {
+	db := setupAuthTestDB(t)
+	ctrl := NewAuthController(service.NewAuthService(db))
+
+	regBody := `{"username":"meuser","password":"mepass123"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/auth/register", bytes.NewReader([]byte(regBody)))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	ctrl.Register(rec, req)
+
+	var regResp map[string]any
+	err := json.Unmarshal(rec.Body.Bytes(), &regResp)
+	require.NoError(t, err)
+	accessToken := regResp["accessToken"].(string)
+
+	req2 := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req2.Header.Set("Authorization", "Bearer "+accessToken)
+	rec2 := httptest.NewRecorder()
+	ctrl.Me(rec2, req2)
+
+	assert.Equal(t, http.StatusOK, rec2.Code)
+	var meResp map[string]any
+	err = json.Unmarshal(rec2.Body.Bytes(), &meResp)
+	require.NoError(t, err)
+	user := meResp["user"].(map[string]any)
+	assert.Equal(t, "meuser", user["username"])
+	assert.NotZero(t, user["id"])
+}
+
+func TestAuthController_Me_NoAuthHeader(t *testing.T) {
+	db := setupAuthTestDB(t)
+	ctrl := NewAuthController(service.NewAuthService(db))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	rec := httptest.NewRecorder()
+	ctrl.Me(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Body.String(), "authentication required")
+}
+
+func TestAuthController_Me_InvalidToken(t *testing.T) {
+	db := setupAuthTestDB(t)
+	ctrl := NewAuthController(service.NewAuthService(db))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer invalid.token.here")
+	rec := httptest.NewRecorder()
+	ctrl.Me(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Body.String(), "invalid token")
+}
+
+func TestAuthController_Me_UserNotFound(t *testing.T) {
+	db := setupAuthTestDB(t)
+	ctrl := NewAuthController(service.NewAuthService(db))
+
+	tokens, err := auth.GenerateTokenPair(9999, "nonexistent")
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer "+tokens.AccessToken)
+	rec := httptest.NewRecorder()
+	ctrl.Me(rec, req)
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+	assert.Contains(t, rec.Body.String(), "user not found")
+}
+
+func TestAuthController_Me_EmptyBearer(t *testing.T) {
+	db := setupAuthTestDB(t)
+	ctrl := NewAuthController(service.NewAuthService(db))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.Header.Set("Authorization", "Bearer ")
+	rec := httptest.NewRecorder()
+	ctrl.Me(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestAuthController_Me_MalformedAuthHeader(t *testing.T) {
+	db := setupAuthTestDB(t)
+	ctrl := NewAuthController(service.NewAuthService(db))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/auth/me", nil)
+	req.Header.Set("Authorization", strings.Repeat("A", 1000))
+	rec := httptest.NewRecorder()
+	ctrl.Me(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }

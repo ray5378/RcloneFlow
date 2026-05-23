@@ -32,8 +32,16 @@ func (r taskServiceSchedulerRunner) RunTask(ctx context.Context, taskID int64, t
 	return err
 }
 
-// Run 启动服务器
+// Run 启动服务器（默认监听 SIGINT/SIGTERM）
 func Run(cfg *config.Config) error {
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	defer signal.Stop(quit)
+	return RunWithShutdown(cfg, quit)
+}
+
+// RunWithShutdown 启动服务器，通过 stop channel 控制关闭
+func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 	// 初始化日志
 	if err := logger.Init(cfg.GetLogLevel(), cfg.GetLogOutput()); err != nil {
 		return err
@@ -191,9 +199,7 @@ func Run(cfg *config.Config) error {
 	}()
 
 	// 等待关闭信号
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	sig := <-quit
+	sig := <-stop
 	logger.Info("收到关闭信号，开始优雅关闭", zap.String("signal", sig.String()))
 
 	cancel()

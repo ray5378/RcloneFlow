@@ -2,12 +2,16 @@ package scheduler
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"rcloneflow/internal/adapter"
 	"rcloneflow/internal/store"
 )
 
@@ -220,4 +224,79 @@ func TestScheduler_DB(t *testing.T) {
 	db := setupSchedulerDB(t)
 	s := New(db, nil)
 	assert.Equal(t, db, s.DB())
+}
+
+func TestTaskRunner_RunTask_TaskNotFound(t *testing.T) {
+	db := setupSchedulerDB(t)
+	runner := &taskRunner{db: db, rc: nil}
+	err := runner.RunTask(context.Background(), 999, "manual")
+	assert.NoError(t, err)
+}
+
+func TestTaskRunner_RunTask_RCError(t *testing.T) {
+	db := setupSchedulerDB(t)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "rclone error", 500)
+	}))
+	defer ts.Close()
+
+	rc := adapter.NewRcloneClient(&adapter.RcloneConfig{BaseURL: ts.URL})
+
+	task := store.Task{
+		Name:         "test-task",
+		Mode:         "copy",
+		SourceRemote: "src",
+		SourcePath:   "/path",
+		TargetRemote: "dst",
+		TargetPath:   "/path",
+		Options:      json.RawMessage(`{"transfers":4}`),
+	}
+	created, err := db.AddTask(task)
+	require.NoError(t, err)
+	id := created.ID
+	require.NoError(t, err)
+
+	runner := &taskRunner{db: db, rc: rc}
+	err = runner.RunTask(context.Background(), id, "scheduled")
+	assert.Error(t, err)
+
+	runs, err := db.ListRunsByTask(id)
+	require.NoError(t, err)
+	assert.Len(t, runs, 1)
+	assert.Equal(t, "failed", runs[0].Status)
+}
+
+func TestTaskRunner_RunTask_Success(t *testing.T) {
+	db := setupSchedulerDB(t)
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"jobid": 42})
+	}))
+	defer ts.Close()
+
+	rc := adapter.NewRcloneClient(&adapter.RcloneConfig{BaseURL: ts.URL})
+
+	task := store.Task{
+		Name:         "success-task",
+		Mode:         "sync",
+		SourceRemote: "src",
+		SourcePath:   "/data",
+		TargetRemote: "dst",
+		TargetPath:   "/backup",
+	}
+	created2, err := db.AddTask(task)
+	require.NoError(t, err)
+	id2 := created2.ID
+
+	runner := &taskRunner{db: db, rc: rc}
+	err = runner.RunTask(context.Background(), id2, "scheduled")
+	assert.NoError(t, err)
+
+	runs, err := db.ListRunsByTask(id2)
+	require.NoError(t, err)
+	assert.Len(t, runs, 1)
+	assert.Equal(t, "running", runs[0].Status)
+	assert.Equal(t, "scheduled", runs[0].Trigger)
 }

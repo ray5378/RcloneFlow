@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -965,5 +967,69 @@ func TestParseETA(t *testing.T) {
 				t.Errorf("parseETA(%q) = %d, want %d", tt.input, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestWait_CommandFinished(t *testing.T) {
+	cmd := exec.Command("echo", "done")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	ok := wait(cmd, 5*time.Second)
+	if !ok {
+		t.Fatal("wait should return true for a quick command")
+	}
+}
+
+func TestWait_CommandTimeout(t *testing.T) {
+	cmd := exec.Command("sleep", "10")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+	ok := wait(cmd, 100*time.Millisecond)
+	if ok {
+		t.Fatal("wait should return false on timeout")
+	}
+	_ = cmd.Process.Kill()
+}
+
+func TestStop_WithProcess(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("SIGINT not supported on Windows")
+	}
+	cmd := exec.Command("sleep", "30")
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start failed: %v", err)
+	}
+
+	r := &Runner{
+		procs:     map[int64]*exec.Cmd{1: cmd},
+		cancelFns: map[int64]context.CancelFunc{},
+	}
+
+	start := time.Now()
+	if err := r.Stop(1); err != nil {
+		t.Fatalf("Stop should succeed: %v", err)
+	}
+	elapsed := time.Since(start)
+
+	if elapsed > 3*time.Second {
+		t.Fatalf("Stop took %v, should be fast (SIGINT kills sleep)", elapsed)
+	}
+}
+
+func TestStop_ClosesContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	r := &Runner{
+		procs:     map[int64]*exec.Cmd{},
+		cancelFns: map[int64]context.CancelFunc{1: cancel},
+	}
+	if err := r.Stop(1); err != nil {
+		t.Fatalf("Stop should return nil: %v", err)
+	}
+	select {
+	case <-ctx.Done():
+	default:
+		t.Fatal("context should be cancelled")
 	}
 }
