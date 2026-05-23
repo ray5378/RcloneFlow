@@ -167,6 +167,7 @@ func TestParseSpecToCron_Valid(t *testing.T) {
 		{"0,30|9,17|*|*|1,5", "0 0,30 9,17 * * 1,5"},
 		{"*|*|*|*|*", "0 * * * * *"},
 		{"|*|*|*|*", "0 * * * * *"},
+		{"04,03,06|17,19|*|*|*", "0 04,03,06 17,19 * * *"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.input, func(t *testing.T) {
@@ -179,14 +180,21 @@ func TestParseSpecToCron_Valid(t *testing.T) {
 
 func TestParseSpecToCron_Invalid(t *testing.T) {
 	invalidSpecs := []string{
+		"",
+		"*|*|*",
 		"0|12|*",
 		"0|12|*|*",
 		"0|12|*|*|*|*",
 		"60|12|*|*|*",
+		"61|*|*|*|*",
 		"0|24|*|*|*",
+		"*|24|*|*|*",
 		"0|12|32|*|*",
+		"*|*|0|*|*",
 		"0|12|*|13|*",
+		"*|*|*|13|*",
 		"0|12|*|*|7",
+		"*|*|*|*|7",
 		"abc|12|*|*|*",
 	}
 	for _, spec := range invalidSpecs {
