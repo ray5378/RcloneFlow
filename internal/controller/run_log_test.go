@@ -39,7 +39,10 @@ func TestClassifyHistoricalLogRow(t *testing.T) {
 	}{
 		{"copied new", "INFO", "file.txt", "Copied (new)", "copied", true},
 		{"copied replaced", "INFO", "file.txt", "Copied (replaced existing)", "copied", true},
+		{"moved", "INFO", "old.txt", "Moved", "copied", true},
+		{"moved with path", "INFO", "folder/file.txt", "Moved to: /dest/file.txt", "copied", true},
 		{"deleted", "INFO", "old.txt", "Deleted", "deleted", true},
+		{"renamed", "INFO", "old.txt", "Renamed", "copied", true},
 		{"error", "ERROR", "file.txt", "transfer failed", "failed", true},
 		{"other", "INFO", "file.txt", "something", "", false},
 	}
