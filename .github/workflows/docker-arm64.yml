@@ -1,4 +1,4 @@
-name: Build and Push Docker Image (AMD64)
+name: Build and Push Docker Image (ARM64)
 
 on:
   push:
@@ -101,19 +101,19 @@ jobs:
         with:
           images: ray5378/rcloneflow
           tags: |
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+            type=sha,prefix={{branch}}-,suffix=-arm64
+            type=raw,value=latest-arm64,enable=${{ github.ref == 'refs/heads/master' }}
 
       - name: Extract short hash
         id: hash
         run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
 
-      - name: Build and push (AMD64)
+      - name: Build and push (ARM64)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          platforms: linux/amd64
+          platforms: linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
