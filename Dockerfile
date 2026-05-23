@@ -80,7 +80,7 @@ RUN hash="${GIT_HASH:-unknown}"; \
     if [ "$hash" != "unknown" ]; then \
       sed -i "s/var CommitHash = \"unknown\"/var CommitHash = \"${hash}\"/" /app/internal/version/version.go; \
     fi; \
-    go build -ldflags="-s -w" -o /out/server ./cmd/server
+    go build -buildvcs=false -ldflags="-s -w" -o /out/server ./cmd/server
 
 # Stage 3: runtime (Alpine)
 FROM alpine:3.19
