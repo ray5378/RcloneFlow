@@ -463,6 +463,7 @@ const taskEditorBaseline = computed(() => JSON.stringify({
     targetRemote: editingTask.value?.targetRemote ?? '',
     targetPath: editingTask.value?.targetPath ?? '',
     options: editingTask.value ? createForm.value.options : { enableStreaming: true },
+    bisyncOptions: editingTask.value?.bisyncOptions ?? {},
   },
   showSourcePathInput: false,
   showTargetPathInput: false,
