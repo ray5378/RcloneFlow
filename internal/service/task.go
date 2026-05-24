@@ -343,11 +343,29 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 	}
 	
 	versions := make(map[string]*BisyncLstVersion)
+	
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
+		
+		if name == "path1.lst" || name == "path2.lst" {
+			versionID := "current"
+			if _, exists := versions[versionID]; !exists {
+				versions[versionID] = &BisyncLstVersion{
+					ID:        versionID,
+					Timestamp: time.Now(),
+					Path1Lst:  "",
+					Path2Lst:  "",
+				}
+			}
+			if name == "path1.lst" {
+				versions[versionID].Path1Lst = name
+			} else if name == "path2.lst" {
+				versions[versionID].Path2Lst = name
+			}
+		}
 		
 		if (strings.HasSuffix(name, ".path1.lst") || strings.HasSuffix(name, ".path2.lst")) && strings.Contains(name, ".lst.") {
 			parts := strings.Split(name, ".lst.")
