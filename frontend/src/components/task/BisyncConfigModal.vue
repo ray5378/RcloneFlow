@@ -112,26 +112,6 @@ function updateOption<K extends keyof BisyncOptions>(key: K, value: BisyncOption
         </div>
 
         <div class="detail-item full-width">
-          <label>备份目录 1 (Backup Dir 1)</label>
-          <input
-            type="text"
-            :value="bisyncOptions.backupDir1"
-            @input="updateOption('backupDir1', ($event.target as HTMLInputElement).value || undefined)"
-            placeholder="源端备份目录路径"
-          />
-        </div>
-
-        <div class="detail-item full-width">
-          <label>备份目录 2 (Backup Dir 2)</label>
-          <input
-            type="text"
-            :value="bisyncOptions.backupDir2"
-            @input="updateOption('backupDir2', ($event.target as HTMLInputElement).value || undefined)"
-            placeholder="目标端备份目录路径"
-          />
-        </div>
-
-        <div class="detail-item full-width">
           <label class="inline-label">
             <input
               :checked="bisyncOptions.createEmptySrcDirs"
