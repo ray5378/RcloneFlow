@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -397,5 +398,9 @@ func (s *TaskService) ResyncBisync(taskID int64) error {
 	opts["resync"] = true
 	b, _ := json.Marshal(opts)
 	task.BisyncOptions = b
-	return s.db.UpdateTask(taskID, task)
+	if err := s.db.UpdateTask(taskID, task); err != nil {
+		return err
+	}
+	_, err := s.RunTask(context.Background(), taskID, "manual")
+	return err
 }
