@@ -365,6 +365,46 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 			} else if name == "path2.lst" {
 				versions[versionID].Path2Lst = name
 			}
+			continue
+		}
+		
+		if strings.HasSuffix(name, "-old") {
+			if strings.Contains(name, ".path1.lst") {
+				prefix := strings.TrimSuffix(name, ".path1.lst-old")
+				versionID := prefix + ".path1"
+				if _, exists := versions[versionID]; !exists {
+					info, err := entry.Info()
+					timestamp := time.Now()
+					if err == nil {
+						timestamp = info.ModTime()
+					}
+					versions[versionID] = &BisyncLstVersion{
+						ID:        versionID,
+						Timestamp: timestamp,
+						Path1Lst:  "",
+						Path2Lst:  "",
+					}
+				}
+				versions[versionID].Path1Lst = name
+			} else if strings.Contains(name, ".path2.lst") {
+				prefix := strings.TrimSuffix(name, ".path2.lst-old")
+				versionID := prefix + ".path2"
+				if _, exists := versions[versionID]; !exists {
+					info, err := entry.Info()
+					timestamp := time.Now()
+					if err == nil {
+						timestamp = info.ModTime()
+					}
+					versions[versionID] = &BisyncLstVersion{
+						ID:        versionID,
+						Timestamp: timestamp,
+						Path1Lst:  "",
+						Path2Lst:  "",
+					}
+				}
+				versions[versionID].Path2Lst = name
+			}
+			continue
 		}
 		
 		if (strings.HasSuffix(name, ".path1.lst") || strings.HasSuffix(name, ".path2.lst")) && strings.Contains(name, ".lst.") {
