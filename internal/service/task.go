@@ -326,6 +326,9 @@ type BisyncLstVersion struct {
 	Timestamp time.Time `json:"timestamp"`
 	Path1Lst  string    `json:"path1Lst"`
 	Path2Lst  string    `json:"path2Lst"`
+	Type      string    `json:"type"`
+	Conflict1 string    `json:"conflict1,omitempty"`
+	Conflict2 string    `json:"conflict2,omitempty"`
 }
 
 func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error) {
@@ -358,12 +361,44 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 					Timestamp: time.Now(),
 					Path1Lst:  "",
 					Path2Lst:  "",
+					Type:      "current",
 				}
 			}
 			if name == "path1.lst" {
 				versions[versionID].Path1Lst = name
 			} else if name == "path2.lst" {
 				versions[versionID].Path2Lst = name
+			}
+			continue
+		}
+		
+		if strings.Contains(name, ".conflict1") || strings.Contains(name, ".conflict2") {
+			prefix := name
+			if strings.Contains(name, ".conflict1") {
+				prefix = strings.TrimSuffix(name, ".conflict1")
+			} else if strings.Contains(name, ".conflict2") {
+				prefix = strings.TrimSuffix(name, ".conflict2")
+			}
+			
+			if _, exists := versions[prefix]; !exists {
+				info, err := entry.Info()
+				timestamp := time.Now()
+				if err == nil {
+					timestamp = info.ModTime()
+				}
+				versions[prefix] = &BisyncLstVersion{
+					ID:        prefix,
+					Timestamp: timestamp,
+					Path1Lst:  "",
+					Path2Lst:  "",
+					Type:      "conflict",
+				}
+			}
+			
+			if strings.Contains(name, ".conflict1") {
+				versions[prefix].Conflict1 = name
+			} else if strings.Contains(name, ".conflict2") {
+				versions[prefix].Conflict2 = name
 			}
 			continue
 		}
@@ -382,6 +417,7 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 						Timestamp: timestamp,
 						Path1Lst:  "",
 						Path2Lst:  "",
+						Type:      "backup",
 					}
 				}
 				versions[prefix].Path1Lst = name
@@ -398,6 +434,7 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 						Timestamp: timestamp,
 						Path1Lst:  "",
 						Path2Lst:  "",
+						Type:      "backup",
 					}
 				}
 				versions[prefix].Path2Lst = name
@@ -417,6 +454,7 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 							Timestamp: timestamp,
 							Path1Lst:  "",
 							Path2Lst:  "",
+							Type:      "backup",
 						}
 					}
 					if strings.Contains(name, ".path1.lst") {
@@ -456,11 +494,37 @@ func (s *TaskService) DeleteBisyncLstVersion(taskID int64, versionID string) err
 		return err
 	}
 	
-	pattern := fmt.Sprintf(".lst.%s.bak", versionID)
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
-			filePath := filepath.Join(dir, entry.Name())
-			_ = os.Remove(filePath)
+	if versionID == "current" {
+		return fmt.Errorf("cannot delete current version")
+	}
+	
+	if strings.Contains(versionID, ".conflict") {
+		conflict1 := strings.TrimSuffix(versionID, ".conflict2") + ".conflict1"
+		conflict2 := strings.TrimSuffix(versionID, ".conflict1") + ".conflict2"
+		for _, entry := range entries {
+			if !entry.IsDir() && (entry.Name() == conflict1 || entry.Name() == conflict2) {
+				filePath := filepath.Join(dir, entry.Name())
+				_ = os.Remove(filePath)
+			}
+		}
+	} else if strings.Contains(versionID, ".lst-old") {
+		parts := strings.Split(versionID, ".path")
+		if len(parts) == 2 {
+			prefix := parts[0]
+			for _, entry := range entries {
+				if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) && strings.HasSuffix(entry.Name(), "-old") {
+					filePath := filepath.Join(dir, entry.Name())
+					_ = os.Remove(filePath)
+				}
+			}
+		}
+	} else {
+		pattern := fmt.Sprintf(".lst.%s.bak", versionID)
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
+				filePath := filepath.Join(dir, entry.Name())
+				_ = os.Remove(filePath)
+			}
 		}
 	}
 	

@@ -46,6 +46,16 @@ async function handleDelete(versionId: string) {
   }
 }
 
+function handleResolveConflict(version: any) {
+  const confirmed = window.confirm(
+    `检测到冲突文件：\n\n${version.conflict1 || ''}\n${version.conflict2 || ''}\n\n建议：\n1. 先备份冲突文件（如果有需要）\n2. 选择"确定"删除冲突文件\n3. 重新运行同步任务解决冲突\n\n是否删除这些冲突文件？`
+  )
+  
+  if (confirmed) {
+    handleDelete(version.id)
+  }
+}
+
 async function handleRollback() {
   if (!props.taskId || !selectedVersionId.value) return
   actionLoading.value = 'rollback'
@@ -144,19 +154,38 @@ watch(
           <div v-if="loading" class="path-empty">加载中...</div>
           <div v-else-if="!versions.length" class="path-empty">暂无历史状态版本</div>
           <div v-else class="files-list">
-            <div v-for="version in versions" :key="version.id" class="file-item" :class="{ selected: selectedVersionId === version.id }">
+            <div v-for="version in versions" :key="version.id" class="file-item" :class="{ selected: selectedVersionId === version.id, 'current': version.type === 'current', 'conflict': version.type === 'conflict' }">
               <div class="version-info">
-                <span class="version-time">
-                  {{ version.id === 'current' ? '当前版本' : formatTimestamp(version.timestamp) }}
-                </span>
-                <span class="version-details">
-                  <span v-if="version.path1Lst">{{ version.path1Lst }}</span>
+                <div class="version-header">
+                  <span class="version-badge" :class="version.type">
+                    {{ version.type === 'current' ? '当前版本' : version.type === 'conflict' ? '冲突文件' : '历史备份' }}
+                  </span>
+                  <span class="version-time">
+                    {{ version.id === 'current' ? '当前' : formatTimestamp(version.timestamp) }}
+                  </span>
+                </div>
+                <div class="version-details">
+                  <span v-if="version.path1Lst">📄 {{ version.path1Lst }}</span>
                   <span v-if="version.path1Lst && version.path2Lst"> + </span>
-                  <span v-if="version.path2Lst">{{ version.path2Lst }}</span>
-                </span>
+                  <span v-if="version.path2Lst">📄 {{ version.path2Lst }}</span>
+                  <span v-if="version.type === 'conflict'" class="conflict-files">
+                    <span v-if="version.conflict1">⚠️ {{ version.conflict1 }}</span>
+                    <span v-if="version.conflict1 && version.conflict2"> | </span>
+                    <span v-if="version.conflict2">⚠️ {{ version.conflict2 }}</span>
+                  </span>
+                </div>
               </div>
               <div class="file-actions">
                 <button
+                  v-if="version.type === 'conflict'"
+                  class="ghost small"
+                  :disabled="actionLoading !== null"
+                  @click="handleResolveConflict(version)"
+                >
+                  处理冲突
+                </button>
+                <button
+                  v-if="version.type !== 'current'"
                   class="ghost small"
                   style="color: #ef4444"
                   :disabled="actionLoading !== null"
@@ -250,7 +279,53 @@ watch(
 .version-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+}
+
+.version-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.version-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.version-badge.current {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.version-badge.backup {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.version-badge.conflict {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.file-item.current {
+  background: rgba(34, 197, 94, 0.05);
+  border-left: 3px solid #22c55e;
+}
+
+.file-item.conflict {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid #ef4444;
 }
 
 .version-time {
@@ -263,6 +338,18 @@ watch(
   font-size: 12px;
   color: var(--muted);
   font-family: monospace;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.conflict-files {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 4px;
+  color: #ef4444;
+  font-size: 11px;
 }
 
 .file-actions {
