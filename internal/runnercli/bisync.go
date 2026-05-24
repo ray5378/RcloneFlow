@@ -3,6 +3,7 @@ package runnercli
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -19,16 +20,26 @@ type BisyncSummary struct {
 	Path2ToPath1 map[string]int `json:"path2ToPath1"`
 }
 
+// isBisyncWorkDirEmpty 检查 bisync 工作目录是否为空
+func isBisyncWorkDirEmpty(workDir string) bool {
+	entries, err := os.ReadDir(workDir)
+	if err != nil {
+		return true
+	}
+	return len(entries) == 0
+}
+
 // buildBisyncCommand 构建 rclone bisync 命令行参数
 func buildBisyncCommand(src, dst, workDir string, options json.RawMessage) []string {
 	args := []string{"bisync", src, dst, "--workdir", workDir}
 
+	needResync := false
 	if len(options) > 0 {
 		var opts map[string]any
 		if err := json.Unmarshal(options, &opts); err == nil {
 			// 处理各种 bisync 选项
 			if resync, ok := opts["resync"].(bool); ok && resync {
-				args = append(args, "--resync")
+				needResync = true
 			}
 			if compare, ok := opts["compare"].(string); ok && compare != "" {
 				args = append(args, "--compare", compare)
@@ -68,6 +79,16 @@ func buildBisyncCommand(src, dst, workDir string, options json.RawMessage) []str
 			}
 		}
 	}
+
+	// 如果用户没有指定 resync 且工作目录为空，则自动添加 resync
+	if !needResync && isBisyncWorkDirEmpty(workDir) {
+		needResync = true
+	}
+
+	if needResync {
+		args = append(args, "--resync")
+	}
+
 	return args
 }
 

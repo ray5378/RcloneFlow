@@ -755,6 +755,21 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		if r.activeMgr != nil {
 			r.activeMgr.RemoveState(run.ID)
 		}
+		// 清除 bisync 任务的 resync 标志
+		if run.TaskMode == "bisync" {
+			if t, ok := r.updater.GetTask(run.TaskID); ok {
+				var opts map[string]any
+				if len(t.BisyncOptions) > 0 {
+					if json.Unmarshal(t.BisyncOptions, &opts) == nil {
+						// 清除 resync 标志
+						delete(opts, "resync")
+						b, _ := json.Marshal(opts)
+						t.BisyncOptions = b
+						_ = r.updater.UpdateTask(run.TaskID, t)
+					}
+				}
+			}
+		}
 		// fire webhook for successful run
 		go func() {
 			defer func() {

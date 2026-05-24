@@ -10,6 +10,7 @@ type RunUpdater interface {
 	UpdateRun(id int64, fn func(*store.Run)) error
 	GetRun(id int64) (store.Run, error)
 	GetTask(id int64) (store.Task, bool)
+	UpdateTask(id int64, task store.Task) error
 }
 
 // EventBroadcaster 抽象事件广播，解耦 runnercli 与 websocket
@@ -32,6 +33,10 @@ func (a *StoreDBAdapter) GetRun(id int64) (store.Run, error) {
 
 func (a *StoreDBAdapter) GetTask(id int64) (store.Task, bool) {
 	return a.DB.GetTask(id)
+}
+
+func (a *StoreDBAdapter) UpdateTask(id int64, task store.Task) error {
+	return a.DB.UpdateTask(id, task)
 }
 
 // WSBroadcaster 将 websocket.Broadcast 适配为 EventBroadcaster
