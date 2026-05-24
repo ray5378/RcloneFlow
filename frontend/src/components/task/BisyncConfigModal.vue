@@ -102,50 +102,6 @@ function updateOption<K extends keyof BisyncOptions>(key: K, value: BisyncOption
         </div>
 
         <div class="detail-item full-width">
-          <label>冲突文件后缀 (Conflict Suffix)</label>
-          <input
-            type="text"
-            :value="bisyncOptions.conflictSuffix"
-            @input="updateOption('conflictSuffix', ($event.target as HTMLInputElement).value || undefined)"
-            placeholder="例如: .backup"
-          />
-        </div>
-
-        <div class="detail-item full-width">
-          <label class="inline-label">
-            <input
-              :checked="bisyncOptions.createEmptySrcDirs"
-              type="checkbox"
-              @change="updateOption('createEmptySrcDirs', ($event.target as HTMLInputElement).checked)"
-            />
-            <span>创建空源目录 (Create Empty Src Dirs)</span>
-          </label>
-        </div>
-
-        <div class="detail-item full-width">
-          <label class="inline-label">
-            <input
-              :checked="bisyncOptions.removeEmptyDirs"
-              type="checkbox"
-              @change="updateOption('removeEmptyDirs', ($event.target as HTMLInputElement).checked)"
-            />
-            <span>删除空目录 (Remove Empty Dirs)</span>
-          </label>
-        </div>
-
-        <div class="detail-item full-width">
-          <label class="inline-label">
-            <input
-              :checked="bisyncOptions.recover"
-              type="checkbox"
-              @change="updateOption('recover', ($event.target as HTMLInputElement).checked)"
-            />
-            <span>恢复模式 (Recover)</span>
-          </label>
-          <p class="hint">尝试从损坏的状态中恢复</p>
-        </div>
-
-        <div class="detail-item full-width">
           <label>历史备份数量</label>
           <input
             type="number"
