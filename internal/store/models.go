@@ -21,16 +21,33 @@ type Tag struct {
 }
 
 type Task struct {
-	ID           int64           `json:"id"`
-	Name         string          `json:"name"`
-	Mode         string          `json:"mode"`
-	SourceRemote string          `json:"sourceRemote"`
-	SourcePath   string          `json:"sourcePath"`
-	TargetRemote string          `json:"targetRemote"`
-	TargetPath   string          `json:"targetPath"`
-	Options      json.RawMessage `json:"options,omitempty"`
-	SortOrder    int64           `json:"sortOrder"`
-	CreatedAt    time.Time       `json:"createdAt"`
+	ID            int64           `json:"id"`
+	Name          string          `json:"name"`
+	Mode          string          `json:"mode"`
+	SourceRemote  string          `json:"sourceRemote"`
+	SourcePath    string          `json:"sourcePath"`
+	TargetRemote  string          `json:"targetRemote"`
+	TargetPath    string          `json:"targetPath"`
+	Options       json.RawMessage `json:"options,omitempty"`
+	BisyncOptions json.RawMessage `json:"bisyncOptions,omitempty"`
+	SortOrder     int64           `json:"sortOrder"`
+	CreatedAt     time.Time       `json:"createdAt"`
+}
+
+type BisyncOptions struct {
+	Resync             bool   `json:"resync,omitempty"`
+	Compare            string `json:"compare,omitempty"`
+	MaxDelete          string `json:"maxDelete,omitempty"`
+	CheckAccess        bool   `json:"checkAccess,omitempty"`
+	CheckFilename      string `json:"checkFilename,omitempty"`
+	ConflictResolve    string `json:"conflictResolve,omitempty"`
+	ConflictLoser      string `json:"conflictLoser,omitempty"`
+	ConflictSuffix     string `json:"conflictSuffix,omitempty"`
+	BackupDir1         string `json:"backupDir1,omitempty"`
+	BackupDir2         string `json:"backupDir2,omitempty"`
+	CreateEmptySrcDirs bool   `json:"createEmptySrcDirs,omitempty"`
+	RemoveEmptyDirs    bool   `json:"removeEmptyDirs,omitempty"`
+	Recover            bool   `json:"recover,omitempty"`
 }
 
 type Schedule struct {

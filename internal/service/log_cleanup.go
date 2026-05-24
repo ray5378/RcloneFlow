@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.uber.org/zap"
+	"rcloneflow/internal/config"
 	"rcloneflow/internal/logger"
 )
 
@@ -94,7 +95,6 @@ func (s *LogCleanupService) getInterval() time.Duration {
 
 func (s *LogCleanupService) cleanup() {
 	retentionDays := s.getRetentionDays()
-	// 删除超出保留期的日志文件和空目录
 	cutoff := time.Now().AddDate(0, 0, -retentionDays)
 	deleted := 0
 
@@ -112,7 +112,6 @@ func (s *LogCleanupService) cleanup() {
 		if err != nil {
 			continue
 		}
-		// 检查目录修改时间是否超过保留期
 		if info.ModTime().Before(cutoff) {
 			if err := os.RemoveAll(subDir); err == nil {
 				deleted++
@@ -120,7 +119,6 @@ func (s *LogCleanupService) cleanup() {
 			}
 			continue
 		}
-		// 目录未过期，清理里面的日志文件
 		subEntries, err := os.ReadDir(subDir)
 		if err != nil {
 			continue
@@ -140,12 +138,46 @@ func (s *LogCleanupService) cleanup() {
 				}
 			}
 		}
-		// 检查目录是否变空
 		remaining, _ := os.ReadDir(subDir)
 		if len(remaining) == 0 {
 			os.Remove(subDir)
 		}
 	}
+
+	dataDir := config.DataDir()
+	bisyncRootDir := filepath.Join(dataDir, "bisync")
+	if bisyncEntries, err := os.ReadDir(bisyncRootDir); err == nil {
+		for _, entry := range bisyncEntries {
+			if !entry.IsDir() {
+				continue
+			}
+			subDir := filepath.Join(bisyncRootDir, entry.Name())
+			info, err := entry.Info()
+			if err != nil {
+				continue
+			}
+			if info.ModTime().Before(cutoff) {
+				if err := os.RemoveAll(subDir); err == nil {
+					deleted++
+					logger.Debug("删除bisync目录", zap.String("dir", entry.Name()))
+				}
+			} else {
+				files, _ := os.ReadDir(subDir)
+				for _, f := range files {
+					if f.IsDir() {
+						continue
+					}
+					fi, _ := f.Info()
+					if fi.ModTime().Before(cutoff) {
+						if err := os.Remove(filepath.Join(subDir, f.Name())); err == nil {
+							deleted++
+						}
+					}
+				}
+			}
+		}
+	}
+
 	if deleted > 0 {
 		logger.Info("日志清理完成", zap.Int("deleted", deleted), zap.Int("retention_days", retentionDays))
 	}

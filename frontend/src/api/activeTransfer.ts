@@ -1,7 +1,7 @@
 import { get } from './client'
 import { t } from '../i18n'
 
-export type TrackingMode = 'normal' | 'cas'
+export type TrackingMode = 'normal' | 'cas' | 'bisync'
 export type ActiveTransferFileStatus = 'pending' | 'in_progress' | 'copied' | 'cas_matched' | 'skipped' | 'failed' | 'deleted'
 
 export interface ActiveTransferSummary {

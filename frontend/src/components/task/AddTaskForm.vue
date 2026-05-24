@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { CreateForm, PathBreadcrumb, PathBrowseItem, TaskFormOptions, TaskFormOptionValue, UpdateTaskOption } from './types'
+import { computed, ref } from 'vue'
+import type { CreateForm, PathBreadcrumb, PathBrowseItem, TaskFormOptions, TaskFormOptionValue, UpdateTaskOption, BisyncOptions } from './types'
 import type { Task } from '../../types'
 import AdvancedTransferSection from './AdvancedTransferSection.vue'
 import AdvancedFilterSection from './AdvancedFilterSection.vue'
 import AdvancedCompareSection from './AdvancedCompareSection.vue'
 import AdvancedPathSection from './AdvancedPathSection.vue'
 import AdvancedOtherSection from './AdvancedOtherSection.vue'
+import BisyncConfigModal from './BisyncConfigModal.vue'
 import { PathItem } from '../path'
 import { t } from '../../i18n'
+
+const showBisyncConfigModal = ref(false)
 
 const props = defineProps<{
   commandMode: boolean
@@ -109,7 +112,14 @@ const updateOption: UpdateTaskOption = (key, value) => {
           <option value="copy">{{ t('addTask.copy') }} (copy)</option>
           <option value="sync">{{ t('addTask.sync') }} (sync)</option>
           <option value="move">{{ t('addTask.move') }} (move)</option>
+          <option value="bisync">{{ t('addTask.bisync') || '双向同步' }} (bisync)</option>
         </select>
+      </div>
+      <div class="field-item" v-if="createForm.mode === 'bisync'">
+        <button class="ghost" type="button" @click="showBisyncConfigModal = true">
+          配置双向同步选项
+        </button>
+        <p class="hint">配置 bisync 的高级选项（如冲突处理、恢复模式等）</p>
       </div>
       <div class="field-item">
         <label>{{ t('addTask.sourceStorage') }} <span style="color: #dc2626">*</span></label>
@@ -207,6 +217,13 @@ const updateOption: UpdateTaskOption = (key, value) => {
         </button>
       </div>
     </div>
+    <BisyncConfigModal
+      :visible="showBisyncConfigModal"
+      :bisync-options="createForm.bisyncOptions || {}"
+      @close="showBisyncConfigModal = false"
+      @save="showBisyncConfigModal = false"
+      @update:bisync-options="(value: BisyncOptions) => (createForm.bisyncOptions = value)"
+    />
   </div>
 </template>
 
@@ -244,4 +261,10 @@ body.light .advanced-section { border-top-color: #ddd; }
 .advanced-options { display: flex; flex-direction: column; gap: 0; }
 .path-empty { padding: 20px; text-align: center; color: #666; font-size: 13px; }
 .form-actions { margin-top: 20px; }
+.hint {
+  margin-top: 8px;
+  color: var(--muted, #94a3b8);
+  font-size: 13px;
+  line-height: 1.5;
+}
 </style>

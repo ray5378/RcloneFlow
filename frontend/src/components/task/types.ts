@@ -1,11 +1,27 @@
 // Shared types for RcloneFlow task form components
 
-export type TaskMode = 'sync' | 'copy' | 'move'
+export type TaskMode = 'sync' | 'copy' | 'move' | 'bisync'
 
 export type TaskFormOptionValue = string | number | boolean | string[] | Record<string, string> | undefined
 
 export interface TaskFormOptions {
   [key: string]: TaskFormOptionValue
+}
+
+export interface BisyncOptions {
+  resync?: boolean
+  compare?: string
+  maxDelete?: string
+  checkAccess?: boolean
+  checkFilename?: string
+  conflictResolve?: string
+  conflictLoser?: string
+  conflictSuffix?: string
+  backupDir1?: string
+  backupDir2?: string
+  createEmptySrcDirs?: boolean
+  removeEmptyDirs?: boolean
+  recover?: boolean
 }
 
 export type UpdateTaskOption = (key: string, value: TaskFormOptionValue) => void
@@ -25,6 +41,7 @@ export interface CreateForm {
   targetRemote: string
   targetPath: string
   options: TaskFormOptions
+  bisyncOptions?: BisyncOptions
   webhooks?: string
   enableStreaming?: boolean
   singleton?: boolean

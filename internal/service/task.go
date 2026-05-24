@@ -2,9 +2,12 @@ package service
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -81,6 +84,12 @@ func (s *TaskService) UpdateTask(id int64, task store.Task) error {
 	}
 	if len(task.Options) > 0 {
 		merged.Options = task.Options
+	}
+	if len(task.BisyncOptions) > 0 {
+		merged.BisyncOptions = task.BisyncOptions
+	}
+	if cur.Mode == "bisync" && merged.Mode != "bisync" {
+		_ = s.cleanupBisyncDir(cur.Name)
 	}
 	if err := s.ensureTaskNameUnique(merged.Name, id); err != nil {
 		return err
@@ -268,6 +277,10 @@ func (s *TaskService) DeleteTask(id int64) error {
 		}
 	}
 
+	if task.Mode == "bisync" {
+		_ = s.cleanupBisyncDir(task.Name)
+	}
+
 	if err := s.db.DeleteRunsByTask(id); err != nil {
 		return err
 	}
@@ -281,4 +294,108 @@ func (s *TaskService) DeleteTask(id int64) error {
 
 func (s *TaskService) GetTask(id int64) (store.Task, bool) {
 	return s.db.GetTask(id)
+}
+
+func (s *TaskService) getBisyncDir(taskName string) string {
+	dataDir := config.DataDir()
+	safeName := func(s string) string {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			s = "task"
+		}
+		invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+		s = invalid.ReplaceAllString(s, "_")
+		return s
+	}(taskName)
+	return filepath.Join(dataDir, "bisync", safeName)
+}
+
+func (s *TaskService) cleanupBisyncDir(taskName string) error {
+	dir := s.getBisyncDir(taskName)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil
+	}
+	return os.RemoveAll(dir)
+}
+
+func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]string, error) {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return nil, ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, err
+	}
+	files := []string{}
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".lst") {
+			files = append(files, entry.Name())
+		}
+	}
+	return files, nil
+}
+
+func (s *TaskService) DeleteBisyncLstFile(taskID int64, filename string) error {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	filePath := filepath.Join(dir, filename)
+	if filepath.Base(filename) != filename {
+		return fmt.Errorf("invalid filename")
+	}
+	return os.Remove(filePath)
+}
+
+func (s *TaskService) RollbackBisyncLstFile(taskID int64, filename string) error {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	srcPath := filepath.Join(dir, filename)
+	if filepath.Base(filename) != filename {
+		return fmt.Errorf("invalid filename")
+	}
+	if _, err := os.Stat(srcPath); os.IsNotExist(err) {
+		return fmt.Errorf("file not found")
+	}
+	now := time.Now().Format("20060102-150405")
+	currentFiles := []string{"path1.lst", "path2.lst"}
+	for _, f := range currentFiles {
+		currentPath := filepath.Join(dir, f)
+		if _, err := os.Stat(currentPath); err == nil {
+			_ = os.Rename(currentPath, filepath.Join(dir, f+"."+now+".bak"))
+		}
+	}
+	if strings.Contains(filename, "path1") {
+		return os.Rename(srcPath, filepath.Join(dir, "path1.lst"))
+	} else if strings.Contains(filename, "path2") {
+		return os.Rename(srcPath, filepath.Join(dir, "path2.lst"))
+	}
+	return fmt.Errorf("unrecognized lst file type")
+}
+
+func (s *TaskService) ResyncBisync(taskID int64) error {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	var opts map[string]any
+	if len(task.BisyncOptions) > 0 {
+		_ = json.Unmarshal(task.BisyncOptions, &opts)
+	}
+	if opts == nil {
+		opts = map[string]any{}
+	}
+	opts["resync"] = true
+	b, _ := json.Marshal(opts)
+	task.BisyncOptions = b
+	return s.db.UpdateTask(taskID, task)
 }

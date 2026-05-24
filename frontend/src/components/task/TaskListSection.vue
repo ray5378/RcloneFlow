@@ -41,6 +41,7 @@ const emit = defineEmits<{
   (e: 'set-webhook', task: Task): void
   (e: 'set-singleton', task: Task): void
   (e: 'open-transfer-detail', taskId: number): void
+  (e: 'open-bisync-lst-manager', task: Task): void
   (e: 'prev-page'): void
   (e: 'next-page'): void
   (e: 'update:jump-page', value: number | null): void
@@ -271,6 +272,7 @@ function handleLastPage() {
         @set-webhook="emit('set-webhook', task)"
         @set-singleton="emit('set-singleton', task)"
         @open-transfer-detail="emit('open-transfer-detail', task.id)"
+        @open-bisync-lst-manager="emit('open-bisync-lst-manager', task)"
       />
       <div v-if="!previewTasks.length" class="empty">{{ t('taskUI.noTasks') }}</div>
     </div>

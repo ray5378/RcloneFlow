@@ -1,3 +1,19 @@
+export interface BisyncOptions {
+  resync?: boolean
+  compare?: string
+  maxDelete?: string
+  checkAccess?: boolean
+  checkFilename?: string
+  conflictResolve?: string
+  conflictLoser?: string
+  conflictSuffix?: string
+  backupDir1?: string
+  backupDir2?: string
+  createEmptySrcDirs?: boolean
+  removeEmptyDirs?: boolean
+  recover?: boolean
+}
+
 export interface Task {
   id: number
   name: string
@@ -7,6 +23,7 @@ export interface Task {
   targetRemote: string
   targetPath: string
   options?: TaskOptions
+  bisyncOptions?: BisyncOptions
   sortOrder?: number
   createdAt: string
 }

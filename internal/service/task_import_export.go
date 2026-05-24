@@ -36,6 +36,12 @@ func (s *TaskService) ExportTasks() (map[string]any, error) {
 				taskMap["options"] = opts
 			}
 		}
+		if len(t.BisyncOptions) > 0 {
+			var bisyncOpts map[string]any
+			if json.Unmarshal(t.BisyncOptions, &bisyncOpts) == nil {
+				taskMap["bisyncOptions"] = bisyncOpts
+			}
+		}
 		exportTasks = append(exportTasks, taskMap)
 	}
 
@@ -126,6 +132,12 @@ func (s *TaskService) ImportTasks(data map[string]any, strategy string) (importe
 				newTask.Options = optsBytes
 			}
 		}
+		if bisyncOpts, ok := taskMap["bisyncOptions"]; ok {
+			bisyncOptsBytes, err := json.Marshal(bisyncOpts)
+			if err == nil {
+				newTask.BisyncOptions = bisyncOptsBytes
+			}
+		}
 
 		lowerName := strings.ToLower(strings.TrimSpace(name))
 		if existingID, exists := existingNames[lowerName]; exists {
@@ -143,6 +155,9 @@ func (s *TaskService) ImportTasks(data map[string]any, strategy string) (importe
 				}
 				if len(newTask.Options) == 0 {
 					newTask.Options = cur.Options
+				}
+				if len(newTask.BisyncOptions) == 0 {
+					newTask.BisyncOptions = cur.BisyncOptions
 				}
 				if err := s.db.UpdateTask(existingID, newTask); err != nil {
 					skipped++

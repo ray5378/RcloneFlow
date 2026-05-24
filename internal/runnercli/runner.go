@@ -72,8 +72,11 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
 	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
 	cmdName := strings.ToLower(mode)
-	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" {
+	isBisyncMode := false // 新增
+	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" && cmdName != "bisync" {
 		cmdName = "copy"
+	} else if cmdName == "bisync" {
+		isBisyncMode = true
 	}
 	originalCmdName := cmdName
 	// Resolve config path
@@ -95,75 +98,94 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}
 	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
 	// 降低默认日志级别：从 -vv 改为 -v，显著减少日志行数和解析/写库开销
-	args := []string{cmdName, src, dst, "--stats", "1s", "--stats-one-line", "--config", cfg}
-	if casCompat != nil && casCompat.ExcludeFrom != "" {
-		args = append(args, "--exclude-from", casCompat.ExcludeFrom)
-	}
-	// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)，并对 WebDAV 目标注入稳态默认（未显式配置时）
+	var args []string
 	var effOpt map[string]any
-	if run.Summary != nil {
-		var merged = map[string]any{}
-		var effm map[string]any
-		if v, ok := run.Summary["transferDefaults"]; ok {
-			if m, ok := v.(map[string]any); ok {
-				for k, val := range m {
-					merged[k] = val
-				}
-			}
-		}
-		if v, ok := run.Summary["effectiveOptions"]; ok {
-			if m, ok := v.(map[string]any); ok {
-				effm = m
-				for k, val := range m {
-					merged[k] = val
-				}
-			}
-		}
-		// WebDAV 稳态参数（当目标底层是 WebDAV）
-		// 显式设置（effectiveOptions）优先：仅在用户未显式设置时注入建议默认；不再做“下限兜底”强制覆盖
-		if isWebDAVUnderlying(cfg, dstRemote) {
-			injectIfMissing := func(k string, v any) {
-				if effm == nil {
-					if _, ok := merged[k]; !ok {
-						merged[k] = v
-					}
-					return
-				}
-				if _, ok := effm[k]; !ok {
-					if _, ok2 := merged[k]; !ok2 {
-						merged[k] = v
-					}
-				}
-			}
-			// 建议默认（保守）：
-			injectIfMissing("timeout", 24*3600)
-			injectIfMissing("connTimeout", 60)
-			injectIfMissing("expectContinueTimeout", 30)
-			injectIfMissing("retries", 5)
-			injectIfMissing("lowLevelRetries", 20)
-			injectIfMissing("disableHttp2", true)
-			// 并发/多线程：仅当用户未显式设置时给出建议默认，用户设置优先生效
-			injectIfMissing("transfers", 1)
-			injectIfMissing("multiThreadStreams", 1)
-		}
-		if len(merged) > 0 {
-			effOpt = merged
-			args = append(args, buildFlagsFromOptions(merged)...)
-		}
-	}
 	casManagedRetries := false
 	maxCASAttempts := 1
-	if casCompat != nil {
-		casManagedRetries = true
-		maxCASAttempts = configuredRetryCount(effOpt)
-		if maxCASAttempts < 1 {
-			maxCASAttempts = 1
+	if isBisyncMode {
+		// 处理 bisync 模式
+		bisyncDir := filepath.Join(dataDir, "bisync", sanitizeFilenameForBisync(run.TaskName, run.TaskID))
+		_ = os.MkdirAll(bisyncDir, 0o755)
+		// 从 run.Summary 中获取 bisync 选项（如果存在）
+		var bisyncOptions json.RawMessage
+		if run.Summary != nil {
+			if opts, ok := run.Summary["bisyncOptions"]; ok {
+				if optsBytes, err := json.Marshal(opts); err == nil {
+					bisyncOptions = optsBytes
+				}
+			}
 		}
-		args = forceFlagValue(args, "--retries", "0")
-		args = forceFlagValue(args, "--low-level-retries", "0")
+		args = buildBisyncCommand(src, dst, bisyncDir, bisyncOptions)
+		// 添加基本参数
+		args = append(args, "--stats", "1s", "--stats-one-line", "--config", cfg, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
+	} else {
+		args = []string{cmdName, src, dst, "--stats", "1s", "--stats-one-line", "--config", cfg}
+		if casCompat != nil && casCompat.ExcludeFrom != "" {
+			args = append(args, "--exclude-from", casCompat.ExcludeFrom)
+		}
+		// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)，并对 WebDAV 目标注入稳态默认（未显式配置时）
+		if run.Summary != nil {
+			var merged = map[string]any{}
+			var effm map[string]any
+			if v, ok := run.Summary["transferDefaults"]; ok {
+				if m, ok := v.(map[string]any); ok {
+					for k, val := range m {
+						merged[k] = val
+					}
+				}
+			}
+			if v, ok := run.Summary["effectiveOptions"]; ok {
+				if m, ok := v.(map[string]any); ok {
+					effm = m
+					for k, val := range m {
+						merged[k] = val
+					}
+				}
+			}
+			// WebDAV 稳态参数（当目标底层是 WebDAV）
+			// 显式设置（effectiveOptions）优先：仅在用户未显式设置时注入建议默认；不再做“下限兜底”强制覆盖
+			if isWebDAVUnderlying(cfg, dstRemote) {
+				injectIfMissing := func(k string, v any) {
+					if effm == nil {
+						if _, ok := merged[k]; !ok {
+							merged[k] = v
+						}
+						return
+					}
+					if _, ok := effm[k]; !ok {
+						if _, ok2 := merged[k]; !ok2 {
+							merged[k] = v
+						}
+					}
+				}
+				// 建议默认（保守）：
+				injectIfMissing("timeout", 24*3600)
+				injectIfMissing("connTimeout", 60)
+				injectIfMissing("expectContinueTimeout", 30)
+				injectIfMissing("retries", 5)
+				injectIfMissing("lowLevelRetries", 20)
+				injectIfMissing("disableHttp2", true)
+				// 并发/多线程：仅当用户未显式设置时给出建议默认，用户设置优先生效
+				injectIfMissing("transfers", 1)
+				injectIfMissing("multiThreadStreams", 1)
+			}
+			if len(merged) > 0 {
+				effOpt = merged
+				args = append(args, buildFlagsFromOptions(merged)...)
+			}
+		}
+		if casCompat != nil {
+			casManagedRetries = true
+			maxCASAttempts = configuredRetryCount(effOpt)
+			if maxCASAttempts < 1 {
+				maxCASAttempts = 1
+			}
+			args = forceFlagValue(args, "--retries", "0")
+			args = forceFlagValue(args, "--low-level-retries", "0")
+		}
+		// 强制启用 JSON 日志：作为系统默认行为，不再提供任务级开关。
+		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	}
-	// 强制启用 JSON 日志：作为系统默认行为，不再提供任务级开关。
-	args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	// 二次兜底：如 --buffer-size/--bwlimit 后是纯数字，自动补单位（M）；
 	// 同时将 --bwlimit 的分号分隔写法转为空格分隔，保证多时段正确识别
 	for i := 0; i < len(args)-1; i++ {

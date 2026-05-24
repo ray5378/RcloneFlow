@@ -28,6 +28,11 @@ interface SingletonFormState {
   singletonEnabled?: boolean
 }
 
+const emit = defineEmits<{
+  (e: 'open-tag-manager'): void
+  (e: 'open-bisync-lst-manager', task: Task): void
+}>()
+
 defineProps<{
   taskSearch: string
   filteredTasks: Task[]
@@ -117,6 +122,7 @@ defineProps<{
     @update:jump-page="setTasksJumpPageValue"
     @jump-page="jumpToTasksPage"
     @open-tag-manager="$emit('open-tag-manager')"
+    @open-bisync-lst-manager="$emit('open-bisync-lst-manager', $event)"
   />
 
   <WebhookConfigModal

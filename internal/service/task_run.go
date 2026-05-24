@@ -127,7 +127,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		}
 		if s.activeMgr != nil {
 			mode := active_transfer.TrackingModeNormal
-			if opts != nil && opts.OpenlistCasCompatible {
+			if t.Mode == "bisync" {
+				mode = active_transfer.TrackingModeBisync
+			} else if opts != nil && opts.OpenlistCasCompatible {
 				mode = active_transfer.TrackingModeCAS
 			}
 			cfg := os.Getenv("RCLONE_CONFIG")
@@ -140,19 +142,22 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 			if opts != nil && opts.Transfers > 0 {
 				s.activeMgr.SetTransferSlots(run.ID, opts.Transfers)
 			}
-			go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.Error("goroutine panic", zap.Any("panic", r))
+			// Bisync 模式有自己的文件发现机制，跳过预检查
+			if t.Mode != "bisync" {
+				go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
+					defer func() {
+						if r := recover(); r != nil {
+							logger.Error("goroutine panic", zap.Any("panic", r))
+						}
+					}()
+					candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
+					if err != nil {
+						s.activeMgr.SetPreflightResult(runID, err)
+						return
 					}
-				}()
-				candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
-				if err != nil {
-					s.activeMgr.SetPreflightResult(runID, err)
-					return
-				}
-				s.activeMgr.MergeCandidates(runID, candidates)
-			}(run.ID, taskID, mode, cfg, src, dst, opts)
+					s.activeMgr.MergeCandidates(runID, candidates)
+				}(run.ID, taskID, mode, cfg, src, dst, opts)
+			}
 		}
 		go func() {
 			defer func() {
@@ -179,7 +184,9 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 	}
 	if s.activeMgr != nil {
 		mode := active_transfer.TrackingModeNormal
-		if opts != nil && opts.OpenlistCasCompatible {
+		if t.Mode == "bisync" {
+			mode = active_transfer.TrackingModeBisync
+		} else if opts != nil && opts.OpenlistCasCompatible {
 			mode = active_transfer.TrackingModeCAS
 		}
 		cfg := os.Getenv("RCLONE_CONFIG")
@@ -192,19 +199,22 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		if opts != nil && opts.Transfers > 0 {
 			s.activeMgr.SetTransferSlots(run.ID, opts.Transfers)
 		}
-		go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("goroutine panic", zap.Any("panic", r))
+		// Bisync 模式有自己的文件发现机制，跳过预检查
+		if t.Mode != "bisync" {
+			go func(runID, taskID int64, mode active_transfer.TrackingMode, cfg, src, dst string, opts *adapter.TaskOptions) {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("goroutine panic", zap.Any("panic", r))
+					}
+				}()
+				candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
+				if err != nil {
+					s.activeMgr.SetPreflightResult(runID, err)
+					return
 				}
-			}()
-			candidates, err := active_transfer.BuildCandidateFiles(context.Background(), cfg, src, dst, opts)
-			if err != nil {
-				s.activeMgr.SetPreflightResult(runID, err)
-				return
-			}
-			s.activeMgr.MergeCandidates(runID, candidates)
-		}(run.ID, taskID, mode, cfg, src, dst, opts)
+				s.activeMgr.MergeCandidates(runID, candidates)
+			}(run.ID, taskID, mode, cfg, src, dst, opts)
+		}
 	}
 	go func() {
 		defer func() {

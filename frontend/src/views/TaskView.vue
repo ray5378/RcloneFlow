@@ -8,6 +8,7 @@ import ToastCenter from '../components/toast/ToastCenter.vue'
 import ScheduleConfigModal from '../components/task/ScheduleConfigModal.vue'
 import TransferringModal from '../components/task/transferring/TransferringModal.vue'
 import TagManagerModal from '../components/task/TagManagerModal.vue'
+import BisyncLstManagerModal from '../components/task/BisyncLstManagerModal.vue'
 import { taskApi, remoteApi, runApi, jobApi, scheduleApi } from '../composables/useApi'
 import { setErrorHandler } from '../composables/useError'
 import { formatBytes, formatBytesPerSec, formatEta } from '../utils/format'
@@ -143,6 +144,20 @@ async function handleUnselectTag(tag: string) {
 
 async function handleDeleteTag(tag: string) {
   await deleteManualTag(tag)
+}
+
+// Bisync 状态文件管理
+const bisyncLstManagerVisible = ref(false)
+const bisyncLstManagerTaskId = ref<number | null>(null)
+
+function openBisyncLstManager(task: any) {
+  bisyncLstManagerTaskId.value = task.id
+  bisyncLstManagerVisible.value = true
+}
+
+function closeBisyncLstManager() {
+  bisyncLstManagerVisible.value = false
+  bisyncLstManagerTaskId.value = null
 }
 
 // 5) 运行详情 / 最终总结链
@@ -535,6 +550,7 @@ function closeTaskEditorModal() {
     :action-tags="actionTags"
     :selected-keyword-tags="selectedKeywordTags"
     @open-tag-manager="openTagManager"
+    @open-bisync-lst-manager="openBisyncLstManager"
   />
 
   <TaskHistoryViewShell
@@ -694,6 +710,13 @@ function closeTaskEditorModal() {
     :message="confirmModal.message"
     @close="closeConfirm"
     @confirm="confirmAndClose"
+  />
+
+  <!-- Bisync 状态文件管理弹窗 -->
+  <BisyncLstManagerModal
+    :visible="bisyncLstManagerVisible"
+    :task-id="bisyncLstManagerTaskId"
+    @close="closeBisyncLstManager"
   />
 </template>
 

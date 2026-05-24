@@ -31,6 +31,7 @@ const emit = defineEmits<{
 function getSuccessLabel(mode?: string) {
   if (mode === 'move') return t('modal.moved')
   if (mode === 'sync') return t('modal.synced')
+  if (mode === 'bisync') return t('modal.synced')
   return t('modal.copied')
 }
 

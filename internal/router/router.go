@@ -130,6 +130,22 @@ func (r *Router) Setup(mux *http.ServeMux) {
 			r.runCtrl.HandleTaskKill(w, req)
 			return
 		}
+		if strings.HasSuffix(req.URL.Path, "/bisync/lst-files") {
+			r.taskCtrl.HandleBisyncLstFiles(w, req)
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/bisync/delete-lst") {
+			r.taskCtrl.HandleBisyncDeleteLst(w, req)
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/bisync/rollback-lst") {
+			r.taskCtrl.HandleBisyncRollbackLst(w, req)
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/bisync/resync") {
+			r.taskCtrl.HandleBisyncResync(w, req)
+			return
+		}
 		r.taskCtrl.HandleTaskActions(w, req)
 	})
 

@@ -1,10 +1,10 @@
 import { ref } from 'vue'
-import type { CreateForm, TaskFormOptions, TaskMode } from '../components/task/types'
+import type { CreateForm, TaskFormOptions, TaskMode, BisyncOptions } from '../components/task/types'
 import type { Task } from '../types'
 import { useTaskFormNormalize } from './useTaskFormNormalize'
 
 function normalizeTaskMode(mode: string): TaskMode {
-  return mode === 'sync' || mode === 'move' || mode === 'copy' ? mode : 'copy'
+  return mode === 'sync' || mode === 'move' || mode === 'copy' || mode === 'bisync' ? (mode as TaskMode) : 'copy'
 }
 
 export function useTaskFormState() {
@@ -17,6 +17,7 @@ export function useTaskFormState() {
     targetRemote: '',
     targetPath: '',
     options: { enableStreaming: true } as TaskFormOptions,
+    bisyncOptions: {} as BisyncOptions,
   })
 
   const commandMode = ref(false)
@@ -37,6 +38,7 @@ export function useTaskFormState() {
       targetRemote: '',
       targetPath: '',
       options: { enableStreaming: true },
+      bisyncOptions: {},
     }
   }
 
@@ -54,6 +56,7 @@ export function useTaskFormState() {
       targetRemote: task.targetRemote,
       targetPath: task.targetPath || '',
       options: normalizeTaskOptionsForForm(task.options as TaskFormOptions | undefined),
+      bisyncOptions: (task.bisyncOptions || {}) as BisyncOptions,
     }
   }
 
