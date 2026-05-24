@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -306,7 +307,7 @@ func (s *TaskService) getBisyncDir(taskName string) string {
 		if s == "" {
 			s = "task"
 		}
-		invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+		invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_.\-:]+`)
 		s = invalid.ReplaceAllString(s, "_")
 		return s
 	}(taskName)
@@ -337,12 +338,33 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 		return nil, ErrTaskNotFound
 	}
 	dir := s.getBisyncDir(task.Name)
-	entries, err := os.ReadDir(dir)
+	
+	var entries []fs.DirEntry
+	var err error
+	
+	entries, err = os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return []BisyncLstVersion{}, nil
+			// 尝试旧格式的目录名（没有保留 . 和 :）
+			safeNameOld := func(s string) string {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					s = "task"
+				}
+				invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+				return invalid.ReplaceAllString(s, "_")
+			}(task.Name)
+			dirOld := filepath.Join(config.DataDir(), "bisync", safeNameOld)
+			entries, err = os.ReadDir(dirOld)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return []BisyncLstVersion{}, nil
+				}
+				return nil, err
+			}
+		} else {
+			return nil, err
 		}
-		return nil, err
 	}
 	
 	versions := make(map[string]*BisyncLstVersion)
@@ -486,12 +508,33 @@ func (s *TaskService) DeleteBisyncLstVersion(taskID int64, versionID string) err
 	}
 	dir := s.getBisyncDir(task.Name)
 	
-	entries, err := os.ReadDir(dir)
+	var entries []fs.DirEntry
+	var err error
+	
+	entries, err = os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil
+			// 尝试旧格式的目录名
+			safeNameOld := func(s string) string {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					s = "task"
+				}
+				invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+				return invalid.ReplaceAllString(s, "_")
+			}(task.Name)
+			dirOld := filepath.Join(config.DataDir(), "bisync", safeNameOld)
+			entries, err = os.ReadDir(dirOld)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil
+				}
+				return err
+			}
+			dir = dirOld
+		} else {
+			return err
 		}
-		return err
 	}
 	
 	if versionID == "current" {
@@ -538,23 +581,67 @@ func (s *TaskService) RollbackBisyncLstVersion(taskID int64, versionID string) e
 	}
 	dir := s.getBisyncDir(task.Name)
 	
-	entries, err := os.ReadDir(dir)
+	var entries []fs.DirEntry
+	var err error
+	
+	entries, err = os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return fmt.Errorf("bisync directory not found")
+			// 尝试旧格式的目录名
+			safeNameOld := func(s string) string {
+				s = strings.TrimSpace(s)
+				if s == "" {
+					s = "task"
+				}
+				invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+				return invalid.ReplaceAllString(s, "_")
+			}(task.Name)
+			dirOld := filepath.Join(config.DataDir(), "bisync", safeNameOld)
+			entries, err = os.ReadDir(dirOld)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return fmt.Errorf("bisync directory not found")
+				}
+				return err
+			}
+			dir = dirOld
+		} else {
+			return err
 		}
-		return err
 	}
 	
-	pattern := fmt.Sprintf(".lst.%s.bak", versionID)
 	path1File := ""
 	path2File := ""
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
-			if strings.Contains(entry.Name(), ".path1.lst.") {
-				path1File = entry.Name()
-			} else if strings.Contains(entry.Name(), ".path2.lst.") {
-				path2File = entry.Name()
+	
+	// 检查是否是旧格式备份（包含 .path1.lst-old 或 .path2.lst-old）
+	if strings.Contains(versionID, ".path1.lst-old") || strings.Contains(versionID, ".path2.lst-old") {
+		prefix := ""
+		if strings.Contains(versionID, ".path1.lst-old") {
+			prefix = strings.TrimSuffix(versionID, ".path1.lst-old")
+		} else if strings.Contains(versionID, ".path2.lst-old") {
+			prefix = strings.TrimSuffix(versionID, ".path2.lst-old")
+		}
+		
+		// 查找对应的旧格式文件
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) && strings.HasSuffix(entry.Name(), "-old") {
+				if strings.Contains(entry.Name(), ".path1.lst-old") {
+					path1File = entry.Name()
+				} else if strings.Contains(entry.Name(), ".path2.lst-old") {
+					path2File = entry.Name()
+				}
+			}
+		}
+	} else {
+		// 新格式备份：.lst.versionID.bak
+		pattern := fmt.Sprintf(".lst.%s.bak", versionID)
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
+				if strings.Contains(entry.Name(), ".path1.lst.") {
+					path1File = entry.Name()
+				} else if strings.Contains(entry.Name(), ".path2.lst.") {
+					path2File = entry.Name()
+				}
 			}
 		}
 	}
