@@ -577,15 +577,20 @@ func (s *TaskService) DeleteBisyncLstVersion(taskID int64, versionID string) err
 				_ = os.Remove(filePath)
 			}
 		}
-	} else if strings.Contains(versionID, ".lst-old") {
-		parts := strings.Split(versionID, ".path")
-		if len(parts) == 2 {
-			prefix := parts[0]
-			for _, entry := range entries {
-				if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) && strings.HasSuffix(entry.Name(), "-old") {
-					filePath := filepath.Join(dir, entry.Name())
-					_ = os.Remove(filePath)
-				}
+	} else if strings.Contains(versionID, ".path1.lst-old") {
+		prefix := strings.TrimSuffix(versionID, ".path1.lst-old")
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) && strings.HasSuffix(entry.Name(), "-old") {
+				filePath := filepath.Join(dir, entry.Name())
+				_ = os.Remove(filePath)
+			}
+		}
+	} else if strings.Contains(versionID, ".path2.lst-old") {
+		prefix := strings.TrimSuffix(versionID, ".path2.lst-old")
+		for _, entry := range entries {
+			if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) && strings.HasSuffix(entry.Name(), "-old") {
+				filePath := filepath.Join(dir, entry.Name())
+				_ = os.Remove(filePath)
 			}
 		}
 	} else {
