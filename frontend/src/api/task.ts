@@ -89,16 +89,16 @@ export async function clearAllTasks(): Promise<void> {
 }
 
 // Bisync 相关 API
-export async function getBisyncLstFiles(taskId: number): Promise<{ files: string[] }> {
-  return get<{ files: string[] }>(`/api/tasks/${taskId}/bisync/lst-files`)
+export async function getBisyncLstFiles(taskId: number): Promise<{ versions: any[] }> {
+  return get<{ versions: any[] }>(`/api/tasks/${taskId}/bisync/lst-files`)
 }
 
-export async function deleteBisyncLstFile(taskId: number, filename: string): Promise<void> {
-  return post(`/api/tasks/${taskId}/bisync/delete-lst`, { filename })
+export async function deleteBisyncLstFile(taskId: number, versionId: string): Promise<void> {
+  return post(`/api/tasks/${taskId}/bisync/delete-lst`, { versionId })
 }
 
-export async function rollbackBisyncLstFile(taskId: number, filename: string): Promise<void> {
-  return post(`/api/tasks/${taskId}/bisync/rollback-lst`, { filename })
+export async function rollbackBisyncLstFile(taskId: number, versionId: string): Promise<void> {
+  return post(`/api/tasks/${taskId}/bisync/rollback-lst`, { versionId })
 }
 
 export async function resyncBisync(taskId: number): Promise<void> {

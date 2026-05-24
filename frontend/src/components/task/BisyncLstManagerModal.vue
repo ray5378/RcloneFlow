@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch, onMounted } from 'vue'
 import { getBisyncLstFiles, deleteBisyncLstFile, rollbackBisyncLstFile, resyncBisync } from '../../api/task'
+import type { BisyncLstVersion } from './types'
 
 const props = defineProps<{
   visible: boolean
@@ -11,18 +12,18 @@ const emit = defineEmits<{
   (e: 'close'): void
 }>()
 
-const lstFiles = ref<string[]>([])
+const versions = ref<BisyncLstVersion[]>([])
 const loading = ref(false)
 const actionLoading = ref<string | null>(null)
-const deletingFile = ref<string | null>(null)
-const rollbackingFile = ref<string | null>(null)
+const deletingVersion = ref<string | null>(null)
+const rollbackingVersion = ref<string | null>(null)
 
 async function loadLstFiles() {
   if (!props.taskId) return
   loading.value = true
   try {
     const res = await getBisyncLstFiles(props.taskId)
-    lstFiles.value = res.files || []
+    versions.value = res.versions || []
   } catch (error) {
     console.error('Failed to load lst files:', error)
   } finally {
@@ -30,33 +31,49 @@ async function loadLstFiles() {
   }
 }
 
-async function handleDelete(filename: string) {
+async function handleDelete(versionId: string) {
   if (!props.taskId) return
-  deletingFile.value = filename
+  deletingVersion.value = versionId
   actionLoading.value = 'delete'
   try {
-    await deleteBisyncLstFile(props.taskId, filename)
+    await deleteBisyncLstFile(props.taskId, versionId)
     await loadLstFiles()
   } catch (error) {
-    console.error('Failed to delete lst file:', error)
+    console.error('Failed to delete lst version:', error)
   } finally {
-    deletingFile.value = null
+    deletingVersion.value = null
     actionLoading.value = null
   }
 }
 
-async function handleRollback(filename: string) {
+async function handleRollback(versionId: string) {
   if (!props.taskId) return
-  rollbackingFile.value = filename
+  rollbackingVersion.value = versionId
   actionLoading.value = 'rollback'
   try {
-    await rollbackBisyncLstFile(props.taskId, filename)
+    await rollbackBisyncLstFile(props.taskId, versionId)
     await loadLstFiles()
   } catch (error) {
-    console.error('Failed to rollback lst file:', error)
+    console.error('Failed to rollback lst version:', error)
   } finally {
-    rollbackingFile.value = null
+    rollbackingVersion.value = null
     actionLoading.value = null
+  }
+}
+
+function formatTimestamp(timestamp: string): string {
+  try {
+    const date = new Date(timestamp)
+    return date.toLocaleString('zh-CN', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    })
+  } catch {
+    return timestamp
   }
 }
 
@@ -102,27 +119,34 @@ watch(
         </div>
 
         <div class="detail-item full-width" style="margin-top: 16px">
-          <label>历史状态文件</label>
+          <label>历史状态版本</label>
           <div v-if="loading" class="path-empty">加载中...</div>
-          <div v-else-if="!lstFiles.length" class="path-empty">暂无历史状态文件</div>
+          <div v-else-if="!versions.length" class="path-empty">暂无历史状态版本</div>
           <div v-else class="files-list">
-            <div v-for="file in lstFiles" :key="file" class="file-item">
-              <span class="file-name">{{ file }}</span>
+            <div v-for="version in versions" :key="version.id" class="file-item">
+              <div class="version-info">
+                <span class="version-time">{{ formatTimestamp(version.timestamp) }}</span>
+                <span class="version-details">
+                  <span v-if="version.path1Lst">path1.lst</span>
+                  <span v-if="version.path1Lst && version.path2Lst"> + </span>
+                  <span v-if="version.path2Lst">path2.lst</span>
+                </span>
+              </div>
               <div class="file-actions">
                 <button
                   class="ghost small"
                   :disabled="actionLoading !== null"
-                  @click="handleRollback(file)"
+                  @click="handleRollback(version.id)"
                 >
-                  {{ rollbackingFile === file ? '回滚中...' : '回滚到此版本' }}
+                  {{ rollbackingVersion === version.id ? '回滚中...' : '回滚到此版本' }}
                 </button>
                 <button
                   class="ghost small"
                   style="color: #ef4444"
                   :disabled="actionLoading !== null"
-                  @click="handleDelete(file)"
+                  @click="handleDelete(version.id)"
                 >
-                  {{ deletingFile === file ? '删除中...' : '删除' }}
+                  {{ deletingVersion === version.id ? '删除中...' : '删除' }}
                 </button>
               </div>
             </div>
@@ -164,9 +188,22 @@ watch(
   border-bottom: none;
 }
 
-.file-name {
+.version-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.version-time {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.version-details {
+  font-size: 12px;
+  color: var(--muted);
   font-family: monospace;
-  font-size: 13px;
 }
 
 .file-actions {

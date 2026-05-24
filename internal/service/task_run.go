@@ -32,6 +32,13 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		return TaskRunResult{}, ErrTaskNotFound
 	}
 
+	// 如果是 bisync 任务，先备份当前的 lst 文件
+	if t.Mode == "bisync" {
+		if err := s.BackupCurrentLstFiles(taskID); err != nil {
+			logger.Warn("failed to backup lst files before running bisync task", zap.Error(err))
+		}
+	}
+
 	var opts *adapter.TaskOptions
 	if len(t.Options) > 0 {
 		if taskOpts, err := adapter.ParseTaskOptionsCompat(t.Options); err == nil {

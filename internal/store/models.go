@@ -48,6 +48,7 @@ type BisyncOptions struct {
 	CreateEmptySrcDirs bool   `json:"createEmptySrcDirs,omitempty"`
 	RemoveEmptyDirs    bool   `json:"removeEmptyDirs,omitempty"`
 	Recover            bool   `json:"recover,omitempty"`
+	LstBackupCount     int    `json:"lstBackupCount,omitempty"`
 }
 
 type Schedule struct {

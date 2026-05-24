@@ -164,6 +164,19 @@ function updateOption<K extends keyof BisyncOptions>(key: K, value: BisyncOption
           </label>
           <p class="hint">尝试从损坏的状态中恢复</p>
         </div>
+
+        <div class="detail-item full-width">
+          <label>历史备份数量</label>
+          <input
+            type="number"
+            :value="bisyncOptions.lstBackupCount || 5"
+            min="1"
+            max="50"
+            @input="updateOption('lstBackupCount', parseInt(($event.target as HTMLInputElement).value) || 5)"
+            placeholder="默认: 5"
+          />
+          <p class="hint">设置保留的 lst 文件历史备份数量，建议 3-10 个版本</p>
+        </div>
       </div>
       <div class="modal-footer">
         <button class="primary" @click="emit('save')">保存</button>

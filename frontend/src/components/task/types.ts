@@ -22,6 +22,14 @@ export interface BisyncOptions {
   createEmptySrcDirs?: boolean
   removeEmptyDirs?: boolean
   recover?: boolean
+  lstBackupCount?: number
+}
+
+export interface BisyncLstVersion {
+  id: string
+  timestamp: string
+  path1Lst: string
+  path2Lst: string
 }
 
 export type UpdateTaskOption = (key: string, value: TaskFormOptionValue) => void
