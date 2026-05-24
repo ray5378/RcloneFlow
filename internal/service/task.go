@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -483,7 +484,15 @@ func (s *TaskService) BackupCurrentLstFiles(taskID int64) error {
 		if _, err := os.Stat(srcPath); err == nil {
 			dstPath := filepath.Join(dir, f+"."+now+".bak")
 			if err := os.Rename(srcPath, dstPath); err != nil {
-				_ = os.Copy(srcPath, dstPath)
+				srcFile, err := os.Open(srcPath)
+				if err == nil {
+					defer srcFile.Close()
+					dstFile, err := os.Create(dstPath)
+					if err == nil {
+						defer dstFile.Close()
+						_, _ = io.Copy(dstFile, srcFile)
+					}
+				}
 			}
 		}
 	}
