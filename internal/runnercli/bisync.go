@@ -20,13 +20,27 @@ type BisyncSummary struct {
 	Path2ToPath1 map[string]int `json:"path2ToPath1"`
 }
 
-// isBisyncWorkDirEmpty 检查 bisync 工作目录是否为空
-func isBisyncWorkDirEmpty(workDir string) bool {
+// hasValidBisyncLstFiles 检查工作目录中是否有有效的 bisync lst 文件
+func hasValidBisyncLstFiles(workDir string) bool {
 	entries, err := os.ReadDir(workDir)
 	if err != nil {
-		return true
+		return false
 	}
-	return len(entries) == 0
+	
+	// 检查是否有 .lst 文件
+	hasPath1Lst := false
+	hasPath2Lst := false
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".lst") {
+			if strings.Contains(entry.Name(), ".path1.lst") {
+				hasPath1Lst = true
+			}
+			if strings.Contains(entry.Name(), ".path2.lst") {
+				hasPath2Lst = true
+			}
+		}
+	}
+	return hasPath1Lst && hasPath2Lst
 }
 
 // buildBisyncCommand 构建 rclone bisync 命令行参数
@@ -80,8 +94,8 @@ func buildBisyncCommand(src, dst, workDir string, options json.RawMessage) []str
 		}
 	}
 
-	// 如果用户没有指定 resync 且工作目录为空，则自动添加 resync
-	if !needResync && isBisyncWorkDirEmpty(workDir) {
+	// 如果用户没有指定 resync 且没有有效的 lst 文件，则自动添加 resync
+	if !needResync && !hasValidBisyncLstFiles(workDir) {
 		needResync = true
 	}
 
