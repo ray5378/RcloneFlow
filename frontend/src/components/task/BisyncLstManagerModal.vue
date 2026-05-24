@@ -86,6 +86,18 @@ function formatTimestamp(timestamp: string): string {
   }
 }
 
+function formatFileSize(bytes: number | undefined): string {
+  if (bytes === undefined || bytes === 0) return ''
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let size = bytes
+  let unitIndex = 0
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024
+    unitIndex++
+  }
+  return `${size.toFixed(unitIndex > 0 ? 2 : 0)} ${units[unitIndex]}`
+}
+
 async function handleResync() {
   if (!props.taskId) return
   actionLoading.value = 'resync'
@@ -165,14 +177,24 @@ watch(
                   </span>
                 </div>
                 <div class="version-details">
-                  <span v-if="version.path1Lst">📄 {{ version.path1Lst }}</span>
-                  <span v-if="version.path1Lst && version.path2Lst"> + </span>
-                  <span v-if="version.path2Lst">📄 {{ version.path2Lst }}</span>
-                  <span v-if="version.type === 'conflict'" class="conflict-files">
-                    <span v-if="version.conflict1">⚠️ {{ version.conflict1 }}</span>
-                    <span v-if="version.conflict1 && version.conflict2"> | </span>
-                    <span v-if="version.conflict2">⚠️ {{ version.conflict2 }}</span>
-                  </span>
+                  <div v-if="version.path1Lst" class="file-line">
+                    <span class="file-name">📄 {{ version.path1Lst }}</span>
+                    <span v-if="version.path1Size" class="file-size">({{ formatFileSize(version.path1Size) }})</span>
+                  </div>
+                  <div v-if="version.path2Lst" class="file-line">
+                    <span class="file-name">📄 {{ version.path2Lst }}</span>
+                    <span v-if="version.path2Size" class="file-size">({{ formatFileSize(version.path2Size) }})</span>
+                  </div>
+                  <div v-if="version.type === 'conflict'" class="conflict-files">
+                    <div v-if="version.conflict1" class="file-line">
+                      <span class="file-name conflict">⚠️ {{ version.conflict1 }}</span>
+                      <span v-if="version.conflict1Size" class="file-size">({{ formatFileSize(version.conflict1Size) }})</span>
+                    </div>
+                    <div v-if="version.conflict2" class="file-line">
+                      <span class="file-name conflict">⚠️ {{ version.conflict2 }}</span>
+                      <span v-if="version.conflict2Size" class="file-size">({{ formatFileSize(version.conflict2Size) }})</span>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="file-actions">
@@ -340,7 +362,28 @@ watch(
   font-family: monospace;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+}
+
+.file-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.file-name {
+  word-break: break-all;
+}
+
+.file-name.conflict {
+  color: #ef4444;
+}
+
+.file-size {
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
 }
 
 .conflict-files {

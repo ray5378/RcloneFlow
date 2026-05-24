@@ -33,6 +33,10 @@ export interface BisyncLstVersion {
   type: 'current' | 'backup' | 'conflict'
   conflict1?: string
   conflict2?: string
+  path1Size?: number
+  path2Size?: number
+  conflict1Size?: number
+  conflict2Size?: number
 }
 
 export type UpdateTaskOption = (key: string, value: TaskFormOptionValue) => void

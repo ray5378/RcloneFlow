@@ -330,6 +330,10 @@ type BisyncLstVersion struct {
 	Type      string    `json:"type"`
 	Conflict1 string    `json:"conflict1,omitempty"`
 	Conflict2 string    `json:"conflict2,omitempty"`
+	Path1Size int64     `json:"path1Size,omitempty"`
+	Path2Size int64     `json:"path2Size,omitempty"`
+	Conflict1Size int64  `json:"conflict1Size,omitempty"`
+	Conflict2Size int64  `json:"conflict2Size,omitempty"`
 }
 
 func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error) {
@@ -377,6 +381,11 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 		
 		if name == "path1.lst" || name == "path2.lst" {
 			versionID := "current"
+			info, _ := entry.Info()
+			size := int64(0)
+			if info != nil {
+				size = info.Size()
+			}
 			if _, exists := versions[versionID]; !exists {
 				versions[versionID] = &BisyncLstVersion{
 					ID:        versionID,
@@ -388,8 +397,10 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 			}
 			if name == "path1.lst" {
 				versions[versionID].Path1Lst = name
+				versions[versionID].Path1Size = size
 			} else if name == "path2.lst" {
 				versions[versionID].Path2Lst = name
+				versions[versionID].Path2Size = size
 			}
 			continue
 		}
@@ -402,10 +413,15 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 				prefix = strings.TrimSuffix(name, ".conflict2")
 			}
 			
+			info, _ := entry.Info()
+			size := int64(0)
+			if info != nil {
+				size = info.Size()
+			}
+			
 			if _, exists := versions[prefix]; !exists {
-				info, err := entry.Info()
 				timestamp := time.Now()
-				if err == nil {
+				if info != nil {
 					timestamp = info.ModTime()
 				}
 				versions[prefix] = &BisyncLstVersion{
@@ -419,21 +435,28 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 			
 			if strings.Contains(name, ".conflict1") {
 				versions[prefix].Conflict1 = name
+				versions[prefix].Conflict1Size = size
 			} else if strings.Contains(name, ".conflict2") {
 				versions[prefix].Conflict2 = name
+				versions[prefix].Conflict2Size = size
 			}
 			continue
 		}
 		
 		if strings.HasSuffix(name, "-old") {
+			info, _ := entry.Info()
+			size := int64(0)
+			if info != nil {
+				size = info.Size()
+			}
+			timestamp := time.Now()
+			if info != nil {
+				timestamp = info.ModTime()
+			}
+			
 			if strings.Contains(name, ".path1.lst") {
 				prefix := strings.TrimSuffix(name, ".path1.lst-old")
 				if _, exists := versions[prefix]; !exists {
-					info, err := entry.Info()
-					timestamp := time.Now()
-					if err == nil {
-						timestamp = info.ModTime()
-					}
 					versions[prefix] = &BisyncLstVersion{
 						ID:        prefix,
 						Timestamp: timestamp,
@@ -443,14 +466,10 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 					}
 				}
 				versions[prefix].Path1Lst = name
+				versions[prefix].Path1Size = size
 			} else if strings.Contains(name, ".path2.lst") {
 				prefix := strings.TrimSuffix(name, ".path2.lst-old")
 				if _, exists := versions[prefix]; !exists {
-					info, err := entry.Info()
-					timestamp := time.Now()
-					if err == nil {
-						timestamp = info.ModTime()
-					}
 					versions[prefix] = &BisyncLstVersion{
 						ID:        prefix,
 						Timestamp: timestamp,
@@ -460,11 +479,17 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 					}
 				}
 				versions[prefix].Path2Lst = name
+				versions[prefix].Path2Size = size
 			}
 			continue
 		}
 		
 		if (strings.HasSuffix(name, ".path1.lst") || strings.HasSuffix(name, ".path2.lst")) && strings.Contains(name, ".lst.") {
+			info, _ := entry.Info()
+			size := int64(0)
+			if info != nil {
+				size = info.Size()
+			}
 			parts := strings.Split(name, ".lst.")
 			if len(parts) == 2 {
 				timestampStr := strings.TrimSuffix(parts[1], ".bak")
@@ -481,8 +506,10 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 					}
 					if strings.Contains(name, ".path1.lst") {
 						versions[versionID].Path1Lst = name
+						versions[versionID].Path1Size = size
 					} else if strings.Contains(name, ".path2.lst") {
 						versions[versionID].Path2Lst = name
+						versions[versionID].Path2Size = size
 					}
 				}
 			}
