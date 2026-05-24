@@ -90,7 +90,7 @@ function isStopped(): boolean {
         <button class="ghost small" @click.stop="emit('setWebhook', task)">🔗 {{ t('taskCard.webhook') }}</button>
         <button class="ghost small" @click.stop="emit('setSingleton', task)">🔒 {{ t('taskCard.singleton') }}</button>
         <button v-if="task.mode === 'bisync'" class="ghost small" @click.stop="emit('openBisyncLstManager', task)">
-          📁 状态文件管理
+          📁 {{ t('taskCard.bisyncStateFiles') }}
         </button>
         <button class="ghost small" @click.stop="emit('edit', task)">✏️ {{ t('taskCard.edit') }}</button>
         <button class="ghost small danger-text" @click.stop="emit('delete', task)">🗑️ {{ t('taskCard.delete') }}</button>

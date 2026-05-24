@@ -42,9 +42,18 @@ const summaryTotalSize = computed(() => formatBytes(normalizedSummary.value?.tot
 const summaryTransferred = computed(() => formatBytes(normalizedSummary.value?.transferredBytes || 0))
 const summaryMessage = computed(() => normalizedSummary.value?.message || '')
 
+function getModeLabel(mode?: string) {
+  if (mode === 'copy') return t('addTask.copy')
+  if (mode === 'sync') return t('addTask.sync')
+  if (mode === 'move') return t('addTask.move')
+  if (mode === 'bisync') return t('addTask.bisync')
+  return mode
+}
+
 function getSuccessLabel(mode?: string) {
   if (mode === 'move') return t('runItem.moved')
   if (mode === 'sync') return t('runItem.synced')
+  if (mode === 'bisync') return t('runItem.synced')
   return t('runItem.copied')
 }
 
@@ -95,7 +104,7 @@ function getProgressText(run: Run): string {
   <div class="item run-item" @click="emit('click', run)">
     <div class="name list-item-name">
       <strong>{{ runTitle }}</strong>
-      <span v-if="run.taskMode" class="mode-tag list-item-tag">{{ run.taskMode }}</span>
+      <span v-if="run.taskMode" class="mode-tag list-item-tag">{{ getModeLabel(run.taskMode) }}</span>
       <span v-if="triggerText" class="trigger-tag list-item-tag">{{ triggerText }}</span>
     </div>
 

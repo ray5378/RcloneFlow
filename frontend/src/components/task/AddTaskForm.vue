@@ -112,14 +112,14 @@ const updateOption: UpdateTaskOption = (key, value) => {
           <option value="copy">{{ t('addTask.copy') }} (copy)</option>
           <option value="sync">{{ t('addTask.sync') }} (sync)</option>
           <option value="move">{{ t('addTask.move') }} (move)</option>
-          <option value="bisync">{{ t('addTask.bisync') || '双向同步' }} (bisync)</option>
+          <option value="bisync">{{ t('addTask.bisync') }} (bisync)</option>
         </select>
       </div>
       <div class="field-item" v-if="createForm.mode === 'bisync'">
         <button class="ghost" type="button" @click="showBisyncConfigModal = true">
-          配置双向同步选项
+          {{ t('addTask.bisyncConfig') }}
         </button>
-        <p class="hint">配置 bisync 的高级选项（如冲突处理、恢复模式等）</p>
+        <p class="hint">{{ t('addTask.bisyncHint') }}</p>
       </div>
       <div class="field-item">
         <label>{{ t('addTask.sourceStorage') }} <span style="color: #dc2626">*</span></label>

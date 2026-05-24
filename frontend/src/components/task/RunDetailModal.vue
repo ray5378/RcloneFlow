@@ -28,6 +28,14 @@ const emit = defineEmits<{
   (e: 'next-files-page'): void
 }>()
 
+function getModeLabel(mode?: string) {
+  if (mode === 'copy') return t('addTask.copy')
+  if (mode === 'sync') return t('addTask.sync')
+  if (mode === 'move') return t('addTask.move')
+  if (mode === 'bisync') return t('addTask.bisync')
+  return mode
+}
+
 function getSuccessLabel(mode?: string) {
   if (mode === 'move') return t('modal.moved')
   if (mode === 'sync') return t('modal.synced')
@@ -58,7 +66,7 @@ const activeFilesTotal = computed(() => Math.max(0, Number(props.runFilesTotal) 
         </div>
         <div class="detail-item">
           <label>{{ t('modal.runMode') }}</label>
-          <span>{{ props.runDetail.taskMode || '-' }}</span>
+          <span>{{ getModeLabel(props.runDetail.taskMode) || '-' }}</span>
         </div>
         <div class="detail-item">
           <label>{{ t('modal.status') }}</label>
