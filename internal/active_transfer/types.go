@@ -14,6 +14,7 @@ type TrackingMode string
 const (
 	TrackingModeNormal TrackingMode = "normal"
 	TrackingModeCAS    TrackingMode = "cas"
+	TrackingModeBisync TrackingMode = "bisync"
 )
 
 type FileStatus string

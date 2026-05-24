@@ -130,6 +130,7 @@ func (s *TagService) RecalcTags() error {
 		{Tag: "sync", Type: "action", Selected: true},
 		{Tag: "copy", Type: "action", Selected: true},
 		{Tag: "move", Type: "action", Selected: true},
+		{Tag: "bisync", Type: "action", Selected: true},
 	}
 	for token, count := range tokenCounts {
 		if count >= 2 {

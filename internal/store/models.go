@@ -35,18 +35,20 @@ type Task struct {
 }
 
 type BisyncOptions struct {
-	Compare            string `json:"compare"`
-	MaxDelete          string `json:"maxDelete"`
-	CheckAccess        bool   `json:"checkAccess"`
-	CheckFilename      string `json:"checkFilename"`
-	ConflictResolve    string `json:"conflictResolve"`
-	ConflictLoser      string `json:"conflictLoser"`
-	ConflictSuffix     string `json:"conflictSuffix"`
-	BackupDir1         string `json:"backupDir1"`
-	BackupDir2         string `json:"backupDir2"`
-	CreateEmptySrcDirs bool   `json:"createEmptySrcDirs"`
-	RemoveEmptyDirs    bool   `json:"removeEmptyDirs"`
-	Recover            bool   `json:"recover"`
+	Resync             bool   `json:"resync,omitempty"`
+	Compare            string `json:"compare,omitempty"`
+	MaxDelete          string `json:"maxDelete,omitempty"`
+	CheckAccess        bool   `json:"checkAccess,omitempty"`
+	CheckFilename      string `json:"checkFilename,omitempty"`
+	ConflictResolve    string `json:"conflictResolve,omitempty"`
+	ConflictLoser      string `json:"conflictLoser,omitempty"`
+	ConflictSuffix     string `json:"conflictSuffix,omitempty"`
+	BackupDir1         string `json:"backupDir1,omitempty"`
+	BackupDir2         string `json:"backupDir2,omitempty"`
+	CreateEmptySrcDirs bool   `json:"createEmptySrcDirs,omitempty"`
+	RemoveEmptyDirs    bool   `json:"removeEmptyDirs,omitempty"`
+	Recover            bool   `json:"recover,omitempty"`
+	LstBackupCount     int    `json:"lstBackupCount,omitempty"`
 }
 
 type Schedule struct {

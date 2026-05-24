@@ -4,7 +4,7 @@ import type { Task } from '../types'
 import { useTaskFormNormalize } from './useTaskFormNormalize'
 
 function normalizeTaskMode(mode: string): TaskMode {
-  return mode === 'sync' || mode === 'move' || mode === 'copy' || mode === 'bisync' ? mode : 'copy'
+  return mode === 'sync' || mode === 'move' || mode === 'copy' || mode === 'bisync' ? (mode as TaskMode) : 'copy'
 }
 
 export function useTaskFormState() {
@@ -24,14 +24,12 @@ export function useTaskFormState() {
   const commandText = ref('')
   const editingTask = ref<Task | null>(null)
   const showAdvancedOptions = ref(false)
-  const showBisyncModal = ref(false)
 
   function resetTaskFormForCreate() {
     editingTask.value = null
     commandMode.value = false
     commandText.value = ''
     showAdvancedOptions.value = false
-    showBisyncModal.value = false
     createForm.value = {
       name: '',
       mode: 'copy',
@@ -40,7 +38,7 @@ export function useTaskFormState() {
       targetRemote: '',
       targetPath: '',
       options: { enableStreaming: true },
-      bisyncOptions: {} as BisyncOptions,
+      bisyncOptions: {},
     }
   }
 
@@ -49,7 +47,6 @@ export function useTaskFormState() {
     commandMode.value = false
     commandText.value = ''
     showAdvancedOptions.value = false
-    showBisyncModal.value = false
 
     createForm.value = {
       name: task.name,
@@ -69,7 +66,6 @@ export function useTaskFormState() {
     commandText,
     editingTask,
     showAdvancedOptions,
-    showBisyncModal,
     resetTaskFormForCreate,
     fillTaskFormForEdit,
   }

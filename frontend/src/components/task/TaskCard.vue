@@ -24,6 +24,7 @@ const emit = defineEmits<{
   setWebhook: [task: Task]
   setSingleton: [task: Task]
   openTransferDetail: [taskId: number]
+  openBisyncLstManager: [task: Task]
   sortInput: [event: Event]
   sortEnter: [event: KeyboardEvent]
 }>()
@@ -88,6 +89,9 @@ function isStopped(): boolean {
         </button>
         <button class="ghost small" @click.stop="emit('setWebhook', task)">🔗 {{ t('taskCard.webhook') }}</button>
         <button class="ghost small" @click.stop="emit('setSingleton', task)">🔒 {{ t('taskCard.singleton') }}</button>
+        <button v-if="task.mode === 'bisync'" class="ghost small" @click.stop="emit('openBisyncLstManager', task)">
+          📁 {{ t('taskCard.bisyncStateFiles') }}
+        </button>
         <button class="ghost small" @click.stop="emit('edit', task)">✏️ {{ t('taskCard.edit') }}</button>
         <button class="ghost small danger-text" @click.stop="emit('delete', task)">🗑️ {{ t('taskCard.delete') }}</button>
       </div>

@@ -9,6 +9,7 @@ export interface TaskFormOptions {
 }
 
 export interface BisyncOptions {
+  resync?: boolean
   compare?: string
   maxDelete?: string
   checkAccess?: boolean
@@ -21,7 +22,14 @@ export interface BisyncOptions {
   createEmptySrcDirs?: boolean
   removeEmptyDirs?: boolean
   recover?: boolean
-  resync?: boolean
+  lstBackupCount?: number
+}
+
+export interface BisyncLstVersion {
+  id: string
+  timestamp: string
+  path1Lst: string
+  path2Lst: string
 }
 
 export type UpdateTaskOption = (key: string, value: TaskFormOptionValue) => void

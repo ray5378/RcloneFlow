@@ -1,226 +1,201 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { t } from '../../i18n'
 import type { BisyncOptions } from './types'
-import { getBisyncFiles, deleteBisyncFile } from '../../api/task'
 
 const props = defineProps<{
   visible: boolean
-  title?: string
-  modelValue: BisyncOptions
-  taskId?: number
-  taskName?: string
+  bisyncOptions: BisyncOptions
 }>()
 
 const emit = defineEmits<{
-  'update:modelValue': [value: BisyncOptions]
-  save: [value: BisyncOptions]
-  close: []
+  (e: 'close'): void
+  (e: 'save'): void
+  (e: 'update:bisyncOptions', value: BisyncOptions): void
 }>()
 
-const draft = ref<BisyncOptions>({})
-const loadingFiles = ref(false)
-const bisyncFiles = ref<string[]>([])
-const deletingFile = ref<string | null>(null)
-
-function cloneOptions(value?: Partial<BisyncOptions> | null): BisyncOptions {
-  return {
-    compare: value?.compare || '',
-    maxDelete: value?.maxDelete || '',
-    checkAccess: !!value?.checkAccess,
-    checkFilename: value?.checkFilename || '',
-    conflictResolve: value?.conflictResolve || '',
-    conflictLoser: value?.conflictLoser || '',
-    conflictSuffix: value?.conflictSuffix || '',
-    backupDir1: value?.backupDir1 || '',
-    backupDir2: value?.backupDir2 || '',
-    createEmptySrcDirs: !!value?.createEmptySrcDirs,
-    removeEmptyDirs: !!value?.removeEmptyDirs,
-    recover: !!value?.recover,
-    resync: !!value?.resync,
-  }
-}
-
-watch(() => [props.visible, props.modelValue] as const, () => {
-  draft.value = cloneOptions(props.modelValue)
-  if (props.visible && props.taskId) {
-    loadBisyncFiles()
-  }
-}, { immediate: true, deep: true })
-
-async function loadBisyncFiles() {
-  if (!props.taskId) return
-  loadingFiles.value = true
-  try {
-    const result = await getBisyncFiles(props.taskId)
-    bisyncFiles.value = result.files || []
-  } catch (error) {
-    console.error('Failed to load bisync files:', error)
-  } finally {
-    loadingFiles.value = false
-  }
-}
-
-async function handleDeleteFile(fileName: string) {
-  if (!props.taskId || deletingFile.value) return
-  deletingFile.value = fileName
-  try {
-    await deleteBisyncFile(props.taskId, fileName)
-    await loadBisyncFiles()
-  } catch (error) {
-    console.error('Failed to delete bisync file:', error)
-  } finally {
-    deletingFile.value = null
-  }
-}
-
-function save() {
-  const next = cloneOptions(draft.value)
-  emit('update:modelValue', next)
-  emit('save', next)
-}
-
-function toggleResync() {
-  draft.value = {
-    ...draft.value,
-    resync: !draft.value.resync,
-  }
+function updateOption<K extends keyof BisyncOptions>(key: K, value: BisyncOptions[K]) {
+  emit('update:bisyncOptions', {
+    ...props.bisyncOptions,
+    [key]: value,
+  })
 }
 </script>
 
 <template>
   <div v-if="visible" class="modal-overlay" @click.self="emit('close')">
-    <div class="modal-content bisync-modal">
+    <div class="modal-content" style="max-width: 600px">
       <div class="modal-header">
-        <h3>{{ title || t('bisync.configTitle') }}</h3>
+        <h3>Bisync 双向同步设置</h3>
         <button class="close-btn" @click="emit('close')">×</button>
       </div>
       <div class="modal-body">
-        <div class="section">
-          <div class="section-title">{{ t('bisync.basicOptions') }}</div>
-          <div class="option-row">
-            <label>{{ t('bisync.compare') }}</label>
-            <input v-model="draft.compare" type="text" :placeholder="t('bisync.comparePlaceholder')" />
-          </div>
-          <div class="option-row">
-            <label>{{ t('bisync.maxDelete') }}</label>
-            <input v-model="draft.maxDelete" type="text" :placeholder="t('bisync.maxDeletePlaceholder')" />
-          </div>
-          <div class="option-row checkbox-row">
-            <label class="inline-label">
-              <input type="checkbox" v-model="draft.checkAccess" />
-              <span>{{ t('bisync.checkAccess') }}</span>
-            </label>
-          </div>
-          <div class="option-row">
-            <label>{{ t('bisync.checkFilename') }}</label>
-            <input v-model="draft.checkFilename" type="text" :placeholder="t('bisync.checkFilenamePlaceholder')" />
-          </div>
+        <div class="detail-item full-width">
+          <label class="inline-label">
+            <input
+              :checked="bisyncOptions.resync"
+              type="checkbox"
+              @change="updateOption('resync', ($event.target as HTMLInputElement).checked)"
+            />
+            <span>重新同步 (Resync)</span>
+          </label>
+          <p class="hint">首次运行或从错误状态恢复时使用，会清理旧状态重新开始同步</p>
         </div>
 
-        <div class="section">
-          <div class="section-title">{{ t('bisync.conflictOptions') }}</div>
-          <div class="option-row">
-            <label>{{ t('bisync.conflictResolve') }}</label>
-            <select v-model="draft.conflictResolve">
-              <option value="">{{ t('bisync.conflictResolvePlaceholder') }}</option>
-              <option value="path1">{{ t('bisync.conflictResolvePath1') }}</option>
-              <option value="path2">{{ t('bisync.conflictResolvePath2') }}</option>
-              <option value="newer">{{ t('bisync.conflictResolveNewer') }}</option>
-              <option value="older">{{ t('bisync.conflictResolveOlder') }}</option>
-            </select>
-          </div>
-          <div class="option-row">
-            <label>{{ t('bisync.conflictLoser') }}</label>
-            <select v-model="draft.conflictLoser">
-              <option value="">{{ t('bisync.conflictLoserPlaceholder') }}</option>
-              <option value="backup">{{ t('bisync.conflictLoserBackup') }}</option>
-              <option value="delete">{{ t('bisync.conflictLoserDelete') }}</option>
-            </select>
-          </div>
-          <div class="option-row">
-            <label>{{ t('bisync.conflictSuffix') }}</label>
-            <input v-model="draft.conflictSuffix" type="text" :placeholder="t('bisync.conflictSuffixPlaceholder')" />
-          </div>
+        <div class="detail-item full-width">
+          <label>比较方式 (Compare)</label>
+          <select
+            :value="bisyncOptions.compare"
+            @change="updateOption('compare', ($event.target as HTMLSelectElement).value || undefined)"
+          >
+            <option value="">默认</option>
+            <option value="size">仅检查大小</option>
+            <option value="modtime">检查修改时间</option>
+            <option value="checksum">检查校验和</option>
+          </select>
         </div>
 
-        <div class="section">
-          <div class="section-title">{{ t('bisync.backupOptions') }}</div>
-          <div class="option-row">
-            <label>{{ t('bisync.backupDir1') }}</label>
-            <input v-model="draft.backupDir1" type="text" :placeholder="t('bisync.backupDirPlaceholder')" />
-          </div>
-          <div class="option-row">
-            <label>{{ t('bisync.backupDir2') }}</label>
-            <input v-model="draft.backupDir2" type="text" :placeholder="t('bisync.backupDirPlaceholder')" />
-          </div>
+        <div class="detail-item full-width">
+          <label>最大删除比例 (Max Delete)</label>
+          <input
+            type="text"
+            :value="bisyncOptions.maxDelete"
+            @input="updateOption('maxDelete', ($event.target as HTMLInputElement).value || undefined)"
+            placeholder="例如: 25 (限制删除不超过 25%)"
+          />
+          <p class="hint">设置删除操作的安全限制，防止意外大量删除</p>
         </div>
 
-        <div class="section">
-          <div class="section-title">{{ t('bisync.otherOptions') }}</div>
-          <div class="option-row checkbox-row">
-            <label class="inline-label">
-              <input type="checkbox" v-model="draft.createEmptySrcDirs" />
-              <span>{{ t('bisync.createEmptySrcDirs') }}</span>
-            </label>
-          </div>
-          <div class="option-row checkbox-row">
-            <label class="inline-label">
-              <input type="checkbox" v-model="draft.removeEmptyDirs" />
-              <span>{{ t('bisync.removeEmptyDirs') }}</span>
-            </label>
-          </div>
-          <div class="option-row checkbox-row">
-            <label class="inline-label">
-              <input type="checkbox" v-model="draft.recover" />
-              <span>{{ t('bisync.recover') }}</span>
-            </label>
-          </div>
-          <div class="option-row checkbox-row">
-            <label class="inline-label">
-              <input type="checkbox" :checked="!!draft.resync" @change="toggleResync" />
-              <span>{{ t('bisync.resync') }}</span>
-            </label>
-            <p class="hint">{{ t('bisync.resyncHint') }}</p>
-          </div>
+        <div class="detail-item full-width">
+          <label class="inline-label">
+            <input
+              :checked="bisyncOptions.checkAccess"
+              type="checkbox"
+              @change="updateOption('checkAccess', ($event.target as HTMLInputElement).checked)"
+            />
+            <span>检查访问权限 (Check Access)</span>
+          </label>
         </div>
 
-        <div class="section">
-          <div class="section-title">{{ t('bisync.lstFiles') }}</div>
-          <div v-if="loadingFiles" class="loading-text">{{ t('common.loading') }}</div>
-          <div v-else-if="bisyncFiles.length === 0" class="empty-text">{{ t('bisync.noLstFiles') }}</div>
-          <div v-else class="file-list">
-            <div v-for="file in bisyncFiles" :key="file" class="file-item">
-              <span class="file-name">{{ file }}</span>
-              <button
-                type="button"
-                class="ghost small delete-btn"
-                :disabled="deletingFile === file"
-                @click="handleDeleteFile(file)"
-              >
-                {{ deletingFile === file ? t('common.deleting') : t('common.delete') }}
-              </button>
-            </div>
-          </div>
+        <div class="detail-item full-width">
+          <label>冲突解决策略 (Conflict Resolve)</label>
+          <select
+            :value="bisyncOptions.conflictResolve"
+            @change="updateOption('conflictResolve', ($event.target as HTMLSelectElement).value || undefined)"
+          >
+            <option value="">默认</option>
+            <option value="path1">优先源端</option>
+            <option value="path2">优先目标端</option>
+            <option value="newer">优先较新文件</option>
+            <option value="older">优先较旧文件</option>
+          </select>
         </div>
 
-        <div class="modal-actions">
-          <button class="ghost" @click="emit('close')">{{ t('common.cancel') }}</button>
-          <button class="primary" @click="save">{{ t('common.save') }}</button>
+        <div class="detail-item full-width">
+          <label>冲突处理 (Conflict Loser)</label>
+          <select
+            :value="bisyncOptions.conflictLoser"
+            @change="updateOption('conflictLoser', ($event.target as HTMLSelectElement).value || undefined)"
+          >
+            <option value="">默认</option>
+            <option value="backup">备份冲突文件</option>
+            <option value="delete">删除冲突文件</option>
+          </select>
         </div>
+
+        <div class="detail-item full-width">
+          <label>冲突文件后缀 (Conflict Suffix)</label>
+          <input
+            type="text"
+            :value="bisyncOptions.conflictSuffix"
+            @input="updateOption('conflictSuffix', ($event.target as HTMLInputElement).value || undefined)"
+            placeholder="例如: .backup"
+          />
+        </div>
+
+        <div class="detail-item full-width">
+          <label>备份目录 1 (Backup Dir 1)</label>
+          <input
+            type="text"
+            :value="bisyncOptions.backupDir1"
+            @input="updateOption('backupDir1', ($event.target as HTMLInputElement).value || undefined)"
+            placeholder="源端备份目录路径"
+          />
+        </div>
+
+        <div class="detail-item full-width">
+          <label>备份目录 2 (Backup Dir 2)</label>
+          <input
+            type="text"
+            :value="bisyncOptions.backupDir2"
+            @input="updateOption('backupDir2', ($event.target as HTMLInputElement).value || undefined)"
+            placeholder="目标端备份目录路径"
+          />
+        </div>
+
+        <div class="detail-item full-width">
+          <label class="inline-label">
+            <input
+              :checked="bisyncOptions.createEmptySrcDirs"
+              type="checkbox"
+              @change="updateOption('createEmptySrcDirs', ($event.target as HTMLInputElement).checked)"
+            />
+            <span>创建空源目录 (Create Empty Src Dirs)</span>
+          </label>
+        </div>
+
+        <div class="detail-item full-width">
+          <label class="inline-label">
+            <input
+              :checked="bisyncOptions.removeEmptyDirs"
+              type="checkbox"
+              @change="updateOption('removeEmptyDirs', ($event.target as HTMLInputElement).checked)"
+            />
+            <span>删除空目录 (Remove Empty Dirs)</span>
+          </label>
+        </div>
+
+        <div class="detail-item full-width">
+          <label class="inline-label">
+            <input
+              :checked="bisyncOptions.recover"
+              type="checkbox"
+              @change="updateOption('recover', ($event.target as HTMLInputElement).checked)"
+            />
+            <span>恢复模式 (Recover)</span>
+          </label>
+          <p class="hint">尝试从损坏的状态中恢复</p>
+        </div>
+
+        <div class="detail-item full-width">
+          <label>历史备份数量</label>
+          <input
+            type="number"
+            :value="bisyncOptions.lstBackupCount || 5"
+            min="1"
+            max="50"
+            @input="updateOption('lstBackupCount', parseInt(($event.target as HTMLInputElement).value) || 5)"
+            placeholder="默认: 5"
+          />
+          <p class="hint">设置保留的 lst 文件历史备份数量，建议 3-10 个版本</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="primary" @click="emit('save')">保存</button>
+        <button class="ghost" @click="emit('close')">取消</button>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.bisync-modal { width: min(720px, 92vw); max-width: 720px; }
-.section { margin-bottom: 20px; }
-.section-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 12px; }
-.option-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-.option-row label { font-size: 12px; color: #888; }
-.option-row input,
-.option-row select {
+.hint {
+  margin-top: 8px;
+  color: var(--muted, #94a3b8);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.modal-content input,
+.modal-content select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -229,18 +204,30 @@ function toggleResync() {
   color: var(--text);
   box-sizing: border-box;
 }
-.checkbox-row { flex-direction: row; align-items: center; gap: 8px; }
-.checkbox-row label.inline-label { display: flex; align-items: center; gap: 8px; margin: 0; }
-.checkbox-row input[type="checkbox"] { width: 16px; height: 16px; }
-.hint { font-size: 11px; color: #888; margin-top: 4px; }
-.file-list { display: flex; flex-direction: column; gap: 8px; }
-.file-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
-.file-name { font-size: 13px; color: var(--text); }
-.delete-btn { color: #ef4444; }
-.loading-text,
-.empty-text { font-size: 13px; color: #888; text-align: center; padding: 20px; }
-.modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-body.light .option-row input,
-body.light .option-row select { background: #fff; border-color: #ddd; color: #333; }
-body.light .file-item { background: #f8fafc; border-color: #e5e7eb; }
+
+body.light .modal-content input,
+body.light .modal-content select {
+  background: #fff;
+  border-color: #ddd;
+  color: #333;
+}
+
+.modal-content label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.modal-content label.inline-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px 0;
+}
+
+.modal-content label.inline-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
 </style>

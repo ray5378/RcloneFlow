@@ -1,4 +1,5 @@
 export interface BisyncOptions {
+  resync?: boolean
   compare?: string
   maxDelete?: string
   checkAccess?: boolean
@@ -11,7 +12,6 @@ export interface BisyncOptions {
   createEmptySrcDirs?: boolean
   removeEmptyDirs?: boolean
   recover?: boolean
-  resync?: boolean
 }
 
 export interface Task {

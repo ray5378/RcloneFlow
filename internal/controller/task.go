@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"math"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -82,7 +81,6 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			ID             int64           `json:"id"`
 			Options        map[string]any  `json:"options"`
-			BisyncOptions  map[string]any  `json:"bisyncOptions"`
 			Orders         map[int64]int64 `json:"orders"`
 			PriorityTaskID int64           `json:"priorityTaskId"`
 		}
@@ -103,18 +101,10 @@ func (c *TaskController) HandleTasks(w http.ResponseWriter, r *http.Request) {
 			WriteJSON(w, 400, map[string]any{"error": "missing id"})
 			return
 		}
-		if req.BisyncOptions != nil {
-			if err := c.taskSvc.UpdateTaskBisyncOptions(req.ID, req.BisyncOptions); err != nil {
-				msg, code := mapServiceError(err)
-				WriteJSON(w, code, map[string]any{"error": msg})
-				return
-			}
-		} else {
-			if err := c.taskSvc.UpdateTaskOptions(req.ID, req.Options); err != nil {
-				msg, code := mapServiceError(err)
-				WriteJSON(w, code, map[string]any{"error": msg})
-				return
-			}
+		if err := c.taskSvc.UpdateTaskOptions(req.ID, req.Options); err != nil {
+			msg, code := mapServiceError(err)
+			WriteJSON(w, code, map[string]any{"error": msg})
+			return
 		}
 		WriteJSON(w, 200, map[string]any{"ok": true})
 
@@ -328,12 +318,6 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Bisync 文件管理
-	if strings.Contains(p, "/bisync") {
-		c.handleBisyncFiles(w, r, p)
-		return
-	}
-
 	// DELETE /api/tasks/{id}
 	if r.Method == http.MethodDelete {
 		id, err := strconv.ParseInt(p, 10, 64)
@@ -367,54 +351,102 @@ func (c *TaskController) HandleTaskActions(w http.ResponseWriter, r *http.Reques
 	WriteJSON(w, 200, result)
 }
 
-func (c *TaskController) handleBisyncFiles(w http.ResponseWriter, r *http.Request, p string) {
-	parts := strings.Split(p, "/")
-	if len(parts) < 2 {
-		w.WriteHeader(404)
+// RunTask 运行指定任务
+func (c *TaskController) RunTask(ctx context.Context, taskID int64, trigger string) (service.TaskRunResult, error) {
+	return c.taskSvc.RunTask(ctx, taskID, trigger)
+}
+
+// HandleBisyncLstFiles 获取任务的 lst 文件版本列表
+func (c *TaskController) HandleBisyncLstFiles(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(405)
 		return
 	}
-
-	idStr := parts[0]
-	id, err := strconv.ParseInt(idStr, 10, 64)
+	p := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
+	p = strings.TrimSuffix(p, "/bisync/lst-files")
+	id, err := strconv.ParseInt(p, 10, 64)
 	if err != nil {
 		WriteJSON(w, 400, map[string]any{"error": "invalid task id"})
 		return
 	}
-
-	task, ok := c.taskSvc.GetTask(id)
-	if !ok {
-		WriteJSON(w, 404, map[string]any{"error": "task not found"})
+	versions, err := c.taskSvc.GetBisyncLstFiles(id)
+	if err != nil {
+		msg, code := mapServiceError(err)
+		WriteJSON(w, code, map[string]any{"error": msg})
 		return
 	}
-
-	// GET /api/tasks/{id}/bisync/files
-	if strings.HasSuffix(p, "/bisync/files") && r.Method == http.MethodGet {
-		files, err := c.taskSvc.GetBisyncFiles(task.Name)
-		if err != nil {
-			WriteJSON(w, 500, map[string]any{"error": err.Error()})
-			return
-		}
-		WriteJSON(w, 200, map[string]any{"files": files})
-		return
-	}
-
-	// DELETE /api/tasks/{id}/bisync/files/{fileName}
-	if len(parts) >= 4 && parts[1] == "bisync" && parts[2] == "files" && r.Method == http.MethodDelete {
-		fileName := strings.Join(parts[3:], "/")
-		if err := c.taskSvc.DeleteBisyncFile(task.Name, fileName); err != nil {
-			if !os.IsNotExist(err) {
-				WriteJSON(w, 500, map[string]any{"error": err.Error()})
-				return
-			}
-		}
-		WriteJSON(w, 200, map[string]any{"ok": true})
-		return
-	}
-
-	w.WriteHeader(404)
+	WriteJSON(w, 200, map[string]any{"versions": versions})
 }
 
-// RunTask 运行指定任务
-func (c *TaskController) RunTask(ctx context.Context, taskID int64, trigger string) (service.TaskRunResult, error) {
-	return c.taskSvc.RunTask(ctx, taskID, trigger)
+// HandleBisyncDeleteLst 删除指定的 lst 文件版本
+func (c *TaskController) HandleBisyncDeleteLst(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(405)
+		return
+	}
+	p := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
+	p = strings.TrimSuffix(p, "/bisync/delete-lst")
+	id, err := strconv.ParseInt(p, 10, 64)
+	if err != nil {
+		WriteJSON(w, 400, map[string]any{"error": "invalid task id"})
+		return
+	}
+	var req struct{ VersionID string `json:"versionId"` }
+	if err := DecodeRequest(w, r, &req); err != nil || req.VersionID == "" {
+		WriteJSON(w, 400, map[string]any{"error": "invalid request body"})
+		return
+	}
+	if err := c.taskSvc.DeleteBisyncLstVersion(id, req.VersionID); err != nil {
+		msg, code := mapServiceError(err)
+		WriteJSON(w, code, map[string]any{"error": msg})
+		return
+	}
+	WriteJSON(w, 200, map[string]any{"ok": true})
+}
+
+// HandleBisyncRollbackLst 回滚到指定 lst 文件版本
+func (c *TaskController) HandleBisyncRollbackLst(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(405)
+		return
+	}
+	p := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
+	p = strings.TrimSuffix(p, "/bisync/rollback-lst")
+	id, err := strconv.ParseInt(p, 10, 64)
+	if err != nil {
+		WriteJSON(w, 400, map[string]any{"error": "invalid task id"})
+		return
+	}
+	var req struct{ VersionID string `json:"versionId"` }
+	if err := DecodeRequest(w, r, &req); err != nil || req.VersionID == "" {
+		WriteJSON(w, 400, map[string]any{"error": "invalid request body"})
+		return
+	}
+	if err := c.taskSvc.RollbackBisyncLstVersion(id, req.VersionID); err != nil {
+		msg, code := mapServiceError(err)
+		WriteJSON(w, code, map[string]any{"error": msg})
+		return
+	}
+	WriteJSON(w, 200, map[string]any{"ok": true})
+}
+
+// HandleBisyncResync 触发 bisync resync
+func (c *TaskController) HandleBisyncResync(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(405)
+		return
+	}
+	p := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
+	p = strings.TrimSuffix(p, "/bisync/resync")
+	id, err := strconv.ParseInt(p, 10, 64)
+	if err != nil {
+		WriteJSON(w, 400, map[string]any{"error": "invalid task id"})
+		return
+	}
+	if err := c.taskSvc.ResyncBisync(id); err != nil {
+		msg, code := mapServiceError(err)
+		WriteJSON(w, code, map[string]any{"error": msg})
+		return
+	}
+	WriteJSON(w, 200, map[string]any{"ok": true})
 }

@@ -10,7 +10,7 @@ func (db *DB) ListTasks() ([]Task, error) {
 	defer db.mu.Unlock()
 
 	rows, err := db.db.Query(`
-		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, sort_order, created_at 
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, bisync_options, sort_order, created_at 
 		FROM tasks ORDER BY sort_order ASC, id ASC`)
 	if err != nil {
 		return nil, err
@@ -21,12 +21,16 @@ func (db *DB) ListTasks() ([]Task, error) {
 	for rows.Next() {
 		var t Task
 		var options sql.NullString
-		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.SortOrder, &t.CreatedAt)
+		var bisyncOptions sql.NullString
+		err := rows.Scan(&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &bisyncOptions, &t.SortOrder, &t.CreatedAt)
 		if err != nil {
 			return nil, err
 		}
 		if options.Valid {
 			t.Options = []byte(options.String)
+		}
+		if bisyncOptions.Valid {
+			t.BisyncOptions = []byte(bisyncOptions.String)
 		}
 		tasks = append(tasks, t)
 	}
@@ -43,9 +47,9 @@ func (db *DB) AddTask(t Task) (Task, error) {
 	}
 
 	result, err := db.db.Exec(`
-		INSERT INTO tasks (name, mode, source_remote, source_path, target_remote, target_path, options, sort_order) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options, nextSortOrder)
+		INSERT INTO tasks (name, mode, source_remote, source_path, target_remote, target_path, options, bisync_options, sort_order) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options, t.BisyncOptions, nextSortOrder)
 	if err != nil {
 		return Task{}, err
 	}
@@ -67,15 +71,19 @@ func (db *DB) GetTask(id int64) (Task, bool) {
 
 	var t Task
 	var options sql.NullString
+	var bisyncOptions sql.NullString
 	err := db.db.QueryRow(`
-		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, sort_order, created_at 
+		SELECT id, name, mode, source_remote, source_path, target_remote, target_path, options, bisync_options, sort_order, created_at 
 		FROM tasks WHERE id = ?`, id).Scan(
-		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &t.SortOrder, &t.CreatedAt)
+		&t.ID, &t.Name, &t.Mode, &t.SourceRemote, &t.SourcePath, &t.TargetRemote, &t.TargetPath, &options, &bisyncOptions, &t.SortOrder, &t.CreatedAt)
 	if err != nil {
 		return Task{}, false
 	}
 	if options.Valid {
 		t.Options = []byte(options.String)
+	}
+	if bisyncOptions.Valid {
+		t.BisyncOptions = []byte(bisyncOptions.String)
 	}
 	return t, true
 }
@@ -85,8 +93,8 @@ func (db *DB) UpdateTask(id int64, t Task) error {
 	defer db.mu.Unlock()
 
 	_, err := db.db.Exec(`
-		UPDATE tasks SET name=?, mode=?, source_remote=?, source_path=?, target_remote=?, target_path=?, options=?, sort_order=?
-		WHERE id=?`, t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options, t.SortOrder, id)
+		UPDATE tasks SET name=?, mode=?, source_remote=?, source_path=?, target_remote=?, target_path=?, options=?, bisync_options=?, sort_order=?
+		WHERE id=?`, t.Name, t.Mode, t.SourceRemote, t.SourcePath, t.TargetRemote, t.TargetPath, t.Options, t.BisyncOptions, t.SortOrder, id)
 	return err
 }
 

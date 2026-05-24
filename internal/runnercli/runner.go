@@ -25,24 +25,6 @@ import (
 	"rcloneflow/internal/util"
 )
 
-func sanitizeFilename(s string, taskID int64) string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		s = fmt.Sprintf("task-%d", taskID)
-	}
-	invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
-	s = invalid.ReplaceAllString(s, "_")
-	// 截断到 60 字符以内，避免过长
-	r := []rune(s)
-	if len(r) > 60 {
-		s = string(r[:60])
-	}
-	if s == "" {
-		s = fmt.Sprintf("task-%d", taskID)
-	}
-	return s
-}
-
 // Runner manages CLI transfers with progress/logs and stop control.
 type Runner struct {
 	mu              sync.Mutex
@@ -90,11 +72,13 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
 	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
 	cmdName := strings.ToLower(mode)
+	isBisyncMode := false // 新增
 	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" && cmdName != "bisync" {
 		cmdName = "copy"
+	} else if cmdName == "bisync" {
+		isBisyncMode = true
 	}
 	originalCmdName := cmdName
-	isBisyncMode := cmdName == "bisync"
 	// Resolve config path
 	dataDir := config.DataDir()
 	cfg := os.Getenv("RCLONE_CONFIG")
@@ -102,7 +86,7 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		cfg = filepath.Join(dataDir, "rclone.conf")
 	}
 	var casCompat *openlistCASCompatPlan
-	if isOpenlistCASCompatible(run) && !isBisyncMode {
+	if isOpenlistCASCompatible(run) {
 		plan, err := buildOpenlistCASCompatPlan(cfg, src, dst, cmdName)
 		if err != nil {
 			return fmt.Errorf("prepare openlist-cas compatibility failed: %w", err)
@@ -114,88 +98,94 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}
 	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
 	// 降低默认日志级别：从 -vv 改为 -v，显著减少日志行数和解析/写库开销
-	args := []string{cmdName, src, dst, "--stats", "1s", "--stats-one-line", "--config", cfg}
-	// 处理 bisync 特定参数
-	if isBisyncMode {
-		// 设置 bisync 工作目录：/app/data/bisync/<任务名>
-		bisyncDir := filepath.Join(dataDir, "bisync", sanitizeFilename(run.TaskName, run.TaskID))
-		_ = os.MkdirAll(bisyncDir, 0o755)
-		args = append(args, "--workdir", bisyncDir)
-		// 处理 bisync 选项
-		if run.Summary != nil {
-			if bisyncOpts, ok := run.Summary["bisyncOptions"].(map[string]any); ok && bisyncOpts != nil {
-				args = append(args, buildBisyncFlagsFromOptions(bisyncOpts)...)
-			}
-		}
-	}
-	if casCompat != nil && casCompat.ExcludeFrom != "" {
-		args = append(args, "--exclude-from", casCompat.ExcludeFrom)
-	}
-	// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)，并对 WebDAV 目标注入稳态默认（未显式配置时）
+	var args []string
 	var effOpt map[string]any
-	if run.Summary != nil {
-		var merged = map[string]any{}
-		var effm map[string]any
-		if v, ok := run.Summary["transferDefaults"]; ok {
-			if m, ok := v.(map[string]any); ok {
-				for k, val := range m {
-					merged[k] = val
-				}
-			}
-		}
-		if v, ok := run.Summary["effectiveOptions"]; ok {
-			if m, ok := v.(map[string]any); ok {
-				effm = m
-				for k, val := range m {
-					merged[k] = val
-				}
-			}
-		}
-		// WebDAV 稳态参数（当目标底层是 WebDAV）
-		// 显式设置（effectiveOptions）优先：仅在用户未显式设置时注入建议默认；不再做“下限兜底”强制覆盖
-		if isWebDAVUnderlying(cfg, dstRemote) {
-			injectIfMissing := func(k string, v any) {
-				if effm == nil {
-					if _, ok := merged[k]; !ok {
-						merged[k] = v
-					}
-					return
-				}
-				if _, ok := effm[k]; !ok {
-					if _, ok2 := merged[k]; !ok2 {
-						merged[k] = v
-					}
-				}
-			}
-			// 建议默认（保守）：
-			injectIfMissing("timeout", 24*3600)
-			injectIfMissing("connTimeout", 60)
-			injectIfMissing("expectContinueTimeout", 30)
-			injectIfMissing("retries", 5)
-			injectIfMissing("lowLevelRetries", 20)
-			injectIfMissing("disableHttp2", true)
-			// 并发/多线程：仅当用户未显式设置时给出建议默认，用户设置优先生效
-			injectIfMissing("transfers", 1)
-			injectIfMissing("multiThreadStreams", 1)
-		}
-		if len(merged) > 0 {
-			effOpt = merged
-			args = append(args, buildFlagsFromOptions(merged)...)
-		}
-	}
 	casManagedRetries := false
 	maxCASAttempts := 1
-	if casCompat != nil {
-		casManagedRetries = true
-		maxCASAttempts = configuredRetryCount(effOpt)
-		if maxCASAttempts < 1 {
-			maxCASAttempts = 1
+	if isBisyncMode {
+		// 处理 bisync 模式
+		bisyncDir := filepath.Join(dataDir, "bisync", sanitizeFilenameForBisync(run.TaskName, run.TaskID))
+		_ = os.MkdirAll(bisyncDir, 0o755)
+		// 从 run.Summary 中获取 bisync 选项（如果存在）
+		var bisyncOptions json.RawMessage
+		if run.Summary != nil {
+			if opts, ok := run.Summary["bisyncOptions"]; ok {
+				if optsBytes, err := json.Marshal(opts); err == nil {
+					bisyncOptions = optsBytes
+				}
+			}
 		}
-		args = forceFlagValue(args, "--retries", "0")
-		args = forceFlagValue(args, "--low-level-retries", "0")
+		args = buildBisyncCommand(src, dst, bisyncDir, bisyncOptions)
+		// 添加基本参数
+		args = append(args, "--stats", "1s", "--stats-one-line", "--config", cfg, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
+	} else {
+		args = []string{cmdName, src, dst, "--stats", "1s", "--stats-one-line", "--config", cfg}
+		if casCompat != nil && casCompat.ExcludeFrom != "" {
+			args = append(args, "--exclude-from", casCompat.ExcludeFrom)
+		}
+		// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)，并对 WebDAV 目标注入稳态默认（未显式配置时）
+		if run.Summary != nil {
+			var merged = map[string]any{}
+			var effm map[string]any
+			if v, ok := run.Summary["transferDefaults"]; ok {
+				if m, ok := v.(map[string]any); ok {
+					for k, val := range m {
+						merged[k] = val
+					}
+				}
+			}
+			if v, ok := run.Summary["effectiveOptions"]; ok {
+				if m, ok := v.(map[string]any); ok {
+					effm = m
+					for k, val := range m {
+						merged[k] = val
+					}
+				}
+			}
+			// WebDAV 稳态参数（当目标底层是 WebDAV）
+			// 显式设置（effectiveOptions）优先：仅在用户未显式设置时注入建议默认；不再做“下限兜底”强制覆盖
+			if isWebDAVUnderlying(cfg, dstRemote) {
+				injectIfMissing := func(k string, v any) {
+					if effm == nil {
+						if _, ok := merged[k]; !ok {
+							merged[k] = v
+						}
+						return
+					}
+					if _, ok := effm[k]; !ok {
+						if _, ok2 := merged[k]; !ok2 {
+							merged[k] = v
+						}
+					}
+				}
+				// 建议默认（保守）：
+				injectIfMissing("timeout", 24*3600)
+				injectIfMissing("connTimeout", 60)
+				injectIfMissing("expectContinueTimeout", 30)
+				injectIfMissing("retries", 5)
+				injectIfMissing("lowLevelRetries", 20)
+				injectIfMissing("disableHttp2", true)
+				// 并发/多线程：仅当用户未显式设置时给出建议默认，用户设置优先生效
+				injectIfMissing("transfers", 1)
+				injectIfMissing("multiThreadStreams", 1)
+			}
+			if len(merged) > 0 {
+				effOpt = merged
+				args = append(args, buildFlagsFromOptions(merged)...)
+			}
+		}
+		if casCompat != nil {
+			casManagedRetries = true
+			maxCASAttempts = configuredRetryCount(effOpt)
+			if maxCASAttempts < 1 {
+				maxCASAttempts = 1
+			}
+			args = forceFlagValue(args, "--retries", "0")
+			args = forceFlagValue(args, "--low-level-retries", "0")
+		}
+		// 强制启用 JSON 日志：作为系统默认行为，不再提供任务级开关。
+		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	}
-	// 强制启用 JSON 日志：作为系统默认行为，不再提供任务级开关。
-	args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	// 二次兜底：如 --buffer-size/--bwlimit 后是纯数字，自动补单位（M）；
 	// 同时将 --bwlimit 的分号分隔写法转为空格分隔，保证多时段正确识别
 	for i := 0; i < len(args)-1; i++ {
@@ -253,7 +243,24 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	logsDir := filepath.Join(logsBase, "logs")
 	_ = os.MkdirAll(logsDir, 0o755)
 	// 日志目录与文件：logs/<任务名-MMDD>/<HHMM>.log（stdout 也合并写入该文件）
-	safeTask := sanitizeFilename(run.TaskName, run.TaskID)
+	sanitizeFilename := func(s string) string {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			s = fmt.Sprintf("task-%d", run.TaskID)
+		}
+		invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+		s = invalid.ReplaceAllString(s, "_")
+		// 截断到 60 字符以内，避免过长
+		r := []rune(s)
+		if len(r) > 60 {
+			s = string(r[:60])
+		}
+		if s == "" {
+			s = fmt.Sprintf("task-%d", run.TaskID)
+		}
+		return s
+	}
+	safeTask := sanitizeFilename(run.TaskName)
 	localNow := time.Now().Local()
 	datePart := localNow.Format("0102") // MMDD
 	timePart := localNow.Format("1504") // HHMM
@@ -501,19 +508,13 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					finalSummary["avgSpeedBps"] = avg
 					// 文件明细（从 stderrFile 解析）
 					files := []map[string]any{}
-					counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0, "conflicts": 0}
+					counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
 					if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
-						if isBisyncMode {
-							files, counts = buildBisyncSummaryFilesFromLog(p)
-						} else {
-							files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
-						}
+						files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
 					}
-					// 异步补全文件大小，不阻塞状态更新（bisync 模式下不进行大小补全，因为双向同步可能没有明确的目标）
-					if !isBisyncMode {
-						r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
-					}
-					rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": util.HumanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg, "isBisync": true}
+					// 异步补全文件大小，不阻塞状态更新
+					r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
+					rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": util.HumanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
 				})
 				r.broadcaster.Broadcast("run_status", map[string]any{
 					"run_id": run.ID,
@@ -590,22 +591,13 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				}
 				finalSummary["avgSpeedBps"] = avg
 				files := []map[string]any{}
-				counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0, "conflicts": 0}
+				counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
 				if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
-					if isBisyncMode {
-						files, counts = buildBisyncSummaryFilesFromLog(p)
-					} else {
-						files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
-					}
+					files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
 				}
-				if !isBisyncMode {
-					r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
-				}
+				r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
 				finalSummary["counts"] = counts
 				finalSummary["files"] = files
-				if isBisyncMode {
-					finalSummary["isBisync"] = true
-				}
 				rr.Summary["finalSummary"] = finalSummary
 			})
 			r.broadcaster.Broadcast("run_status", map[string]any{
@@ -742,26 +734,17 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			finalSummary["avgSpeedBps"] = avg
 			// 从 stderrFile 解析文件级明细
 			files := []map[string]any{}
-			counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0, "conflicts": 0}
+			counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
 			if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
-				if isBisyncMode {
-					files, counts = buildBisyncSummaryFilesFromLog(p)
-				} else {
-					files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
-				}
+				files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
 			}
 			// 异步补全文件大小，不阻塞状态更新。
 			// finalSummary 只服务于历史详情 / 最终总结展示；
 			// 不要再往回恢复 stableProgress / cardSummary 这类完成态兼容字段，
 			// 以免运行中链路与任务卡片完成态再次发生语义混用。
-			if !isBisyncMode {
-				r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
-			}
+			r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
 			finalSummary["counts"] = counts
 			finalSummary["files"] = files
-			if isBisyncMode {
-				finalSummary["isBisync"] = true
-			}
 			rr.Summary["finalSummary"] = finalSummary
 
 		})
@@ -771,6 +754,21 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		})
 		if r.activeMgr != nil {
 			r.activeMgr.RemoveState(run.ID)
+		}
+		// 清除 bisync 任务的 resync 标志
+		if run.TaskMode == "bisync" {
+			if t, ok := r.updater.GetTask(run.TaskID); ok {
+				var opts map[string]any
+				if len(t.BisyncOptions) > 0 {
+					if json.Unmarshal(t.BisyncOptions, &opts) == nil {
+						// 清除 resync 标志
+						delete(opts, "resync")
+						b, _ := json.Marshal(opts)
+						t.BisyncOptions = b
+						_ = r.updater.UpdateTask(run.TaskID, t)
+					}
+				}
+			}
 		}
 		// fire webhook for successful run
 		go func() {

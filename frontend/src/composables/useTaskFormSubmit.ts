@@ -49,7 +49,7 @@ export function useTaskFormSubmit(options: UseTaskFormSubmitOptions) {
       targetPath: options.createForm.value.targetPath,
       options: options.normalizeTaskOptions(options.createForm.value.options),
     }
-    if (options.createForm.value.mode === 'bisync' && options.createForm.value.bisyncOptions) {
+    if (options.createForm.value.mode === 'bisync') {
       payload.bisyncOptions = options.createForm.value.bisyncOptions
     }
     return payload

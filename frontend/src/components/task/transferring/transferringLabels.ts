@@ -9,6 +9,13 @@ export function getTrackingLabels(mode: TrackingMode) {
       pending: t('activeTransfer.pendingProcessing'),
     }
   }
+  if (mode === 'bisync') {
+    return {
+      current: t('activeTransfer.currentSync'),
+      completed: t('activeTransfer.completedSync'),
+      pending: t('activeTransfer.pendingSync'),
+    }
+  }
   return {
     current: t('activeTransfer.currentTransfer'),
     completed: t('activeTransfer.completedTransfer'),

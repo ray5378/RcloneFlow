@@ -204,6 +204,10 @@ func (db *DB) migrate() error {
 			version: 7,
 			sql:    `ALTER TABLE task_tags ADD COLUMN selected INTEGER NOT NULL DEFAULT 0;`,
 		},
+		{
+			version: 8,
+			sql:    `ALTER TABLE tasks ADD COLUMN bisync_options TEXT;`,
+		},
 	}
 
 	var currentVersion int

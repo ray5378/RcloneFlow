@@ -1,167 +1,189 @@
 package runnercli
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"regexp"
 	"strings"
 )
 
-func classifyBisyncRow(level, path, msg string, sizes map[string]int64) (map[string]any, string, bool) {
-	row := map[string]any{"path": path, "at": "", "status": "", "action": "", "sizeBytes": 0}
-	if sz, ok := sizes[path]; ok {
-		row["sizeBytes"] = sz
-	}
-	low := strings.ToLower(strings.TrimSpace(msg))
-	lowPath := strings.ToLower(path)
+type BisyncFileDirection string
 
-	var direction string
-	var pathOrigin string
-	if strings.Contains(lowPath, "path1") || strings.Contains(low, "path1") {
-		pathOrigin = "Path1"
-		direction = "path1-to-path2"
-	} else if strings.Contains(lowPath, "path2") || strings.Contains(low, "path2") {
-		pathOrigin = "Path2"
-		direction = "path2-to-path1"
-	}
+const (
+	BisyncDirectionPath1ToPath2 BisyncFileDirection = "path1_to_path2"
+	BisyncDirectionPath2ToPath1 BisyncFileDirection = "path2_to_path1"
+)
 
-	if pathOrigin != "" {
-		row["pathOrigin"] = pathOrigin
-		row["direction"] = direction
-	}
-
-	switch {
-	case strings.Contains(low, "file is new") || strings.Contains(low, "file is newer") || strings.Contains(low, "file is older"):
-		row["status"] = "success"
-		row["action"] = "Copied"
-		return row, "copied", true
-	case strings.Contains(low, "file was deleted"):
-		row["status"] = "success"
-		row["action"] = "Deleted"
-		return row, "deleted", true
-	case strings.Contains(low, "new or changed in both paths") || strings.Contains(low, "conflict"):
-		row["status"] = "warning"
-		row["action"] = "Conflict"
-		return row, "conflicts", true
-	default:
-		return nil, "", false
-	}
+type BisyncSummary struct {
+	Path1ToPath2 map[string]int `json:"path1ToPath2"`
+	Path2ToPath1 map[string]int `json:"path2ToPath1"`
 }
 
-func buildBisyncSummaryFilesFromLog(logPath string) ([]map[string]any, map[string]int) {
-	files := []map[string]any{}
-	counts := map[string]int{
-		"copied":   0,
-		"deleted":  0,
-		"skipped":  0,
-		"failed":   0,
-		"conflicts": 0,
-		"total":    0,
-	}
-	if logPath == "" {
-		return files, counts
-	}
-	b, err := os.ReadFile(logPath)
+// hasValidBisyncLstFiles 检查工作目录中是否有有效的 bisync lst 文件
+func hasValidBisyncLstFiles(workDir string) bool {
+	entries, err := os.ReadDir(workDir)
 	if err != nil {
-		return files, counts
+		return false
 	}
-	lines := strings.Split(string(b), "\n")
-
-	for _, line := range lines {
-		if strings.TrimSpace(line) == "" {
-			continue
-		}
-		level, path, msg := extractPartsFromLogLine(line)
-		if strings.TrimSpace(path) == "" {
-			continue
-		}
-		row, category, ok := classifyBisyncRow(level, path, msg, nil)
-		if ok {
-			files = append(files, row)
-			if category == "copied" {
-				counts["copied"]++
-			} else if category == "deleted" {
-				counts["deleted"]++
-			} else if category == "conflicts" {
-				counts["conflicts"]++
-			} else if category == "skipped" {
-				counts["skipped"]++
-			} else if category == "failed" {
-				counts["failed"]++
+	
+	// 检查是否有 .lst 文件
+	hasPath1Lst := false
+	hasPath2Lst := false
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".lst") {
+			if strings.Contains(entry.Name(), ".path1.lst") {
+				hasPath1Lst = true
+			}
+			if strings.Contains(entry.Name(), ".path2.lst") {
+				hasPath2Lst = true
 			}
 		}
 	}
-	counts["total"] = counts["copied"] + counts["deleted"] + counts["failed"] + counts["conflicts"] + counts["skipped"]
-	return files, counts
+	return hasPath1Lst && hasPath2Lst
 }
 
-func extractPartsFromLogLine(line string) (string, string, string) {
-	m := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR|WARNING)\s*:\s*(.+?):\s*(.+)$`).FindStringSubmatch(strings.TrimSpace(line))
-	if len(m) == 0 {
-		m2 := regexp.MustCompile(`(?:(\d{4}/\d{2}/\d{2}\s+\d{2}:\d{2}:\d{2})\s+)?(INFO|NOTICE|ERROR|WARNING)\s*:\s*(.+)$`).FindStringSubmatch(strings.TrimSpace(line))
-		if len(m2) == 0 {
-			return "", "", line
+// buildBisyncCommand 构建 rclone bisync 命令行参数
+func buildBisyncCommand(src, dst, workDir string, options json.RawMessage) []string {
+	args := []string{"bisync", src, dst, "--workdir", workDir}
+
+	needResync := false
+	if len(options) > 0 {
+		var opts map[string]any
+		if err := json.Unmarshal(options, &opts); err == nil {
+			// 处理各种 bisync 选项
+			if resync, ok := opts["resync"].(bool); ok && resync {
+				needResync = true
+			}
+			if compare, ok := opts["compare"].(string); ok && compare != "" {
+				args = append(args, "--compare", compare)
+			}
+			if maxDelete, ok := opts["maxDelete"].(string); ok && maxDelete != "" {
+				args = append(args, "--max-delete", maxDelete)
+			}
+			if checkAccess, ok := opts["checkAccess"].(bool); ok && checkAccess {
+				args = append(args, "--check-access")
+			}
+			if checkFilename, ok := opts["checkFilename"].(string); ok && checkFilename != "" {
+				args = append(args, "--check-filename", checkFilename)
+			}
+			if conflictResolve, ok := opts["conflictResolve"].(string); ok && conflictResolve != "" {
+				args = append(args, "--conflict-resolve", conflictResolve)
+			}
+			if conflictLoser, ok := opts["conflictLoser"].(string); ok && conflictLoser != "" {
+				args = append(args, "--conflict-loser", conflictLoser)
+			}
+			if conflictSuffix, ok := opts["conflictSuffix"].(string); ok && conflictSuffix != "" {
+				args = append(args, "--conflict-suffix", conflictSuffix)
+			}
+			if backupDir1, ok := opts["backupDir1"].(string); ok && backupDir1 != "" {
+				args = append(args, "--backup-dir1", backupDir1)
+			}
+			if backupDir2, ok := opts["backupDir2"].(string); ok && backupDir2 != "" {
+				args = append(args, "--backup-dir2", backupDir2)
+			}
+			if createEmptySrcDirs, ok := opts["createEmptySrcDirs"].(bool); ok && createEmptySrcDirs {
+				args = append(args, "--create-empty-src-dirs")
+			}
+			if removeEmptyDirs, ok := opts["removeEmptyDirs"].(bool); ok && removeEmptyDirs {
+				args = append(args, "--remove-empty-dirs")
+			}
+			if recover, ok := opts["recover"].(bool); ok && recover {
+				args = append(args, "--recover")
+			}
 		}
-		return m2[2], "", m2[3]
 	}
-	return m[2], strings.TrimSpace(m[3]), strings.TrimSpace(m[4])
+
+	// 如果用户没有指定 resync 且没有有效的 lst 文件，则自动添加 resync
+	if !needResync && !hasValidBisyncLstFiles(workDir) {
+		needResync = true
+	}
+
+	if needResync {
+		args = append(args, "--resync")
+	}
+
+	return args
 }
 
-func buildBisyncFlagsFromOptions(opt map[string]any) []string {
-	flags := []string{}
-	push := func(k string, vs ...string) { flags = append(flags, k); flags = append(flags, vs...) }
-	asBool := func(v any) (bool, bool) { b, ok := v.(bool); return b, ok }
-	asStr := func(v any) (string, bool) {
-		s, ok := v.(string)
-		if !ok {
-			return "", false
-		}
-		s = strings.TrimSpace(s)
-		if s == "" {
-			return "", false
-		}
-		return s, true
+// classifyBisyncLogRow 解析 bisync 的日志行，判断方向和类型
+func classifyBisyncLogRow(level, path, msg string, sizes map[string]int64) (map[string]any, string, bool) {
+	row := make(map[string]any)
+	row["path"] = path
+	row["message"] = msg
+	row["level"] = level
+	row["status"] = ""
+	row["action"] = ""
+
+	lowmsg := strings.ToLower(msg)
+
+	// 检测 A→B 传输
+	if strings.Contains(lowmsg, "path1") || strings.Contains(lowmsg, "source") {
+		row["direction"] = string(BisyncDirectionPath1ToPath2)
+	} else if strings.Contains(lowmsg, "path2") || strings.Contains(lowmsg, "dest") {
+		row["direction"] = string(BisyncDirectionPath2ToPath1)
+	} else {
+		// 默认假设 A→B
+		row["direction"] = string(BisyncDirectionPath1ToPath2)
 	}
 
-	// bisync 特定参数
-	if s, ok := asStr(opt["compare"]); ok {
-		push("--compare", s)
-	}
-	if s, ok := asStr(opt["maxDelete"]); ok {
-		push("--max-delete", s)
-	}
-	if b, ok := asBool(opt["checkAccess"]); ok && b {
-		push("--check-access")
-	}
-	if s, ok := asStr(opt["checkFilename"]); ok {
-		push("--check-filename", s)
-	}
-	if s, ok := asStr(opt["conflictResolve"]); ok {
-		push("--conflict-resolve", s)
-	}
-	if s, ok := asStr(opt["conflictLoser"]); ok {
-		push("--conflict-loser", s)
-	}
-	if s, ok := asStr(opt["conflictSuffix"]); ok {
-		push("--conflict-suffix", s)
-	}
-	if s, ok := asStr(opt["backupDir1"]); ok {
-		push("--backup-dir1", s)
-	}
-	if s, ok := asStr(opt["backupDir2"]); ok {
-		push("--backup-dir2", s)
-	}
-	if b, ok := asBool(opt["createEmptySrcDirs"]); ok && b {
-		push("--create-empty-src-dirs")
-	}
-	if b, ok := asBool(opt["removeEmptyDirs"]); ok && b {
-		push("--remove-empty-dirs")
-	}
-	if b, ok := asBool(opt["recover"]); ok && b {
-		push("--recover")
-	}
-	if b, ok := asBool(opt["resync"]); ok && b {
-		push("--resync")
+	// 检测文件操作类型
+	switch {
+	case strings.Contains(lowmsg, "copied"):
+		row["status"] = "success"
+		row["action"] = "copied"
+	case strings.Contains(lowmsg, "deleted"):
+		row["status"] = "success"
+		row["action"] = "deleted"
+	case strings.Contains(lowmsg, "skipped"):
+		row["status"] = "skipped"
+		row["action"] = "skipped"
+	case strings.Contains(lowmsg, "error") || strings.Contains(lowmsg, "failed"):
+		row["status"] = "failed"
+		row["action"] = "error"
+	default:
+		return nil, "", false
 	}
 
-	return flags
+	if sz, ok := sizes[path]; ok && sz > 0 {
+		row["sizeBytes"] = sz
+	}
+
+	return row, row["status"].(string), true
+}
+
+// buildBisyncFinalSummary 从日志构建双向总结
+func buildBisyncFinalSummary(logPath string) (BisyncSummary, []map[string]any, []map[string]any) {
+	summary := BisyncSummary{
+		Path1ToPath2: map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0},
+		Path2ToPath1: map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0},
+	}
+
+	files1To2 := []map[string]any{}
+	files2To1 := []map[string]any{}
+
+	// 简单实现：统计不同方向的文件
+	// 真实的实现需要完整解析日志
+	// 这里先做一个占位实现，逻辑类似 buildFinalSummaryFilesFromLog
+
+	return summary, files1To2, files2To1
+}
+
+// sanitizeFilenameForBisync 安全文件名（复用 runner.go 中已有的逻辑）
+func sanitizeFilenameForBisync(s string, taskID int64) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		s = fmt.Sprintf("task-%d", taskID)
+	}
+	invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+	s = invalid.ReplaceAllString(s, "_")
+	// 截断到 60 字符以内，避免过长
+	r := []rune(s)
+	if len(r) > 60 {
+		s = string(r[:60])
+	}
+	if s == "" {
+		s = fmt.Sprintf("task-%d", taskID)
+	}
+	return s
 }

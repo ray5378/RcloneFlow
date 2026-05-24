@@ -1,10 +1,15 @@
 package service
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -85,13 +90,9 @@ func (s *TaskService) UpdateTask(id int64, task store.Task) error {
 	if len(task.BisyncOptions) > 0 {
 		merged.BisyncOptions = task.BisyncOptions
 	}
-
-	// 如果任务名更改了，或者从 bisync 模式切换到其他模式，需要清理旧的 bisync 目录
-	if (strings.TrimSpace(task.Name) != "" && strings.TrimSpace(task.Name) != cur.Name) ||
-		(strings.TrimSpace(task.Mode) != "" && strings.ToLower(task.Mode) != "bisync" && strings.ToLower(cur.Mode) == "bisync") {
-		s.cleanupBisyncDir(cur.Name)
+	if cur.Mode == "bisync" && merged.Mode != "bisync" {
+		_ = s.cleanupBisyncDir(cur.Name)
 	}
-
 	if err := s.ensureTaskNameUnique(merged.Name, id); err != nil {
 		return err
 	}
@@ -240,50 +241,6 @@ func (s *TaskService) UpdateTaskOptions(id int64, opts map[string]any) error {
 	return s.db.UpdateTask(id, t)
 }
 
-func (s *TaskService) UpdateTaskBisyncOptions(id int64, bisyncOpts map[string]any) error {
-	t, ok := s.db.GetTask(id)
-	if !ok {
-		return ErrTaskNotFound
-	}
-	b, err := json.Marshal(bisyncOpts)
-	if err != nil {
-		return err
-	}
-	t.BisyncOptions = b
-	return s.db.UpdateTask(id, t)
-}
-
-func (s *TaskService) GetBisyncFiles(taskName string) ([]string, error) {
-	trimmedName := strings.TrimSpace(taskName)
-	if trimmedName == "" {
-		return []string{}, nil
-	}
-	bisyncDir := filepath.Join(config.DataDir(), "bisync", trimmedName)
-	entries, err := os.ReadDir(bisyncDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
-		return nil, err
-	}
-	files := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			files = append(files, entry.Name())
-		}
-	}
-	return files, nil
-}
-
-func (s *TaskService) DeleteBisyncFile(taskName, fileName string) error {
-	trimmedName := strings.TrimSpace(taskName)
-	if trimmedName == "" {
-		return nil
-	}
-	filePath := filepath.Join(config.DataDir(), "bisync", trimmedName, fileName)
-	return os.Remove(filePath)
-}
-
 func (s *TaskService) DeleteTask(id int64) error {
 	task, ok := s.db.GetTask(id)
 	if !ok {
@@ -322,8 +279,9 @@ func (s *TaskService) DeleteTask(id int64) error {
 		}
 	}
 
-	// 清理 bisync 目录
-	s.cleanupBisyncDir(task.Name)
+	if task.Mode == "bisync" {
+		_ = s.cleanupBisyncDir(task.Name)
+	}
 
 	if err := s.db.DeleteRunsByTask(id); err != nil {
 		return err
@@ -336,15 +294,302 @@ func (s *TaskService) DeleteTask(id int64) error {
 	return err
 }
 
-func (s *TaskService) cleanupBisyncDir(taskName string) {
-	trimmedName := strings.TrimSpace(taskName)
-	if trimmedName == "" {
-		return
-	}
-	bisyncDir := filepath.Join(config.DataDir(), "bisync", trimmedName)
-	_ = os.RemoveAll(bisyncDir)
-}
-
 func (s *TaskService) GetTask(id int64) (store.Task, bool) {
 	return s.db.GetTask(id)
+}
+
+func (s *TaskService) getBisyncDir(taskName string) string {
+	dataDir := config.DataDir()
+	safeName := func(s string) string {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			s = "task"
+		}
+		invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+		s = invalid.ReplaceAllString(s, "_")
+		return s
+	}(taskName)
+	return filepath.Join(dataDir, "bisync", safeName)
+}
+
+func (s *TaskService) cleanupBisyncDir(taskName string) error {
+	dir := s.getBisyncDir(taskName)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return nil
+	}
+	return os.RemoveAll(dir)
+}
+
+type BisyncLstVersion struct {
+	ID        string    `json:"id"`
+	Timestamp time.Time `json:"timestamp"`
+	Path1Lst  string    `json:"path1Lst"`
+	Path2Lst  string    `json:"path2Lst"`
+}
+
+func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error) {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return nil, ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []BisyncLstVersion{}, nil
+		}
+		return nil, err
+	}
+	
+	versions := make(map[string]*BisyncLstVersion)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		
+		if (strings.HasSuffix(name, ".path1.lst") || strings.HasSuffix(name, ".path2.lst")) && strings.Contains(name, ".lst.") {
+			parts := strings.Split(name, ".lst.")
+			if len(parts) == 2 {
+				timestampStr := strings.TrimSuffix(parts[1], ".bak")
+				if timestamp, err := time.Parse("20060102-150405", timestampStr); err == nil {
+					versionID := timestampStr
+					if _, exists := versions[versionID]; !exists {
+						versions[versionID] = &BisyncLstVersion{
+							ID:        versionID,
+							Timestamp: timestamp,
+							Path1Lst:  "",
+							Path2Lst:  "",
+						}
+					}
+					if strings.Contains(name, ".path1.lst") {
+						versions[versionID].Path1Lst = name
+					} else if strings.Contains(name, ".path2.lst") {
+						versions[versionID].Path2Lst = name
+					}
+				}
+			}
+		}
+	}
+	
+	result := make([]BisyncLstVersion, 0, len(versions))
+	for _, v := range versions {
+		result = append(result, *v)
+	}
+	
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Timestamp.After(result[j].Timestamp)
+	})
+	
+	return result, nil
+}
+
+func (s *TaskService) DeleteBisyncLstVersion(taskID int64, versionID string) error {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	
+	pattern := fmt.Sprintf(".lst.%s.bak", versionID)
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
+			filePath := filepath.Join(dir, entry.Name())
+			_ = os.Remove(filePath)
+		}
+	}
+	
+	return nil
+}
+
+func (s *TaskService) RollbackBisyncLstVersion(taskID int64, versionID string) error {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("bisync directory not found")
+		}
+		return err
+	}
+	
+	pattern := fmt.Sprintf(".lst.%s.bak", versionID)
+	path1File := ""
+	path2File := ""
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
+			if strings.Contains(entry.Name(), ".path1.lst.") {
+				path1File = entry.Name()
+			} else if strings.Contains(entry.Name(), ".path2.lst.") {
+				path2File = entry.Name()
+			}
+		}
+	}
+	
+	if path1File == "" && path2File == "" {
+		return fmt.Errorf("version not found")
+	}
+	
+	now := time.Now().Format("20060102-150405")
+	currentFiles := []string{"path1.lst", "path2.lst"}
+	for _, f := range currentFiles {
+		currentPath := filepath.Join(dir, f)
+		if _, err := os.Stat(currentPath); err == nil {
+			_ = os.Rename(currentPath, filepath.Join(dir, f+"."+now+".bak"))
+		}
+	}
+	
+	if path1File != "" {
+		if err := os.Rename(filepath.Join(dir, path1File), filepath.Join(dir, "path1.lst")); err != nil {
+			return err
+		}
+	}
+	if path2File != "" {
+		if err := os.Rename(filepath.Join(dir, path2File), filepath.Join(dir, "path2.lst")); err != nil {
+			return err
+		}
+	}
+	
+	return nil
+}
+
+func (s *TaskService) BackupCurrentLstFiles(taskID int64) error {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	
+	now := time.Now().Format("20060102-150405")
+	currentFiles := []string{"path1.lst", "path2.lst"}
+	for _, f := range currentFiles {
+		srcPath := filepath.Join(dir, f)
+		if _, err := os.Stat(srcPath); err == nil {
+			dstPath := filepath.Join(dir, f+"."+now+".bak")
+			if err := os.Rename(srcPath, dstPath); err != nil {
+				_ = os.Copy(srcPath, dstPath)
+			}
+		}
+	}
+	
+	return s.cleanupOldLstBackups(taskID)
+}
+
+func (s *TaskService) cleanupOldLstBackups(taskID int64) error {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	
+	backupCount := 5
+	if len(task.BisyncOptions) > 0 {
+		var opts store.BisyncOptions
+		if json.Unmarshal(task.BisyncOptions, &opts) == nil && opts.LstBackupCount > 0 {
+			backupCount = opts.LstBackupCount
+		}
+	}
+	
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	
+	type backupFile struct {
+		name      string
+		timestamp time.Time
+	}
+	backups := make([]backupFile, 0)
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".bak") {
+			continue
+		}
+		name := entry.Name()
+		parts := strings.Split(name, ".lst.")
+		if len(parts) == 2 {
+			timestampStr := strings.TrimSuffix(parts[1], ".bak")
+			if timestamp, err := time.Parse("20060102-150405", timestampStr); err == nil {
+				backups = append(backups, backupFile{name: name, timestamp: timestamp})
+			}
+		}
+	}
+	
+	sort.Slice(backups, func(i, j int) bool {
+		return backups[i].timestamp.After(backups[j].timestamp)
+	})
+	
+	if len(backups) > backupCount*2 {
+		timestampSet := make(map[string]bool)
+		for _, b := range backups {
+			timestampParts := strings.Split(b.name, ".lst.")
+			if len(timestampParts) == 2 {
+				timestampSet[strings.TrimSuffix(timestampParts[1], ".bak")] = true
+			}
+		}
+		
+		timestamps := make([]string, 0, len(timestampSet))
+		for ts := range timestampSet {
+			timestamps = append(timestamps, ts)
+		}
+		
+		sort.Slice(timestamps, func(i, j int) bool {
+			t1, _ := time.Parse("20060102-150405", timestamps[i])
+			t2, _ := time.Parse("20060102-150405", timestamps[j])
+			return t1.After(t2)
+		})
+		
+		if len(timestamps) > backupCount {
+			for i := backupCount; i < len(timestamps); i++ {
+				pattern := fmt.Sprintf(".lst.%s.bak", timestamps[i])
+				for _, entry := range entries {
+					if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
+						_ = os.Remove(filepath.Join(dir, entry.Name()))
+					}
+				}
+			}
+		}
+	}
+	
+	return nil
+}
+
+func (s *TaskService) ResyncBisync(taskID int64) error {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	var opts map[string]any
+	if len(task.BisyncOptions) > 0 {
+		_ = json.Unmarshal(task.BisyncOptions, &opts)
+	}
+	if opts == nil {
+		opts = map[string]any{}
+	}
+	opts["resync"] = true
+	b, _ := json.Marshal(opts)
+	task.BisyncOptions = b
+	if err := s.db.UpdateTask(taskID, task); err != nil {
+		return err
+	}
+	_, err := s.RunTask(context.Background(), taskID, "manual")
+	return err
 }
