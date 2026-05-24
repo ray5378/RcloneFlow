@@ -11,7 +11,10 @@
    - Resync 按钮
    - 基本配置项
    - 高级配置项（折叠）
-   - LST 文件列表与删除
+   - LST 文件列表：
+     - 显示历史版本
+     - 删除功能
+     - 回滚功能（点击某个版本即可回滚）
 3. **运行时显示**: 传输中弹窗与历史详情需区分显示 A→B 和 B→A 两个方向
 4. **数据清理**: 删除任务或模式从 bisync 切换到其他时，删除对应 bisync 目录
 5. **各模块补充**: 标签、历史、导入导出、日志清理等模块均需支持 bisync
@@ -140,6 +143,7 @@ ALTER TABLE tasks ADD COLUMN bisync_options TEXT;
 **新增函数**:
 - `GetBisyncLstFiles(taskID int64) ([]string, error)` - 获取任务的 lst 文件列表
 - `DeleteBisyncLstFile(taskID int64, filename string) error` - 删除指定的 lst 文件
+- `RollbackBisyncLstFile(taskID int64, filename string) error` - 回滚到指定的 lst 文件版本
 - `ResyncBisync(taskID int64) error` - 触发 resync
 - `cleanupBisyncDir(taskName string) error` - 清理 bisync 目录（任务删除/模式切换时调用）
 
@@ -178,6 +182,7 @@ ALTER TABLE tasks ADD COLUMN bisync_options TEXT;
 **新增端点**:
 - `GET /api/tasks/{id}/bisync/lst-files` - 获取 lst 文件列表
 - `POST /api/tasks/{id}/bisync/delete-lst` - 删除 lst 文件
+- `POST /api/tasks/{id}/bisync/rollback-lst` - 回滚到指定的 lst 文件
 - `POST /api/tasks/{id}/bisync/resync` - 触发 resync
 
 **文件**: [internal/router/router.go](/workspace/internal/router/router.go)
@@ -197,6 +202,7 @@ ALTER TABLE tasks ADD COLUMN bisync_options TEXT;
 新增函数:
 - `getBisyncLstFiles(taskId)`
 - `deleteBisyncLstFile(taskId, filename)`
+- `rollbackBisyncLstFile(taskId, filename)`
 - `resyncBisync(taskId)`
 
 ### 6.3 Bisync 配置弹窗组件（新建）
@@ -206,7 +212,10 @@ ALTER TABLE tasks ADD COLUMN bisync_options TEXT;
 1. Resync 按钮（若为新建任务则禁用，因为没有 taskId）
 2. 基本配置区（resync, compare, maxDelete 等）
 3. 高级配置区（折叠，包含冲突解决、备份目录等）
-4. LST 文件列表（仅编辑已有任务时可用）
+4. LST 文件列表（仅编辑已有任务时可用）：
+   - 显示文件名、修改时间
+   - "回滚" 按钮：点击后将该文件设为当前版本（重命名为标准文件名，如 `path1.lst` / `path2.lst`）
+   - "删除" 按钮：删除历史版本
 
 ### 6.4 任务表单更新
 **文件**: [frontend/src/components/task/AddTaskForm.vue](/workspace/frontend/src/components/task/AddTaskForm.vue)
@@ -290,7 +299,6 @@ ALTER TABLE tasks ADD COLUMN bisync_options TEXT;
 
 1. 为 bisync 添加全局默认配置（Settings 模块）
 2. 优化运行时双向进度显示的实时性
-3. 提供 lst 文件历史版本回滚功能
 
 ## 十一、实施顺序建议
 
