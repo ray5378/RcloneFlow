@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { t } from '../i18n'
 import { showToast } from '../api/errors'
 import * as api from '../api'
@@ -246,10 +246,10 @@ export function useBrowser(options: UseBrowserOptions = {}) {
   onMounted(async () => {
     await remoteMgmt.loadRemoteOrder()
     await loadRemotesInternal()
-    const onContextClick = () => { contextMenu.contextMenu.value.show = false }
-    document.addEventListener('click', onContextClick)
-    return () => document.removeEventListener('click', onContextClick)
   })
+  const onContextClick = () => { contextMenu.contextMenu.value.show = false }
+  document.addEventListener('click', onContextClick)
+  onUnmounted(() => document.removeEventListener('click', onContextClick))
 
   return {
     browserFs,
