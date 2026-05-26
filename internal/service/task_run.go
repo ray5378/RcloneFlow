@@ -95,6 +95,13 @@ func (s *TaskService) RunTask(ctx context.Context, taskID int64, trigger string)
 		TargetPath:   t.TargetPath,
 	}
 
+	if t.Mode == "bisync" && len(t.BisyncOptions) > 0 {
+		var bisyncOpts map[string]any
+		if err := json.Unmarshal(t.BisyncOptions, &bisyncOpts); err == nil && bisyncOpts != nil {
+			newRun.Summary["bisyncOptions"] = bisyncOpts
+		}
+	}
+
 	if isSingleton && singletonMode {
 		run, existed, err := s.db.TryAcquireRun(&newRun)
 		if err != nil {

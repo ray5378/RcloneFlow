@@ -39,7 +39,7 @@ func classifyRunLogRow(level, path, msg string, sizes map[string]int64, openlist
 	if isRunObjectNotFoundSummary(path, msg) {
 		return nil, "", false
 	}
-	if strings.TrimSpace(path) == "<nil>" {
+	if strings.TrimSpace(path) == "" || strings.TrimSpace(path) == "<nil>" {
 		return nil, "", false
 	}
 	if upperLevel == "ERROR" {

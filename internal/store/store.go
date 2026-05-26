@@ -33,11 +33,25 @@ func Open(dir string) (*DB, error) {
 
 	_, err = db.Exec("PRAGMA foreign_keys = ON")
 	if err != nil {
+		db.Close()
 		return nil, fmt.Errorf("enable foreign keys: %w", err)
+	}
+
+	_, err = db.Exec("PRAGMA journal_mode = WAL")
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("set journal mode: %w", err)
+	}
+
+	_, err = db.Exec("PRAGMA busy_timeout = 5000")
+	if err != nil {
+		db.Close()
+		return nil, fmt.Errorf("set busy timeout: %w", err)
 	}
 
 	s := NewDB(db)
 	if err := s.migrate(); err != nil {
+		s.db.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
 
@@ -45,12 +59,15 @@ func Open(dir string) (*DB, error) {
 }
 
 func (db *DB) migrate() error {
-	_, _ = db.db.Exec(`
+	_, err := db.db.Exec(`
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version INTEGER PRIMARY KEY,
 			applied_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
+	if err != nil {
+		return fmt.Errorf("create schema_migrations table: %w", err)
+	}
 
 	type migration struct {
 		version int
@@ -221,10 +238,10 @@ func (db *DB) migrate() error {
 			continue
 		}
 		if _, err := db.db.Exec(m.sql); err != nil {
-			return fmt.Errorf("应用迁移 v%d 失败: %w", m.version, err)
+			return fmt.Errorf("apply migration v%d failed: %w", m.version, err)
 		}
 		if _, err := db.db.Exec("INSERT INTO schema_migrations (version) VALUES (?)", m.version); err != nil {
-			return fmt.Errorf("记录迁移版本 %d 失败: %w", m.version, err)
+			return fmt.Errorf("record migration version %d failed: %w", m.version, err)
 		}
 	}
 
@@ -234,3 +251,4 @@ func (db *DB) migrate() error {
 func (db *DB) Close() error {
 	return db.db.Close()
 }
+

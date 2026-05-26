@@ -7,7 +7,7 @@ import DefaultsModal from './components/modals/DefaultsModal.vue'
 import TaskManagerModal from './components/modals/TaskManagerModal.vue'
 import ToastCenter from './components/toast/ToastCenter.vue'
 import { useToastCenter } from './composables/useToastCenter'
-import { registerToast } from './api/errors'
+import { registerToast, registerConfirmCallback } from './api/errors'
 
 import * as api from './api'
 import { getSettings } from './api/settings'
@@ -17,6 +17,31 @@ import { locale, toggleLocale, t } from './i18n'
 
 const { toasts, showToast } = useToastCenter()
 registerToast(showToast)
+
+const confirmState = ref<{ show: boolean; title: string; message: string; resolve: ((value: boolean) => void) | null }>({
+  show: false,
+  title: '',
+  message: '',
+  resolve: null
+})
+
+function handleConfirm() {
+  if (confirmState.value.resolve) { confirmState.value.resolve(true) }
+  confirmState.value.show = false
+}
+
+function handleCancel() {
+  if (confirmState.value.resolve) { confirmState.value.resolve(false) }
+  confirmState.value.show = false
+}
+
+async function confirmCallback(title: string, message: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    confirmState.value = { show: true, title, message, resolve }
+  })
+}
+
+registerConfirmCallback(confirmCallback)
 
 let toastCleanup: (() => void) | null = null
 onMounted(() => {
@@ -100,21 +125,21 @@ function handleLogout() {
 
 async function handleChangePassword() {
   if (passwordForm.newPassword && passwordForm.newPassword !== passwordForm.confirmPassword) {
-    alert(t('account.mismatch'))
+    showToast(t('account.mismatch'), 'error')
     return
   }
   if (passwordForm.newPassword && passwordForm.newPassword.length < 6) {
-    alert(t('account.tooShort'))
+    showToast(t('account.tooShort'), 'error')
     return
   }
   try {
     await changePassword(passwordForm.oldPassword, passwordForm.newPassword, passwordForm.username)
-    alert(t('account.updateSuccess'))
+    showToast(t('account.updateSuccess'), 'success')
     showPasswordModal.value = false
     showSettingsModal.value = false
     handleLogout()
   } catch (e: any) {
-    alert(e.message || t('account.updateFailed'))
+    showToast(e.message || t('account.updateFailed'), 'error')
   }
 }
 
@@ -158,6 +183,16 @@ onMounted(async () => {
 
 <template>
   <div class="app">
+    <div v-if="confirmState.show" class="modal-overlay" @click.self="handleCancel">
+      <div class="modal-content confirm-modal">
+        <h3>{{ confirmState.title }}</h3>
+        <p>{{ confirmState.message }}</p>
+        <div class="modal-footer">
+          <button class="ghost" @click="handleCancel">{{ t('common.cancel') }}</button>
+          <button class="primary danger" @click="handleConfirm">{{ t('modal.confirm') }}</button>
+        </div>
+      </div>
+    </div>
     <ToastCenter :toasts="toasts" />
     <LoginView v-if="authChecked && !isAuth" :has-existing-users="hasExistingUsers" @success="handleLoginSuccess" />
     <template v-else-if="authChecked && isAuth">
@@ -356,7 +391,13 @@ onMounted(async () => {
 .modal-footer { display: flex; justify-content: flex-end; gap: 12px; }
 .modal-footer button { padding: 10px 20px; border-radius: 8px; font-size: 14px; }
 .modal-footer .ghost { background: transparent; border: 1px solid #333; color: #ccc; }
-.modal-footer .primary { background: #64b5f6; border: none; color: #fff; }
+.modal-footer .primary { background: #64b5f6;
+.confirm-modal { max-width: 400px; }
+.confirm-modal h3 { margin: 0 0 16px 0; font-size: 18px; color: #fff; }
+.confirm-modal p { margin: 0 0 20px 0; color: #ccc; line-height: 1.5; }
+body.light .confirm-modal h3 { color: #1a1a1a; }
+body.light .confirm-modal p { color: #666; }
+.modal-footer .primary.danger { background: #f44336; } border: none; color: #fff; }
 body.light .app { background: #f5f7fb; color: #1a1a1a; }
 body.light .header { background: rgba(255,255,255,.86); border-bottom-color: #e6e8ec; }
 body.light .field-item label, body.light .settings-arrow { color: #666; }

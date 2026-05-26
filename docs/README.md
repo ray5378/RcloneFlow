@@ -10,6 +10,16 @@
 
 ---
 
+## 0. 开发指南
+
+### `DEVELOPMENT_GUIDE.md`
+适合场景：
+- 第一次接触项目，需要完整的开发指引
+- 想了解技术栈、项目结构、开发流程
+- 想快速配置开发环境并开始编码
+
+这是面向开发者的完整指南，包含从环境配置到问题排查的所有内容。
+
 ## 1. 如果你只想先看一份
 
 优先看：
@@ -28,6 +38,15 @@
 如果你不知道从哪开始，先看它。
 
 ---
+
+### `DEVELOPMENT_GUIDE.md`
+适合场景：
+- 完整的开发指南
+- 技术栈介绍
+- 项目结构说明
+- 开发环境配置
+- 前后端开发规范
+- 构建与部署
 
 ## 2. 日常开发时最常用
 
@@ -110,11 +129,13 @@
 
 ### 对新接手项目的人
 建议顺序：
-1. `README.md`
-2. `ENGINEERING_RULES.md`
-3. `DEVELOPMENT_CHECKLIST.md`
-4. `TECH_DEBT.md`
-5. 再按前后端方向看 `FRONTEND_RULES.md` 或 `BACKEND_RULES.md`
+1. `DEVELOPMENT_GUIDE.md`
+2. `docs/README.md`
+3. `docs/ENGINEERING_RULES.md`
+4. `docs/DEVELOPMENT_CHECKLIST.md`
+5. `docs/ARCHITECTURE_OVERVIEW.md`
+6. `docs/TECH_DEBT.md`
+7. 再按前后端方向看 `FRONTEND_RULES.md` 或 `BACKEND_RULES.md`
 
 ### 对正在改前端的人
 建议顺序：

@@ -17,7 +17,7 @@ func classifyHistoricalLogRow(level, path, msg string) (map[string]any, string, 
 	if isCASRunObjectNotFoundSummaryRow(path, msg) {
 		return nil, "", false
 	}
-	if strings.TrimSpace(path) == "<nil>" {
+	if strings.TrimSpace(path) == "" || strings.TrimSpace(path) == "<nil>" {
 		return nil, "", false
 	}
 	if upperLevel == "ERROR" {

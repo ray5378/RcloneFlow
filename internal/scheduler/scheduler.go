@@ -16,6 +16,152 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	maxRetries        = 3
+	baseBackoff       = 1 * time.Second
+	maxBackoff        = 5 * time.Minute
+	scheduleNextDelay = 5 * time.Minute
+)
+
+func init() {
+	_ = baseBackoff
+	_ = maxBackoff
+}
+
+type RetryableError struct {
+	Err error
+}
+
+func (e *RetryableError) Error() string {
+	return e.Err.Error()
+}
+
+func (e *RetryableError) Unwrap() error {
+	return e.Err
+}
+
+type BackoffScheduler struct {
+	*Scheduler
+}
+
+func (s *BackoffScheduler) runTaskWithRetry(ctx context.Context, taskID int64, trigger string, scheduleID int64, cronSpec string) {
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if attempt > 0 {
+			backoff := baseBackoff * time.Duration(1<<(attempt-1))
+			if backoff > maxBackoff {
+				backoff = maxBackoff
+			}
+			logger.Info("任务执行失败，准备重试",
+				zap.Int64("task_id", taskID),
+				zap.Int("attempt", attempt),
+				zap.Duration("backoff", backoff))
+			time.Sleep(backoff)
+		}
+
+		err := s.r.RunTask(ctx, taskID, trigger)
+		if err == nil {
+			if attempt > 0 {
+				logger.Info("任务重试成功",
+					zap.Int64("task_id", taskID),
+					zap.Int("attempts", attempt+1))
+			}
+			return
+		}
+		lastErr = err
+		logger.Warn("任务执行失败",
+			zap.Int64("task_id", taskID),
+			zap.Int("attempt", attempt+1),
+			zap.Int("max_retries", maxRetries),
+			zap.Error(err))
+	}
+
+	s.db.UpdateScheduleNextRunTime(scheduleID, time.Now().Add(scheduleNextDelay))
+	logger.Error("任务重试次数已用尽",
+		zap.Int64("task_id", taskID),
+		zap.Int64("schedule_id", scheduleID),
+		zap.String("cron_spec", cronSpec),
+		zap.Error(lastErr))
+}
+
+func (s *BackoffScheduler) AddScheduleWithRetry(schedule store.Schedule) error {
+	if !schedule.Enabled {
+		return nil
+	}
+	cronSpec, ok := ParseSpecToCron(schedule.Spec)
+	if !ok {
+		return fmt.Errorf("invalid cron spec")
+	}
+	taskID := schedule.TaskID
+	scheduleID := schedule.ID
+
+	s.mu.Lock()
+	if eid, ok := s.entries[scheduleID]; ok {
+		s.cron.Remove(eid)
+		delete(s.entries, scheduleID)
+	}
+	s.mu.Unlock()
+
+	nextTime, err := CalcNextRun(cronSpec)
+	if err == nil {
+		s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
+	}
+
+	eid, err := s.cron.AddFunc(cronSpec, func() {
+		s.runTaskWithRetry(context.Background(), taskID, "schedule", scheduleID, cronSpec)
+		nextTime, err := CalcNextRun(cronSpec)
+		if err == nil {
+			s.db.UpdateScheduleNextRunTime(scheduleID, nextTime)
+		}
+	})
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	s.entries[scheduleID] = eid
+	s.mu.Unlock()
+	logger.Info("定时任务已添加(运行时)",
+		zap.Int64("schedule_id", scheduleID),
+		zap.Int64("task_id", taskID),
+		zap.String("cron_spec", cronSpec))
+	return nil
+}
+
+func NewWithBackoff(db *store.DB, runner Runner) *BackoffScheduler {
+	return &BackoffScheduler{
+		Scheduler: &Scheduler{
+			cron:    cron.New(cron.WithSeconds()),
+			db:      db,
+			r:       runner,
+			entries: map[int64]cron.EntryID{},
+		},
+	}
+}
+
+func (s *BackoffScheduler) Start() error {
+	schedules, err := s.db.ListSchedules()
+	if err != nil {
+		return err
+	}
+	for _, item := range schedules {
+		if !item.Enabled {
+			continue
+		}
+		if err := s.AddScheduleWithRetry(item); err != nil {
+			logger.Warn("添加定时任务失败",
+				zap.Int64("schedule_id", item.ID),
+				zap.String("spec", item.Spec),
+				zap.Error(err))
+			continue
+		}
+		logger.Info("定时任务已启动",
+			zap.Int64("schedule_id", item.ID),
+			zap.Int64("task_id", item.TaskID))
+	}
+	s.cron.Start()
+	return nil
+}
+
 // Runner 任务运行器接口
 type Runner interface {
 	RunTask(ctx context.Context, taskID int64, trigger string) error
@@ -285,3 +431,4 @@ func (s *Scheduler) Stop() {
 		<-ctx.Done()
 	}
 }
+

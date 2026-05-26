@@ -8,6 +8,7 @@ import RemoteConfirmStep from '../remote/RemoteConfirmStep.vue'
 import * as api from '../../api'
 import type { Provider, ProviderOption } from '../../types'
 import { t } from '../../i18n'
+import { showErrorToast } from '../../api/errors'
 import { getProviderDescription } from '../remote/remoteUtils'
 
 const props = defineProps<{
@@ -146,7 +147,7 @@ async function create() {
       emit('close')
     }, 800)
   } catch (e) {
-    alert((e as Error).message)
+    showErrorToast((e as Error).message)
   } finally {
     creating.value = false
   }

@@ -12,6 +12,12 @@ import {
   exportTasks,
   importTasks,
   clearAllTasks,
+  getBisyncLstFiles,
+  deleteBisyncLstFile,
+  rollbackBisyncLstFile,
+  getBisyncLstContent,
+  resyncBisync,
+  resolveBisyncConflict,
 } from './task'
 
 // Mock the client module
@@ -194,6 +200,38 @@ describe('task API', () => {
       expect(post).toHaveBeenCalledWith('/api/tasks/import', payload)
       expect(result).toEqual(mockResponse)
     })
+
+    it('should handle optional remote conflict strategy', async () => {
+      const payload = {
+        tasks: [],
+        schedules: [],
+        conflictStrategy: 'overwrite' as const,
+        remoteConflictStrategy: 'skip' as const,
+      }
+      const mockResponse = { imported: 0, skipped: 0, overwritten: 0, remotesAdded: 0, remotesSkipped: 0, remotesOverwritten: 0, remoteErrors: [] }
+      ;(post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockResponse)
+
+      const result = await importTasks(payload)
+
+      expect(post).toHaveBeenCalledWith('/api/tasks/import', payload)
+      expect(result).toEqual(mockResponse)
+    })
+
+    it('should handle rclone config in payload', async () => {
+      const payload = {
+        tasks: [],
+        schedules: [],
+        conflictStrategy: 'skip' as const,
+        rcloneConfig: { myremote: { type: 'local' } },
+      }
+      const mockResponse = { imported: 0, skipped: 0, overwritten: 0 }
+      ;(post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockResponse)
+
+      const result = await importTasks(payload)
+
+      expect(post).toHaveBeenCalledWith('/api/tasks/import', payload)
+      expect(result).toEqual(mockResponse)
+    })
   })
 
   describe('clearAllTasks', () => {
@@ -203,6 +241,80 @@ describe('task API', () => {
       await clearAllTasks()
 
       expect(del).toHaveBeenCalledWith('/api/tasks/clear')
+    })
+  })
+
+  describe('Bisync APIs', () => {
+    describe('getBisyncLstFiles', () => {
+      it('should call get with task id', async () => {
+        const mockResponse = { versions: [] }
+        ;(get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockResponse)
+
+        const result = await getBisyncLstFiles(1)
+
+        expect(get).toHaveBeenCalledWith('/api/tasks/1/bisync/lst-files')
+        expect(result).toEqual(mockResponse)
+      })
+    })
+
+    describe('deleteBisyncLstFile', () => {
+      it('should call post with task id and version id', async () => {
+        ;(post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined)
+
+        await deleteBisyncLstFile(1, 'version123')
+
+        expect(post).toHaveBeenCalledWith('/api/tasks/1/bisync/delete-lst', { versionId: 'version123' })
+      })
+    })
+
+    describe('rollbackBisyncLstFile', () => {
+      it('should call post with task id and version id', async () => {
+        ;(post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined)
+
+        await rollbackBisyncLstFile(1, 'version123')
+
+        expect(post).toHaveBeenCalledWith('/api/tasks/1/bisync/rollback-lst', { versionId: 'version123' })
+      })
+    })
+
+    describe('getBisyncLstContent', () => {
+      it('should call get with task id and encoded file name', async () => {
+        const mockResponse = { content: 'file content' }
+        ;(get as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockResponse)
+
+        const result = await getBisyncLstContent(1, 'test file.lst')
+
+        expect(get).toHaveBeenCalledWith('/api/tasks/1/bisync/lst-content?file=test%20file.lst')
+        expect(result).toEqual(mockResponse)
+      })
+    })
+
+    describe('resyncBisync', () => {
+      it('should call post with task id', async () => {
+        ;(post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined)
+
+        await resyncBisync(1)
+
+        expect(post).toHaveBeenCalledWith('/api/tasks/1/bisync/resync', {})
+      })
+    })
+
+    describe('resolveBisyncConflict', () => {
+      it('should call post with task id, version id, and keep file option', async () => {
+        ;(post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined)
+
+        await resolveBisyncConflict(1, 'version123', 'conflict1')
+
+        expect(post).toHaveBeenCalledWith('/api/tasks/1/bisync/resolve-conflict', { versionId: 'version123', keepFile: 'conflict1' })
+      })
+
+      it('should handle keepFile option conflict2', async () => {
+        ;(post as ReturnType<typeof vi.fn>).mockResolvedValueOnce(undefined)
+
+        await resolveBisyncConflict(1, 'version456', 'conflict2')
+
+        expect(post).toHaveBeenCalledWith('/api/tasks/1/bisync/resolve-conflict', { versionId: 'version456', keepFile: 'conflict2' })
+      })
     })
   })
 })

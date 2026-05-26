@@ -61,9 +61,46 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 		return err
 	}
 
-	// 初始化 logger
+	// 初始化嵌入式 rclone
 	maybeStartEmbeddedRC()
-	// 初始化rclone客户端
+	
+	// 初始化服务、控制器、路由
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	services, err := initServices(cfg, db, ctx)
+	if err != nil {
+		return err
+	}
+
+	mux := setupRouter(cfg, services.controllers)
+	srv := startHTTPServer(cfg, mux)
+
+	// 等待关闭信号
+	sig := <-stop
+	logger.Info("收到关闭信号，开始优雅关闭", zap.String("signal", sig.String()))
+
+	shutdown(services, srv)
+	return nil
+}
+
+// appServices 包含应用程序的所有服务和控制器
+type appServices struct {
+	taskSvc         *service.TaskService
+	scheduleSvc     *service.ScheduleService
+	runSvc          *service.RunService
+	authSvc         *service.AuthService
+	tagSvc          *service.TagService
+	cleanupSvc      *service.CleanupService
+	logCleanupSvc   *service.LogCleanupService
+	sched           *scheduler.Scheduler
+	activeMgr       *active_transfer.Manager
+	controllers     []any
+}
+
+// initServices 初始化所有服务和控制器
+func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appServices, error) {
+	// 初始化 rclone 客户端
 	rc := adapter.NewRcloneClient(nil)
 
 	// 清空所有运行状态（容器重启后恢复，防止单例模式误判）
@@ -71,7 +108,7 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 		logger.Warn("清空运行状态失败", zap.Error(err))
 	}
 
-	// 初始化服务层（定时任务采用 TaskService 以使用 CLI Runner，确保产生日志 stderrFile）
+	// 初始化服务层
 	activeMgr := active_transfer.NewManager()
 	activeMgr.SetPersistFunc(func(runID int64, snap active_transfer.ActiveTransferSnapshot) {
 		_ = db.UpdateRun(runID, func(rr *store.Run) {
@@ -88,63 +125,41 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 			"snapshot": snap,
 		})
 	})
+	
 	taskSvc := service.NewTaskService(db, activeMgr)
 	scheduleSvc := service.NewScheduleService(db)
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
+	authSvc := service.NewAuthService(db)
+	tagSvc := service.NewTagService(db)
+	
+	taskSvc.SetTagService(tagSvc)
+	if err := tagSvc.RecalcTags(); err != nil {
+		logger.Error("标签初始化失败", zap.Error(err))
+	}
+
+	// 初始化调度器
+	sched := scheduler.NewWithRunner(db, taskServiceSchedulerRunner{svc: taskSvc})
+	if err := sched.Start(); err != nil {
+		logger.Error("调度器初始化失败", zap.Error(err))
+		return nil, err
+	}
 
 	// 初始化控制器
 	remoteCtrl := controller.NewRemoteController(rc)
 	taskCtrl := controller.NewTaskController(taskSvc, scheduleSvc, runSvc, rc)
 	browserCtrl := controller.NewBrowserController(rc)
 	activeTransferCtrl := controller.NewActiveTransferController(activeMgr, runSvc)
-
-	// 初始化调度器(需要在controller之前,以便传递)
-	// 使用 TaskService 作为 Runner，以统一走 CLI Runner（生成 stderr 日志文件）
-	sched := scheduler.NewWithRunner(db, taskServiceSchedulerRunner{svc: taskSvc})
-	if err := sched.Start(); err != nil {
-		logger.Error("调度器初始化失败", zap.Error(err))
-		return err
-	}
-
 	scheduleCtrl := controller.NewScheduleController(scheduleSvc, sched)
 	runCtrl := controller.NewRunController(runSvc, rc)
 	fsCtrl := controller.NewFsController(rc)
-	authSvc := service.NewAuthService(db)
 	authCtrl := controller.NewAuthController(authSvc)
-
-	// 标签服务
-	tagSvc := service.NewTagService(db)
-	taskSvc.SetTagService(tagSvc)
-	if err := tagSvc.RecalcTags(); err != nil {
-		logger.Error("标签初始化失败", zap.Error(err))
-	}
 	tagCtrl := controller.NewTagController(tagSvc)
-
-	// 版本信息
 	versionCtrl := controller.NewVersionController(rc)
 
-	// 初始化路由
-	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl, cfg.GetStaticDir())
-
-	// 注入 settings → cleanup 重排钩子（在声明服务之后再赋值）
+	// 初始化清理服务
 	var cleanupSvc *service.CleanupService
 	var logCleanupSvc *service.LogCleanupService
-	controller.ReplanCleanupHook = func(intervalHours int, retentionDays int) {
-		if cleanupSvc != nil {
-			cleanupSvc.Replan(intervalHours, retentionDays)
-		}
-	}
-	controller.ReplanLogCleanupHook = func(retentionDays int) {
-		if logCleanupSvc != nil {
-			logCleanupSvc.Replan(retentionDays)
-		}
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// 启动历史记录清理服务
-	// 清理服务（单实例），供设置保存后重排
+	
 	if cfg.GetCleanupInterval() > 0 && cfg.GetCleanupRetention() > 0 {
 		cleanupSvc = service.NewCleanupService(
 			runSvc,
@@ -164,13 +179,12 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 			zap.Int("retention_days", cfg.GetCleanupRetention()))
 	}
 
-	// 启动日志清理服务（产品语义上跟随历史记录保留天数）
 	logsDir := filepath.Join(cfg.GetDataDir(), "logs")
 	logRetention := cfg.GetCleanupRetention()
 	if logRetention <= 0 {
 		logRetention = 7 // 默认7天
 	}
-	logCleanupSvc = service.NewLogCleanupService(logsDir, 24*time.Hour, logRetention) // 每天检查一次
+	logCleanupSvc = service.NewLogCleanupService(logsDir, 24*time.Hour, logRetention)
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -180,10 +194,56 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 		logCleanupSvc.Start(ctx)
 	}()
 
-	// 设置路由
+	// 注入 settings → cleanup 重排钩子
+	controller.ReplanCleanupHook = func(intervalHours int, retentionDays int) {
+		if cleanupSvc != nil {
+			cleanupSvc.Replan(intervalHours, retentionDays)
+		}
+	}
+	controller.ReplanLogCleanupHook = func(retentionDays int) {
+		if logCleanupSvc != nil {
+			logCleanupSvc.Replan(retentionDays)
+		}
+	}
+
+	return &appServices{
+		taskSvc:         taskSvc,
+		scheduleSvc:     scheduleSvc,
+		runSvc:          runSvc,
+		authSvc:         authSvc,
+		tagSvc:          tagSvc,
+		cleanupSvc:      cleanupSvc,
+		logCleanupSvc:   logCleanupSvc,
+		sched:           sched,
+		activeMgr:       activeMgr,
+		controllers:     []any{remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl},
+	}, nil
+}
+
+// setupRouter 设置 HTTP 路由
+func setupRouter(cfg *config.Config, controllers []any) *http.ServeMux {
+	// 这里我们展开 controllers，因为类型化参数更好
+	// 我们需要正确转换它们
+	remoteCtrl := controllers[0].(*controller.RemoteController)
+	taskCtrl := controllers[1].(*controller.TaskController)
+	browserCtrl := controllers[2].(*controller.BrowserController)
+	scheduleCtrl := controllers[3].(*controller.ScheduleController)
+	runCtrl := controllers[4].(*controller.RunController)
+	fsCtrl := controllers[5].(*controller.FsController)
+	authCtrl := controllers[6].(*controller.AuthController)
+	activeTransferCtrl := controllers[7].(*controller.ActiveTransferController)
+	tagCtrl := controllers[8].(*controller.TagController)
+	versionCtrl := controllers[9].(*controller.VersionController)
+	
+	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl, cfg.GetStaticDir())
+	
 	mux := http.NewServeMux()
 	r.Setup(mux)
+	return mux
+}
 
+// startHTTPServer 启动 HTTP 服务器
+func startHTTPServer(cfg *config.Config, mux *http.ServeMux) *http.Server {
 	addr := cfg.GetServerAddr()
 	srv := &http.Server{
 		Addr:         addr,
@@ -193,7 +253,6 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 		IdleTimeout:  120 * time.Second,
 	}
 
-	// 启动服务器
 	go func() {
 		logger.Info("服务监听中", zap.String("addr", addr))
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -201,20 +260,19 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 		}
 	}()
 
-	// 等待关闭信号
-	sig := <-stop
-	logger.Info("收到关闭信号，开始优雅关闭", zap.String("signal", sig.String()))
+	return srv
+}
 
-	cancel()
+// shutdown 优雅关闭所有服务
+func shutdown(services *appServices, srv *http.Server) {
 	logger.Info("已通知后台服务停止")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
+	
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("服务器关闭失败", zap.Error(err))
-		return err
 	}
 	logger.Info("服务器已安全关闭")
-	return nil
 }
 

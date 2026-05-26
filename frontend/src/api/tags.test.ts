@@ -1,11 +1,15 @@
-import { describe, it, expect, vi } from 'vitest'
-import { fetchTags } from './tags'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { fetchTags, selectTag, createTag, deleteTag } from './tags'
 
 vi.mock('./auth', () => ({
   getToken: () => 'mock-token'
 }))
 
-describe('fetchTags', () => {
+describe('tags api', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
   it('should return tags from API', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -24,5 +28,23 @@ describe('fetchTags', () => {
     global.fetch = vi.fn().mockResolvedValue({ ok: false } as Response)
     const tags = await fetchTags()
     expect(tags).toEqual([])
+  })
+
+  it('should call selectTag without error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true } as Response)
+    await expect(selectTag('test-tag', true)).resolves.not.toThrow()
+    expect(fetch).toHaveBeenCalled()
+  })
+
+  it('should call createTag without error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true } as Response)
+    await expect(createTag('new-tag')).resolves.not.toThrow()
+    expect(fetch).toHaveBeenCalled()
+  })
+
+  it('should call deleteTag without error', async () => {
+    globalThis.fetch = vi.fn().mockResolvedValue({ ok: true } as Response)
+    await expect(deleteTag('old-tag')).resolves.not.toThrow()
+    expect(fetch).toHaveBeenCalled()
   })
 })

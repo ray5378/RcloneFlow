@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { getSettings, saveSettings, resetSettings } from '../../api/settings'
+import { showErrorToast } from '../../api/errors'
 import { t } from '../../i18n'
 
 const emit = defineEmits<{
@@ -103,7 +104,7 @@ async function doConfirmReset() {
     if (savedTimer) clearTimeout(savedTimer)
     savedTimer = window.setTimeout(() => { saved.value = false }, 10000)
   } catch (e: any) {
-    alert(e?.message || e)
+    showErrorToast(e?.message || e)
   } finally {
     saving.value = false
     showResetConfirm.value = false

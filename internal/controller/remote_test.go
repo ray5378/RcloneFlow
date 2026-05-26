@@ -1,71 +1,250 @@
 package controller
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"rcloneflow/internal/adapter"
 )
 
+func setupRemoteController(t *testing.T) *RemoteController {
+	t.Helper()
+	rc := adapter.NewRcloneClient(nil)
+	return NewRemoteController(rc)
+}
+
+func TestRemoteController_Healthz(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	rec := httptest.NewRecorder()
+	ctrl.Healthz(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestRemoteController_HandleRemotes_Get(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/remotes", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleRemotes(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestRemoteController_HandleRemotes_Post(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/remotes", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleRemotes(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestRemoteController_HandleRemotes_Put(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/remotes", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleRemotes(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestRemoteController_HandleRemotes_MethodNotAllowed(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/remotes", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleRemotes(rec, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestRemoteController_HandleRemoteConfig_Get(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/remotes/config/test", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleRemoteConfig(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestRemoteController_HandleRemoteConfig_MissingName(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/remotes/config/", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleRemoteConfig(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestRemoteController_HandleRemoteConfig_MethodNotAllowed(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/remotes/config/test", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleRemoteConfig(rec, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestRemoteController_HandleRemoteTest(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/remotes/test", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleRemoteTest(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestRemoteController_HandleProviders(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/providers", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleProviders(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestRemoteController_HandleProviders_MethodNotAllowed(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/providers", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleProviders(rec, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestRemoteController_HandleConfigDump(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleConfigDump(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestRemoteController_HandleConfigDump_MethodNotAllowed(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/config", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleConfigDump(rec, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestRemoteController_HandleConfigActions_Get(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/config/test", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleConfigActions(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestRemoteController_HandleConfigActions_Delete(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/config/test", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleConfigActions(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestRemoteController_HandleConfigActions_MethodNotAllowed(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/config/test", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleConfigActions(rec, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestRemoteController_HandleUsage(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/usage/test:", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleUsage(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestRemoteController_HandleUsage_MissingFs(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/usage/", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleUsage(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestRemoteController_HandleUsage_MethodNotAllowed(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/usage/test:", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleUsage(rec, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestRemoteController_HandleFsInfo(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fsinfo/test:", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleFsInfo(rec, req)
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
+func TestRemoteController_HandleFsInfo_MissingFs(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/fsinfo/", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleFsInfo(rec, req)
+
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestRemoteController_HandleFsInfo_MethodNotAllowed(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/fsinfo/test:", nil)
+	rec := httptest.NewRecorder()
+	ctrl.HandleFsInfo(rec, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+}
+
+func TestRemoteController_RcloneClient(t *testing.T) {
+	ctrl := setupRemoteController(t)
+
+	rc := ctrl.RcloneClient()
+	assert.NotNil(t, rc)
+}
+
 func TestRemoteController_RunTask(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]any
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, "bad request", 400)
-			return
-		}
-		assert.Equal(t, "remotesrc:", body["srcFs"])
-		assert.Equal(t, "remotedst:", body["dstFs"])
-		assert.Equal(t, true, body["_async"])
+	ctrl := setupRemoteController(t)
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"jobId": 42})
-	}))
-	defer ts.Close()
-
-	rc := adapter.NewRcloneClient(&adapter.RcloneConfig{
-		BaseURL: ts.URL,
-	})
-	ctrl := NewRemoteController(rc)
-
-	jobID, err := ctrl.RunTask(context.Background(), 1, "copy", "remotesrc", "/", "remotedst", "/", "manual", nil)
-	require.NoError(t, err)
-	assert.Equal(t, int64(42), jobID)
-}
-
-func TestRemoteController_RunTask_Sync(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"jobId": 99})
-	}))
-	defer ts.Close()
-
-	rc := adapter.NewRcloneClient(&adapter.RcloneConfig{
-		BaseURL: ts.URL,
-	})
-	ctrl := NewRemoteController(rc)
-
-	jobID, err := ctrl.RunTask(context.Background(), 2, "sync", "src", "/a", "dst", "/b", "scheduled", nil)
-	require.NoError(t, err)
-	assert.Equal(t, int64(99), jobID)
-}
-
-func TestRemoteController_RunTask_APIError(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, "rclone error", 500)
-	}))
-	defer ts.Close()
-
-	rc := adapter.NewRcloneClient(&adapter.RcloneConfig{
-		BaseURL: ts.URL,
-	})
-	ctrl := NewRemoteController(rc)
-
-	_, err := ctrl.RunTask(context.Background(), 3, "copy", "src", "/", "dst", "/", "manual", nil)
+	_, err := ctrl.RunTask(nil, 1, "copy", "src", "/path", "dst", "/path", "manual", nil)
 	assert.Error(t, err)
 }

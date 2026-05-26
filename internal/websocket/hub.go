@@ -60,7 +60,6 @@ func (h *Hub) removeClient(client *Client) {
 		return
 	}
 	delete(h.clients, client)
-	close(client.send)
 }
 
 // Run starts the hub's main loop
@@ -141,7 +140,10 @@ func (c *Client) ReadPump() {
 
 // WritePump pumps messages from the hub to the WebSocket connection
 func (c *Client) WritePump() {
-	defer c.conn.Close()
+	defer func() {
+		c.conn.Close()
+		c.hub.removeClient(c)
+	}()
 	for {
 		message, ok := <-c.send
 		if !ok {

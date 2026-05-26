@@ -51,8 +51,15 @@ func (s *TaskService) ListTasks() ([]store.Task, error) {
 	return s.db.ListTasks()
 }
 
+func (s *TaskService) validateTask(task store.Task, excludeID int64) error {
+	if err := s.ensureTaskNameUnique(task.Name, excludeID); err != nil {
+		return err
+	}
+	return nil
+}
+
 func (s *TaskService) CreateTask(task store.Task) (store.Task, error) {
-	if err := s.ensureTaskNameUnique(task.Name, 0); err != nil {
+	if err := s.validateTask(task, 0); err != nil {
 		return store.Task{}, err
 	}
 	result, err := s.db.AddTask(task)
@@ -95,7 +102,7 @@ func (s *TaskService) UpdateTask(id int64, task store.Task) error {
 	if cur.Mode == "bisync" && merged.Mode != "bisync" {
 		_ = s.cleanupBisyncDir(cur.Name)
 	}
-	if err := s.ensureTaskNameUnique(merged.Name, id); err != nil {
+	if err := s.validateTask(merged, id); err != nil {
 		return err
 	}
 	if err := s.db.UpdateTask(id, merged); err != nil {
@@ -307,11 +314,15 @@ func (s *TaskService) getBisyncDir(taskName string) string {
 		if s == "" {
 			s = "task"
 		}
-		invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_.\-:]+`)
+		invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_.-]+`)
 		s = invalid.ReplaceAllString(s, "_")
 		return s
 	}(taskName)
 	return filepath.Join(dataDir, "bisync", safeName)
+}
+
+func (s *TaskService) getBakDir(taskName string) string {
+	return filepath.Join(s.getBisyncDir(taskName), "bak")
 }
 
 func (s *TaskService) cleanupBisyncDir(taskName string) error {
@@ -323,17 +334,19 @@ func (s *TaskService) cleanupBisyncDir(taskName string) error {
 }
 
 type BisyncLstVersion struct {
-	ID        string    `json:"id"`
-	Timestamp time.Time `json:"timestamp"`
-	Path1Lst  string    `json:"path1Lst"`
-	Path2Lst  string    `json:"path2Lst"`
-	Type      string    `json:"type"`
-	Conflict1 string    `json:"conflict1,omitempty"`
-	Conflict2 string    `json:"conflict2,omitempty"`
-	Path1Size int64     `json:"path1Size,omitempty"`
-	Path2Size int64     `json:"path2Size,omitempty"`
-	Conflict1Size int64  `json:"conflict1Size,omitempty"`
-	Conflict2Size int64  `json:"conflict2Size,omitempty"`
+	ID              string    `json:"id"`
+	Timestamp       time.Time `json:"timestamp"`
+	Path1Lst        string    `json:"path1Lst"`
+	Path2Lst        string    `json:"path2Lst"`
+	Type            string    `json:"type"`
+	Conflict1       string    `json:"conflict1,omitempty"`
+	Conflict2       string    `json:"conflict2,omitempty"`
+	Path1Size       int64     `json:"path1Size,omitempty"`
+	Path2Size       int64     `json:"path2Size,omitempty"`
+	Conflict1Size   int64     `json:"conflict1Size,omitempty"`
+	Conflict2Size   int64     `json:"conflict2Size,omitempty"`
+	Conflict1Mtime  time.Time `json:"conflict1Mtime,omitempty"`
+	Conflict2Mtime  time.Time `json:"conflict2Mtime,omitempty"`
 }
 
 func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error) {
@@ -349,7 +362,6 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 	entries, err = os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// 尝试旧格式的目录名（没有保留 . 和 :）
 			safeNameOld := func(s string) string {
 				s = strings.TrimSpace(s)
 				if s == "" {
@@ -383,17 +395,21 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 			versionID := "current"
 			info, _ := entry.Info()
 			size := int64(0)
+			modTime := time.Now()
 			if info != nil {
 				size = info.Size()
+				modTime = info.ModTime()
 			}
 			if _, exists := versions[versionID]; !exists {
 				versions[versionID] = &BisyncLstVersion{
 					ID:        versionID,
-					Timestamp: time.Now(),
+					Timestamp: modTime,
 					Path1Lst:  "",
 					Path2Lst:  "",
 					Type:      "current",
 				}
+			} else if modTime.After(versions[versionID].Timestamp) {
+				versions[versionID].Timestamp = modTime
 			}
 			if name == "path1.lst" {
 				versions[versionID].Path1Lst = name
@@ -436,9 +452,11 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 			if strings.Contains(name, ".conflict1") {
 				versions[prefix].Conflict1 = name
 				versions[prefix].Conflict1Size = size
+				versions[prefix].Conflict1Mtime = info.ModTime()
 			} else if strings.Contains(name, ".conflict2") {
 				versions[prefix].Conflict2 = name
 				versions[prefix].Conflict2Size = size
+				versions[prefix].Conflict2Mtime = info.ModTime()
 			}
 			continue
 		}
@@ -484,32 +502,77 @@ func (s *TaskService) GetBisyncLstFiles(taskID int64) ([]BisyncLstVersion, error
 			continue
 		}
 		
-		if (strings.HasSuffix(name, ".path1.lst") || strings.HasSuffix(name, ".path2.lst")) && strings.Contains(name, ".lst.") {
+		if name == "path1.lst" || name == "path2.lst" || strings.HasSuffix(name, ".path1.lst") || strings.HasSuffix(name, ".path2.lst") {
+			versionID := "current"
+			info, _ := entry.Info()
+			size := int64(0)
+			modTime := time.Now()
+			if info != nil {
+				size = info.Size()
+				modTime = info.ModTime()
+			}
+			if _, exists := versions[versionID]; !exists {
+				versions[versionID] = &BisyncLstVersion{
+					ID:        versionID,
+					Timestamp: modTime,
+					Path1Lst:  "",
+					Path2Lst:  "",
+					Type:      "current",
+				}
+			} else if modTime.After(versions[versionID].Timestamp) {
+				versions[versionID].Timestamp = modTime
+			}
+			if strings.HasSuffix(name, ".path1.lst") {
+				versions[versionID].Path1Lst = name
+				versions[versionID].Path1Size = size
+			} else {
+				versions[versionID].Path2Lst = name
+				versions[versionID].Path2Size = size
+			}
+		}
+	}
+	
+	bakDir := s.getBakDir(task.Name)
+	if bakEntries, err := os.ReadDir(bakDir); err == nil {
+		for _, entry := range bakEntries {
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".bak") {
+				continue
+			}
+			name := entry.Name()
+			if strings.HasSuffix(name, "-old") {
+				continue
+			}
 			info, _ := entry.Info()
 			size := int64(0)
 			if info != nil {
 				size = info.Size()
 			}
-			parts := strings.Split(name, ".lst.")
-			if len(parts) == 2 {
-				timestampStr := strings.TrimSuffix(parts[1], ".bak")
-				if timestamp, err := time.Parse("20060102-150405", timestampStr); err == nil {
-					versionID := timestampStr
-					if _, exists := versions[versionID]; !exists {
-						versions[versionID] = &BisyncLstVersion{
-							ID:        versionID,
+			tsStr := ""
+			base := strings.TrimSuffix(name, ".bak")
+			if idx := strings.LastIndex(base, ".lst."); idx >= 0 {
+				tsStr = base[idx+5:]
+			} else if idx := strings.LastIndex(base, ".path1.lst."); idx >= 0 {
+				tsStr = base[idx+11:]
+			} else if idx := strings.LastIndex(base, ".path2.lst."); idx >= 0 {
+				tsStr = base[idx+11:]
+			}
+			if tsStr != "" {
+				if timestamp, err := time.ParseInLocation("20060102-150405", tsStr, time.Local); err == nil {
+					if _, exists := versions[tsStr]; !exists {
+						versions[tsStr] = &BisyncLstVersion{
+							ID:        tsStr,
 							Timestamp: timestamp,
 							Path1Lst:  "",
 							Path2Lst:  "",
 							Type:      "backup",
 						}
 					}
-					if strings.Contains(name, ".path1.lst") {
-						versions[versionID].Path1Lst = name
-						versions[versionID].Path1Size = size
-					} else if strings.Contains(name, ".path2.lst") {
-						versions[versionID].Path2Lst = name
-						versions[versionID].Path2Size = size
+					if strings.HasPrefix(base, "path1.lst.") || strings.Contains(base, ".path1.lst.") {
+						versions[tsStr].Path1Lst = name
+						versions[tsStr].Path1Size = size
+					} else if strings.HasPrefix(base, "path2.lst.") || strings.Contains(base, ".path2.lst.") {
+						versions[tsStr].Path2Lst = name
+						versions[tsStr].Path2Size = size
 					}
 				}
 			}
@@ -541,7 +604,6 @@ func (s *TaskService) DeleteBisyncLstVersion(taskID int64, versionID string) err
 	entries, err = os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// 尝试旧格式的目录名
 			safeNameOld := func(s string) string {
 				s = strings.TrimSpace(s)
 				if s == "" {
@@ -565,7 +627,7 @@ func (s *TaskService) DeleteBisyncLstVersion(taskID int64, versionID string) err
 	}
 	
 	if versionID == "current" {
-		return fmt.Errorf("cannot delete current version")
+		return ErrBisyncCurrentVersion
 	}
 	
 	if strings.Contains(versionID, ".conflict") {
@@ -594,11 +656,22 @@ func (s *TaskService) DeleteBisyncLstVersion(taskID int64, versionID string) err
 			}
 		}
 	} else {
-		pattern := fmt.Sprintf(".lst.%s.bak", versionID)
+		found := false
 		for _, entry := range entries {
-			if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
-				filePath := filepath.Join(dir, entry.Name())
-				_ = os.Remove(filePath)
+			if !entry.IsDir() && strings.HasPrefix(entry.Name(), versionID) && strings.HasSuffix(entry.Name(), "-old") {
+				_ = os.Remove(filepath.Join(dir, entry.Name()))
+				found = true
+			}
+		}
+		if !found {
+			pattern := fmt.Sprintf(".lst.%s.bak", versionID)
+			bakDir := s.getBakDir(task.Name)
+			if bakEntries, err := os.ReadDir(bakDir); err == nil {
+				for _, entry := range bakEntries {
+					if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
+						_ = os.Remove(filepath.Join(bakDir, entry.Name()))
+					}
+				}
 			}
 		}
 	}
@@ -619,7 +692,6 @@ func (s *TaskService) RollbackBisyncLstVersion(taskID int64, versionID string) e
 	entries, err = os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
-			// 尝试旧格式的目录名
 			safeNameOld := func(s string) string {
 				s = strings.TrimSpace(s)
 				if s == "" {
@@ -645,7 +717,6 @@ func (s *TaskService) RollbackBisyncLstVersion(taskID int64, versionID string) e
 	path1File := ""
 	path2File := ""
 	
-	// 检查是否是旧格式备份（包含 .path1.lst-old 或 .path2.lst-old）
 	if strings.Contains(versionID, ".path1.lst-old") || strings.Contains(versionID, ".path2.lst-old") {
 		prefix := ""
 		if strings.Contains(versionID, ".path1.lst-old") {
@@ -654,7 +725,6 @@ func (s *TaskService) RollbackBisyncLstVersion(taskID int64, versionID string) e
 			prefix = strings.TrimSuffix(versionID, ".path2.lst-old")
 		}
 		
-		// 查找对应的旧格式文件
 		for _, entry := range entries {
 			if !entry.IsDir() && strings.HasPrefix(entry.Name(), prefix) && strings.HasSuffix(entry.Name(), "-old") {
 				if strings.Contains(entry.Name(), ".path1.lst-old") {
@@ -665,14 +735,29 @@ func (s *TaskService) RollbackBisyncLstVersion(taskID int64, versionID string) e
 			}
 		}
 	} else {
-		// 新格式备份：.lst.versionID.bak
-		pattern := fmt.Sprintf(".lst.%s.bak", versionID)
 		for _, entry := range entries {
-			if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
-				if strings.Contains(entry.Name(), ".path1.lst.") {
+			if !entry.IsDir() && strings.HasPrefix(entry.Name(), versionID) && strings.HasSuffix(entry.Name(), "-old") {
+				if strings.Contains(entry.Name(), ".path1.lst-old") {
 					path1File = entry.Name()
-				} else if strings.Contains(entry.Name(), ".path2.lst.") {
+				} else if strings.Contains(entry.Name(), ".path2.lst-old") {
 					path2File = entry.Name()
+				}
+			}
+		}
+		if path1File == "" && path2File == "" {
+			pattern := fmt.Sprintf(".lst.%s.bak", versionID)
+			bakDir := s.getBakDir(task.Name)
+			if bakEntries, err := os.ReadDir(bakDir); err == nil {
+				for _, entry := range bakEntries {
+					if entry.IsDir() || !strings.Contains(entry.Name(), pattern) {
+						continue
+					}
+					name := entry.Name()
+					if strings.Contains(name, ".path1.lst.") || strings.HasPrefix(name, "path1.lst.") {
+						path1File = filepath.Join(bakDir, name)
+					} else if strings.Contains(name, ".path2.lst.") || strings.HasPrefix(name, "path2.lst.") {
+						path2File = filepath.Join(bakDir, name)
+					}
 				}
 			}
 		}
@@ -682,23 +767,51 @@ func (s *TaskService) RollbackBisyncLstVersion(taskID int64, versionID string) e
 		return fmt.Errorf("version not found")
 	}
 	
-	now := time.Now().Format("20060102-150405")
-	currentFiles := []string{"path1.lst", "path2.lst"}
-	for _, f := range currentFiles {
-		currentPath := filepath.Join(dir, f)
-		if _, err := os.Stat(currentPath); err == nil {
-			_ = os.Rename(currentPath, filepath.Join(dir, f+"."+now+".bak"))
+	bakDir := s.getBakDir(task.Name)
+	_ = os.MkdirAll(bakDir, 0o755)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasSuffix(name, "-old") || strings.HasSuffix(name, ".bak") {
+			continue
+		}
+		if strings.HasSuffix(name, ".path1.lst") || name == "path1.lst" {
+			srcPath := filepath.Join(dir, name)
+			if info, err := os.Stat(srcPath); err == nil {
+				ts := info.ModTime().Format("20060102-150405")
+				_ = os.Rename(srcPath, filepath.Join(bakDir, "path1.lst."+ts+".bak"))
+			}
+		} else if strings.HasSuffix(name, ".path2.lst") || name == "path2.lst" {
+			srcPath := filepath.Join(dir, name)
+			if info, err := os.Stat(srcPath); err == nil {
+				ts := info.ModTime().Format("20060102-150405")
+				_ = os.Rename(srcPath, filepath.Join(bakDir, "path2.lst."+ts+".bak"))
+			}
 		}
 	}
 	
 	if path1File != "" {
-		if err := os.Rename(filepath.Join(dir, path1File), filepath.Join(dir, "path1.lst")); err != nil {
-			return err
+		src := path1File
+		if !filepath.IsAbs(src) {
+			src = filepath.Join(dir, src)
+		}
+		if _, err := os.Stat(src); err == nil {
+			if err := os.Rename(src, filepath.Join(dir, "path1.lst")); err != nil {
+				return err
+			}
 		}
 	}
 	if path2File != "" {
-		if err := os.Rename(filepath.Join(dir, path2File), filepath.Join(dir, "path2.lst")); err != nil {
-			return err
+		src := path2File
+		if !filepath.IsAbs(src) {
+			src = filepath.Join(dir, src)
+		}
+		if _, err := os.Stat(src); err == nil {
+			if err := os.Rename(src, filepath.Join(dir, "path2.lst")); err != nil {
+				return err
+			}
 		}
 	}
 	
@@ -711,17 +824,18 @@ func (s *TaskService) BackupCurrentLstFiles(taskID int64) error {
 		return ErrTaskNotFound
 	}
 	dir := s.getBisyncDir(task.Name)
+	bakDir := s.getBakDir(task.Name)
 	
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(bakDir, 0o755); err != nil {
 		return err
 	}
 	
-	now := time.Now().Format("20060102-150405")
 	currentFiles := []string{"path1.lst", "path2.lst"}
 	for _, f := range currentFiles {
 		srcPath := filepath.Join(dir, f)
-		if _, err := os.Stat(srcPath); err == nil {
-			dstPath := filepath.Join(dir, f+"."+now+".bak")
+		if info, err := os.Stat(srcPath); err == nil {
+			ts := info.ModTime().Format("20060102-150405")
+			dstPath := filepath.Join(bakDir, f+"."+ts+".bak")
 			if err := os.Rename(srcPath, dstPath); err != nil {
 				srcFile, err := os.Open(srcPath)
 				if err == nil {
@@ -730,6 +844,7 @@ func (s *TaskService) BackupCurrentLstFiles(taskID int64) error {
 					if err == nil {
 						defer dstFile.Close()
 						_, _ = io.Copy(dstFile, srcFile)
+						os.Remove(srcPath)
 					}
 				}
 			}
@@ -744,7 +859,7 @@ func (s *TaskService) cleanupOldLstBackups(taskID int64) error {
 	if !ok {
 		return ErrTaskNotFound
 	}
-	dir := s.getBisyncDir(task.Name)
+	bakDir := s.getBakDir(task.Name)
 	
 	backupCount := 5
 	if len(task.BisyncOptions) > 0 {
@@ -754,7 +869,7 @@ func (s *TaskService) cleanupOldLstBackups(taskID int64) error {
 		}
 	}
 	
-	entries, err := os.ReadDir(dir)
+	entries, err := os.ReadDir(bakDir)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -775,7 +890,7 @@ func (s *TaskService) cleanupOldLstBackups(taskID int64) error {
 		parts := strings.Split(name, ".lst.")
 		if len(parts) == 2 {
 			timestampStr := strings.TrimSuffix(parts[1], ".bak")
-			if timestamp, err := time.Parse("20060102-150405", timestampStr); err == nil {
+			if timestamp, err := time.ParseInLocation("20060102-150405", timestampStr, time.Local); err == nil {
 				backups = append(backups, backupFile{name: name, timestamp: timestamp})
 			}
 		}
@@ -800,8 +915,8 @@ func (s *TaskService) cleanupOldLstBackups(taskID int64) error {
 		}
 		
 		sort.Slice(timestamps, func(i, j int) bool {
-			t1, _ := time.Parse("20060102-150405", timestamps[i])
-			t2, _ := time.Parse("20060102-150405", timestamps[j])
+			t1, _ := time.ParseInLocation("20060102-150405", timestamps[i], time.Local)
+			t2, _ := time.ParseInLocation("20060102-150405", timestamps[j], time.Local)
 			return t1.After(t2)
 		})
 		
@@ -810,13 +925,90 @@ func (s *TaskService) cleanupOldLstBackups(taskID int64) error {
 				pattern := fmt.Sprintf(".lst.%s.bak", timestamps[i])
 				for _, entry := range entries {
 					if !entry.IsDir() && strings.Contains(entry.Name(), pattern) {
-						_ = os.Remove(filepath.Join(dir, entry.Name()))
+						_ = os.Remove(filepath.Join(bakDir, entry.Name()))
 					}
 				}
 			}
 		}
 	}
 	
+	return nil
+}
+
+func (s *TaskService) GetBisyncLstContent(taskID int64, fileName string) (string, error) {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return "", ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	filePath := filepath.Join(dir, fileName)
+
+	if strings.HasSuffix(fileName, ".bak") {
+		bakDir := s.getBakDir(task.Name)
+		bakPath := filepath.Join(bakDir, fileName)
+		if _, err := os.Stat(bakPath); err == nil {
+			filePath = bakPath
+		}
+	}
+
+	if !strings.HasPrefix(filePath, filepath.Clean(dir)+string(filepath.Separator)) &&
+		!strings.HasPrefix(filePath, filepath.Clean(s.getBakDir(task.Name))+string(filepath.Separator)) {
+		return "", fmt.Errorf("invalid file name")
+	}
+
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return "", fmt.Errorf("file not found")
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("not a file")
+	}
+	if info.Size() > 10*1024*1024 {
+		return "", fmt.Errorf("file too large")
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read file")
+	}
+	return string(data), nil
+}
+
+func (s *TaskService) ResolveBisyncConflict(taskID int64, versionID, keepFile string) error {
+	task, ok := s.db.GetTask(taskID)
+	if !ok {
+		return ErrTaskNotFound
+	}
+	dir := s.getBisyncDir(task.Name)
+	if _, err := os.Stat(dir); err != nil {
+		return fmt.Errorf("bisync directory not found")
+	}
+
+	var keepName, deleteName string
+	if keepFile == "conflict1" {
+		keepName = versionID + ".conflict1"
+		deleteName = versionID + ".conflict2"
+	} else {
+		keepName = versionID + ".conflict2"
+		deleteName = versionID + ".conflict1"
+	}
+
+	keepPath := filepath.Join(dir, keepName)
+	delPath := filepath.Join(dir, deleteName)
+	if !strings.HasPrefix(filepath.Clean(keepPath), filepath.Clean(dir)+string(os.PathSeparator)) ||
+		!strings.HasPrefix(filepath.Clean(delPath), filepath.Clean(dir)+string(os.PathSeparator)) {
+		return fmt.Errorf("invalid file path")
+	}
+
+	if err := os.Remove(delPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to remove conflict file: %w", err)
+	}
+
+	origPath := filepath.Join(dir, versionID)
+	if err := os.Rename(keepPath, origPath); err != nil {
+		return fmt.Errorf("failed to rename file: %w", err)
+	}
+
 	return nil
 }
 
@@ -841,3 +1033,4 @@ func (s *TaskService) ResyncBisync(taskID int64) error {
 	_, err := s.RunTask(context.Background(), taskID, "manual")
 	return err
 }
+

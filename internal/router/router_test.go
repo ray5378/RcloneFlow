@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"rcloneflow/internal/adapter"
+	"rcloneflow/internal/auth"
 	"rcloneflow/internal/controller"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
@@ -221,4 +222,46 @@ func TestRouter_Setup_StaticRoot(t *testing.T) {
 	buf := make([]byte, 256)
 	n, _ := resp.Body.Read(buf)
 	assert.Contains(t, string(buf[:n]), "RcloneFlow UI")
+}
+
+func TestRouter_Setup_BisyncEndpoint_Returns404(t *testing.T) {
+	r := setupRouterTest(t)
+	mux := http.NewServeMux()
+	r.Setup(mux)
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	pair, err := auth.GenerateTokenPair(1, "admin")
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/tasks/999/bisync/lst-files", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestRouter_Setup_BisyncResolveConflict(t *testing.T) {
+	r := setupRouterTest(t)
+	mux := http.NewServeMux()
+	r.Setup(mux)
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	pair, err := auth.GenerateTokenPair(1, "admin")
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodGet, srv.URL+"/api/tasks/1/bisync/resolve-conflict", nil)
+	require.NoError(t, err)
+	req.Header.Set("Authorization", "Bearer "+pair.AccessToken)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
 }

@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 
 describe('BrowserView storage node hover styling', () => {
   it('uses task-card-like hover highlight and lift for storage tiles', () => {
-    const source = readFileSync(resolve(__dirname, './BrowserView.vue'), 'utf8')
+    const source = readFileSync(resolve(__dirname, '../components/StoragePanel.vue'), 'utf8')
 
     expect(source).toContain('.tile:hover')
     expect(source).toContain('transform: translateY(-2px)')

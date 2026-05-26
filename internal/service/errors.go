@@ -18,4 +18,6 @@ var (
 	ErrAuthOldPasswordWrong  = errors.New("old password is incorrect")
 	ErrAuthUsernameTaken     = errors.New("username is already taken")
 	ErrAuthUserNotFound      = errors.New("user not found")
+
+	ErrBisyncCurrentVersion = errors.New("cannot delete current version")
 )

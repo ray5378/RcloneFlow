@@ -1,6 +1,10 @@
 import { onMounted, onUnmounted, watch, type Ref } from 'vue'
 import type { Run } from '../types'
 
+const HISTORY_POLL_FAST_MS = 3000
+const HISTORY_POLL_IDLE_MS = 15000
+const INITIAL_REFRESH_DELAY_MS = 1500
+
 interface UseTaskHistoryLoaderOptions {
   taskRuns: Ref<Run[]>
   historyFilterTaskId: Ref<number | null>
@@ -13,15 +17,13 @@ interface UseTaskHistoryLoaderOptions {
 }
 
 export function useTaskHistoryLoader(options: UseTaskHistoryLoaderOptions) {
-  const HISTORY_POLL_FAST_MS = 3000
-  const HISTORY_POLL_IDLE_MS = 15000
-
   let historyRefreshTimer: number | null = null
 
   function stableStringify(value: any) {
     try {
       return JSON.stringify(value)
-    } catch {
+    } catch (e) {
+      console.warn('[useTaskHistoryLoader] Failed to stringify value:', e)
       return ''
     }
   }
@@ -82,8 +84,8 @@ export function useTaskHistoryLoader(options: UseTaskHistoryLoaderOptions) {
         if (document.visibilityState === 'visible') {
           await refreshTaskHistoryRuns()
         }
-      } catch (err) {
-        throw err
+      } catch (e) {
+        console.error('[useTaskHistoryLoader] Failed to refresh task history:', e)
       } finally {
         scheduleNextHistoryRefresh()
       }
@@ -99,14 +101,18 @@ export function useTaskHistoryLoader(options: UseTaskHistoryLoaderOptions) {
     options.jumpPage.value = 1
     options.historyFilterTaskId.value = taskId
     options.currentModule.value = 'history'
-    refreshTaskHistoryRuns().catch(() => {})
-    startHistoryRefreshLoop(1500)
+    refreshTaskHistoryRuns().catch((e) => {
+      console.error('[useTaskHistoryLoader] Failed to refresh task history in viewTaskHistory:', e)
+    })
+    startHistoryRefreshLoop(INITIAL_REFRESH_DELAY_MS)
   }
 
   watch([options.currentModule, options.historyFilterTaskId], ([module, taskId]) => {
     if (module === 'history' && taskId !== null) {
-      refreshTaskHistoryRuns().catch(() => {})
-      startHistoryRefreshLoop(1500)
+      refreshTaskHistoryRuns().catch((e) => {
+        console.error('[useTaskHistoryLoader] Failed to refresh task history in watch:', e)
+      })
+      startHistoryRefreshLoop(INITIAL_REFRESH_DELAY_MS)
       return
     }
     stopHistoryRefreshLoop()
@@ -119,7 +125,7 @@ export function useTaskHistoryLoader(options: UseTaskHistoryLoaderOptions) {
 
   onMounted(() => {
     if (options.currentModule.value === 'history' && options.historyFilterTaskId.value !== null) {
-      startHistoryRefreshLoop(1500)
+      startHistoryRefreshLoop(INITIAL_REFRESH_DELAY_MS)
     }
   })
 

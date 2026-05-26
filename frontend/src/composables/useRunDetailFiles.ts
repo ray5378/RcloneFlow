@@ -10,6 +10,9 @@ interface UseRunDetailFilesOptions {
   }
 }
 
+const DEFAULT_PAGE_SIZE = 10
+const MIN_PAGE_SIZE = 1
+
 function getRunFileKind(row: Partial<RunFileRow> & { action?: string }): RunFileKind {
   const status = String(row.status || '').trim().toLowerCase()
   const action = String(row.action || '').trim().toLowerCase()
@@ -26,7 +29,7 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
   const runFiles = ref<any[]>([])
   const runFilesTotal = ref(0)
   const runFilesPage = ref(1)
-  const runFilesPageSize = ref(Math.max(10, Math.floor((window.innerHeight - 380) / 32)))
+  const runFilesPageSize = ref(Math.max(DEFAULT_PAGE_SIZE, Math.floor((window.innerHeight - 380) / 32)))
 
   function resetRunFiles() {
     runFilesPage.value = 1
@@ -35,17 +38,13 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
   }
 
   async function reloadRunFiles() {
-    try {
-      if (!options.runDetail.value?.id) return
-      const page = runFilesPage.value || 1
-      const pageSize = runFilesPageSize.value || 1
-      const offset = (page - 1) * pageSize
-      const res = await options.runApi.getFiles(options.runDetail.value.id, offset, pageSize)
-      runFiles.value = res.items || []
-      runFilesTotal.value = res.total || 0
-    } catch (e) {
-      throw e
-    }
+    if (!options.runDetail.value?.id) return
+    const page = runFilesPage.value || 1
+    const pageSize = runFilesPageSize.value || MIN_PAGE_SIZE
+    const offset = (page - 1) * pageSize
+    const res = await options.runApi.getFiles(options.runDetail.value.id, offset, pageSize)
+    runFiles.value = res.items || []
+    runFilesTotal.value = res.total || 0
   }
 
   function openRunDetailFiles(run: any) {
@@ -61,33 +60,37 @@ export function useRunDetailFiles(options: UseRunDetailFilesOptions) {
   const pagedRunFiles = computed(() => visibleRunFiles.value)
   const totalRunFilesPages = computed(() => Math.max(1, Math.ceil((runFilesTotal.value || 0) / runFilesPageSize.value)))
 
+  const validatedRunFilesPage = computed({
+    get: () => {
+      const total = totalRunFilesPages.value
+      const current = runFilesPage.value
+      if (current < 1) return 1
+      if (current > total) return total
+      return current
+    },
+    set: (val: number) => {
+      runFilesPage.value = val
+    }
+  })
+
   watch(() => options.runDetail.value?.id, () => {
     resetRunFiles()
     void reloadRunFiles()
   })
 
-  watch([runFilesPage, runFilesPageSize], () => {
-    const totalPages = totalRunFilesPages.value
-    if (runFilesPage.value > totalPages) {
-      runFilesPage.value = totalPages
-      return
-    }
-    if (runFilesPage.value < 1) {
-      runFilesPage.value = 1
-      return
-    }
+  watch([validatedRunFilesPage, runFilesPageSize], () => {
     void reloadRunFiles()
   })
 
   function goPrevFilesPage() {
-    if (runFilesPage.value > 1) {
-      runFilesPage.value--
+    if (validatedRunFilesPage.value > 1) {
+      validatedRunFilesPage.value--
     }
   }
 
   function goNextFilesPage() {
-    if (runFilesPage.value < totalRunFilesPages.value) {
-      runFilesPage.value++
+    if (validatedRunFilesPage.value < totalRunFilesPages.value) {
+      validatedRunFilesPage.value++
     }
   }
 

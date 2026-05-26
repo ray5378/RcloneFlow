@@ -142,8 +142,16 @@ func (r *Router) Setup(mux *http.ServeMux) {
 			r.taskCtrl.HandleBisyncRollbackLst(w, req)
 			return
 		}
+		if strings.HasSuffix(req.URL.Path, "/bisync/lst-content") {
+			r.taskCtrl.HandleBisyncLstContent(w, req)
+			return
+		}
 		if strings.HasSuffix(req.URL.Path, "/bisync/resync") {
 			r.taskCtrl.HandleBisyncResync(w, req)
+			return
+		}
+		if strings.HasSuffix(req.URL.Path, "/bisync/resolve-conflict") {
+			r.taskCtrl.HandleBisyncResolveConflict(w, req)
 			return
 		}
 		r.taskCtrl.HandleTaskActions(w, req)

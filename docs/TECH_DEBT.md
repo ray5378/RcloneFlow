@@ -1,3 +1,30 @@
+
+
+## 已完成优化记录
+
+### BrowserView.vue 优化 ✅ (2026-05-26)
+
+**完成的工作：
+- ✅ 创建统一入口 `useBrowser.ts` composable
+- ✅ 拆分为三个子组件：
+  - StoragePanel.vue
+  - BrowserPanel.vue
+  - ManageStoragePanel.vue
+- ✅ 所有 composables 都导出完整类型定义
+- ✅ BrowserView.vue 大幅精简
+
+**关键好处：
+- 主视图从近千行简化为装配层
+- 更好的职责分离
+- 更容易维护和测试
+- 完整的类型安全保障
+
+**拆分模式可复用：
+1. 创建统一 composable 入口
+2. 按 UI 区块拆分子组件
+3. 通过 props/emits 清晰通信
+4. 保持类型安全
+
 # TECH_DEBT.md
 
 开发向技术债与重构清单。

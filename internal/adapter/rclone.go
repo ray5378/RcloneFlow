@@ -76,6 +76,9 @@ func (c *RcloneClient) Call(ctx context.Context, endpoint string, req, resp inte
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
 	}
+	if httpResp == nil {
+		return fmt.Errorf("request failed: nil response")
+	}
 	defer httpResp.Body.Close()
 
 	respBody, _ := io.ReadAll(httpResp.Body)

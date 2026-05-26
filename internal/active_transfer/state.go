@@ -11,6 +11,7 @@ import (
 )
 
 type PersistFunc func(runID int64, snap ActiveTransferSnapshot)
+type PersistErrorFunc func(runID int64, snap ActiveTransferSnapshot, err error)
 
 const (
 	degradeCandidateThreshold = 2000
@@ -23,6 +24,7 @@ type Manager struct {
 	byRunID map[int64]*ActiveTransferState
 	byTask  map[int64]*ActiveTransferState
 	persist PersistFunc
+	onError PersistErrorFunc
 
 	persistThrottle time.Duration
 	pendingPersist  map[int64]ActiveTransferSnapshot
@@ -45,6 +47,12 @@ func (m *Manager) SetPersistFunc(fn PersistFunc) {
 	m.persist = fn
 }
 
+func (m *Manager) SetPersistErrorFunc(fn PersistErrorFunc) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onError = fn
+}
+
 func (m *Manager) SetPersistThrottle(d time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -54,6 +62,7 @@ func (m *Manager) SetPersistThrottle(d time.Duration) {
 func (m *Manager) emitPersist(runID int64, snap ActiveTransferSnapshot) {
 	m.mu.RLock()
 	persist := m.persist
+	onError := m.onError
 	m.mu.RUnlock()
 	if persist == nil {
 		return
@@ -61,7 +70,10 @@ func (m *Manager) emitPersist(runID int64, snap ActiveTransferSnapshot) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("goroutine panic", zap.Any("panic", r))
+				logger.Error("goroutine panic in persist", zap.Any("panic", r))
+				if onError != nil {
+					onError(runID, snap, &PersistPanicError{Panic: r})
+				}
 			}
 		}()
 		persist(runID, snap)
@@ -80,6 +92,14 @@ func (m *Manager) flushPendingPersist(runID int64) {
 	delete(m.persistTimers, runID)
 	m.mu.Unlock()
 	m.emitPersist(runID, snap)
+}
+
+type PersistPanicError struct {
+	Panic interface{}
+}
+
+func (e *PersistPanicError) Error() string {
+	return "persist panic"
 }
 
 func (m *Manager) persistSnapshotLocked(st *ActiveTransferState) {
@@ -105,7 +125,13 @@ func (m *Manager) persistSnapshotLockedMode(st *ActiveTransferState, immediate b
 		go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				logger.Error("goroutine panic", zap.Any("panic", r))
+				logger.Error("goroutine panic in persist", zap.Any("panic", r))
+				m.mu.RLock()
+				onError := m.onError
+				m.mu.RUnlock()
+				if onError != nil {
+					onError(runID, snap, &PersistPanicError{Panic: r})
+				}
 			}
 		}()
 		m.persist(runID, snap)
@@ -241,7 +267,7 @@ func (m *Manager) MergeCandidates(runID int64, candidates []TransferCandidateFil
 			if st.CurrentFile != nil && normalizePath(st.CurrentFile.Path) == key {
 				st.CurrentFile.Name = cur.Name
 				if c.Order > 0 {
-					st.CurrentFile.Order = c.Order
+					st.CurrentFile.Order = cur.Order
 				}
 				if c.SizeBytes > 0 && st.CurrentFile.TotalBytes == 0 {
 					st.CurrentFile.TotalBytes = c.SizeBytes
@@ -443,7 +469,6 @@ func (m *Manager) SetTransferSlots(runID int64, slots int) {
 	m.persistSnapshotLockedImmediate(st)
 }
 
-// Reducer methods — event callbacks from runnercli
 func (m *Manager) OnFileProgress(runID int64, path string, bytes, total, speed int64, pct *float64) {
 	m.UpdateCurrentFile(runID, path, bytes, total, speed, pct)
 }
@@ -467,3 +492,4 @@ func (m *Manager) OnFileSkipped(runID int64, path string, message string) {
 func (m *Manager) OnFileDeleted(runID int64, path string) {
 	m.MarkCompleted(runID, path, FileStatusDeleted, "")
 }
+

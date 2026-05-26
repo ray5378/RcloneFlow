@@ -1,5 +1,19 @@
 const API_BASE = ''
 
+const STORAGE_KEYS = {
+  AUTH_TOKEN: 'authToken',
+  REFRESH_TOKEN: 'refreshToken',
+  USER: 'user',
+}
+
+const API_PATHS = {
+  HAS_USERS: '/api/auth/has-users',
+  LOGIN: '/api/auth/login',
+  REGISTER: '/api/auth/register',
+  ME: '/api/auth/me',
+  CHANGE_PASSWORD: '/api/auth/change-password',
+}
+
 export interface AuthResponse {
   accessToken: string
   refreshToken: string
@@ -9,91 +23,111 @@ export interface AuthResponse {
   }
 }
 
-export function setTokens(accessToken: string, refreshToken: string) {
-  localStorage.setItem('authToken', accessToken)
-  localStorage.setItem('refreshToken', refreshToken)
+export interface User {
+  id: number
+  username: string
 }
 
-export async function hasUsers(): Promise<boolean> {
-  const res = await fetch(`${API_BASE}/api/auth/has-users`)
-  if (!res.ok) return false
-  const data = await res.json()
-  return data.exists === true
+function buildUrl(path: string): string {
+  return `${API_BASE}${path}`
 }
 
-export async function login(username: string, password: string): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password })
-  })
+function getAuthHeader(): Record<string, string> {
+  const token = localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+async function handleApiResponse<T>(res: Response, defaultError: string): Promise<T> {
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: '登录失败' }))
-    throw new Error(error.error || '登录失败')
+    const error = await res.json().catch(() => ({ error: defaultError }))
+    throw new Error(error.error || defaultError)
   }
   return res.json()
 }
 
-export async function register(username: string, password: string): Promise<AuthResponse> {
-  const res = await fetch(`${API_BASE}/api/auth/register`, {
+export function setTokens(accessToken: string, refreshToken: string): void {
+  localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, accessToken)
+  localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken)
+}
+
+export function setUser(user: User): void {
+  localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user))
+}
+
+export async function hasUsers(): Promise<boolean> {
+  const res = await fetch(buildUrl(API_PATHS.HAS_USERS))
+  if (!res.ok) return false
+  const data = await res.json().catch(() => ({ exists: false }))
+  return data.exists === true
+}
+
+export async function login(username: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(buildUrl(API_PATHS.LOGIN), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, password })
   })
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: '注册失败' }))
-    throw new Error(error.error || '注册失败')
-  }
-  const data = await res.json()
+  return handleApiResponse<AuthResponse>(res, '登录失败')
+}
+
+export async function register(username: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(buildUrl(API_PATHS.REGISTER), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password })
+  })
+  const data = await handleApiResponse<AuthResponse>(res, '注册失败')
   setTokens(data.accessToken, data.refreshToken)
-  localStorage.setItem('user', JSON.stringify(data.user))
+  setUser(data.user)
   return data
 }
 
-export function logout() {
-  localStorage.removeItem('authToken')
-  localStorage.removeItem('refreshToken')
-  localStorage.removeItem('user')
+export function logout(): void {
+  localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN)
+  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN)
+  localStorage.removeItem(STORAGE_KEYS.USER)
 }
 
 export function getToken(): string | null {
-  return localStorage.getItem('authToken')
+  return localStorage.getItem(STORAGE_KEYS.AUTH_TOKEN)
 }
 
 export function getRefreshToken(): string | null {
-  return localStorage.getItem('refreshToken')
+  return localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN)
 }
 
 export function isLoggedIn(): boolean {
   return !!getToken()
 }
 
-export function getUser(): { id: number; username: string } | null {
-  const user = localStorage.getItem('user')
-  return user ? JSON.parse(user) : null
+export function getUser(): User | null {
+  const user = localStorage.getItem(STORAGE_KEYS.USER)
+  if (!user) return null
+  try {
+    return JSON.parse(user) as User
+  } catch {
+    console.warn('[auth] Failed to parse user from localStorage')
+    logout()
+    return null
+  }
 }
 
-export async function me(): Promise<{ id: number; username: string }> {
-  const res = await fetch('/api/auth/me', {
-    headers: { 'Authorization': `Bearer ${getToken()}` }
+export async function me(): Promise<User> {
+  const res = await fetch(buildUrl(API_PATHS.ME), {
+    headers: getAuthHeader()
   })
-  if (!res.ok) throw new Error('unauthorized')
-  const data = await res.json()
+  const data = await handleApiResponse<{ user: User }>(res, 'unauthorized')
   return data.user
 }
 
 export async function changePassword(oldPassword: string, newPassword: string, username?: string): Promise<{ message: string }> {
-  const res = await fetch('/api/auth/change-password', {
+  const res = await fetch(buildUrl(API_PATHS.CHANGE_PASSWORD), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${getToken()}`
+      ...getAuthHeader()
     },
     body: JSON.stringify({ oldPassword, newPassword, username })
   })
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ error: '修改失败' }))
-    throw new Error(error.error || '修改失败')
-  }
-  return res.json()
+  return handleApiResponse<{ message: string }>(res, '修改失败')
 }

@@ -2,6 +2,9 @@ import { computed, ref, watch, type Ref } from 'vue'
 import type { FinalSummary, FinalSummaryFile } from '../api/run'
 import type { Run, RunSummaryPayload } from '../types'
 
+const DEFAULT_PAGE_SIZE = 10
+const MIN_PAGE_SIZE = 1
+
 interface UseRunDetailComputedOptions {
   runDetail?: Ref<any>
   detailFiles?: Ref<any[]>
@@ -11,7 +14,7 @@ interface UseRunDetailComputedOptions {
 
 export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   const finalFilesPage = options?.finalFilesPage ?? ref(1)
-  const finalFilesPageSize = options?.finalFilesPageSize ?? ref(Math.max(10, Math.floor((window.innerHeight - 420) / 34)))
+  const finalFilesPageSize = options?.finalFilesPageSize ?? ref(Math.max(DEFAULT_PAGE_SIZE, Math.floor((window.innerHeight - 420) / 34)))
   const finalSummaryByRunId = new Map<number, FinalSummary | null>()
   const finalSummaryBySummaryText = new Map<string, FinalSummary | null>()
 
@@ -29,24 +32,19 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
       const runId = run?.id
       if (runId && finalSummaryByRunId.has(runId)) return finalSummaryByRunId.get(runId) || null
       const sum = summary as RunSummaryPayload | undefined
-      // 历史详情只读 finalSummary；
-      // 不从 progress / completedFreezeByTask 倒推最终总结。
       const finalSummary = (sum && typeof sum === 'object' && sum.finalSummary) ? (sum.finalSummary as FinalSummary) : null
       if (runId) finalSummaryByRunId.set(runId, finalSummary)
       return finalSummary
-    } catch {
+    } catch (e) {
+      console.warn('[useRunDetailComputed] Failed to parse final summary:', e)
       return null
     }
-  }
-
-  function getFinalSummary(run: Run | null | undefined): FinalSummary | null {
-    return parseFinalSummary(run)
   }
 
   const summaryFiles = computed(() => {
     if (!options?.runDetail) return [] as FinalSummaryFile[]
     const detail = options.runDetail.value as Record<string, unknown>
-    return (getFinalSummary(detail)?.files || []) as FinalSummaryFile[]
+    return (parseFinalSummary(detail)?.files || []) as FinalSummaryFile[]
   })
 
   const detailFiles = computed(() => {
@@ -62,7 +60,7 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   })
 
   function getSummaryCounts(run: Run | null | undefined) {
-    const fs = getFinalSummary(run)
+    const fs = parseFinalSummary(run)
     const counts = (fs?.counts && typeof fs.counts === 'object') ? fs.counts : null
     return {
       all: Number(counts?.total || finalFiles.value.length || 0),
@@ -83,12 +81,12 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
 
   const finalFilesTotal = computed(() => finalFiles.value.length)
   const totalFinalFilesPages = computed(() => {
-    const pageSize = finalFilesPageSize.value || 1
+    const pageSize = finalFilesPageSize.value || MIN_PAGE_SIZE
     return Math.max(1, Math.ceil((finalFilesTotal.value || 0) / pageSize))
   })
   const pagedFinalFiles = computed(() => {
     const page = finalFilesPage.value || 1
-    const pageSize = finalFilesPageSize.value || 1
+    const pageSize = finalFilesPageSize.value || MIN_PAGE_SIZE
     const start = (page - 1) * pageSize
     return finalFiles.value.slice(start, start + pageSize)
   })
@@ -123,7 +121,7 @@ export function useRunDetailComputed(options?: UseRunDetailComputedOptions) {
   }
 
   return {
-    getFinalSummary,
+    getFinalSummary: parseFinalSummary,
     finalFilesPage,
     finalFilesPageSize,
     hasFinalSummaryFiles,

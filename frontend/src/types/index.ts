@@ -1,5 +1,4 @@
 export interface BisyncOptions {
-  resync?: boolean
   compare?: string
   maxDelete?: string
   checkAccess?: boolean

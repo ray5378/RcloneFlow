@@ -430,6 +430,33 @@ func (c *TaskController) HandleBisyncRollbackLst(w http.ResponseWriter, r *http.
 	WriteJSON(w, 200, map[string]any{"ok": true})
 }
 
+// HandleBisyncLstContent 读取指定 lst 文件内容
+func (c *TaskController) HandleBisyncLstContent(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(405)
+		return
+	}
+	p := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
+	p = strings.TrimSuffix(p, "/bisync/lst-content")
+	id, err := strconv.ParseInt(p, 10, 64)
+	if err != nil {
+		WriteJSON(w, 400, map[string]any{"error": "invalid task id"})
+		return
+	}
+	fileName := r.URL.Query().Get("file")
+	if fileName == "" {
+		WriteJSON(w, 400, map[string]any{"error": "missing file parameter"})
+		return
+	}
+	content, err := c.taskSvc.GetBisyncLstContent(id, fileName)
+	if err != nil {
+		msg, code := mapServiceError(err)
+		WriteJSON(w, code, map[string]any{"error": msg})
+		return
+	}
+	WriteJSON(w, 200, map[string]any{"content": content})
+}
+
 // HandleBisyncResync 触发 bisync resync
 func (c *TaskController) HandleBisyncResync(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -444,6 +471,35 @@ func (c *TaskController) HandleBisyncResync(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if err := c.taskSvc.ResyncBisync(id); err != nil {
+		msg, code := mapServiceError(err)
+		WriteJSON(w, code, map[string]any{"error": msg})
+		return
+	}
+	WriteJSON(w, 200, map[string]any{"ok": true})
+}
+
+// HandleBisyncResolveConflict 解决冲突：保留一个版本，删除另一个，重命名回原始名
+func (c *TaskController) HandleBisyncResolveConflict(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(405)
+		return
+	}
+	p := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
+	p = strings.TrimSuffix(p, "/bisync/resolve-conflict")
+	id, err := strconv.ParseInt(p, 10, 64)
+	if err != nil {
+		WriteJSON(w, 400, map[string]any{"error": "invalid task id"})
+		return
+	}
+	var req struct {
+		VersionID string `json:"versionId"`
+		KeepFile  string `json:"keepFile"`
+	}
+	if err := DecodeRequest(w, r, &req); err != nil || req.VersionID == "" || (req.KeepFile != "conflict1" && req.KeepFile != "conflict2") {
+		WriteJSON(w, 400, map[string]any{"error": "invalid request body, need versionId and keepFile (conflict1|conflict2)"})
+		return
+	}
+	if err := c.taskSvc.ResolveBisyncConflict(id, req.VersionID, req.KeepFile); err != nil {
 		msg, code := mapServiceError(err)
 		WriteJSON(w, code, map[string]any{"error": msg})
 		return

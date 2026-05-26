@@ -50,12 +50,25 @@ describe('useWebSocket.ts', () => {
       expect(ws.lastMessage.value).toEqual({ type: 'test', data: { value: 42 } })
     })
 
-    it('should throw on invalid JSON messages', () => {
+    it('should warn on invalid JSON messages and keep connection open', () => {
       const ws = useWebSocket()
       ws.connect()
       wsInstance.onopen()
-
-      expect(() => wsInstance.onmessage({ data: 'not json' })).toThrow()
+      
+      // Mock console.warn
+      const originalWarn = console.warn
+      console.warn = vi.fn()
+      
+      expect(() => wsInstance.onmessage({ data: 'not json' })).not.toThrow()
+      
+      expect(console.warn).toHaveBeenCalledWith(
+        '[useWebSocket] Failed to parse message:', 
+        'not json',
+        expect.any(SyntaxError)
+      )
+      
+      // Restore console.warn
+      console.warn = originalWarn
     })
 
     it('should not send when disconnected', () => {

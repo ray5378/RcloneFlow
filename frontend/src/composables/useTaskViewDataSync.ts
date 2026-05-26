@@ -2,6 +2,8 @@ import { onUnmounted, type Ref } from 'vue'
 import { useWebSocket, onWsMessage } from './useWebSocket'
 import * as api from '../api'
 import type { Run, Schedule, Task } from '../types'
+import type { ActiveRun, GlobalStats } from '../api/run'
+import type { TaskBootstrapPayload } from '../api/task'
 
 interface UseTaskViewDataSyncOptions {
   tasks: Ref<Task[]>
@@ -11,21 +13,25 @@ interface UseTaskViewDataSyncOptions {
   runsTotal: Ref<number>
   runsPage: Ref<number>
   runsPageSize: number
-  activeRuns: Ref<any[]>
-  globalStats: Ref<any>
+  activeRuns: Ref<ActiveRun[]>
+  globalStats: Ref<GlobalStats | null>
   showGlobalStatsModal: Ref<boolean>
   currentModule: Ref<'history' | 'add' | 'tasks'>
   lastNonDecreasingTotalsByTask: Ref<Record<number, { runId?: number; totalBytes: number; totalCount: number }>>
-  taskApi: { list: () => Promise<Task[]>; bootstrap?: (page?: number, pageSize?: number) => Promise<any> }
+  taskApi: { list: () => Promise<Task[]>; bootstrap?: (page?: number, pageSize?: number) => Promise<TaskBootstrapPayload> }
   remoteApi: { list: () => Promise<{ remotes?: string[] }> }
   scheduleApi: { list: () => Promise<Schedule[]> }
   runApi: { list: (page: number, pageSize: number) => Promise<{ runs?: Run[]; total?: number }> }
-  jobApi: { list: () => Promise<any[]> }
+  jobApi: { list: () => Promise<ActiveRun[]> }
 }
 
 const TASKS_SNAPSHOT_KEY = 'lastTasksSnapshot'
 const TASKS_SNAPSHOT_VERSION = 2
 const TASKS_SNAPSHOT_WRITE_DELAY_MS = 1200
+const ACTIVE_RUNS_RELOAD_DELAY_MS = 150
+const DATA_RELOAD_DELAY_MS = 300
+const STAGED_RELOAD_DELAYS_MS = [500, 2000]
+const ZERO_DELAY_MS = 0
 
 export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   let loadSeq = 0
@@ -38,7 +44,8 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   function stableStringify(value: any) {
     try {
       return JSON.stringify(value)
-    } catch {
+    } catch (e) {
+      console.warn('[useTaskViewDataSync] Failed to stringify value:', e)
       return ''
     }
   }
@@ -48,7 +55,20 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   }
 
   function getActiveRunKey(item: any) {
-    return String(item?.runRecord?.id ?? item?.runId ?? item?.id ?? item?.runRecord?.taskId ?? item?.taskId ?? item?.taskID ?? item?.task_id ?? '')
+    const keyFields = [
+      () => item?.runRecord?.id,
+      () => item?.runId,
+      () => item?.id,
+      () => item?.runRecord?.taskId,
+      () => item?.taskId,
+      () => item?.taskID,
+      () => item?.task_id
+    ]
+    for (const getter of keyFields) {
+      const val = getter()
+      if (val != null) return String(val)
+    }
+    return ''
   }
 
   function reconcileListByKey<T>(current: T[], incoming: T[], getKey: (item: T) => string, isSame: (a: T, b: T) => boolean) {
@@ -76,8 +96,8 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     return changed ? merged : prev
   }
 
-  function replaceActiveRuns(nextList: any[]) {
-    const merged = reconcileListByKey<any>(
+  function replaceActiveRuns(nextList: ActiveRun[]) {
+    const merged = reconcileListByKey<ActiveRun>(
       options.activeRuns.value || [],
       nextList || [],
       getActiveRunKey,
@@ -89,7 +109,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   }
 
   function compactTaskSnapshot(tasks: Task[]) {
-    return (tasks || []).map((task: any) => ({
+    return (tasks || []).map((task) => ({
       id: Number(task?.id || 0),
       name: String(task?.name || ''),
       sourcePath: String(task?.sourcePath || task?.src || ''),
@@ -115,7 +135,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
           tasks: compactTaskSnapshot(options.tasks.value || []),
         }
         localStorage.setItem(TASKS_SNAPSHOT_KEY, JSON.stringify(payload))
-      } catch {}
+      } catch (e) {
+        console.error('[useTaskViewDataSync] Failed to write tasks snapshot:', e)
+      }
     }, TASKS_SNAPSHOT_WRITE_DELAY_MS)
   }
 
@@ -128,7 +150,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
       if (parsed && Number(parsed.version) >= 2 && Array.isArray(parsed.tasks)) {
         return parsed.tasks as Task[]
       }
-    } catch {}
+    } catch (e) {
+      console.warn('[useTaskViewDataSync] Failed to restore tasks snapshot:', e)
+    }
     return null
   }
 
@@ -158,6 +182,7 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
       }
       scheduleTasksSnapshotWrite()
     } catch (e) {
+      console.error('[useTaskViewDataSync] Failed to load data:', e)
       if (!options.tasks.value || options.tasks.value.length === 0) {
         const snap = restoreTasksSnapshot()
         if (Array.isArray(snap)) options.tasks.value = snap
@@ -166,10 +191,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
   }
 
   async function loadActiveRuns() {
-    try {
-      const data = await options.jobApi.list()
-      const list: any[] = (data || []).map((it: any) => {
-        const raw: any = (it && typeof it.progress === 'object' && it.progress)
+    const data = await options.jobApi.list()
+    const list: any[] = (data || []).map((it: any) => {
+      const raw: any = (it && typeof it.progress === 'object' && it.progress)
           ? { ...it.progress }
           : null
         if (!raw) return it
@@ -205,18 +229,11 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
         }
       })
       replaceActiveRuns(list)
-    } catch (e) {
-      throw e
     }
-  }
 
   async function loadGlobalStats() {
-    try {
-      const stats = await api.getGlobalStats()
-      options.globalStats.value = stats || {}
-    } catch (e) {
-      throw e
-    }
+    const stats = await api.getGlobalStats()
+    options.globalStats.value = stats || {}
   }
 
   function openGlobalStats() {
@@ -224,27 +241,33 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
     loadGlobalStats()
   }
 
-  function scheduleActiveRunsReload(delay = 150) {
+  function scheduleActiveRunsReload(delay = ACTIVE_RUNS_RELOAD_DELAY_MS) {
     if (activeRunsReloadTimer) return
     activeRunsReloadTimer = window.setTimeout(() => {
       activeRunsReloadTimer = null
-      loadActiveRuns().catch(() => {})
+      loadActiveRuns().catch((e) => {
+        console.error('[useTaskViewDataSync] Failed to reload active runs:', e)
+      })
     }, delay)
   }
 
-  function scheduleDataReload(delay = 300) {
+  function scheduleDataReload(delay = DATA_RELOAD_DELAY_MS) {
     if (dataReloadTimer) return
     dataReloadTimer = window.setTimeout(() => {
       dataReloadTimer = null
-      loadData().catch(() => {})
+      loadData().catch((e) => {
+        console.error('[useTaskViewDataSync] Failed to reload data:', e)
+      })
     }, delay)
   }
 
   function scheduleActiveRunsReloadStaged() {
-    ;[500, 2000].forEach(delay => {
+    STAGED_RELOAD_DELAYS_MS.forEach(delay => {
       window.setTimeout(() => {
         if (activeRunsReloadTimer) return
-        loadActiveRuns().catch(() => {})
+        loadActiveRuns().catch((e) => {
+          console.error('[useTaskViewDataSync] Failed to reload active runs (staged):', e)
+        })
       }, delay)
     })
   }
@@ -268,9 +291,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
               options.runs.value[idx] = { ...options.runs.value[idx], status: msg.data.status }
             }
           }
-          scheduleActiveRunsReload(0)
+          scheduleActiveRunsReload(ZERO_DELAY_MS)
           scheduleActiveRunsReloadStaged()
-          scheduleDataReload(0)
+          scheduleDataReload(ZERO_DELAY_MS)
         } else if (msg.type === 'run_progress' && msg.data) {
           const idx = options.activeRuns.value.findIndex(r => r.runRecord?.id === msg.data.run_id)
           if (idx !== -1) {
@@ -316,15 +339,22 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
               scheduleActiveRunsReload()
             }
           } else {
-            scheduleActiveRunsReload(0)
+            scheduleActiveRunsReload(ZERO_DELAY_MS)
           }
           if (options.currentModule?.value === 'history') {
             const runIdx = options.runs.value.findIndex(r => r.id === msg.data.run_id)
             if (runIdx !== -1) {
               const curRun = options.runs.value[runIdx] || {}
-              const sum = typeof curRun.summary === 'string'
-                ? (() => { try { return JSON.parse(curRun.summary) } catch { return {} } })()
-                : (curRun.summary || {})
+              let sum: any = {}
+              try {
+                if (typeof curRun.summary === 'string') {
+                  sum = JSON.parse(curRun.summary)
+                } else {
+                  sum = curRun.summary || {}
+                }
+              } catch (e) {
+                console.warn('[useTaskViewDataSync] Failed to parse run summary:', e)
+              }
               const prevProgress = sum.progress || {}
               const nextPlannedFiles = Math.max(Number(prevProgress.plannedFiles || 0), Number(msg.data.plannedFiles || 0))
               const nextLogicalTotalCount = Math.max(
@@ -356,9 +386,15 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
 
     const offRunStatus = onWsMessage('run_status', () => {
       Promise.all([
-        loadActiveRuns().catch(() => {}),
-        loadData().catch(() => {}),
-      ]).catch(() => {})
+        loadActiveRuns().catch((e) => {
+          console.error('[useTaskViewDataSync] Failed to load active runs on status change:', e)
+        }),
+        loadData().catch((e) => {
+          console.error('[useTaskViewDataSync] Failed to load data on status change:', e)
+        }),
+      ]).catch((e) => {
+        console.error('[useTaskViewDataSync] Failed to handle status change:', e)
+      })
     })
 
     cleanupRealtime = () => {
@@ -388,7 +424,9 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
           tasks: compactTaskSnapshot(options.tasks.value || []),
         }
         localStorage.setItem(TASKS_SNAPSHOT_KEY, JSON.stringify(payload))
-      } catch {}
+      } catch (e) {
+        console.error('[useTaskViewDataSync] Failed to write tasks snapshot on unmount:', e)
+      }
     }
     cleanupRealtime?.()
   })

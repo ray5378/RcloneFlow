@@ -54,76 +54,46 @@ func New(updater RunUpdater, broadcaster EventBroadcaster, activeMgr ...*active_
 	}
 }
 
-func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcPath, dstRemote, dstPath string) error {
-	r.mu.Lock()
-	if _, ok := r.procs[run.ID]; ok {
-		r.mu.Unlock()
-		return errors.New("run already exists")
-	}
-	r.mu.Unlock()
-
-	runCtx, runCancel := context.WithCancel(ctx)
-	r.mu.Lock()
-	r.cancelFns[run.ID] = runCancel
-	r.mu.Unlock()
-	registerCancelFn(run.ID, runCancel)
-
-	runner := &adapter.CmdRunner{}
-	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
-	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
+// buildTransferArgs builds the command-line arguments for a transfer
+func (r *Runner) buildTransferArgs(mode, src, dst, cfg string, run store.Run) ([]string, *openlistCASCompatPlan, bool, int, map[string]any, string, error) {
+	var args []string
+	var err error
+	var effOpt map[string]any
+	var casCompat *openlistCASCompatPlan
+	casManagedRetries := false
+	maxCASAttempts := 1
 	cmdName := strings.ToLower(mode)
-	isBisyncMode := false // 新增
+	isBisyncMode := false
 	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" && cmdName != "bisync" {
 		cmdName = "copy"
 	} else if cmdName == "bisync" {
 		isBisyncMode = true
 	}
 	originalCmdName := cmdName
-	// Resolve config path
-	dataDir := config.DataDir()
-	cfg := os.Getenv("RCLONE_CONFIG")
-	if cfg == "" {
-		cfg = filepath.Join(dataDir, "rclone.conf")
-	}
-	var casCompat *openlistCASCompatPlan
+	
 	if isOpenlistCASCompatible(run) {
 		plan, err := buildOpenlistCASCompatPlan(cfg, src, dst, cmdName)
 		if err != nil {
-			return fmt.Errorf("prepare openlist-cas compatibility failed: %w", err)
+			return nil, nil, false, 0, nil, "", fmt.Errorf("prepare openlist-cas compatibility failed: %w", err)
 		}
 		casCompat = plan
 		if cmdName == "sync" {
 			cmdName = "copy"
 		}
 	}
-	// Base args：非交互环境使用 --stats-one-line（不与 --progress 同用）
-	// 降低默认日志级别：从 -vv 改为 -v，显著减少日志行数和解析/写库开销
-	var args []string
-	var effOpt map[string]any
-	casManagedRetries := false
-	maxCASAttempts := 1
+	
 	if isBisyncMode {
-		// 处理 bisync 模式
-		bisyncDir := filepath.Join(dataDir, "bisync", sanitizeFilenameForBisync(run.TaskName, run.TaskID))
-		_ = os.MkdirAll(bisyncDir, 0o755)
-		// 从 run.Summary 中获取 bisync 选项（如果存在）
-		var bisyncOptions json.RawMessage
-		if run.Summary != nil {
-			if opts, ok := run.Summary["bisyncOptions"]; ok {
-				if optsBytes, err := json.Marshal(opts); err == nil {
-					bisyncOptions = optsBytes
-				}
-			}
+		args, err = buildBisyncArgs(src, dst, run)
+		if err != nil {
+			return nil, nil, false, 0, nil, "", fmt.Errorf("build bisync args: %w", err)
 		}
-		args = buildBisyncCommand(src, dst, bisyncDir, bisyncOptions)
-		// 添加基本参数
 		args = append(args, "--stats", "1s", "--stats-one-line", "--config", cfg, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	} else {
 		args = []string{cmdName, src, dst, "--stats", "1s", "--stats-one-line", "--config", cfg}
 		if casCompat != nil && casCompat.ExcludeFrom != "" {
 			args = append(args, "--exclude-from", casCompat.ExcludeFrom)
 		}
-		// attach advanced options: merge transferDefaults (global) <- effectiveOptions (task)，并对 WebDAV 目标注入稳态默认（未显式配置时）
+		
 		if run.Summary != nil {
 			var merged = map[string]any{}
 			var effm map[string]any
@@ -142,9 +112,8 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					}
 				}
 			}
-			// WebDAV 稳态参数（当目标底层是 WebDAV）
-			// 显式设置（effectiveOptions）优先：仅在用户未显式设置时注入建议默认；不再做“下限兜底”强制覆盖
-			if isWebDAVUnderlying(cfg, dstRemote) {
+			
+			if isWebDAVUnderlying(cfg, dstRemote(src)) {
 				injectIfMissing := func(k string, v any) {
 					if effm == nil {
 						if _, ok := merged[k]; !ok {
@@ -158,22 +127,22 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 						}
 					}
 				}
-				// 建议默认（保守）：
 				injectIfMissing("timeout", 24*3600)
 				injectIfMissing("connTimeout", 60)
 				injectIfMissing("expectContinueTimeout", 30)
 				injectIfMissing("retries", 5)
 				injectIfMissing("lowLevelRetries", 20)
 				injectIfMissing("disableHttp2", true)
-				// 并发/多线程：仅当用户未显式设置时给出建议默认，用户设置优先生效
 				injectIfMissing("transfers", 1)
 				injectIfMissing("multiThreadStreams", 1)
 			}
+			
 			if len(merged) > 0 {
 				effOpt = merged
 				args = append(args, buildFlagsFromOptions(merged)...)
 			}
 		}
+		
 		if casCompat != nil {
 			casManagedRetries = true
 			maxCASAttempts = configuredRetryCount(effOpt)
@@ -183,66 +152,22 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			args = forceFlagValue(args, "--retries", "0")
 			args = forceFlagValue(args, "--low-level-retries", "0")
 		}
-		// 强制启用 JSON 日志：作为系统默认行为，不再提供任务级开关。
+		
 		args = append(args, "--use-json-log", "--log-level", "INFO", "--stats-log-level", "INFO")
 	}
-	// 二次兜底：如 --buffer-size/--bwlimit 后是纯数字，自动补单位（M）；
-	// 同时将 --bwlimit 的分号分隔写法转为空格分隔，保证多时段正确识别
-	for i := 0; i < len(args)-1; i++ {
-		if args[i] == "--buffer-size" || args[i] == "--bwlimit" {
-			n := strings.TrimSpace(args[i+1])
-			if args[i] == "--bwlimit" {
-				// 兼容 07:30,2M;17:40,2M;23:00,3M → 07:30,2M 17:40,2M 23:00,3M
-				if strings.Contains(n, ";") {
-					n = strings.ReplaceAll(n, ";", " ")
-				}
-				args[i+1] = n
-			}
-			pureNum := n != ""
-			for _, ch := range n {
-				if ch < '0' || ch > '9' {
-					pureNum = false
-					break
-				}
-			}
-			if pureNum {
-				args[i+1] = n + "M"
-			}
-		}
-	}
-	// 去重：--bwlimit 若出现多次，仅保留最后一次（后者覆盖前者）
-	{
-		last := -1
-		for i := 0; i < len(args); i++ {
-			if args[i] == "--bwlimit" {
-				last = i
-			}
-		}
-		if last >= 0 {
-			newArgs := make([]string, 0, len(args))
-			for i := 0; i < len(args); {
-				if args[i] == "--bwlimit" && i != last {
-					// 跳过成对参数
-					i += 2
-					continue
-				}
-				newArgs = append(newArgs, args[i])
-				i++
-			}
-			args = newArgs
-		}
-	}
-	// header will be written after files are opened below
-	startLine := "[runner] rclone " + strings.Join(args, " ") + "\n"
-	missingCfg := ""
-	if _, err := os.Stat(cfg); err != nil {
-		missingCfg = "[runner] warn: config not found: " + cfg + "\n"
-	}
+	
+	args = normalizeArgUnits(args)
+	args = deduplicateArgs(args)
+	
+	return args, casCompat, casManagedRetries, maxCASAttempts, effOpt, originalCmdName, nil
+}
 
+// setupLogFiles creates log files and returns them with metadata
+func (r *Runner) setupLogFiles(run store.Run, cfg string) (*os.File, string, string) {
 	logsBase := config.DataDir()
 	logsDir := filepath.Join(logsBase, "logs")
 	_ = os.MkdirAll(logsDir, 0o755)
-	// 日志目录与文件：logs/<任务名-MMDD>/<HHMM>.log（stdout 也合并写入该文件）
+	
 	sanitizeFilename := func(s string) string {
 		s = strings.TrimSpace(s)
 		if s == "" {
@@ -250,10 +175,9 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		}
 		invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
 		s = invalid.ReplaceAllString(s, "_")
-		// 截断到 60 字符以内，避免过长
-		r := []rune(s)
-		if len(r) > 60 {
-			s = string(r[:60])
+		runes := []rune(s)
+		if len(runes) > 60 {
+			s = string(runes[:60])
 		}
 		if s == "" {
 			s = fmt.Sprintf("task-%d", run.TaskID)
@@ -262,14 +186,24 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 	}
 	safeTask := sanitizeFilename(run.TaskName)
 	localNow := time.Now().Local()
-	datePart := localNow.Format("0102") // MMDD
-	timePart := localNow.Format("1504") // HHMM
+	datePart := localNow.Format("0102")
+	timePart := localNow.Format("1504")
 	subDir := filepath.Join(logsDir, fmt.Sprintf("%s-%s", safeTask, datePart))
 	_ = os.MkdirAll(subDir, 0o755)
 	stderrPath := filepath.Join(subDir, fmt.Sprintf("%s.log", timePart))
 	stderrFile, _ := os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	
+	startLine := "[runner] rclone ...\n"
+	missingCfg := ""
+	if _, err := os.Stat(cfg); err != nil {
+		missingCfg = "[runner] warn: config not found: " + cfg + "\n"
+	}
+	
+	return stderrFile, stderrPath, startLine + missingCfg
+}
 
-	// Mandatory preflight: sequential pagination by top-level dirs to stabilize totals
+// runPreflight runs preflight checks and updates stats
+func (r *Runner) runPreflight(run store.Run, cfg, src string, effOpt map[string]any) {
 	if b, c, e := sizeOfPaged(&adapter.CmdRunner{}, cfg, src, effOpt); e == nil {
 		_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
 			if rr.Summary == nil {
@@ -278,32 +212,32 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			rr.Summary["preflight"] = map[string]any{"totalCount": c, "totalBytes": b}
 		})
 	}
+}
 
+// startProcess starts the rclone process and sets up the pipes
+func (r *Runner) startProcess(runCtx context.Context, args []string) (*exec.Cmd, io.ReadCloser, io.ReadCloser, io.WriteCloser, io.WriteCloser, error) {
+	runner := &adapter.CmdRunner{}
 	cmd := runner.CmdContext(runCtx, args...)
-	// fan-out: write to parser via io.Pipe（由 consumer 单点写入同一文件）
+	
 	outR, outW := io.Pipe()
 	errR, errW := io.Pipe()
-	// 写入头信息到单一日志文件
-	_, _ = stderrFile.WriteString(startLine)
-	if effOpt != nil {
-		if b, _ := json.Marshal(effOpt); len(b) > 0 {
-			optsLine := "[runner] effectiveOptions " + string(b) + "\n"
-			_, _ = stderrFile.WriteString(optsLine)
-		}
-	}
-	if missingCfg != "" {
-		_, _ = stderrFile.WriteString(missingCfg)
-	}
-	attemptLogOffset, _ := stderrFile.Seek(0, io.SeekCurrent)
+	
 	cmd.Stdout = outW
 	cmd.Stderr = errW
+	
 	if err := cmd.Start(); err != nil {
-		return err
+		return nil, nil, nil, nil, nil, err
 	}
+	
+	return cmd, outR, errR, outW, errW, nil
+}
 
+// initializeRunState updates the run with initial state
+func (r *Runner) initializeRunState(run store.Run, cmd *exec.Cmd, stderrPath string) {
 	r.mu.Lock()
 	r.procs[run.ID] = cmd
 	r.mu.Unlock()
+	
 	_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
 		if rr.Summary == nil {
 			rr.Summary = map[string]any{}
@@ -315,7 +249,6 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 		if cmd.Process != nil {
 			rr.Summary["pid"] = cmd.Process.Pid
 		}
-		// 初始化运行中统计：已完成文件数
 		if p, ok := rr.Summary["progress"].(map[string]any); ok {
 			if _, ok2 := p["completedFiles"]; !ok2 {
 				p["completedFiles"] = float64(0)
@@ -324,35 +257,10 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 			rr.Summary["progress"] = map[string]any{"completedFiles": float64(0)}
 		}
 	})
+}
 
-	// 两路都写入同一日志文件，并启用 one-line 解析 + 按文件统计
-	fileStats := &fileProgress{m: map[string]*fileProg{}, recentCap: 100}
-	// 仅解析 stderr（rclone 进度通常在 stderr），stdout 只写文件，减少重复解析/写库
-	casMode := isOpenlistCASCompatible(run)
-	excludeFrom := ""
-	if casCompat != nil {
-		excludeFrom = casCompat.ExcludeFrom
-	}
-	var consumeWG sync.WaitGroup
-	consumeWG.Add(2)
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.Error("goroutine panic", zap.Any("panic", r))
-			}
-		}()
-		defer consumeWG.Done()
-		r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
-	}()
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.Error("goroutine panic", zap.Any("panic", r))
-			}
-		}()
-		defer consumeWG.Done()
-		r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
-	}()
+// waitForCompletion waits for the process to complete and handles the outcome
+func (r *Runner) waitForCompletion(ctx context.Context, run store.Run, cmd *exec.Cmd, outR, errR io.ReadCloser, stderrFile *os.File, stderrPath string, args []string, casCompat *openlistCASCompatPlan, casManagedRetries bool, maxCASAttempts int, effOpt map[string]any, cfg, src, dst, originalCmdName, cmdName string, attemptLogOffset int64) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -368,21 +276,78 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				_ = os.Remove(casCompat.ExcludeFrom)
 			}
 		}()
+		
 		attempt := 1
+		fileStats := &fileProgress{m: map[string]*fileProg{}, recentCap: 100}
+		var consumeWG sync.WaitGroup
+		casMode := isOpenlistCASCompatible(run)
+		excludeFrom := ""
+		if casCompat != nil {
+			excludeFrom = casCompat.ExcludeFrom
+		}
+		
 		for {
-			err := cmd.Wait()
-			outW.Close()
-			errW.Close()
+			var newCmd *exec.Cmd
+			var newOutR, newErrR io.ReadCloser
+			var newOutW, newErrW io.WriteCloser
+			
+			if attempt == 1 {
+				newCmd = cmd
+				newOutR = outR
+				newErrR = errR
+			} else {
+				newOutR, newOutW = io.Pipe()
+				newErrR, newErrW = io.Pipe()
+				stderrFile, _ = os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+				attemptLogOffset, _ = stderrFile.Seek(0, io.SeekCurrent)
+				newCmd = (&adapter.CmdRunner{}).CmdContext(ctx, args...)
+				newCmd.Stdout = newOutW
+				newCmd.Stderr = newErrW
+				if startErr := newCmd.Start(); startErr != nil {
+					break
+				}
+				
+				r.mu.Lock()
+				r.procs[run.ID] = newCmd
+				r.mu.Unlock()
+			}
+			
+			consumeWG = sync.WaitGroup{}
+			consumeWG.Add(2)
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("goroutine panic", zap.Any("panic", r))
+					}
+				}()
+				defer consumeWG.Done()
+				r.consume(run.ID, newOutR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
+			}()
+			go func() {
+				defer func() {
+					if r := recover(); r != nil {
+						logger.Error("goroutine panic", zap.Any("panic", r))
+					}
+				}()
+				defer consumeWG.Done()
+				r.consume(run.ID, newErrR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
+			}()
+			
+			err := newCmd.Wait()
+			newOutW.Close()
+			newErrW.Close()
 			consumeWG.Wait()
 			_ = stderrFile.Sync()
 			stderrFile.Close()
-			if err == nil && (cmd.ProcessState == nil || cmd.ProcessState.Success()) {
+			
+			if err == nil && (newCmd.ProcessState == nil || newCmd.ProcessState.Success()) {
 				break
 			}
-			// 如果已触发停止，不再重试
-			if runCtx.Err() != nil {
+			
+			if ctx.Err() != nil {
 				break
 			}
+			
 			if casManagedRetries && attempt <= maxCASAttempts {
 				analysis := analyzeCASAttemptLogSegment(stderrPath, attemptLogOffset, casMode)
 				if len(analysis.RealFailures) == 0 && len(analysis.CASMatchedPaths) > 0 {
@@ -414,205 +379,24 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 					err = nil
 					break
 				}
-				if len(analysis.RealFailures) > 0 && attempt < maxCASAttempts && runCtx.Err() == nil {
+				
+				if len(analysis.RealFailures) > 0 && attempt < maxCASAttempts && ctx.Err() == nil {
 					attempt++
-					outR, outW = io.Pipe()
-					errR, errW = io.Pipe()
-					stderrFile, _ = os.OpenFile(stderrPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
-					attemptLogOffset, _ = stderrFile.Seek(0, io.SeekCurrent)
-					cmd = runner.CmdContext(runCtx, args...)
-					cmd.Stdout = outW
-					cmd.Stderr = errW
-					if startErr := cmd.Start(); startErr != nil {
-						err = startErr
-						break
-					}
-					r.mu.Lock()
-					r.procs[run.ID] = cmd
-					r.mu.Unlock()
-					consumeWG = sync.WaitGroup{}
-					consumeWG.Add(2)
-					go func() {
-						defer func() {
-							if r := recover(); r != nil {
-								logger.Error("goroutine panic", zap.Any("panic", r))
-							}
-						}()
-						defer consumeWG.Done()
-						r.consume(run.ID, outR, stderrFile, false, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
-					}()
-					go func() {
-						defer func() {
-							if r := recover(); r != nil {
-								logger.Error("goroutine panic", zap.Any("panic", r))
-							}
-						}()
-						defer consumeWG.Done()
-						r.consume(run.ID, errR, stderrFile, true, fileStats, casMode, originalCmdName == "move", cfg, dst, excludeFrom)
-					}()
 					continue
 				}
 			}
-			if err != nil || (cmd.ProcessState != nil && !cmd.ProcessState.Success()) {
-				_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
-					rr.Status = "failed"
-					if rr.Summary == nil {
-						rr.Summary = map[string]any{}
-					}
-					rr.Summary["finished"] = true
-					rr.Summary["success"] = false
-					fin := time.Now().Local()
-					rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
-					// 冻结最终总结（失败态）
-					finalSummary := map[string]any{}
-					var start time.Time
-					if s, ok := rr.Summary["startedAt"].(string); ok {
-						if t, e := time.Parse(time.RFC3339, s); e == nil {
-							start = t
-						}
-					}
-					if !start.IsZero() {
-						finalSummary["startAt"] = start.Format(time.RFC3339)
-					}
-					finalSummary["finishedAt"] = fin.Format(time.RFC3339)
-					durSec := int64(0)
-					if !start.IsZero() {
-						durSec = int64(fin.Sub(start).Seconds())
-					}
-					if durSec < 0 {
-						durSec = 0
-					}
-					finalSummary["durationSec"] = durSec
-					finalSummary["durationText"] = util.HumanDuration(durSec)
-					finalSummary["result"] = "failed"
-					// 体量/均速：失败态 finalSummary 也只从 progress 读取
-					var prog map[string]any
-					if p, ok := rr.Summary["progress"].(map[string]any); ok {
-						prog = p
-					}
-					var bytes, total int64
-					if prog != nil {
-						if v, ok := prog["bytes"].(float64); ok {
-							bytes = int64(v)
-						}
-						if v, ok := prog["totalBytes"].(float64); ok {
-							total = int64(v)
-						}
-					}
-					finalSummary["transferredBytes"] = bytes
-					finalSummary["totalBytes"] = total
-					avg := int64(0)
-					if durSec > 0 {
-						avg = bytes / durSec
-					}
-					finalSummary["avgSpeedBps"] = avg
-					// 文件明细（从 stderrFile 解析）
-					files := []map[string]any{}
-					counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
-					if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
-						files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
-					}
-					// 异步补全文件大小，不阻塞状态更新
-					r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
-					rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": util.HumanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
-				})
-				r.broadcaster.Broadcast("run_status", map[string]any{
-					"run_id": run.ID,
-					"status": "failed",
-				})
-				if r.activeMgr != nil {
-					r.activeMgr.RemoveState(run.ID)
-				}
-				// fire webhook for failed run
-				go func() {
-					defer func() {
-						if r := recover(); r != nil {
-							logger.Error("goroutine panic", zap.Any("panic", r))
-						}
-					}()
-					r.postWebhookIfNeeded(run.ID)
-				}()
-				r.mu.Lock()
-				delete(r.procs, run.ID)
-				r.mu.Unlock()
-				unregisterCancelFn(run.ID)
+			
+			if err != nil || (newCmd.ProcessState != nil && !newCmd.ProcessState.Success()) {
+				r.handleRunFailure(run, newCmd, stderrPath, cfg, dst, originalCmdName, cmdName)
 				return
 			}
 		}
-		if runCtx.Err() != nil {
-			_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
-				rr.Status = "stopped"
-				if rr.Summary == nil {
-					rr.Summary = map[string]any{}
-				}
-				rr.Summary["finished"] = true
-				rr.Summary["success"] = false
-				fin := time.Now().Local()
-				rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
-				finalSummary := map[string]any{}
-				var start time.Time
-				if s, ok := rr.Summary["startedAt"].(string); ok {
-					if t, e := time.Parse(time.RFC3339, s); e == nil {
-						start = t
-					}
-				}
-				if !start.IsZero() {
-					finalSummary["startAt"] = start.Format(time.RFC3339)
-				}
-				finalSummary["finishedAt"] = fin.Format(time.RFC3339)
-				durSec := int64(0)
-				if !start.IsZero() {
-					durSec = int64(fin.Sub(start).Seconds())
-				}
-				if durSec < 0 {
-					durSec = 0
-				}
-				finalSummary["durationSec"] = durSec
-				finalSummary["durationText"] = util.HumanDuration(durSec)
-				finalSummary["result"] = "stopped"
-				var prog map[string]any
-				if p, ok := rr.Summary["progress"].(map[string]any); ok {
-					prog = p
-				}
-				var bytes, total int64
-				if prog != nil {
-					if v, ok := prog["bytes"].(float64); ok {
-						bytes = int64(v)
-					}
-					if v, ok := prog["totalBytes"].(float64); ok {
-						total = int64(v)
-					}
-				}
-				finalSummary["transferredBytes"] = bytes
-				finalSummary["totalBytes"] = total
-				avg := int64(0)
-				if durSec > 0 {
-					avg = bytes / durSec
-				}
-				finalSummary["avgSpeedBps"] = avg
-				files := []map[string]any{}
-				counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
-				if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
-					files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
-				}
-				r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
-				finalSummary["counts"] = counts
-				finalSummary["files"] = files
-				rr.Summary["finalSummary"] = finalSummary
-			})
-			r.broadcaster.Broadcast("run_status", map[string]any{
-				"run_id": run.ID,
-				"status": "stopped",
-			})
-			if r.activeMgr != nil {
-				r.activeMgr.RemoveState(run.ID)
-			}
-			r.mu.Lock()
-			delete(r.procs, run.ID)
-			r.mu.Unlock()
-			unregisterCancelFn(run.ID)
+		
+		if ctx.Err() != nil {
+			r.handleRunStopped(run, stderrPath, cfg, dst, originalCmdName, cmdName)
 			return
 		}
+		
 		if casCompat != nil {
 			if postErr := casCompat.ApplyPostActions(cfg, src, dst, originalCmdName); postErr != nil {
 				_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
@@ -648,146 +432,78 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 				return
 			}
 		}
-		// WebDAV 完成确认（copy/sync/move 通用）：在目录可读基础上，对预期文件做可见性确认。
-		if isWebDAVUnderlying(cfg, dstRemote) {
-			interval := config.GetFinishWaitInterval()
-			timeout := config.GetFinishWaitTimeout()
-			if timeout > 0 {
-				vr := &adapter.CmdRunner{}
-				deadline := time.Now().Add(timeout)
-				expected := expectedVisibleDestinationPaths(casCompat, originalCmdName)
-				for time.Now().Before(deadline) {
-					allOk := true
-					args := []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}
-					out, _, e := vr.Run(context.Background(), args...)
-					if e != nil {
-						allOk = false
-					}
-					var arr []map[string]any
-					if json.Unmarshal([]byte(out), &arr) != nil {
-						allOk = false
-					}
-					if allOk && len(expected) > 0 {
-						visible := normalizeVisibleTargetPaths(arr, isOpenlistCASCompatible(run))
-						allOk = areAllExpectedPathsVisible(expected, visible)
-					}
-					if allOk {
-						break
-					}
-					time.Sleep(interval)
-				}
-			}
+		
+		if isWebDAVUnderlying(cfg, dstRemote(dst)) {
+			r.waitForWebDAVFiles(cfg, dst, casCompat, originalCmdName)
 		}
-		_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
-			rr.Status = "finished"
-			if rr.Summary == nil {
-				rr.Summary = map[string]any{}
-			}
-			rr.Summary["finished"] = true
-			rr.Summary["success"] = true
-			fin := time.Now().Local()
-			rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
-			// 生成并冻结最终总结 finalSummary（仅在结束时一次性写入）
-			finalSummary := map[string]any{}
-			// 时间
-			var start time.Time
-			if s, ok := rr.Summary["startedAt"].(string); ok {
-				if t, e := time.Parse(time.RFC3339, s); e == nil {
-					start = t
-				}
-			}
-			if !start.IsZero() {
-				finalSummary["startAt"] = start.Format(time.RFC3339)
-			}
-			finalSummary["finishedAt"] = fin.Format(time.RFC3339)
-			durSec := int64(0)
-			if !start.IsZero() {
-				durSec = int64(fin.Sub(start).Seconds())
-			}
-			if durSec < 0 {
-				durSec = 0
-			}
-			finalSummary["durationSec"] = durSec
-			finalSummary["durationText"] = util.HumanDuration(durSec)
-			// 结果
-			finalSummary["result"] = "success"
-			// 体量/均速：完成态只从 progress 读取
-			var prog map[string]any
-			if p, ok := rr.Summary["progress"].(map[string]any); ok {
-				prog = p
-			}
-			var bytes, total int64
-			if prog != nil {
-				if v, ok := prog["bytes"].(float64); ok {
-					bytes = int64(v)
-				}
-				if v, ok := prog["totalBytes"].(float64); ok {
-					total = int64(v)
-				}
-			}
-			finalSummary["transferredBytes"] = bytes
-			finalSummary["totalBytes"] = total
-			avg := int64(0)
-			if durSec > 0 {
-				avg = bytes / durSec
-			}
-			finalSummary["avgSpeedBps"] = avg
-			// 从 stderrFile 解析文件级明细
-			files := []map[string]any{}
-			counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
-			if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
-				files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
-			}
-			// 异步补全文件大小，不阻塞状态更新。
-			// finalSummary 只服务于历史详情 / 最终总结展示；
-			// 不要再往回恢复 stableProgress / cardSummary 这类完成态兼容字段，
-			// 以免运行中链路与任务卡片完成态再次发生语义混用。
-			r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
-			finalSummary["counts"] = counts
-			finalSummary["files"] = files
-			rr.Summary["finalSummary"] = finalSummary
-
-		})
-		r.broadcaster.Broadcast("run_status", map[string]any{
-			"run_id": run.ID,
-			"status": "finished",
-		})
-		if r.activeMgr != nil {
-			r.activeMgr.RemoveState(run.ID)
-		}
-		// 清除 bisync 任务的 resync 标志
-		if run.TaskMode == "bisync" {
-			if t, ok := r.updater.GetTask(run.TaskID); ok {
-				var opts map[string]any
-				if len(t.BisyncOptions) > 0 {
-					if json.Unmarshal(t.BisyncOptions, &opts) == nil {
-						// 清除 resync 标志
-						delete(opts, "resync")
-						b, _ := json.Marshal(opts)
-						t.BisyncOptions = b
-						_ = r.updater.UpdateTask(run.TaskID, t)
-					}
-				}
-			}
-		}
-		// fire webhook for successful run
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logger.Error("goroutine panic", zap.Any("panic", r))
-				}
-			}()
-			r.postWebhookIfNeeded(run.ID)
-		}()
-		r.mu.Lock()
-		delete(r.procs, run.ID)
-		r.mu.Unlock()
+		
+		r.handleRunSuccess(run, stderrPath, cfg, dst, originalCmdName, cmdName)
 	}()
+}
+
+func dstRemote(dst string) string {
+	parts := strings.SplitN(dst, ":", 2)
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return dst
+}
+
+func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcPath, dstRemote, dstPath string) error {
+	r.mu.Lock()
+	if _, ok := r.procs[run.ID]; ok {
+		r.mu.Unlock()
+		return errors.New("run already exists")
+	}
+	r.mu.Unlock()
+
+	runCtx, runCancel := context.WithCancel(ctx)
+	r.mu.Lock()
+	r.cancelFns[run.ID] = runCancel
+	r.mu.Unlock()
+	registerCancelFn(run.ID, runCancel)
+
+	src := srcRemote + ":" + strings.TrimPrefix(srcPath, "/")
+	dst := dstRemote + ":" + strings.TrimPrefix(dstPath, "/")
+	cmdName := strings.ToLower(mode)
+	if cmdName != "copy" && cmdName != "sync" && cmdName != "move" && cmdName != "bisync" {
+		cmdName = "copy"
+	}
+
+	dataDir := config.DataDir()
+	cfg := os.Getenv("RCLONE_CONFIG")
+	if cfg == "" {
+		cfg = filepath.Join(dataDir, "rclone.conf")
+	}
+
+	args, casCompat, casManagedRetries, maxCASAttempts, effOpt, originalCmdName, err := r.buildTransferArgs(mode, src, dst, cfg, run)
+	if err != nil {
+		return err
+	}
+
+	stderrFile, stderrPath, initialLog := r.setupLogFiles(run, cfg)
+	stderrFile.WriteString(initialLog)
+	if effOpt != nil {
+		if b, _ := json.Marshal(effOpt); len(b) > 0 {
+			stderrFile.WriteString("[runner] effectiveOptions " + string(b) + "\n")
+		}
+	}
+	attemptLogOffset, _ := stderrFile.Seek(0, io.SeekCurrent)
+
+	r.runPreflight(run, cfg, src, effOpt)
+
+	cmd, outR, errR, _, _, err := r.startProcess(runCtx, args)
+	if err != nil {
+		return err
+	}
+
+	r.initializeRunState(run, cmd, stderrPath)
+	r.waitForCompletion(runCtx, run, cmd, outR, errR, stderrFile, stderrPath, args, casCompat, casManagedRetries, maxCASAttempts, effOpt, cfg, src, dst, originalCmdName, cmdName, attemptLogOffset)
+
 	return nil
 }
 
 func (r *Runner) Stop(runID int64) error {
-	// Cancel context first to signal retry loops to abort
 	r.mu.Lock()
 	if cf, ok := r.cancelFns[runID]; ok {
 		cf()
@@ -795,8 +511,6 @@ func (r *Runner) Stop(runID int64) error {
 	cmd, ok := r.procs[runID]
 	r.mu.Unlock()
 	if !ok || cmd == nil || cmd.Process == nil {
-		// Process already exited (e.g. retry loop about to start a new one);
-		// context cancellation above will abort any pending retry.
 		return nil
 	}
 	_ = cmd.Process.Signal(syscall.SIGINT)
@@ -831,3 +545,331 @@ func wait(cmd *exec.Cmd, d time.Duration) bool {
 		return false
 	}
 }
+
+// normalizeArgUnits ensures flags have proper units and converts separators
+func normalizeArgUnits(args []string) []string {
+	for i := 0; i < len(args)-1; i++ {
+		if args[i] == "--buffer-size" || args[i] == "--bwlimit" {
+			n := strings.TrimSpace(args[i+1])
+			if args[i] == "--bwlimit" {
+				if strings.Contains(n, ";") {
+					n = strings.ReplaceAll(n, ";", " ")
+				}
+				args[i+1] = n
+			}
+			pureNum := n != ""
+			for _, ch := range n {
+				if ch < '0' || ch > '9' {
+					pureNum = false
+					break
+				}
+			}
+			if pureNum {
+				args[i+1] = n + "M"
+			}
+		}
+	}
+	return args
+}
+
+// deduplicateArgs removes duplicate flags like --bwlimit
+func deduplicateArgs(args []string) []string {
+	last := -1
+	for i := 0; i < len(args); i++ {
+		if args[i] == "--bwlimit" {
+			last = i
+		}
+	}
+	if last >= 0 {
+		newArgs := make([]string, 0, len(args))
+		for i := 0; i < len(args); {
+			if args[i] == "--bwlimit" && i != last {
+				i += 2
+				continue
+			}
+			newArgs = append(newArgs, args[i])
+			i++
+		}
+		args = newArgs
+	}
+	return args
+}
+
+// handleRunFailure handles a failed run
+func (r *Runner) handleRunFailure(run store.Run, cmd *exec.Cmd, stderrPath, cfg, dst, originalCmdName, cmdName string) {
+	_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
+		rr.Status = "failed"
+		if rr.Summary == nil {
+			rr.Summary = map[string]any{}
+		}
+		rr.Summary["finished"] = true
+		rr.Summary["success"] = false
+		fin := time.Now().Local()
+		rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
+		finalSummary := map[string]any{}
+		var start time.Time
+		if s, ok := rr.Summary["startedAt"].(string); ok {
+			if t, e := time.Parse(time.RFC3339, s); e == nil {
+				start = t
+			}
+		}
+		if !start.IsZero() {
+			finalSummary["startAt"] = start.Format(time.RFC3339)
+		}
+		finalSummary["finishedAt"] = fin.Format(time.RFC3339)
+		durSec := int64(0)
+		if !start.IsZero() {
+			durSec = int64(fin.Sub(start).Seconds())
+		}
+		if durSec < 0 {
+			durSec = 0
+		}
+		finalSummary["durationSec"] = durSec
+		finalSummary["durationText"] = util.HumanDuration(durSec)
+		finalSummary["result"] = "failed"
+		
+		var prog map[string]any
+		if p, ok := rr.Summary["progress"].(map[string]any); ok {
+			prog = p
+		}
+		var bytes, total int64
+		if prog != nil {
+			if v, ok := prog["bytes"].(float64); ok {
+				bytes = int64(v)
+			}
+			if v, ok := prog["totalBytes"].(float64); ok {
+				total = int64(v)
+			}
+		}
+		finalSummary["transferredBytes"] = bytes
+		finalSummary["totalBytes"] = total
+		avg := int64(0)
+		if durSec > 0 {
+			avg = bytes / durSec
+		}
+		finalSummary["avgSpeedBps"] = avg
+		
+		files := []map[string]any{}
+		counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
+		if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
+			files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
+		}
+		r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
+		rr.Summary["finalSummary"] = map[string]any{"counts": counts, "files": files, "startAt": finalSummary["startAt"], "finishedAt": finalSummary["finishedAt"], "durationSec": durSec, "durationText": util.HumanDuration(durSec), "result": "failed", "transferredBytes": bytes, "totalBytes": total, "avgSpeedBps": avg}
+	})
+	r.broadcaster.Broadcast("run_status", map[string]any{
+		"run_id": run.ID,
+		"status": "failed",
+	})
+	if r.activeMgr != nil {
+		r.activeMgr.RemoveState(run.ID)
+	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		r.postWebhookIfNeeded(run.ID)
+	}()
+	r.mu.Lock()
+	delete(r.procs, run.ID)
+	r.mu.Unlock()
+	unregisterCancelFn(run.ID)
+}
+
+// handleRunStopped handles a stopped run
+func (r *Runner) handleRunStopped(run store.Run, stderrPath, cfg, dst, originalCmdName, cmdName string) {
+	_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
+		rr.Status = "stopped"
+		if rr.Summary == nil {
+			rr.Summary = map[string]any{}
+		}
+		rr.Summary["finished"] = true
+		rr.Summary["success"] = false
+		fin := time.Now().Local()
+		rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
+		finalSummary := map[string]any{}
+		var start time.Time
+		if s, ok := rr.Summary["startedAt"].(string); ok {
+			if t, e := time.Parse(time.RFC3339, s); e == nil {
+				start = t
+			}
+		}
+		if !start.IsZero() {
+			finalSummary["startAt"] = start.Format(time.RFC3339)
+		}
+		finalSummary["finishedAt"] = fin.Format(time.RFC3339)
+		durSec := int64(0)
+		if !start.IsZero() {
+			durSec = int64(fin.Sub(start).Seconds())
+		}
+		if durSec < 0 {
+			durSec = 0
+		}
+		finalSummary["durationSec"] = durSec
+		finalSummary["durationText"] = util.HumanDuration(durSec)
+		finalSummary["result"] = "stopped"
+		
+		var prog map[string]any
+		if p, ok := rr.Summary["progress"].(map[string]any); ok {
+			prog = p
+		}
+		var bytes, total int64
+		if prog != nil {
+			if v, ok := prog["bytes"].(float64); ok {
+				bytes = int64(v)
+			}
+			if v, ok := prog["totalBytes"].(float64); ok {
+				total = int64(v)
+			}
+		}
+		finalSummary["transferredBytes"] = bytes
+		finalSummary["totalBytes"] = total
+		avg := int64(0)
+		if durSec > 0 {
+			avg = bytes / durSec
+		}
+		finalSummary["avgSpeedBps"] = avg
+		
+		files := []map[string]any{}
+		counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
+		if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
+			files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
+		}
+		r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
+		finalSummary["counts"] = counts
+		finalSummary["files"] = files
+		rr.Summary["finalSummary"] = finalSummary
+	})
+	r.broadcaster.Broadcast("run_status", map[string]any{
+		"run_id": run.ID,
+		"status": "stopped",
+	})
+	if r.activeMgr != nil {
+		r.activeMgr.RemoveState(run.ID)
+	}
+	r.mu.Lock()
+	delete(r.procs, run.ID)
+	r.mu.Unlock()
+	unregisterCancelFn(run.ID)
+}
+
+// handleRunSuccess handles a successful run
+func (r *Runner) handleRunSuccess(run store.Run, stderrPath, cfg, dst, originalCmdName, cmdName string) {
+	_ = r.updater.UpdateRun(run.ID, func(rr *store.Run) {
+		rr.Status = "finished"
+		if rr.Summary == nil {
+			rr.Summary = map[string]any{}
+		}
+		rr.Summary["finished"] = true
+		rr.Summary["success"] = true
+		fin := time.Now().Local()
+		rr.Summary["finishedAt"] = fin.Format(time.RFC3339)
+		finalSummary := map[string]any{}
+		var start time.Time
+		if s, ok := rr.Summary["startedAt"].(string); ok {
+			if t, e := time.Parse(time.RFC3339, s); e == nil {
+				start = t
+			}
+		}
+		if !start.IsZero() {
+			finalSummary["startAt"] = start.Format(time.RFC3339)
+		}
+		finalSummary["finishedAt"] = fin.Format(time.RFC3339)
+		durSec := int64(0)
+		if !start.IsZero() {
+			durSec = int64(fin.Sub(start).Seconds())
+		}
+		if durSec < 0 {
+			durSec = 0
+		}
+		finalSummary["durationSec"] = durSec
+		finalSummary["durationText"] = util.HumanDuration(durSec)
+		finalSummary["result"] = "success"
+		
+		var prog map[string]any
+		if p, ok := rr.Summary["progress"].(map[string]any); ok {
+			prog = p
+		}
+		var bytes, total int64
+		if prog != nil {
+			if v, ok := prog["bytes"].(float64); ok {
+				bytes = int64(v)
+			}
+			if v, ok := prog["totalBytes"].(float64); ok {
+				total = int64(v)
+			}
+		}
+		finalSummary["transferredBytes"] = bytes
+		finalSummary["totalBytes"] = total
+		avg := int64(0)
+		if durSec > 0 {
+			avg = bytes / durSec
+		}
+		finalSummary["avgSpeedBps"] = avg
+		
+		files := []map[string]any{}
+		counts := map[string]int{"copied": 0, "deleted": 0, "skipped": 0, "failed": 0, "total": 0}
+		if p, ok := rr.Summary["stderrFile"].(string); ok && p != "" {
+			files, counts = buildFinalSummaryFilesFromLog(p, isOpenlistCASCompatible(run), strings.ToLower(cmdName) == "move")
+		}
+		r.enrichFilesSizesAsync(run.ID, files, dst, cfg, isOpenlistCASCompatible(run))
+		finalSummary["counts"] = counts
+		finalSummary["files"] = files
+		rr.Summary["finalSummary"] = finalSummary
+	})
+	r.broadcaster.Broadcast("run_status", map[string]any{
+		"run_id": run.ID,
+		"status": "finished",
+	})
+	if r.activeMgr != nil {
+		r.activeMgr.RemoveState(run.ID)
+	}
+	if run.TaskMode == "bisync" {
+		ClearBisyncResyncFlag(r.updater, run.TaskID)
+	}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("goroutine panic", zap.Any("panic", r))
+			}
+		}()
+		r.postWebhookIfNeeded(run.ID)
+	}()
+	r.mu.Lock()
+	delete(r.procs, run.ID)
+	r.mu.Unlock()
+}
+
+// waitForWebDAVFiles waits for WebDAV files to become visible
+func (r *Runner) waitForWebDAVFiles(cfg, dst string, casCompat *openlistCASCompatPlan, originalCmdName string) {
+	interval := config.GetFinishWaitInterval()
+	timeout := config.GetFinishWaitTimeout()
+	if timeout > 0 {
+		vr := &adapter.CmdRunner{}
+		deadline := time.Now().Add(timeout)
+		expected := expectedVisibleDestinationPaths(casCompat, originalCmdName)
+		for time.Now().Before(deadline) {
+			allOk := true
+			args := []string{"lsjson", dst, "--config", cfg, "--files-only", "--recursive"}
+			out, _, e := vr.Run(context.Background(), args...)
+			if e != nil {
+				allOk = false
+			}
+			var arr []map[string]any
+			if json.Unmarshal([]byte(out), &arr) != nil {
+				allOk = false
+			}
+			if allOk && len(expected) > 0 {
+				visible := normalizeVisibleTargetPaths(arr, false)
+				allOk = areAllExpectedPathsVisible(expected, visible)
+			}
+			if allOk {
+				break
+			}
+			time.Sleep(interval)
+		}
+	}
+}
+

@@ -9,17 +9,18 @@ import {
   withErrorHandler,
   withConfirm,
   registerToast,
+  registerConfirmCallback,
   HTTP_ERROR_MESSAGES,
   createErrorBoundary,
 } from './errors'
 
-// Mock window.dispatchEvent
 const mockDispatchEvent = vi.fn()
 window.dispatchEvent = mockDispatchEvent
 
 describe('errors.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    registerConfirmCallback(null as any)
   })
 
   describe('HTTP_ERROR_MESSAGES', () => {
@@ -176,10 +177,10 @@ describe('errors.ts', () => {
   })
 
   describe('withConfirm', () => {
-    it('should return null if user cancels', async () => {
-      const originalConfirm = window.confirm
-      // @ts-ignore - mock for testing
-      window.confirm = vi.fn().mockReturnValue(false)
+    it('should return null if user cancels via callback', async () => {
+      const mockConfirm = vi.fn().mockResolvedValue(false)
+      registerConfirmCallback(mockConfirm)
+      
       const apiCall = vi.fn()
       
       const result = await withConfirm(apiCall, {
@@ -188,13 +189,13 @@ describe('errors.ts', () => {
       
       expect(result).toBeNull()
       expect(apiCall).not.toHaveBeenCalled()
-      window.confirm = originalConfirm
+      expect(mockConfirm).toHaveBeenCalledWith('确认', 'Are you sure?')
     })
 
-    it('should call apiCall if user confirms', async () => {
-      const originalConfirm = window.confirm
-      // @ts-ignore - mock for testing
-      window.confirm = vi.fn().mockReturnValue(true)
+    it('should call apiCall if user confirms via callback', async () => {
+      const mockConfirm = vi.fn().mockResolvedValue(true)
+      registerConfirmCallback(mockConfirm)
+      
       const apiCall = vi.fn().mockResolvedValue('result')
       
       const result = await withConfirm(apiCall, {
@@ -204,7 +205,20 @@ describe('errors.ts', () => {
       
       expect(result).toBe('result')
       expect(apiCall).toHaveBeenCalledTimes(1)
-      window.confirm = originalConfirm
+    })
+
+    it('should use custom title when provided', async () => {
+      const mockConfirm = vi.fn().mockResolvedValue(true)
+      registerConfirmCallback(mockConfirm)
+      
+      const apiCall = vi.fn().mockResolvedValue('result')
+      
+      await withConfirm(apiCall, {
+        confirmTitle: 'Custom Title',
+        confirmMessage: 'Are you sure?',
+      })
+      
+      expect(mockConfirm).toHaveBeenCalledWith('Custom Title', 'Are you sure?')
     })
   })
 
@@ -214,14 +228,12 @@ describe('errors.ts', () => {
       
       registerToast(customToast)
       
-      // After registration, showToast should call the custom function
       showToast('test custom', 'success')
       
       expect(customToast).toHaveBeenCalledWith('test custom', 'success', 3000)
     })
 
     it('should still work with window event fallback', () => {
-      // Reset to null to test fallback
       registerToast(null as any)
       mockDispatchEvent.mockClear()
       
@@ -237,7 +249,6 @@ describe('errors.ts', () => {
       const boundary = createErrorBoundary(errorHandler)
       const testError = new Error('test error')
       
-      // Test by calling onError with test error and info
       boundary.onError(testError, 'error info')
       
       expect(errorHandler).toHaveBeenCalledWith(testError, 'error info')

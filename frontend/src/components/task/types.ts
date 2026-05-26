@@ -7,9 +7,7 @@ export type TaskFormOptionValue = string | number | boolean | string[] | Record<
 export interface TaskFormOptions {
   [key: string]: TaskFormOptionValue
 }
-
 export interface BisyncOptions {
-  resync?: boolean
   compare?: string
   maxDelete?: string
   checkAccess?: boolean
@@ -37,6 +35,8 @@ export interface BisyncLstVersion {
   path2Size?: number
   conflict1Size?: number
   conflict2Size?: number
+  conflict1Mtime?: string
+  conflict2Mtime?: string
 }
 
 export type UpdateTaskOption = (key: string, value: TaskFormOptionValue) => void

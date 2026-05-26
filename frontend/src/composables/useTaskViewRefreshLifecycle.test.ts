@@ -1,22 +1,89 @@
-import { describe, it, expect, vi } from 'vitest'
-import { ref } from 'vue'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useTaskViewRefreshLifecycle } from './useTaskViewRefreshLifecycle'
+import { ref } from 'vue'
 
 describe('useTaskViewRefreshLifecycle', () => {
-  const createOptions = () => ({
-    tasks: ref([]),
-    activeRuns: ref([]),
-    currentModule: ref<'history' | 'add' | 'tasks'>('tasks'),
-    getRunningProgressByTask: vi.fn().mockReturnValue(null),
-    loadData: vi.fn().mockResolvedValue(undefined),
-    loadActiveRuns: vi.fn().mockResolvedValue(undefined),
-    setupRealtimeSync: vi.fn(),
-    stuckMs: 30000,
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('should be a function', () => {
+    expect(typeof useTaskViewRefreshLifecycle).toBe('function')
+  })
+
+  it('should accept correct options', () => {
+    const loadData = vi.fn().mockResolvedValue(undefined)
+    const loadActiveRuns = vi.fn().mockResolvedValue(undefined)
+    const getRunningProgressByTask = vi.fn().mockReturnValue({ percentage: 0, completedFiles: 0 })
+
+    expect(() => {
+      useTaskViewRefreshLifecycle({
+        tasks: ref([]),
+        activeRuns: ref([]),
+        getRunningProgressByTask,
+        loadData,
+        loadActiveRuns,
+        stuckMs: 25000,
+      })
+    }).not.toThrow()
+  })
+
+  it('should handle currentModule option', () => {
+    const loadData = vi.fn().mockResolvedValue(undefined)
+    const loadActiveRuns = vi.fn().mockResolvedValue(undefined)
+    const getRunningProgressByTask = vi.fn().mockReturnValue({ percentage: 0, completedFiles: 0 })
+
+    expect(() => {
+      useTaskViewRefreshLifecycle({
+        tasks: ref([]),
+        activeRuns: ref([]),
+        currentModule: ref<'tasks' | 'history' | 'add'>('tasks'),
+        getRunningProgressByTask,
+        loadData,
+        loadActiveRuns,
+        stuckMs: 25000,
+      })
+    }).not.toThrow()
+  })
+
+  it('should handle setupRealtimeSync option', () => {
+    const loadData = vi.fn().mockResolvedValue(undefined)
+    const loadActiveRuns = vi.fn().mockResolvedValue(undefined)
+    const getRunningProgressByTask = vi.fn().mockReturnValue({ percentage: 0, completedFiles: 0 })
+    const setupRealtimeSync = vi.fn()
+
+    expect(() => {
+      useTaskViewRefreshLifecycle({
+        tasks: ref([]),
+        activeRuns: ref([]),
+        getRunningProgressByTask,
+        loadData,
+        loadActiveRuns,
+        setupRealtimeSync,
+        stuckMs: 25000,
+      })
+    }).not.toThrow()
   })
 
   it('should return empty object', () => {
-    const options = createOptions()
-    const result = useTaskViewRefreshLifecycle(options)
+    const loadData = vi.fn().mockResolvedValue(undefined)
+    const loadActiveRuns = vi.fn().mockResolvedValue(undefined)
+    const getRunningProgressByTask = vi.fn().mockReturnValue({ percentage: 0, completedFiles: 0 })
+
+    const result = useTaskViewRefreshLifecycle({
+      tasks: ref([]),
+      activeRuns: ref([]),
+      getRunningProgressByTask,
+      loadData,
+      loadActiveRuns,
+      stuckMs: 25000,
+    })
+
     expect(result).toEqual({})
   })
 })

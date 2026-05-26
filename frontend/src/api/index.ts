@@ -37,7 +37,7 @@ export type { FileItem } from './browser'
 export { listPath, copyFile, moveFile, copyDir, moveDir, deleteFile, purgeDir, mkdir } from './browser'
 
 // ============ 错误处理 ============
-export { showToast, showSuccessToast, showErrorToast, showWarningToast, showInfoToast, handleApiError, withErrorHandler, withConfirm, registerToast } from './errors'
+export { showToast, showSuccessToast, showErrorToast, showWarningToast, showInfoToast, handleApiError, withErrorHandler, withConfirm, registerToast, registerConfirmCallback } from './errors'
 export type { ToastType } from './errors'
 
 // ============ 认证 ============

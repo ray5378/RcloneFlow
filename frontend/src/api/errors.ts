@@ -1,65 +1,16 @@
-/**
- * API 统一错误处理模块
- * 统一错误处理和Toast提示
- */
-
 export type ToastType = 'success' | 'error' | 'warning' | 'info'
 
-// Toast显示函数类型
-type ShowToastFn = (message: string, type: ToastType, duration?: number) => void
-
-let showToastFn: ShowToastFn | null = null
-
-/**
- * 注册Toast函数
- */
-export function registerToast(fn: ShowToastFn) {
-  showToastFn = fn
+const TOAST_EVENTS = {
+  SHOW_TOAST: 'show-toast',
 }
 
-/**
- * 显示Toast（通过事件触发，由Toast组件处理）
- */
-export function showToast(message: string, type: ToastType = 'info', duration = 3000) {
-  if (showToastFn) {
-    showToastFn(message, type, duration)
-  } else {
-    // Fallback: 使用自定义事件
-    window.dispatchEvent(new CustomEvent('show-toast', {
-      detail: { message, type, duration }
-    }))
-  }
+const TOAST_DURATIONS = {
+  SUCCESS: 3000,
+  ERROR: 4000,
+  WARNING: 3500,
+  INFO: 3000,
 }
 
-/**
- * 显示成功提示
- */
-export function showSuccessToast(message: string, duration = 3000) {
-  showToast(message, 'success', duration)
-}
-
-/**
- * 显示错误提示
- */
-export function showErrorToast(message: string, duration = 4000) {
-  showToast(message, 'error', duration)
-}
-
-/**
- * 显示警告提示
- */
-export function showWarningToast(message: string, duration = 3500) {
-  showToast(message, 'warning', duration)
-}
-
-/**
- * 显示信息提示
- */
-export function showInfoToast(message: string, duration = 3000) {
-  showToast(message, 'info', duration)
-}
-
-// HTTP状态码对应的错误信息
 export const HTTP_ERROR_MESSAGES: Record<number, string> = {
   400: '请求参数错误',
   401: '未授权，请重新登录',
@@ -72,43 +23,84 @@ export const HTTP_ERROR_MESSAGES: Record<number, string> = {
   504: '网关超时',
 }
 
-/**
- * 获取HTTP状态码对应的中文错误信息
- */
+const DEFAULT_MESSAGES = {
+  OPERATION_FAILED: '操作失败',
+  REQUEST_FAILED: '请求失败',
+  CONFIRM_TITLE: '确认',
+}
+
+type ShowToastFn = (message: string, type: ToastType, duration?: number) => void
+
+let showToastFn: ShowToastFn | null = null
+
+export function registerToast(fn: ShowToastFn): void {
+  showToastFn = fn
+}
+
+function dispatchToastEvent(message: string, type: ToastType, duration: number): void {
+  window.dispatchEvent(new CustomEvent(TOAST_EVENTS.SHOW_TOAST, {
+    detail: { message, type, duration }
+  }))
+}
+
+export function showToast(message: string, type: ToastType = 'info', duration = TOAST_DURATIONS.INFO): void {
+  if (showToastFn) {
+    showToastFn(message, type, duration)
+  } else {
+    dispatchToastEvent(message, type, duration)
+  }
+}
+
+export function showSuccessToast(message: string, duration = TOAST_DURATIONS.SUCCESS): void {
+  showToast(message, 'success', duration)
+}
+
+export function showErrorToast(message: string, duration = TOAST_DURATIONS.ERROR): void {
+  showToast(message, 'error', duration)
+}
+
+export function showWarningToast(message: string, duration = TOAST_DURATIONS.WARNING): void {
+  showToast(message, 'warning', duration)
+}
+
+export function showInfoToast(message: string, duration = TOAST_DURATIONS.INFO): void {
+  showToast(message, 'info', duration)
+}
+
 function getHttpErrorMessage(status: number): string {
   return HTTP_ERROR_MESSAGES[status] || `请求失败 (${status})`
 }
 
-/**
- * 解析错误消息
- */
-function parseErrorMessage(error: unknown): string {
+export function parseErrorMessage(error: unknown): string {
   if (error instanceof Error) {
     return error.message
   }
   if (typeof error === 'string') {
     return error
   }
-  return '操作失败'
+  return DEFAULT_MESSAGES.OPERATION_FAILED
 }
 
-/**
- * API请求错误处理
- */
-export function handleApiError(error: unknown, fallbackMsg = '请求失败'): string {
+function extractHttpStatusFromError(error: Error): number | null {
+  const httpStatusMatch = error.message.match(/status.*?(\d{3})/i)
+  if (httpStatusMatch) {
+    const status = parseInt(httpStatusMatch[1], 10)
+    if (status >= 400 && status < 600) {
+      return status
+    }
+  }
+  return null
+}
+
+export function handleApiError(error: unknown, fallbackMsg = DEFAULT_MESSAGES.REQUEST_FAILED): string {
   let message = fallbackMsg
   
   if (error instanceof Error) {
-    // 检查是否是HTTP错误
-    const httpStatusMatch = error.message.match(/status.*?(\d{3})/i)
-    if (httpStatusMatch) {
-      const status = parseInt(httpStatusMatch[1], 10)
+    const status = extractHttpStatusFromError(error)
+    if (status !== null) {
       message = getHttpErrorMessage(status)
     } else if (error.message && !error.message.includes('fetch')) {
-      // 后端返回的错误信息
       message = error.message
-    } else {
-      message = fallbackMsg
     }
   }
   
@@ -116,13 +108,16 @@ export function handleApiError(error: unknown, fallbackMsg = '请求失败'): st
   return message
 }
 
-/**
- * 带错误处理的API调用包装器
- */
+export interface WithErrorHandlerOptions<T> {
+  apiCall: () => Promise<T>
+  successMessage?: string
+  errorMessage?: string
+}
+
 export async function withErrorHandler<T>(
   apiCall: () => Promise<T>,
   successMessage?: string,
-  errorMessage = '操作失败'
+  errorMessage = DEFAULT_MESSAGES.OPERATION_FAILED
 ): Promise<T | null> {
   try {
     const result = await apiCall()
@@ -136,9 +131,22 @@ export async function withErrorHandler<T>(
   }
 }
 
-/**
- * 带确认提示的API调用
- */
+type ConfirmCallback = (title: string, message: string) => Promise<boolean>
+
+let confirmCallback: ConfirmCallback | null = null
+
+export function registerConfirmCallback(fn: ConfirmCallback): void {
+  confirmCallback = fn
+}
+
+export interface WithConfirmOptions<T> {
+  apiCall: () => Promise<T>
+  confirmTitle?: string
+  confirmMessage: string
+  successMessage?: string
+  errorMessage?: string
+}
+
 export async function withConfirm<T>(
   apiCall: () => Promise<T>,
   options: {
@@ -148,25 +156,33 @@ export async function withConfirm<T>(
     errorMessage?: string
   }
 ): Promise<T | null> {
-  if (!confirm(options.confirmMessage)) {
+  const confirmed = confirmCallback
+    ? await confirmCallback(
+        options.confirmTitle || DEFAULT_MESSAGES.CONFIRM_TITLE,
+        options.confirmMessage
+      )
+    : window.confirm(options.confirmMessage)
+  
+  if (!confirmed) {
     return null
   }
   
   return withErrorHandler(
     apiCall,
     options.successMessage,
-    options.errorMessage || '操作失败'
+    options.errorMessage || DEFAULT_MESSAGES.OPERATION_FAILED
   )
 }
 
-/**
- * 创建错误边界（用于捕获组件错误）
- */
+export interface ErrorBoundaryOptions {
+  errorHandler: (error: Error, errorInfo: string) => void
+}
+
 export function createErrorBoundary(
   errorHandler: (error: Error, errorInfo: string) => void
 ) {
   return {
-    onError(error: Error, errorInfo: string) {
+    onError(error: Error, errorInfo: string): void {
       errorHandler(error, errorInfo)
       showErrorToast(parseErrorMessage(error))
     }

@@ -4,8 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
+
+	"rcloneflow/internal/config"
+	"rcloneflow/internal/store"
 )
 
 type BisyncFileDirection string
@@ -186,4 +190,37 @@ func sanitizeFilenameForBisync(s string, taskID int64) string {
 		s = fmt.Sprintf("task-%d", taskID)
 	}
 	return s
+}
+
+// buildBisyncArgs 构建 bisync 启动参数（含工作目录创建和选项读取）
+func buildBisyncArgs(src, dst string, run store.Run) ([]string, error) {
+	dataDir := config.DataDir()
+	bisyncDir := filepath.Join(dataDir, "bisync", sanitizeFilenameForBisync(run.TaskName, run.TaskID))
+	if err := os.MkdirAll(bisyncDir, 0o755); err != nil {
+		return nil, err
+	}
+	var bisyncOptions json.RawMessage
+	if run.Summary != nil {
+		if opts, ok := run.Summary["bisyncOptions"]; ok {
+			if optsBytes, err := json.Marshal(opts); err == nil {
+				bisyncOptions = optsBytes
+			}
+		}
+	}
+	return buildBisyncCommand(src, dst, bisyncDir, bisyncOptions), nil
+}
+
+// ClearBisyncResyncFlag 清除 bisync 任务的 resync 标志
+func ClearBisyncResyncFlag(updater RunUpdater, taskID int64) {
+	if t, ok := updater.GetTask(taskID); ok {
+		var opts map[string]any
+		if len(t.BisyncOptions) > 0 {
+			if json.Unmarshal(t.BisyncOptions, &opts) == nil {
+				delete(opts, "resync")
+				b, _ := json.Marshal(opts)
+				t.BisyncOptions = b
+				_ = updater.UpdateTask(taskID, t)
+			}
+		}
+	}
 }

@@ -101,6 +101,14 @@ export async function rollbackBisyncLstFile(taskId: number, versionId: string): 
   return post(`/api/tasks/${taskId}/bisync/rollback-lst`, { versionId })
 }
 
+export async function getBisyncLstContent(taskId: number, fileName: string): Promise<{ content: string }> {
+  return get<{ content: string }>(`/api/tasks/${taskId}/bisync/lst-content?file=${encodeURIComponent(fileName)}`)
+}
+
 export async function resyncBisync(taskId: number): Promise<void> {
   return post(`/api/tasks/${taskId}/bisync/resync`, {})
+}
+
+export async function resolveBisyncConflict(taskId: number, versionId: string, keepFile: 'conflict1' | 'conflict2'): Promise<void> {
+  return post(`/api/tasks/${taskId}/bisync/resolve-conflict`, { versionId, keepFile })
 }

@@ -1,15 +1,41 @@
 import { ref } from 'vue'
 import * as api from '../api'
+import { updateTaskOptions } from '../api/task'
+import type { Task } from '../types'
 import { getToken } from '../api/auth'
 import { formatBytes, formatBytesPerSec } from '../utils/format'
 import { t } from '../i18n'
 
+
+
+interface WebhookFormData {
+  taskId: number | null
+  postUrl: string
+  triggerId: string
+  matchText: string
+  webhookSecret: string
+  notify: { manual: boolean; schedule: boolean; webhook: boolean }
+  status: { success: boolean; failed: boolean; hasTransfer: boolean }
+  wecomUrl: string
+}
+
+interface WebhookTestPayload {
+  title: string
+  triggerZh: string
+  statusZh: string
+  summaryZh: string
+  task: { id: number; name: string; mode: string }
+  run: { id: number; trigger: string; status: string; startedAt: string; finishedAt: string; durationSeconds: number; durationText: string }
+  summary: { totalCount: number; completedCount: number; failedCount: number; skippedCount: number; totalBytes: number; transferredBytes: number; avgSpeedBps: number }
+  files: string[]
+  omittedCount: number
+}
 export function useTaskWebhookConfig(options: {
   loadData: () => Promise<void>
   showToast: (message: string, type?: 'info' | 'success' | 'error') => void
 }) {
   const showWebhookModal = ref(false)
-  const webhookForm = ref<any>({
+  const webhookForm = ref<WebhookFormData>({
     taskId: null,
     postUrl: '',
     triggerId: '',
@@ -30,7 +56,7 @@ export function useTaskWebhookConfig(options: {
     webhookForm.value.webhookSecret = generateSecret()
   }
 
-  function setWebhook(task: any) {
+  function setWebhook(task: Task) {
     webhookForm.value.taskId = task.id
     try {
       const raw = task.options || task.Options || {}
@@ -80,7 +106,7 @@ export function useTaskWebhookConfig(options: {
         webhookNotifyOn: webhookForm.value.notify,
         webhookNotifyStatus: webhookForm.value.status,
       }
-      const fn: any = (api as any).updateTaskOptions
+      const fn = updateTaskOptions
       if (typeof fn === 'function') {
         await fn(id, payload)
       } else {
@@ -100,7 +126,7 @@ export function useTaskWebhookConfig(options: {
     }
   }
 
-  function buildWecomMarkdown(p: any) {
+  function buildWecomMarkdown(p: WebhookTestPayload) {
     const taskName = p?.task?.name || t('runtime.webhookTestTask')
     const statusZh = p?.statusZh || t('runtime.webhookTestStatus')
     const triggerZh = p?.triggerZh || t('runtime.webhookTestTrigger')
@@ -133,7 +159,7 @@ export function useTaskWebhookConfig(options: {
         options.showToast(t('runtime.webhookNeedUrl'), 'error')
         return
       }
-      const payload: any = {
+      const payload: WebhookTestPayload = {
         title: t('runtime.webhookTestTitle'),
         triggerZh: t('runtime.webhookTestTrigger'),
         statusZh: t('runtime.webhookTestStatus'),

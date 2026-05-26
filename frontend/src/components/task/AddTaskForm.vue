@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import type { CreateForm, PathBreadcrumb, PathBrowseItem, TaskFormOptions, TaskFormOptionValue, UpdateTaskOption, BisyncOptions } from './types'
+import type { CreateForm, PathBreadcrumb, PathBrowseItem, TaskFormOptions, TaskFormOptionValue, UpdateTaskOption } from './types'
 import type { Task } from '../../types'
 import AdvancedTransferSection from './AdvancedTransferSection.vue'
 import AdvancedFilterSection from './AdvancedFilterSection.vue'
 import AdvancedCompareSection from './AdvancedCompareSection.vue'
 import AdvancedPathSection from './AdvancedPathSection.vue'
 import AdvancedOtherSection from './AdvancedOtherSection.vue'
-import BisyncConfigModal from './BisyncConfigModal.vue'
 import { PathItem } from '../path'
 import { t } from '../../i18n'
-
-const showBisyncConfigModal = ref(false)
 
 const props = defineProps<{
   commandMode: boolean
@@ -115,12 +112,6 @@ const updateOption: UpdateTaskOption = (key, value) => {
           <option value="bisync">{{ t('addTask.bisync') }} (bisync)</option>
         </select>
       </div>
-      <div class="field-item" v-if="createForm.mode === 'bisync'">
-        <button class="ghost" type="button" @click="showBisyncConfigModal = true">
-          {{ t('addTask.bisyncConfig') }}
-        </button>
-        <p class="hint">{{ t('addTask.bisyncHint') }}</p>
-      </div>
       <div class="field-item">
         <label>{{ t('addTask.sourceStorage') }} <span style="color: #dc2626">*</span></label>
         <select v-model="createForm.sourceRemote" @change="$emit('source-remote-change')">
@@ -217,13 +208,6 @@ const updateOption: UpdateTaskOption = (key, value) => {
         </button>
       </div>
     </div>
-    <BisyncConfigModal
-      :visible="showBisyncConfigModal"
-      :bisync-options="createForm.bisyncOptions || {}"
-      @close="showBisyncConfigModal = false"
-      @save="showBisyncConfigModal = false"
-      @update:bisync-options="(value: BisyncOptions) => (createForm.bisyncOptions = value)"
-    />
   </div>
 </template>
 

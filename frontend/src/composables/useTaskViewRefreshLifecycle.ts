@@ -1,5 +1,9 @@
 import { onMounted, onUnmounted, watch, type Ref } from 'vue'
 
+const INITIAL_POLL_DELAY_MS = 1500
+const MODULE_CHANGE_POLL_DELAY_MS = 300
+const STUCK_CHECK_INTERVAL_MS = 1000
+
 export function useTaskViewRefreshLifecycle(options: {
   tasks: Ref<any[]>
   activeRuns: Ref<any[]>
@@ -14,6 +18,7 @@ export function useTaskViewRefreshLifecycle(options: {
   const ACTIVE_POLL_IDLE_MS = 12000
 
   let lastRenderedSignature = ''
+  let lastStuckRefreshTime = 0
   let stuckTimer: number | null = null
   let activePollTimer: number | null = null
 
@@ -39,8 +44,8 @@ export function useTaskViewRefreshLifecycle(options: {
         if (document.visibilityState === 'visible') {
           await options.loadActiveRuns()
         }
-      } catch (err) {
-        throw err
+      } catch (e) {
+        console.error('[useTaskViewRefreshLifecycle] Failed to load active runs:', e)
       } finally {
         scheduleNextActivePoll()
       }
@@ -55,13 +60,21 @@ export function useTaskViewRefreshLifecycle(options: {
     watch(options.currentModule, (next) => {
       if (next === 'tasks') {
         Promise.all([
-          Promise.resolve(options.loadData()).catch(() => {}),
-          options.loadActiveRuns().catch(() => {}),
-        ]).catch(() => {})
+          Promise.resolve(options.loadData()).catch((e) => {
+            console.error('[useTaskViewRefreshLifecycle] Failed to load data on module change:', e)
+          }),
+          options.loadActiveRuns().catch((e) => {
+            console.error('[useTaskViewRefreshLifecycle] Failed to load active runs on module change:', e)
+          }),
+        ]).catch((e) => {
+          console.error('[useTaskViewRefreshLifecycle] Failed to handle module change:', e)
+        })
         setTimeout(() => {
-          options.loadActiveRuns().catch(() => {})
-        }, 300)
-        restartActivePollLoop(1500)
+          options.loadActiveRuns().catch((e) => {
+            console.error('[useTaskViewRefreshLifecycle] Failed to load active runs after module change:', e)
+          })
+        }, MODULE_CHANGE_POLL_DELAY_MS)
+        restartActivePollLoop(INITIAL_POLL_DELAY_MS)
       } else {
         stopActivePollLoop()
       }
@@ -75,12 +88,18 @@ export function useTaskViewRefreshLifecycle(options: {
 
   onMounted(() => {
     Promise.all([
-      Promise.resolve(options.loadData()).catch(() => {}),
-      options.loadActiveRuns().catch(() => {}),
-    ]).catch(() => {})
+      Promise.resolve(options.loadData()).catch((e) => {
+        console.error('[useTaskViewRefreshLifecycle] Failed to load data on mount:', e)
+      }),
+      options.loadActiveRuns().catch((e) => {
+        console.error('[useTaskViewRefreshLifecycle] Failed to load active runs on mount:', e)
+      }),
+    ]).catch((e) => {
+      console.error('[useTaskViewRefreshLifecycle] Failed to initialize on mount:', e)
+    })
     options.setupRealtimeSync?.()
 
-    restartActivePollLoop(1500)
+    restartActivePollLoop(INITIAL_POLL_DELAY_MS)
 
     stuckTimer = window.setInterval(() => {
       try {
@@ -104,16 +123,18 @@ export function useTaskViewRefreshLifecycle(options: {
         const sig = `${activeTasks.size}|${sigParts.join(',')}`
         if (sig === lastRenderedSignature) {
           const now = Date.now()
-          const last = (window as any).__last_stuck_refresh || 0
+          const last = lastStuckRefreshTime
           if (now - last > options.stuckMs) {
-            ;(window as any).__last_stuck_refresh = now
+            lastStuckRefreshTime = now
             options.loadData()
           }
         } else {
           lastRenderedSignature = sig
         }
-      } catch {}
-    }, 1000)
+      } catch (e) {
+        console.error('[useTaskViewRefreshLifecycle] Error in stuck detection timer:', e)
+      }
+    }, STUCK_CHECK_INTERVAL_MS)
 
   })
 

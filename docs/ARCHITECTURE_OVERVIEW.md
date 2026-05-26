@@ -46,12 +46,21 @@
 - `frontend/src/views/ScheduleView.vue`
 - `frontend/src/views/LoginView.vue`
 
+**BrowserView.vue 已优化参考：
+- 已拆分为三个子组件：StoragePanel、BrowserPanel、ManageStoragePanel
+- 使用统一的 useBrowser.ts 入口
+- 代码结构更清晰可维护
+
 ### 3.2 组件层
 可复用 UI 组件位于：
 - `frontend/src/components/*`
 - 其中任务相关拆分已形成：
   - `components/task/RunningHintModal.vue`
   - `components/task/runningHint.ts`
+- 浏览器相关拆分已形成：
+  - `components/StoragePanel.vue`
+  - `components/BrowserPanel.vue`
+  - `components/ManageStoragePanel.vue`
 
 ### 3.3 组合逻辑层
 可复用状态与组合逻辑位于：
@@ -61,6 +70,12 @@
   - `useActiveRunLookup.ts`
   - `activeRunProgress.ts`
   - `useWebSocket.ts`
+- 当前浏览器相关重点：
+  - `useBrowser.ts` - 统一入口
+  - `useBrowserClipboard.ts`
+  - `useBrowserContextMenu.ts`
+  - `useBrowserFileOps.ts`
+  - `useBrowserRemoteManagement.ts`
 
 ### 3.4 API 请求层
 前端接口封装位于：
@@ -189,11 +204,14 @@ rclone one-line progress 日志是运行中真实进度的重要来源。
 
 以下区域改动时默认高风险：
 
-- `frontend/src/views/TaskView.vue`
+- `frontend/src/views/TaskView.vue` - ⚠️ 仍需继续拆分
 - `internal/controller/run.go`
 - `internal/runnercli/runner.go`
 - `frontend/src/composables/useWebSocket.ts`
 - 运行中相关 UI 组件与 composable
+
+**已优化区域（风险降低**：
+- ✅ `frontend/src/views/BrowserView.vue` - 已拆分为子组件和统一 composable
 
 原因通常包括：
 - 多层状态链汇聚
@@ -247,7 +265,3 @@ rclone one-line progress 日志是运行中真实进度的重要来源。
 - 最后在哪里展示
 
 那通常说明你还不该急着改代码，应该先把链路走通。
-通。
-��路走通。
-通。
-��。

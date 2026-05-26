@@ -1,5 +1,6 @@
 import type { Ref } from 'vue'
 import type { Run } from '../types'
+import { showErrorToast } from '../api/errors'
 
 interface UseTaskHistoryActionsOptions {
   runs: Ref<Run[]>
@@ -18,8 +19,8 @@ interface UseTaskHistoryActionsOptions {
 
 export function useTaskHistoryActions(options: UseTaskHistoryActionsOptions) {
   async function clearRun(id: number) {
-    const prevRuns = options.runs.value
-    const prevTaskRuns = options.taskRuns.value
+    const prevRuns = [...options.runs.value]
+    const prevTaskRuns = [...options.taskRuns.value]
 
     options.runs.value = options.runs.value.filter(r => r.id !== id)
     options.taskRuns.value = options.taskRuns.value.filter(r => r.id !== id)
@@ -30,8 +31,11 @@ export function useTaskHistoryActions(options: UseTaskHistoryActionsOptions) {
 
     const ok = await options.runApi.delete(id)
     if (!ok) {
-      options.runs.value = prevRuns
-      options.taskRuns.value = prevTaskRuns
+      if (JSON.stringify(options.runs.value) === JSON.stringify(prevRuns.filter(r => r.id !== id))) {
+        options.runs.value = prevRuns
+        options.taskRuns.value = prevTaskRuns
+      }
+      showErrorToast('删除运行记录失败')
       return
     }
 
@@ -46,8 +50,8 @@ export function useTaskHistoryActions(options: UseTaskHistoryActionsOptions) {
       return false
     }
 
-    const prevRuns = options.runs.value
-    const prevTaskRuns = options.taskRuns.value
+    const prevRuns = [...options.runs.value]
+    const prevTaskRuns = [...options.taskRuns.value]
     const taskId = options.historyFilterTaskId.value
 
     options.taskRuns.value = []
@@ -57,8 +61,11 @@ export function useTaskHistoryActions(options: UseTaskHistoryActionsOptions) {
 
     const ok = await options.runApi.deleteByTask(taskId)
     if (!ok) {
-      options.runs.value = prevRuns
-      options.taskRuns.value = prevTaskRuns
+      if (JSON.stringify(options.runs.value) === JSON.stringify(prevRuns.filter(r => r.taskId !== taskId))) {
+        options.runs.value = prevRuns
+        options.taskRuns.value = prevTaskRuns
+      }
+      showErrorToast('删除所有历史记录失败')
       return false
     }
 

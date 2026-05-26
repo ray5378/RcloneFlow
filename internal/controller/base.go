@@ -34,6 +34,8 @@ func mapServiceError(err error) (string, int) {
 		return "schedule not found", 404
 	case errors.Is(err, service.ErrRunNotFound):
 		return "run not found", 404
+	case errors.Is(err, service.ErrBisyncCurrentVersion):
+		return "cannot delete current version", 400
 	default:
 		return "internal error", 500
 	}

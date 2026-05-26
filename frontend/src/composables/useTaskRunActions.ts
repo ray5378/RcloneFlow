@@ -53,15 +53,11 @@ export function useTaskRunActions(options: UseTaskRunActionsOptions) {
         return result
       }
 
-      try {
-        await options.loadData()
-        await options.loadActiveRuns?.()
-        // fire-and-forget delayed polls — no timer reference needed; cannot leak after completion
-        setTimeout(() => { options.loadActiveRuns?.().catch(() => {}) }, 300)
-        setTimeout(() => { options.loadActiveRuns?.().catch(() => {}) }, 1200)
-      } catch (e) {
-        throw e
-      }
+      await options.loadData()
+      await options.loadActiveRuns?.()
+      // fire-and-forget delayed polls — no timer reference needed; cannot leak after completion
+      setTimeout(() => { options.loadActiveRuns?.().catch(() => {}) }, 300)
+      setTimeout(() => { options.loadActiveRuns?.().catch(() => {}) }, 1200)
       setTimeout(() => {
         if (runningTaskId.value === taskId) {
           runningTaskId.value = null

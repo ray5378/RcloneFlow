@@ -3,9 +3,40 @@ import type { Ref } from 'vue'
 import type { CreateForm, PathBreadcrumb, PathBrowseItem } from '../components/task/types'
 import type { Task } from '../types'
 
+const DEFAULT_PAGE_SIZE = 10
+
 interface UseTaskPathBrowseOptions {
   createForm: Ref<CreateForm>
   listPath: (remote: string, path: string) => Promise<{ items?: PathBrowseItem[] }>
+}
+
+interface PathBrowseHelper {
+  pathOptions: typeof pathOptionsRef
+  currentPath: typeof currentPathRef
+  breadcrumbs: ReturnType<typeof breadcrumbsRef>
+  setShowInput: (value: boolean) => void
+  loadPath: (remote: string, path: string) => Promise<void>
+  onRemoteChange: () => void
+  onBreadcrumbClick: (path: string) => void
+  onItemClick: (item: PathBrowseItem) => void
+  onItemArrow: (item: PathBrowseItem) => void
+}
+
+const pathOptionsRef = ref<PathBrowseItem[]>([])
+const currentPathRef = ref('')
+
+function breadcrumbsRef(getRemote: () => string, getPath: () => string) {
+  return computed<PathBreadcrumb[]>(() => {
+    if (!getRemote()) return []
+    const parts = (getPath() || '').split('/').filter(Boolean)
+    const crumbs = [{ name: getRemote() + ':', path: '' }]
+    let current = ''
+    for (const part of parts) {
+      current += '/' + part
+      crumbs.push({ name: part, path: current })
+    }
+    return crumbs
+  })
 }
 
 export function useTaskPathBrowse(options: UseTaskPathBrowseOptions) {
@@ -25,23 +56,15 @@ export function useTaskPathBrowse(options: UseTaskPathBrowseOptions) {
   }
 
   async function loadSourcePath(remote: string, path: string) {
-    try {
-      const data = await options.listPath(remote, path)
-      sourcePathOptions.value = data.items || []
-      sourceCurrentPath.value = path
-    } catch (e) {
-      throw e
-    }
+    const data = await options.listPath(remote, path)
+    sourcePathOptions.value = data.items || []
+    sourceCurrentPath.value = path
   }
 
   async function loadTargetPath(remote: string, path: string) {
-    try {
-      const data = await options.listPath(remote, path)
-      targetPathOptions.value = data.items || []
-      targetCurrentPath.value = path
-    } catch (e) {
-      throw e
-    }
+    const data = await options.listPath(remote, path)
+    targetPathOptions.value = data.items || []
+    targetCurrentPath.value = path
   }
 
   function resetTaskPathBrowse() {

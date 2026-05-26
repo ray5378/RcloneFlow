@@ -84,6 +84,7 @@ func TestMapServiceError(t *testing.T) {
 		{"task name exists", service.ErrTaskNameExists, 409, "task name already exists"},
 		{"schedule not found", service.ErrScheduleNotFound, 404, "schedule not found"},
 		{"run not found", service.ErrRunNotFound, 404, "run not found"},
+		{"bisync current version", service.ErrBisyncCurrentVersion, 400, "cannot delete current version"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
