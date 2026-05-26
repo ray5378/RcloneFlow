@@ -260,7 +260,7 @@ func (r *Runner) initializeRunState(run store.Run, cmd *exec.Cmd, stderrPath str
 }
 
 // waitForCompletion waits for the process to complete and handles the outcome
-func (r *Runner) waitForCompletion(ctx context.Context, run store.Run, cmd *exec.Cmd, outR, errR io.ReadCloser, stderrFile *os.File, stderrPath string, args []string, casCompat *openlistCASCompatPlan, casManagedRetries bool, maxCASAttempts int, effOpt map[string]any, cfg, src, dst, originalCmdName, cmdName string, attemptLogOffset int64) {
+func (r *Runner) waitForCompletion(ctx context.Context, run store.Run, cmd *exec.Cmd, outR, errR io.ReadCloser, outW, errW io.WriteCloser, stderrFile *os.File, stderrPath string, args []string, casCompat *openlistCASCompatPlan, casManagedRetries bool, maxCASAttempts int, effOpt map[string]any, cfg, src, dst, originalCmdName, cmdName string, attemptLogOffset int64) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
@@ -334,8 +334,13 @@ func (r *Runner) waitForCompletion(ctx context.Context, run store.Run, cmd *exec
 			}()
 			
 			err := newCmd.Wait()
-			newOutW.Close()
-			newErrW.Close()
+			if attempt == 1 {
+				outW.Close()
+				errW.Close()
+			} else {
+				newOutW.Close()
+				newErrW.Close()
+			}
 			consumeWG.Wait()
 			_ = stderrFile.Sync()
 			stderrFile.Close()
@@ -492,13 +497,13 @@ func (r *Runner) Start(ctx context.Context, run store.Run, mode, srcRemote, srcP
 
 	r.runPreflight(run, cfg, src, effOpt)
 
-	cmd, outR, errR, _, _, err := r.startProcess(runCtx, args)
+	cmd, outR, errR, outW, errW, err := r.startProcess(runCtx, args)
 	if err != nil {
 		return err
 	}
 
 	r.initializeRunState(run, cmd, stderrPath)
-	r.waitForCompletion(runCtx, run, cmd, outR, errR, stderrFile, stderrPath, args, casCompat, casManagedRetries, maxCASAttempts, effOpt, cfg, src, dst, originalCmdName, cmdName, attemptLogOffset)
+	r.waitForCompletion(runCtx, run, cmd, outR, errR, outW, errW, stderrFile, stderrPath, args, casCompat, casManagedRetries, maxCASAttempts, effOpt, cfg, src, dst, originalCmdName, cmdName, attemptLogOffset)
 
 	return nil
 }

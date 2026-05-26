@@ -60,6 +60,7 @@ func (h *Hub) removeClient(client *Client) {
 		return
 	}
 	delete(h.clients, client)
+	close(client.send)
 }
 
 // Run starts the hub's main loop
