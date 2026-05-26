@@ -16,7 +16,7 @@ export const taskApi = {
     try { return await api.updateTask(id, task) } catch (err) { handleError(err, { module: 'Task', operation: t('runtime.taskUpdate') }); return null }
   },
   async delete(id: number) {
-    try { return await api.deleteTask(id) } catch (err) { handleError(err, { module: 'Task', operation: t('runtime.taskDelete') }); return false }
+    try { await api.deleteTask(id); return true } catch (err) { handleError(err, { module: 'Task', operation: t('runtime.taskDelete') }); return false }
   },
   async run(id: number) {
     try { return await api.runTask(id) } catch (err) { handleError(err, { module: 'Task', operation: t('runtime.taskRun') }); return null }
