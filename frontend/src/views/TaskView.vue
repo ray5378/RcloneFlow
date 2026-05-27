@@ -46,6 +46,8 @@ const {
   
   // Bisync LST Manager
   bisyncLstManagerVisible,
+  bisyncLstManagerTaskId,
+  bisyncLstManagerOptions,
   openBisyncLstManager,
   closeBisyncLstManager,
   
@@ -461,6 +463,7 @@ const {
   <BisyncLstManagerModal
     :visible="bisyncLstManagerVisible"
     :task-id="bisyncLstManagerTaskId"
+    :bisync-options="bisyncLstManagerOptions"
     @close="closeBisyncLstManager"
   />
 

@@ -1030,6 +1030,7 @@ func (s *TaskService) ResyncBisync(taskID int64) error {
 	if err := s.db.UpdateTask(taskID, task); err != nil {
 		return err
 	}
+	_ = s.BackupCurrentLstFiles(taskID)
 	_, err := s.RunTask(context.Background(), taskID, "manual")
 	return err
 }

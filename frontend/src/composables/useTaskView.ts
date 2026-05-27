@@ -54,6 +54,8 @@ export interface UseTaskViewReturn {
   handleUnselectTag: (tag: string) => Promise<void>
   handleDeleteTag: (tag: string) => Promise<void>
   bisyncLstManagerVisible: ReturnType<typeof ref<boolean>>
+  bisyncLstManagerTaskId: ReturnType<typeof ref<number | null>>
+  bisyncLstManagerOptions: ReturnType<typeof ref<any>>
   openBisyncLstManager: (task: any) => void
   closeBisyncLstManager: () => void
   runningTaskId: ReturnType<typeof useTaskListRuntime>['runningTaskId']
@@ -270,6 +272,8 @@ function useTaskViewBisyncManager() {
 
   return {
     bisyncLstManagerVisible,
+    bisyncLstManagerTaskId,
+    bisyncLstManagerOptions,
     openBisyncLstManager,
     closeBisyncLstManager,
   }
@@ -451,6 +455,8 @@ export function useTaskView(): UseTaskViewReturn {
 
   const {
     bisyncLstManagerVisible,
+    bisyncLstManagerTaskId,
+    bisyncLstManagerOptions,
     openBisyncLstManager,
     closeBisyncLstManager,
   } = useTaskViewBisyncManager()
@@ -768,6 +774,8 @@ export function useTaskView(): UseTaskViewReturn {
     handleUnselectTag,
     handleDeleteTag,
     bisyncLstManagerVisible,
+    bisyncLstManagerTaskId,
+    bisyncLstManagerOptions,
     openBisyncLstManager,
     closeBisyncLstManager,
     runningTaskId,
