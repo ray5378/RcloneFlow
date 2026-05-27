@@ -4,6 +4,9 @@ import { onWsMessage } from './useWebSocket'
 
 const PAGE_SIZE = 10
 const MIN_TRANSFER_SLOTS = 1
+const TIME_CONSTANTS = {
+  FINISH_WINDOW_MS: 15000,
+}
 
 interface SortableItem {
   order?: number | string
@@ -79,9 +82,32 @@ function appendNewCompletedItemsForLastPage(current: ActiveTransferCompletedFile
   return additions.length ? sortCompletedItems([...current, ...additions]) : current
 }
 
+function freezeCompletedProgress(p: ActiveTransferSummary | null): ActiveTransferSummary | null {
+  if (!p) return null
+  
+  const frozen = { ...p }
+  const percentage = Number(frozen.percentage || 0)
+  
+  if (percentage >= 99.999) {
+    frozen.percentage = 100
+    const totalBytes = Number(frozen.totalBytes || 0)
+    if (totalBytes > 0) frozen.bytes = totalBytes
+    const totalCount = Number(frozen.totalCount || 0)
+    if (totalCount > 0) frozen.completedCount = totalCount
+    frozen.speed = 0
+    frozen.eta = 0
+    frozen.phase = 'completed'
+  }
+  
+  return frozen
+}
+
 function mergeNonDecreasingSummary(prev: ActiveTransferSummary | null, next: ActiveTransferSummary | null): ActiveTransferSummary | null {
   if (!next) return prev
-  if (!prev) return next
+  if (!prev) {
+    const frozen = freezeCompletedProgress(next)
+    return frozen || next
+  }
 
   const nextTotalBytes = Math.max(Number(prev.totalBytes || 0), Number(next.totalBytes || 0))
   const nextPlannedFiles = Math.max(Number(prev.plannedFiles || 0), Number(next.plannedFiles || 0))
@@ -92,16 +118,20 @@ function mergeNonDecreasingSummary(prev: ActiveTransferSummary | null, next: Act
   )
   const nextTotalCount = nextLogicalTotalCount
   const nextCompletedCount = Math.max(Number(prev.completedCount || 0), Number(next.completedCount || 0))
+  const nextBytes = Math.max(Number(prev.bytes || 0), Number(next.bytes || 0))
   
   let nextPercentage = Number(next.percentage || 0)
   if (!nextPercentage && nextTotalBytes > 0) {
-    nextPercentage = Math.min(100, (Number(next.bytes || 0) / nextTotalBytes) * 100)
+    nextPercentage = Math.min(100, (nextBytes / nextTotalBytes) * 100)
   }
   nextPercentage = Math.max(Number(prev.percentage || 0), nextPercentage)
   if (nextCompletedCount >= nextTotalCount && nextTotalCount > 0) nextPercentage = 100
   if (nextPercentage > 100) nextPercentage = 100
 
-  return {
+  let nextSpeed = Number(next.speed || prev.speed || 0)
+  const nextEta = Number(next.eta || prev.eta || 0)
+
+  const merged = {
     ...prev,
     ...next,
     plannedFiles: nextPlannedFiles,
@@ -110,8 +140,14 @@ function mergeNonDecreasingSummary(prev: ActiveTransferSummary | null, next: Act
     pendingCount: Math.max(0, nextTotalCount - nextCompletedCount),
     totalCount: nextTotalCount,
     totalBytes: nextTotalBytes,
+    bytes: nextBytes,
     percentage: nextPercentage,
+    speed: nextSpeed,
+    eta: nextEta,
   }
+
+  const final = freezeCompletedProgress(merged)
+  return final || merged
 }
 
 const NO_ACTIVE_TRANSFER_ERRORS = [
@@ -149,6 +185,7 @@ export function useActiveTransferDetail() {
   const runId = ref<number | null>(null)
   const trackingMode = ref<TrackingMode>('normal')
   const summary = ref<ActiveTransferSummary | null>(null)
+  const completedFreeze = ref<ActiveTransferSummary & { __frozenAt: number } | null>(null)
   const currentFile = ref<ActiveTransferCurrentFile | null>(null)
   const currentFiles = ref<ActiveTransferCurrentFile[]>([])
   const transferSlots = ref(MIN_TRANSFER_SLOTS)
@@ -168,6 +205,13 @@ export function useActiveTransferDetail() {
   const completedTotalPages = computed(() => Math.max(1, Math.ceil(Math.max(completedTotal.value, 0) / PAGE_SIZE)))
   const pendingTotalPages = computed(() => Math.max(1, Math.ceil(pendingTotal.value / PAGE_SIZE)))
 
+  const stableSummary = computed(() => {
+    if (completedFreeze.value) {
+      return completedFreeze.value
+    }
+    return summary.value
+  })
+
   function shouldHandleRunMessage(incomingRunId: any, incomingTaskId?: any): boolean {
     return visible.value && (
       (runId.value != null && Number(incomingRunId) === Number(runId.value)) ||
@@ -177,6 +221,7 @@ export function useActiveTransferDetail() {
 
   function resetTransferState(): void {
     summary.value = null
+    completedFreeze.value = null
     currentFile.value = null
     currentFiles.value = []
     transferSlots.value = MIN_TRANSFER_SLOTS
@@ -228,7 +273,7 @@ export function useActiveTransferDetail() {
       completed.length + pending.length,
     )
     
-    summary.value = mergeNonDecreasingSummary(summary.value, {
+    const merged = mergeNonDecreasingSummary(summary.value, {
       ...summary.value,
       ...createEmptySnapshot(),
       trackingMode: snapshot.trackingMode,
@@ -239,6 +284,19 @@ export function useActiveTransferDetail() {
       preflightPending: !!snapshot.preflightPending,
       preflightFinished: !!snapshot.preflightFinished,
     })
+
+    if (merged && Number(merged.percentage || 0) >= 99.999) {
+      if (!completedFreeze.value) {
+        completedFreeze.value = {
+          ...merged,
+          __frozenAt: Date.now(),
+        }
+      }
+      summary.value = completedFreeze.value
+    } else {
+      completedFreeze.value = null
+      summary.value = merged
+    }
   }
 
   function clampPageValues(): void {
@@ -266,7 +324,22 @@ export function useActiveTransferDetail() {
       
       runId.value = overview.runId
       trackingMode.value = overview.trackingMode
-      summary.value = mergeNonDecreasingSummary(summary.value, overview.summary)
+      
+      const merged = mergeNonDecreasingSummary(summary.value, overview.summary)
+      
+      if (merged && Number(merged.percentage || 0) >= 99.999) {
+        if (!completedFreeze.value) {
+          completedFreeze.value = {
+            ...merged,
+            __frozenAt: Date.now(),
+          }
+        }
+        summary.value = completedFreeze.value
+      } else {
+        completedFreeze.value = null
+        summary.value = merged
+      }
+      
       currentFile.value = overview.currentFile || null
       currentFiles.value = sortCurrentFiles(overview.currentFiles || (overview.currentFile ? [overview.currentFile] : []))
       transferSlots.value = Math.max(MIN_TRANSFER_SLOTS, Number(overview.transferSlots || overview.summary?.transferSlots || transferSlots.value || MIN_TRANSFER_SLOTS))
@@ -380,11 +453,12 @@ export function useActiveTransferDetail() {
       const incomingPlannedFiles = Number(data?.plannedFiles || 0)
       const incomingLogicalTotalCount = Number(data?.logicalTotalCount || data?.totalCount || incomingPlannedFiles || prev.logicalTotalCount || prev.totalCount || 0)
       const nextCompletedCount = Math.max(Number(prev.completedCount || 0), Number(data?.completedFiles || 0))
+      const nextBytes = Math.max(Number(prev.bytes || 0), Number(data?.bytes || 0))
       
-      summary.value = mergeNonDecreasingSummary(summary.value, {
+      const merged = mergeNonDecreasingSummary(summary.value, {
         ...prev,
-        bytes: Number(data?.bytes || prev.bytes || 0),
-        totalBytes: Number(data?.total || prev.totalBytes || 0),
+        bytes: nextBytes,
+        totalBytes: Math.max(Number(prev.totalBytes || 0), Number(data?.total || prev.totalBytes || 0)),
         speed: Number(data?.speed || prev.speed || 0),
         percentage: Number(data?.percent || prev.percentage || 0),
         eta: Number(data?.eta || prev.eta || 0),
@@ -396,6 +470,19 @@ export function useActiveTransferDetail() {
         phase: typeof data?.phase === 'string' ? data.phase : prev.phase,
         lastUpdatedAt: typeof data?.lastUpdatedAt === 'string' ? data.lastUpdatedAt : prev.lastUpdatedAt,
       })
+
+      if (merged && Number(merged.percentage || 0) >= 99.999) {
+        if (!completedFreeze.value) {
+          completedFreeze.value = {
+            ...merged,
+            __frozenAt: Date.now(),
+          }
+        }
+        summary.value = completedFreeze.value
+      } else {
+        completedFreeze.value = null
+        summary.value = merged
+      }
     }
   })
 
@@ -416,7 +503,7 @@ export function useActiveTransferDetail() {
     activeTransferVisible: visible,
     activeTransferTaskId: taskId,
     activeTransferTrackingMode: trackingMode,
-    activeTransferSummary: summary,
+    activeTransferSummary: stableSummary,
     activeTransferCurrentFile: currentFile,
     activeTransferCurrentFiles: currentFiles,
     activeTransferSlots: transferSlots,
