@@ -191,7 +191,7 @@ func (c *RunController) HandleRunKillCLI(w http.ResponseWriter, r *http.Request)
 		}
 		break
 	}
-	WriteJSON(w, 404, map[string]any{"error": "run not found or no pid"})
+	WriteJSON(w, 200, map[string]any{"killed": false})
 }
 
 func (c *RunController) HandleTaskKill(w http.ResponseWriter, r *http.Request) {
@@ -233,7 +233,7 @@ func (c *RunController) HandleTaskKill(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, 200, map[string]any{"killed": true, "runId": candidate.ID})
 		return
 	}
-	WriteJSON(w, 404, map[string]any{"error": "pid not found"})
+	WriteJSON(w, 200, map[string]any{"killed": false})
 }
 
 // HandleRunLog 统一提供 stderr 单文件下载

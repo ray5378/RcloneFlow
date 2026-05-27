@@ -13,19 +13,14 @@ defineProps<{
   clipboard: UseBrowserClipboardReturn
   contextMenu: UseBrowserContextMenuReturn
   fileOps: UseBrowserFileOpsReturn
-  onRefreshBrowser: () => Promise<void>
-  onEnterItem: (item: FileItem) => void
   onFormatTime: (time: string) => string
   onFormatSize: (size: string) => string
-  onCopyItem: () => void
-  onMoveItem: () => void
-  onStartRename: () => void
-  onConfirmDelete: () => void
 }>()
 
 defineEmits<{
   refreshBrowser: []
   enterItem: [item: FileItem]
+  navigateCrumb: [path: string]
   copyItem: []
   moveItem: []
   startRename: []
@@ -44,7 +39,7 @@ defineEmits<{
         <button
           class="crumb"
           :class="{ current: i === breadcrumbs.length - 1 }"
-          @click="crumb.path !== browserPath && ($emit('refreshBrowser'))"
+          @click="crumb.path !== browserPath && $emit('navigateCrumb', crumb.path)"
         >
           {{ crumb.name }}
         </button>

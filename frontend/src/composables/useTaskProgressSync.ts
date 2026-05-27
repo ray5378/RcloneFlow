@@ -48,7 +48,7 @@ export function useTaskProgressSync(options: UseTaskProgressSyncOptions): UseTas
   })
 
   function extractTaskId(item: any): number {
-    return Number(item?.taskId ?? item?.taskID ?? item?.task_id ?? 0)
+    return Number(item?.taskId ?? item?.runRecord?.taskId ?? item?.taskID ?? item?.task_id ?? 0)
   }
 
   function normalizeSummaryProgress(p: unknown): ActiveRunProgress | null {

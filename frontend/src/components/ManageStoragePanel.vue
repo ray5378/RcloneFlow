@@ -5,11 +5,6 @@ import type { UseBrowserFileOpsReturn } from '../composables/useBrowserFileOps'
 defineProps<{
   remoteMgmt: UseBrowserRemoteManagementReturn
   fileOps: UseBrowserFileOpsReturn
-  onBack: () => void
-  onOpenAddRemote: () => void
-  onOpenEditRemote: (name: string) => Promise<void>
-  onOpenEditDesc: (name: string) => void
-  onHandleDeleteRemote: (name: string) => Promise<void>
 }>()
 
 defineEmits<{
@@ -33,7 +28,7 @@ defineEmits<{
       </div>
     </div>
     <div class="list">
-      <div v-for="name in remoteMgmt.remotes" :key="name" class="item" @click="remoteMgmt.openRemote(name)">
+      <div v-for="name in remoteMgmt.remotes.value" :key="name" class="item" @click="remoteMgmt.openRemote(name)">
         <div class="name">
           <strong>{{ name }}</strong>
         </div>

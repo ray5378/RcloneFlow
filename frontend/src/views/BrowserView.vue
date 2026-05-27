@@ -69,6 +69,7 @@ async function openEditRemote(name: string) {
   <!-- Storage Panel -->
   <StoragePanel
     :remote-mgmt="remoteMgmt"
+    :selected-remote="browserFs"
     @open-manage-storage="openManageStorage"
     @open-add-remote="openAddRemote"
   />
@@ -84,12 +85,15 @@ async function openEditRemote(name: string) {
     :clipboard="clipboard"
     :context-menu="contextMenu"
     :file-ops="fileOps"
+    :on-format-time="formatTime"
+    :on-format-size="formatSize"
     @refresh-browser="refreshBrowser"
     @enter-item="enterItem"
     @copy-item="copyItem"
     @move-item="moveItem"
     @start-rename="startRename"
     @confirm-delete="confirmDelete"
+    @navigate-crumb="browserPath = $event; refreshBrowser()"
   />
 
   <!-- Manage Storage Panel -->
@@ -171,7 +175,7 @@ async function openEditRemote(name: string) {
   <EditDescModal
     :show="showEditDesc"
     :remote-name="editDescRemote"
-    :description="remoteMgmt.descriptions[editDescRemote] || ''"
+    :description="remoteMgmt.descriptions.value[editDescRemote] || ''"
     @close="showEditDesc = false"
     @save="saveDesc"
   />

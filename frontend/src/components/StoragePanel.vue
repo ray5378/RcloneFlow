@@ -3,8 +3,7 @@ import type { UseBrowserRemoteManagementReturn } from '../composables/useBrowser
 
 defineProps<{
   remoteMgmt: UseBrowserRemoteManagementReturn
-  onOpenManageStorage: () => void
-  onOpenAddRemote: () => void
+  selectedRemote: string
 }>()
 
 defineEmits<{
@@ -32,6 +31,7 @@ defineEmits<{
         v-for="name in remoteMgmt.getOrderedRemotes()"
         :key="name"
         class="tile"
+        :class="{ active: name === selectedRemote }"
         draggable="true"
         @click="remoteMgmt.openRemote(name)"
         @dragstart="remoteMgmt.onDragStart(name)"
@@ -65,6 +65,12 @@ defineEmits<{
   transform: translateY(-2px);
 }
 
+.tile.active {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.60);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.20);
+}
+
 body.light .tile {
   border-color: rgba(15, 23, 42, 0.12);
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
@@ -74,5 +80,11 @@ body.light .tile:hover {
   background: #f8f8f8;
   border-color: rgba(25, 118, 210, 0.30);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+}
+
+body.light .tile.active {
+  background: rgba(25, 118, 210, 0.12);
+  border-color: rgba(25, 118, 210, 0.50);
+  box-shadow: 0 4px 12px rgba(25, 118, 210, 0.15);
 }
 </style>

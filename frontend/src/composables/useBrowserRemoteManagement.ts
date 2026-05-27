@@ -20,6 +20,7 @@ export interface UseBrowserRemoteManagementReturn {
   onDragOver: (e: DragEvent, name: string) => void
   onDrop: (e: DragEvent, targetName: string) => void
   onDragEnd: () => void
+  openRemote: (name: string) => Promise<void>
   deleteRemote: (name: string) => Promise<{ show: boolean; title: string; message: string; onConfirm: () => Promise<void> }>
   saveDesc: (name: string, desc: string) => void
 }
@@ -127,6 +128,7 @@ export function useBrowserRemoteManagement(options: UseBrowserRemoteManagementOp
     onDragOver,
     onDrop,
     onDragEnd,
+    openRemote: options.openRemote,
     deleteRemote,
     saveDesc
   }

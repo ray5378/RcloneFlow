@@ -458,12 +458,13 @@ const {
   <BisyncLstManagerModal
     :visible="bisyncLstManagerVisible"
     :task-id="bisyncLstManagerTaskId"
-    :options="bisyncLstManagerOptions"
     @close="closeBisyncLstManager"
   />
 
   <ConfirmModal
-    :confirm="confirmModal"
+    :visible="confirmModal.show"
+    :title="confirmModal.title"
+    :message="confirmModal.message"
     @confirm="confirmAndClose"
     @close="closeConfirm"
   />
