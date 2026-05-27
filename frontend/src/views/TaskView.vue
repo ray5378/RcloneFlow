@@ -454,10 +454,10 @@ const {
     :suggested-tags="suggestedTags"
     :selected-keyword-tags="selectedKeywordTags"
     :action-tags="actionTags"
-    @create="handleCreateTag"
-    @select="handleSelectTag"
-    @unselect="handleUnselectTag"
-    @delete="handleDeleteTag"
+    @create-tag="handleCreateTag"
+    @select-tag="handleSelectTag"
+    @unselect-tag="handleUnselectTag"
+    @delete-tag="handleDeleteTag"
     @close="closeTagManager"
   />
 
