@@ -16,6 +16,7 @@ const {
   currentModule,
   
   // Task List
+  tasks,
   filteredTasks,
   tasksTotal,
   tasksPage,
@@ -177,6 +178,7 @@ const {
   commandMode,
   commandText,
   createForm,
+  remotes,
   editingTask,
   showAdvancedOptions,
   creatingState,
@@ -253,6 +255,7 @@ const {
   <TaskListViewShell
     v-if="currentModule !== 'history'"
     :task-search="taskSearch"
+    :all-tasks="tasks"
     :filtered-tasks="filteredTasks"
     :get-schedule-by-task-id="getScheduleByTaskId"
     :get-task-card-progress-by-task="getTaskCardProgressByTask"
