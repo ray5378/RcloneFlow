@@ -453,6 +453,7 @@ const {
     :visible="tagManagerVisible"
     :suggested-tags="suggestedTags"
     :selected-keyword-tags="selectedKeywordTags"
+    :action-tags="actionTags"
     @create="handleCreateTag"
     @select="handleSelectTag"
     @unselect="handleUnselectTag"
