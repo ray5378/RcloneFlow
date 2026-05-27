@@ -179,7 +179,7 @@ func sanitizeFilenameForBisync(s string, taskID int64) string {
 	if s == "" {
 		s = fmt.Sprintf("task-%d", taskID)
 	}
-	invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+	invalid := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_.-]+`)
 	s = invalid.ReplaceAllString(s, "_")
 	// 截断到 60 字符以内，避免过长
 	r := []rune(s)
