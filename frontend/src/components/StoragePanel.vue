@@ -43,8 +43,8 @@ defineEmits<{
           <span class="tile-name">☁️ {{ name }}</span>
           <span class="tile-drag">⋮⋮</span>
         </div>
-        <div v-if="remoteMgmt.descriptions[name]" class="tile-desc">
-          {{ remoteMgmt.descriptions[name] }}
+        <div v-if="remoteMgmt.descriptions.value[name]" class="tile-desc">
+          {{ remoteMgmt.descriptions.value[name] }}
         </div>
       </div>
     </div>
