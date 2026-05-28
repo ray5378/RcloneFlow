@@ -231,6 +231,7 @@ func (s *TaskService) ImportTasks(data map[string]any, strategy string) (importe
 		}
 	}
 
+	s.recalcTags()
 	return imported, skipped, overwritten, nil
 }
 
