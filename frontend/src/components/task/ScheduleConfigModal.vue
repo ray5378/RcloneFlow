@@ -186,27 +186,234 @@ function save() {
 </template>
 
 <style scoped>
-.schedule-modal { width: min(960px, 92vw); max-width: 960px; }
-.toggle-row { display:flex; gap:12px; margin-bottom:16px; }
-.toggle-btn { flex:1; padding:12px 16px; border-radius:10px; border:1px solid #475569; background:#111827; color:#e5e7eb; font-weight:700; }
-.toggle-btn.active.enable-btn { background:#166534; border-color:#166534; color:#fff; }
-.toggle-btn.active.disable-btn { background:#b91c1c; border-color:#b91c1c; color:#fff; }
-.status-line { display:flex; align-items:center; gap:10px; margin-bottom:16px; }
-.status-label { color:#94a3b8; font-size:13px; }
-.status-pill { padding:4px 10px; border-radius:999px; font-size:12px; font-weight:700; }
-.status-pill.enabled { background:#22c55e33; color:#22c55e; }
-.status-pill.disabled { background:#7c2d1233; color:#fca5a5; }
-.schedule-fields { display:flex; flex-direction:column; gap:12px; padding:12px; background:var(--surface); border-radius:8px; }
-.schedule-row { display:flex; flex-direction:column; gap:6px; }
-.schedule-row label { font-size:12px; color:#888; }
-.chip-select { display:flex; flex-wrap:wrap; gap:4px; }
-.chip-btn { padding:4px 8px; font-size:11px; border:1px solid var(--border); border-radius:4px; background:var(--surface); color:var(--text); cursor:pointer; transition:all .2s; }
-.chip-btn:hover { border-color:var(--accent); }
-.chip-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
-.minute-chips .chip-btn { padding:2px 4px; font-size:10px; min-width:24px; text-align:center; }
-.schedule-preview { margin-top:14px; }
-.hint { font-size:12px; color:#888; }
-.modal-actions { display:flex; justify-content:flex-end; gap:10px; margin-top:20px; }
-body.light .toggle-btn { background:#fff; color:#222; border-color:#cbd5e1; }
-body.light .schedule-fields { background:#f8fafc; }
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--surface);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-content.schedule-modal {
+  width: min(960px, 92vw);
+  max-width: 960px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--text);
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.close-btn:hover {
+  background: var(--hover);
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.toggle-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 10px;
+  border: 1px solid #475569;
+  background: #111827;
+  color: #e5e7eb;
+  font-weight: 700;
+}
+
+.toggle-btn.active.enable-btn {
+  background: #166534;
+  border-color: #166534;
+  color: #fff;
+}
+
+.toggle-btn.active.disable-btn {
+  background: #b91c1c;
+  border-color: #b91c1c;
+  color: #fff;
+}
+
+.status-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.status-label {
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.status-pill {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status-pill.enabled {
+  background: #22c55e33;
+  color: #22c55e;
+}
+
+.status-pill.disabled {
+  background: #7c2d1233;
+  color: #fca5a5;
+}
+
+.schedule-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: var(--surface);
+  border-radius: 8px;
+}
+
+.schedule-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schedule-row label {
+  font-size: 12px;
+  color: #888;
+}
+
+.chip-select {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.chip-btn {
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chip-btn:hover {
+  border-color: var(--accent);
+}
+
+.chip-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.minute-chips .chip-btn {
+  padding: 2px 4px;
+  font-size: 10px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.schedule-preview {
+  margin-top: 14px;
+}
+
+.hint {
+  font-size: 12px;
+  color: #888;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+body.light .toggle-btn {
+  background: #fff;
+  color: #222;
+  border-color: #cbd5e1;
+}
+
+body.light .schedule-fields {
+  background: #f8fafc;
+}
+
+@media (max-width: 640px) {
+  .modal-overlay {
+    padding: 10px;
+  }
+
+  .modal-content {
+    max-height: 85vh;
+    border-radius: 16px;
+  }
+
+  .modal-header {
+    padding: 14px 16px;
+  }
+
+  .modal-header h3 {
+    font-size: 16px;
+  }
+
+  .modal-body {
+    padding: 16px;
+  }
+}
 </style>
