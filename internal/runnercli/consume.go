@@ -24,7 +24,6 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 		jsonLevel := ""
 		jsonMsg := ""
 		jsonObj := ""
-		// 1) JSON 行：既尝试直接提取 machine-readable progress，也把 msg/object 解包给现有文本解析链复用。
 		var rec map[string]any
 		if json.Unmarshal([]byte(line), &rec) == nil {
 			prog := map[string]any{}
@@ -40,6 +39,10 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 			if v, ok := rec["eta"].(float64); ok {
 				prog["eta"] = v
 			}
+			var (
+				currentFile  map[string]any
+				currentFiles []map[string]any
+			)
 			if stats, ok := rec["stats"].(map[string]any); ok {
 				if v, ok := stats["bytes"].(float64); ok {
 					prog["bytes"] = v
@@ -54,8 +57,8 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					prog["eta"] = v
 				}
 				if tr, ok := stats["transferring"].([]any); ok && len(tr) > 0 {
-					currentFiles := make([]map[string]any, 0, len(tr))
-					for i, rawItem := range tr {
+					currentFiles = make([]map[string]any, 0, len(tr))
+					for _, rawItem := range tr {
 						item, ok := rawItem.(map[string]any)
 						if !ok {
 							continue
@@ -78,34 +81,21 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						if r.activeMgr != nil {
 							r.activeMgr.OnFileProgress(runID, name, int64(cb), int64(tb), int64(sp), pctPtr)
 						}
-						currentFile := map[string]any{
-							"name": name,
-							"path": name,
-							"bytes": cb,
+						cf := map[string]any{
+							"name":      name,
+							"path":      name,
+							"bytes":     cb,
 							"totalBytes": tb,
-							"speed": sp,
-							"status": "in_progress",
+							"speed":     sp,
+							"status":    "in_progress",
 						}
 						if pctPtr != nil {
-							currentFile["percentage"] = *pctPtr
+							cf["percentage"] = *pctPtr
 						}
-						currentFiles = append(currentFiles, currentFile)
-						if i == 0 {
-							_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
-								if rr.Summary == nil {
-									rr.Summary = map[string]any{}
-								}
-								rr.Summary["currentFile"] = currentFile
-							})
+						if currentFile == nil {
+							currentFile = cf
 						}
-					}
-					if len(currentFiles) > 0 {
-						_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
-							if rr.Summary == nil {
-								rr.Summary = map[string]any{}
-							}
-							rr.Summary["currentFiles"] = currentFiles
-						})
+						currentFiles = append(currentFiles, cf)
 					}
 				}
 			}
@@ -128,31 +118,35 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					parsedLine = msg
 				}
 			}
-			if len(prog) > 0 {
-				if parsed, ok := parseOneLineProgress(parsedLine); ok {
-					if v, ok2 := parsed["completedFiles"]; ok2 {
-						prog["completedFiles"] = v
-					} else if _, ok2 := parsed["plannedFiles"]; ok2 {
-						prog["completedFiles"] = float64(0)
-					}
-					if v, ok2 := parsed["plannedFiles"]; ok2 {
-						prog["plannedFiles"] = v
-					}
-					if v, ok2 := parsed["eta"]; ok2 {
-						prog["eta"] = v
-					}
-					if v, ok2 := parsed["percentage"]; ok2 {
-						if _, ok3 := prog["percentage"]; !ok3 {
-							prog["percentage"] = v
+			hasTransferring := currentFiles != nil && len(currentFiles) > 0
+			hasProgress := len(prog) > 0
+			if hasTransferring || hasProgress {
+				if hasProgress {
+					if parsed, ok := parseOneLineProgress(parsedLine); ok {
+						if v, ok2 := parsed["completedFiles"]; ok2 {
+							prog["completedFiles"] = v
+						} else if _, ok2 := parsed["plannedFiles"]; ok2 {
+							prog["completedFiles"] = float64(0)
+						}
+						if v, ok2 := parsed["plannedFiles"]; ok2 {
+							prog["plannedFiles"] = v
+						}
+						if v, ok2 := parsed["eta"]; ok2 {
+							prog["eta"] = v
+						}
+						if v, ok2 := parsed["percentage"]; ok2 {
+							if _, ok3 := prog["percentage"]; !ok3 {
+								prog["percentage"] = v
+							}
 						}
 					}
+					recomputeProgressPct(prog)
 				}
-				recomputeProgressPct(prog)
 				_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
 					if rr.Summary == nil {
 						rr.Summary = map[string]any{}
 					}
-					if prev, ok := rr.Summary["progress"].(map[string]any); ok {
+					if prev, ok := rr.Summary["progress"].(map[string]any); ok && hasProgress {
 						if pc, ok2 := prev["completedFiles"].(float64); ok2 {
 							if nc, ok3 := prog["completedFiles"].(float64); ok3 {
 								if nc < pc {
@@ -162,9 +156,9 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 								prog["completedFiles"] = pc
 							}
 						}
-						if pp, ok2 := prev["plannedFiles"].(float64); ok2 {
-							if np, ok3 := prog["plannedFiles"].(float64); ok3 {
-								if np < pp {
+						if pp, ok2 := prev["plannedFiles"]; ok2 {
+							if np, ok3 := prog["plannedFiles"]; ok3 {
+								if np.(float64) < pp.(float64) {
 									prog["plannedFiles"] = pp
 								}
 							} else {
@@ -180,26 +174,36 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 							rr.Summary["files"] = fp.snapshot(100)
 						}
 					}
-					rr.Summary["progress"] = prog
-					rr.Summary["progressLine"] = parsedLine
-					if b, ok := prog["bytes"].(float64); ok {
-						rr.BytesTransferred = int64(b)
+					if hasProgress {
+						rr.Summary["progress"] = prog
+						rr.Summary["progressLine"] = parsedLine
+						if b, ok := prog["bytes"].(float64); ok {
+							rr.BytesTransferred = int64(b)
+						}
+						if sp, ok := prog["speed"].(float64); ok {
+							rr.Speed = fmt.Sprintf("%d B/s", int64(sp))
+						}
 					}
-					if sp, ok := prog["speed"].(float64); ok {
-						rr.Speed = fmt.Sprintf("%d B/s", int64(sp))
+					if hasTransferring {
+						if currentFile != nil {
+							rr.Summary["currentFile"] = currentFile
+						}
+						rr.Summary["currentFiles"] = currentFiles
 					}
 				})
-				r.broadcaster.Broadcast("run_progress", map[string]any{
-					"run_id":         runID,
-					"bytes":          prog["bytes"],
-					"total":          prog["totalBytes"],
-					"speed":          prog["speed"],
-					"percent":        prog["percentage"],
-					"completedFiles": prog["completedFiles"],
-					"plannedFiles":   prog["plannedFiles"],
-					"totalCount":     prog["plannedFiles"],
-					"eta":            prog["eta"],
-				})
+				if hasProgress {
+					r.broadcaster.Broadcast("run_progress", map[string]any{
+						"run_id":         runID,
+						"bytes":          prog["bytes"],
+						"total":          prog["totalBytes"],
+						"speed":          prog["speed"],
+						"percent":        prog["percentage"],
+						"completedFiles": prog["completedFiles"],
+						"plannedFiles":   prog["plannedFiles"],
+						"totalCount":     prog["plannedFiles"],
+						"eta":            prog["eta"],
+					})
+				}
 				continue
 			}
 		}
