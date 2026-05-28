@@ -31,9 +31,7 @@ export function useBrowserRemoteManagement(options: UseBrowserRemoteManagementOp
   const remotes = ref<string[]>([])
   const remoteOrder = ref<string[]>(JSON.parse(localStorage.getItem('remoteOrder') || '[]'))
   const draggedRemote = ref('')
-  const descriptions = ref<Record<string, string>>(
-    JSON.parse(localStorage.getItem('remoteDescriptions') || '{}')
-  )
+  const descriptions = ref<Record<string, string>>({})
 
   function getOrderedRemotes() {
     const remotesList = remotes.value
@@ -104,7 +102,6 @@ export function useBrowserRemoteManagement(options: UseBrowserRemoteManagementOp
         try {
           await api.deleteRemote(name)
           delete descriptions.value[name]
-          localStorage.setItem('remoteDescriptions', JSON.stringify(descriptions.value))
           await options.loadRemotes()
         } catch (e) {
           showToast((e as Error).message, 'error')
@@ -116,21 +113,13 @@ export function useBrowserRemoteManagement(options: UseBrowserRemoteManagementOp
   async function loadDescriptions() {
     try {
       const data = await api.listRemotes()
-      if (data.descriptions) {
-        const merged = { ...localStorage.getItem('remoteDescriptions') ? JSON.parse(localStorage.getItem('remoteDescriptions')!) : {} }
-        for (const [name, desc] of Object.entries(data.descriptions)) {
-          if (desc) merged[name] = desc
-        }
-        descriptions.value = merged
-        localStorage.setItem('remoteDescriptions', JSON.stringify(merged))
-      }
+      descriptions.value = data.descriptions || {}
     } catch {
     }
   }
 
   async function saveDesc(name: string, desc: string) {
     descriptions.value[name] = desc
-    localStorage.setItem('remoteDescriptions', JSON.stringify(descriptions.value))
     try {
       await updateRemoteDescription(name, desc)
     } catch {

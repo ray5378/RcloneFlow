@@ -7,6 +7,10 @@ vi.mock('../api', () => ({
   deleteRemote: vi.fn(),
 }))
 
+vi.mock('../api/remote', () => ({
+  updateRemoteDescription: vi.fn(),
+}))
+
 vi.mock('../api/errors', () => ({
   showToast: vi.fn(),
 }))
@@ -46,12 +50,6 @@ describe('useBrowserRemoteManagement.ts', () => {
       localStorage.setItem('remoteOrder', JSON.stringify(['remote1', 'remote2']))
       const mgmt = useBrowserRemoteManagement(mockOptions)
       expect(mgmt.remoteOrder.value).toEqual(['remote1', 'remote2'])
-    })
-
-    it('should load descriptions from localStorage if available', () => {
-      localStorage.setItem('remoteDescriptions', JSON.stringify({ remote1: 'desc1' }))
-      const mgmt = useBrowserRemoteManagement(mockOptions)
-      expect(mgmt.descriptions.value).toEqual({ remote1: 'desc1' })
     })
 
     it('should initialize with empty draggedRemote', () => {
@@ -279,37 +277,35 @@ describe('useBrowserRemoteManagement.ts', () => {
   })
 
   describe('saveDesc', () => {
-    it('should save description to state', () => {
+    it('should save description to state and call API', async () => {
+      const remote = await import('../api/remote')
       const mgmt = useBrowserRemoteManagement(mockOptions)
-      mgmt.saveDesc('test-remote', 'test description')
+      await mgmt.saveDesc('test-remote', 'test description')
       expect(mgmt.descriptions.value['test-remote']).toBe('test description')
+      expect(remote.updateRemoteDescription).toHaveBeenCalledWith('test-remote', 'test description')
     })
 
-    it('should persist to localStorage', () => {
-      const mgmt = useBrowserRemoteManagement(mockOptions)
-      mgmt.saveDesc('test-remote', 'test description')
-      expect(localStorage.getItem('remoteDescriptions')).toBe(
-        JSON.stringify({ 'test-remote': 'test description' })
-      )
-    })
-
-    it('should update existing description', () => {
+    it('should update existing description', async () => {
+      const remote = await import('../api/remote')
       const mgmt = useBrowserRemoteManagement(mockOptions)
       mgmt.descriptions.value = { 'test-remote': 'old description' }
 
-      mgmt.saveDesc('test-remote', 'new description')
+      await mgmt.saveDesc('test-remote', 'new description')
 
       expect(mgmt.descriptions.value['test-remote']).toBe('new description')
+      expect(remote.updateRemoteDescription).toHaveBeenCalledWith('test-remote', 'new description')
     })
 
-    it('should preserve other descriptions', () => {
+    it('should preserve other descriptions', async () => {
+      const remote = await import('../api/remote')
       const mgmt = useBrowserRemoteManagement(mockOptions)
       mgmt.descriptions.value = { 'other-remote': 'other description' }
 
-      mgmt.saveDesc('test-remote', 'test description')
+      await mgmt.saveDesc('test-remote', 'test description')
 
       expect(mgmt.descriptions.value['other-remote']).toBe('other description')
       expect(mgmt.descriptions.value['test-remote']).toBe('test description')
+      expect(remote.updateRemoteDescription).toHaveBeenCalledWith('test-remote', 'test description')
     })
   })
 })
