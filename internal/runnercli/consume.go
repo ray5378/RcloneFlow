@@ -352,31 +352,6 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 					if r.activeMgr != nil {
 						r.activeMgr.OnFileCopied(runID, name)
 					}
-					marked = true
-				}
-				_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
-					if rr.Summary == nil {
-						rr.Summary = map[string]any{}
-					}
-					rr.Summary["progressLine"] = line
-				})
-				if marked {
-					_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
-						if rr.Summary == nil {
-							rr.Summary = map[string]any{}
-						}
-						prog, _ := rr.Summary["progress"].(map[string]any)
-						if prog == nil {
-							prog = map[string]any{}
-						}
-						if lst := fp.copiedList(); len(lst) > 0 {
-							if nc, ok := prog["completedFiles"].(float64); !ok || float64(len(lst)) > nc {
-								prog["completedFiles"] = float64(len(lst))
-							}
-							rr.Summary["files"] = fp.snapshot(100)
-						}
-						rr.Summary["progress"] = prog
-					})
 				}
 				continue
 			}
@@ -421,21 +396,6 @@ func (r *Runner) consume(runID int64, rd io.Reader, out *os.File, parseStats boo
 						}
 						r.appendCASExclude(excludeFrom, path)
 						_, _ = out.WriteString(fmt.Sprintf("NOTICE : %s: CAS compatible match after source cleanup (%s)\n", path, msg))
-						marked = true
-						_ = r.updater.UpdateRun(runID, func(rr *store.Run) {
-							if rr.Summary == nil {
-								rr.Summary = map[string]any{}
-							}
-							prog, _ := rr.Summary["progress"].(map[string]any)
-							if prog == nil {
-								prog = map[string]any{}
-							}
-							if lst := fp.copiedList(); len(lst) > 0 {
-								prog["completedFiles"] = float64(len(lst))
-								rr.Summary["files"] = fp.snapshot(100)
-							}
-							rr.Summary["progress"] = prog
-						})
 						continue
 					} else {
 						if r.activeMgr != nil {

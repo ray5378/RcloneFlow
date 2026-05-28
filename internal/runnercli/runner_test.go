@@ -280,12 +280,10 @@ func TestConsume_JSONWrappedFileProgressUpdatesActiveTransfer(t *testing.T) {
 	if got := st.CurrentFile.TotalBytes; got <= st.CurrentFile.Bytes {
 		t.Fatalf("unexpected current file progress: %#v", st.CurrentFile)
 	}
-	gotRun, err := db.GetRun(run.ID)
-	if err != nil {
-		t.Fatalf("GetRun() error = %v", err)
-	}
-	if got := anyString(gotRun.Summary["progressLine"]); !strings.Contains(got, "a/file1.mkv") {
-		t.Fatalf("progressLine=%q, want file path included", got)
+	// per-file events no longer write progressLine to DB directly;
+	// aggregate stats lines drive DB updates.
+	if got := len(fp.copiedList()); got != 0 {
+		t.Fatalf("fp.copied len=%d, want 0 (not completed yet)", got)
 	}
 }
 
@@ -337,17 +335,6 @@ func TestConsume_JSONErrorObjectNotFoundMarksCASMatchedInActiveTransfer(t *testi
 	pending := mgr.ListPending(task.ID, 0, 10)
 	if pending.Total != 0 {
 		t.Fatalf("pending total=%d, want 0", pending.Total)
-	}
-	gotRun, err := db.GetRun(run.ID)
-	if err != nil {
-		t.Fatalf("GetRun() error = %v", err)
-	}
-	prog, _ := gotRun.Summary["progress"].(map[string]any)
-	if prog == nil {
-		t.Fatalf("expected progress map, got %#v", gotRun.Summary)
-	}
-	if gotv, ok := prog["completedFiles"].(float64); !ok || int(gotv) != 1 {
-		t.Fatalf("completedFiles=%#v, want 1; progress=%#v", prog["completedFiles"], prog)
 	}
 	if called == 0 {
 		t.Fatalf("expected casVerifier to be called")
