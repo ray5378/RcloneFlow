@@ -867,7 +867,7 @@ func (r *Runner) waitForWebDAVFiles(cfg, dst string, casCompat *openlistCASCompa
 				allOk = false
 			}
 			if allOk && len(expected) > 0 {
-				visible := normalizeVisibleTargetPaths(arr, false)
+				visible := normalizeVisibleTargetPaths(arr, casCompat != nil)
 				allOk = areAllExpectedPathsVisible(expected, visible)
 			}
 			if allOk {

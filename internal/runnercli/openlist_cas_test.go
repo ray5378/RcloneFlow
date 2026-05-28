@@ -343,13 +343,20 @@ func TestBuildOpenlistCASCompatPlanFromPaths_SourceCASStillNormal(t *testing.T) 
 
 func TestExpectedVisibleDestinationPaths(t *testing.T) {
 	plan := &openlistCASCompatPlan{SourceFiles: []string{"dir/a.mp4", "dir/b.mp4"}, MatchedSource: []string{"dir/a.mp4"}}
+	// copy: CAS-matched files are excluded (not transferred), so only unmatched remain
 	copyExpected := expectedVisibleDestinationPaths(plan, "copy")
-	if len(copyExpected) != 2 {
-		t.Fatalf("copy expected=%v, want all source files", copyExpected)
+	if len(copyExpected) != 1 || copyExpected[0] != "dir/b.mp4" {
+		t.Fatalf("copy expected=%v, want [dir/b.mp4] (CAS-matched excluded)", copyExpected)
 	}
 	moveExpected := expectedVisibleDestinationPaths(plan, "move")
 	if len(moveExpected) != 1 || moveExpected[0] != "dir/a.mp4" {
 		t.Fatalf("move expected=%v, want matched files only", moveExpected)
+	}
+	// No matches: all source files expected
+	planNoMatch := &openlistCASCompatPlan{SourceFiles: []string{"dir/a.mp4", "dir/b.mp4"}, MatchedSource: nil}
+	allExpected := expectedVisibleDestinationPaths(planNoMatch, "copy")
+	if len(allExpected) != 2 {
+		t.Fatalf("all expected=%v, want all source files when no CAS matches", allExpected)
 	}
 }
 

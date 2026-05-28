@@ -64,7 +64,18 @@ func expectedVisibleDestinationPaths(plan *openlistCASCompatPlan, originalMode s
 	if originalMode == "move" {
 		return append([]string(nil), plan.MatchedSource...)
 	}
-	return append([]string(nil), plan.SourceFiles...)
+	expected := make([]string, 0, len(plan.SourceFiles))
+	matched := make(map[string]struct{}, len(plan.MatchedSource))
+	for _, m := range plan.MatchedSource {
+		matched[m] = struct{}{}
+	}
+	for _, p := range plan.SourceFiles {
+		if _, ok := matched[p]; ok {
+			continue
+		}
+		expected = append(expected, p)
+	}
+	return expected
 }
 
 func areAllExpectedPathsVisible(expected []string, visible map[string]struct{}) bool {
