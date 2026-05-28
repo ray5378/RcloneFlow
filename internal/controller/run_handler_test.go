@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -345,4 +346,82 @@ func TestRunController_HandleRunStopCLI(t *testing.T) {
 
 	// Should return 200 even if run doesn't exist (UpdateRunStatus is a no-op)
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestRunController_HandleRunStatus_GET_UsesGetRun(t *testing.T) {
+	db := setupRunTestDB(t)
+	task, err := db.AddTask(store.Task{
+		Name: "test-task-get", Mode: "copy", SourceRemote: "src", SourcePath: "/a",
+		TargetRemote: "dst", TargetPath: "/b",
+	})
+	require.NoError(t, err)
+
+	summary := map[string]any{"progress": map[string]any{"bytes": float64(500), "totalBytes": float64(1000)}}
+	run, err := db.AddRun(store.Run{
+		TaskID: task.ID, Status: "running", Trigger: "manual", TaskName: "test-task-get",
+		Summary: summary,
+	})
+	require.NoError(t, err)
+
+	c := NewRunController(service.NewRunService(service.NewStoreRunAdapter(db)), adapter.NewRcloneClient(nil))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/"+fmt.Sprintf("%d", run.ID), nil)
+	rec := httptest.NewRecorder()
+	c.HandleRunStatus(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]any
+	err = json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	assert.Equal(t, float64(run.ID), resp["id"])
+	assert.Equal(t, "running", resp["status"])
+}
+
+func TestRunController_HandleRunLog_GET_UsesGetRun(t *testing.T) {
+	db := setupRunTestDB(t)
+	task, err := db.AddTask(store.Task{
+		Name: "test-task-log", Mode: "copy", SourceRemote: "src", SourcePath: "/a",
+		TargetRemote: "dst", TargetPath: "/b",
+	})
+	require.NoError(t, err)
+
+	run, err := db.AddRun(store.Run{
+		TaskID: task.ID, Status: "running", Trigger: "manual", TaskName: "test-task-log",
+	})
+	require.NoError(t, err)
+
+	c := NewRunController(service.NewRunService(service.NewStoreRunAdapter(db)), adapter.NewRcloneClient(nil))
+
+	req := httptest.NewRequest(http.MethodGet, "/api/runs/"+fmt.Sprintf("%d", run.ID)+"/log", nil)
+	rec := httptest.NewRecorder()
+	c.HandleRunLog(rec, req)
+
+	assert.Equal(t, http.StatusNotFound, rec.Code)
+}
+
+func TestRunController_HandleRunKillCLI_UsesGetRun(t *testing.T) {
+	db := setupRunTestDB(t)
+	task, err := db.AddTask(store.Task{
+		Name: "test-task-kill", Mode: "copy", SourceRemote: "src", SourcePath: "/a",
+		TargetRemote: "dst", TargetPath: "/b",
+	})
+	require.NoError(t, err)
+
+	run, err := db.AddRun(store.Run{
+		TaskID: task.ID, Status: "running", Trigger: "manual", TaskName: "test-task-kill",
+	})
+	require.NoError(t, err)
+
+	c := NewRunController(service.NewRunService(service.NewStoreRunAdapter(db)), adapter.NewRcloneClient(nil))
+
+	req := httptest.NewRequest(http.MethodPost, "/api/runs/"+fmt.Sprintf("%d", run.ID)+"/kill", nil)
+	rec := httptest.NewRecorder()
+	c.HandleRunKillCLI(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	var resp map[string]any
+	err = json.NewDecoder(rec.Body).Decode(&resp)
+	require.NoError(t, err)
+	_, ok := resp["killed"]
+	assert.True(t, ok, "response should have 'killed' field")
 }

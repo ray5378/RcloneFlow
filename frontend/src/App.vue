@@ -52,7 +52,10 @@ onMounted(() => {
   window.addEventListener('show-toast', handler)
   toastCleanup = () => window.removeEventListener('show-toast', handler)
 })
-onUnmounted(() => { toastCleanup?.() })
+onUnmounted(() => {
+  toastCleanup?.()
+  resizeCleanup()
+})
 
 const currentPage = ref(localStorage.getItem('currentPage') || (location.hash.replace('#', '') || 'browser'))
 const taskViewKey = ref(0)
@@ -163,6 +166,7 @@ onMounted(async () => {
   if (hash && ['browser', 'tasks'].includes(hash)) currentPage.value = hash
   checkMobile()
   window.addEventListener('resize', checkMobile)
+  const resizeCleanup = () => window.removeEventListener('resize', checkMobile)
   hasExistingUsers.value = await hasUsers()
   if (!checkAuth()) {
     authChecked.value = true

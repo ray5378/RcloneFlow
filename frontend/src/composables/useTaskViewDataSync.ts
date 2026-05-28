@@ -281,9 +281,15 @@ export function useTaskViewDataSync(options: UseTaskViewDataSyncOptions) {
         if (msg.type === 'run_status' && msg.data) {
           const status = msg.data.status
           if (status && status !== 'running') {
+            const removed = options.activeRuns.value.find(
+              r => r.runRecord?.id === msg.data.run_id
+            )
             options.activeRuns.value = options.activeRuns.value.filter(
               r => r.runRecord?.id !== msg.data.run_id
             )
+            if (removed?.runRecord?.taskId != null) {
+              delete options.lastNonDecreasingTotalsByTask.value[removed.runRecord.taskId]
+            }
           }
           if (options.currentModule?.value === 'history') {
             const idx = options.runs.value.findIndex(r => r.id === msg.data.run_id)

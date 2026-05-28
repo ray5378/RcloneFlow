@@ -3,11 +3,16 @@ package websocket
 import (
 	"encoding/json"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
 
-// Hub maintains active client connections and broadcasts messages
+const (
+	pingInterval     = 25 * time.Second
+	readWriteTimeout = 30 * time.Second
+)
+
 type Hub struct {
 	clients    map[*Client]bool
 	broadcast  chan []byte
@@ -17,20 +22,17 @@ type Hub struct {
 	done       chan struct{}
 }
 
-// Client represents a WebSocket client connection
 type Client struct {
 	hub  *Hub
 	conn *websocket.Conn
 	send chan []byte
 }
 
-// Message represents a WebSocket message
 type Message struct {
 	Type string      `json:"type"`
 	Data interface{} `json:"data,omitempty"`
 }
 
-// NewHub creates a new Hub instance
 func NewHub() *Hub {
 	return &Hub{
 		clients:    make(map[*Client]bool),
@@ -63,7 +65,6 @@ func (h *Hub) removeClient(client *Client) {
 	close(client.send)
 }
 
-// Run starts the hub's main loop
 func (h *Hub) Run() {
 	for {
 		select {
@@ -99,7 +100,6 @@ func (h *Hub) Run() {
 	}
 }
 
-// Broadcast sends a message to all connected clients
 func (h *Hub) Broadcast(msgType string, data interface{}) {
 	msg := Message{Type: msgType, Data: data}
 	payload, err := json.Marshal(msg)
@@ -109,14 +109,12 @@ func (h *Hub) Broadcast(msgType string, data interface{}) {
 	h.broadcast <- payload
 }
 
-// ClientCount returns the number of connected clients
 func (h *Hub) ClientCount() int {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return len(h.clients)
 }
 
-// NewClient creates a new WebSocket client
 func NewClient(hub *Hub, conn *websocket.Conn) *Client {
 	return &Client{
 		hub:  hub,
@@ -125,12 +123,16 @@ func NewClient(hub *Hub, conn *websocket.Conn) *Client {
 	}
 }
 
-// ReadPump pumps messages from the WebSocket connection to the hub
 func (c *Client) ReadPump() {
 	defer func() {
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
+	c.conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+	c.conn.SetPongHandler(func(string) error {
+		c.conn.SetReadDeadline(time.Now().Add(readWriteTimeout))
+		return nil
+	})
 	for {
 		_, _, err := c.conn.ReadMessage()
 		if err != nil {
@@ -139,20 +141,29 @@ func (c *Client) ReadPump() {
 	}
 }
 
-// WritePump pumps messages from the hub to the WebSocket connection
 func (c *Client) WritePump() {
+	ticker := time.NewTicker(pingInterval)
 	defer func() {
+		ticker.Stop()
 		c.conn.Close()
 		c.hub.removeClient(c)
 	}()
 	for {
-		message, ok := <-c.send
-		if !ok {
-			c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-			return
-		}
-		if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
-			return
+		select {
+		case message, ok := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
+			if !ok {
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				return
+			}
+		case <-ticker.C:
+			c.conn.SetWriteDeadline(time.Now().Add(readWriteTimeout))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
 		}
 	}
 }

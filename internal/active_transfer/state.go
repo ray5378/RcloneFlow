@@ -203,6 +203,7 @@ func (m *Manager) InitState(runID, taskID int64, mode TrackingMode, candidates [
 		}
 		st.Candidates[key] = c
 		st.Pending[key] = TransferPendingFile{Path: key, Name: c.Name, SizeBytes: c.SizeBytes, Status: FileStatusPending, Order: c.Order}
+		st.dirtySort = true
 		trimPendingRetainedLocked(st)
 	}
 	m.byRunID[runID] = st
@@ -304,6 +305,7 @@ func (m *Manager) MergeCandidates(runID int64, candidates []TransferCandidateFil
 	st.PreflightPending = false
 	st.PreflightFinished = true
 	st.UpdatedAt = time.Now()
+	st.dirtySort = true
 	m.persistSnapshotLockedImmediate(st)
 }
 
@@ -385,6 +387,7 @@ func (m *Manager) UpdateCurrentFile(runID int64, path string, bytes, total, spee
 		trimPendingRetainedLocked(st)
 	}
 	st.UpdatedAt = time.Now()
+	st.dirtySort = true
 	m.persistSnapshotLocked(st)
 }
 
@@ -454,6 +457,7 @@ func (m *Manager) MarkCompleted(runID int64, path string, status FileStatus, mes
 		}
 	}
 	st.UpdatedAt = time.Now()
+	st.dirtySort = true
 	m.persistSnapshotLocked(st)
 }
 

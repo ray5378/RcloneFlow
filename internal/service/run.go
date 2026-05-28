@@ -1,20 +1,17 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
 	"rcloneflow/internal/logger"
 )
 
-// RunRecord 运行记录结构。
-// Summary 当前同时承载两类信息：
-// - summary.progress：历史 run 的运行中快照
-// - summary.finalSummary：历史详情 / 最终总结
-// 但 active runs 主链只允许消费 summary.progress，不得把 finalSummary 回流成运行中字段。
 type RunRecord struct {
 	ID               int64  `json:"id"`
 	TaskID           int64  `json:"taskId"`
@@ -34,7 +31,6 @@ type RunRecord struct {
 	Summary          string `json:"summary,omitempty"`
 }
 
-// RunServiceInterface 运行记录服务接口
 type RunServiceInterface interface {
 	ListRuns(page, pageSize int) ([]RunRecord, int, error)
 	ListRunsByTask(taskId int64) ([]RunRecord, error)
@@ -51,17 +47,14 @@ type RunServiceInterface interface {
 	ResetSequence(tableName string) error
 }
 
-// RunService 运行记录服务层
 type RunService struct {
 	db RunServiceInterface
 }
 
-// NewRunService 创建运行记录服务
 func NewRunService(db RunServiceInterface) *RunService {
 	return &RunService{db: db}
 }
 
-// ListRuns 获取所有运行记录（分页）
 func (s *RunService) ListRuns(page, pageSize int) ([]RunRecord, int, error) {
 	return s.db.ListRuns(page, pageSize)
 }
@@ -70,37 +63,32 @@ func (s *RunService) ListRunsByTask(taskId int64) ([]RunRecord, error) {
 	return s.db.ListRunsByTask(taskId)
 }
 
-// ListActiveRuns 获取所有运行中的任务
 func (s *RunService) ListActiveRuns() ([]RunRecord, error) {
 	return s.db.ListActiveRuns()
 }
 
-// GetRun 获取指定运行记录
 func (s *RunService) GetRun(id int64) (RunRecord, error) {
 	return s.db.GetRun(id)
 }
 
-// GetActiveRunByTaskID 获取任务当前运行中的记录
 func (s *RunService) GetActiveRunByTaskID(taskID int64) (RunRecord, error) {
 	return s.db.GetActiveRunByTaskID(taskID)
 }
 
-// UpdateRunStatus 更新运行状态
 func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
+	if len(summary) == 0 {
+		return
+	}
 	s.db.UpdateRun(id, func(r *RunRecord) {
-		// 读取旧 summary
 		var old map[string]any
 		if r.Summary != "" {
 			if err := json.Unmarshal([]byte(r.Summary), &old); err != nil {
 				logger.Error("unmarshal run summary", zap.Error(err))
+				old = nil
 			}
 		}
-		if old == nil {
-			old = map[string]any{}
-		}
-		// 合并：src 覆盖 dst 的同名键；map 递归
 		merged := deepMerge(old, summary)
-		if bs, err := json.Marshal(merged); err == nil {
+		if bs, err := jsonMarshal(merged); err == nil {
 			r.Summary = string(bs)
 		}
 		finished, _ := merged["finished"].(bool)
@@ -119,7 +107,26 @@ func (s *RunService) UpdateRunStatus(id int64, summary map[string]any) {
 	})
 }
 
-// deepMerge merges b into a (map[string]any); for nested maps it recurses.
+var jsonBufPool = sync.Pool{
+	New: func() any {
+		return &bytes.Buffer{}
+	},
+}
+
+func jsonMarshal(v any) ([]byte, error) {
+	buf := jsonBufPool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer jsonBufPool.Put(buf)
+	enc := json.NewEncoder(buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	result := make([]byte, buf.Len()-1)
+	copy(result, buf.Bytes())
+	return result, nil
+}
+
 func deepMerge(a, b map[string]any) map[string]any {
 	if a == nil {
 		a = map[string]any{}
@@ -127,7 +134,7 @@ func deepMerge(a, b map[string]any) map[string]any {
 	for k, v := range b {
 		if vm, ok := v.(map[string]any); ok {
 			if am, ok2 := a[k].(map[string]any); ok2 {
-				a[k] = deepMerge(am, vm)
+				deepMerge(am, vm)
 			} else {
 				a[k] = deepMerge(map[string]any{}, vm)
 			}
@@ -202,7 +209,6 @@ func cleanupRunLog(run RunRecord) {
 	}
 }
 
-// CleanOldRuns 删除指定天数之前的运行记录，返回删除的记录数
 func (s *RunService) CleanOldRuns(days int) (int64, error) {
 	if days <= 0 {
 		return 0, nil
@@ -249,4 +255,3 @@ func (s *RunService) CleanOldRuns(days int) (int64, error) {
 func (s *RunService) Vacuum() error {
 	return s.db.Vacuum()
 }
-

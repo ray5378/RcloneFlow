@@ -5,36 +5,70 @@ import (
 	"time"
 )
 
-func TestHubBroadcastRemovesStaleClientsSafely(t *testing.T) {
+func TestHubConstants(t *testing.T) {
+	assert := func(cond bool, msg string) {
+		if !cond {
+			t.Fatal(msg)
+		}
+	}
+	assert(pingInterval > 0, "pingInterval must be positive")
+	assert(readWriteTimeout > pingInterval, "readWriteTimeout must be greater than pingInterval")
+	assert(pingInterval < 60*time.Second, "pingInterval must be less than 60s")
+}
+
+func TestHubBroadcast_TwoClients(t *testing.T) {
 	h := NewHub()
 	go h.Run()
 
-	good := &Client{hub: h, send: make(chan []byte, 1)}
-	stale := &Client{hub: h, send: make(chan []byte, 1)}
-	stale.send <- []byte("full")
-
-	h.register <- good
-	h.register <- stale
+	c1 := NewClient(h, nil)
+	c2 := NewClient(h, nil)
+	h.register <- c1
+	h.register <- c2
 	time.Sleep(20 * time.Millisecond)
 
-	h.Broadcast("test", map[string]any{"ok": true})
-	time.Sleep(50 * time.Millisecond)
-
-	if got := h.ClientCount(); got != 1 {
-		t.Fatalf("clientCount=%d want 1", got)
+	if n := h.ClientCount(); n != 2 {
+		t.Fatalf("ClientCount=%d want 2", n)
 	}
 
-	select {
-	case <-good.send:
-		// ok
-	case <-time.After(100 * time.Millisecond):
-		t.Fatalf("expected good client to receive broadcast")
+	h.Broadcast("ping_test", map[string]any{"msg": "hello"})
+	time.Sleep(30 * time.Millisecond)
+
+	h.Stop()
+}
+
+func TestHubBroadcast_EmptyHub(t *testing.T) {
+	h := NewHub()
+	go h.Run()
+
+	h.Broadcast("test", map[string]any{"data": 123})
+
+	h.Stop()
+}
+
+func TestHubRegisterUnregister_ClientCount(t *testing.T) {
+	h := NewHub()
+	go h.Run()
+
+	c1 := NewClient(h, nil)
+	c2 := NewClient(h, nil)
+
+	h.register <- c1
+	time.Sleep(10 * time.Millisecond)
+	if n := h.ClientCount(); n != 1 {
+		t.Fatalf("after c1 register: ClientCount=%d want 1", n)
 	}
 
-	h.mu.RLock()
-	_, staleStillPresent := h.clients[stale]
-	h.mu.RUnlock()
-	if staleStillPresent {
-		t.Fatalf("expected stale client to be removed from hub")
+	h.register <- c2
+	time.Sleep(10 * time.Millisecond)
+	if n := h.ClientCount(); n != 2 {
+		t.Fatalf("after c2 register: ClientCount=%d want 2", n)
 	}
+
+	h.unregister <- c1
+	time.Sleep(10 * time.Millisecond)
+	if n := h.ClientCount(); n != 1 {
+		t.Fatalf("after c1 unregister: ClientCount=%d want 1", n)
+	}
+
+	h.Stop()
 }

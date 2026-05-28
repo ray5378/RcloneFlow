@@ -88,11 +88,11 @@ type ActiveTransferState struct {
 	CurrentFile   *TransferCurrentFile
 	CurrentFiles  map[string]TransferCurrentFile
 	Completed     map[string]TransferCompletedFile
-	Pending       map[string]TransferPendingFile
+	Pending      map[string]TransferPendingFile
 	TotalCount    int
 	CompletedCount int
-	PendingCount   int
-	TransferSlots  int
+	PendingCount  int
+	TransferSlots int
 	Degraded           bool
 	DegradeReason      string
 	PreflightPending   bool
@@ -101,6 +101,7 @@ type ActiveTransferState struct {
 	NextCompletedOrder int
 	StartedAt          time.Time
 	UpdatedAt          time.Time
+	dirtySort          bool
 }
 
 type ActiveTransferOverviewResponse struct {
@@ -148,56 +149,63 @@ func (s *ActiveTransferState) Snapshot() ActiveTransferSnapshot {
 	for _, v := range s.Completed {
 		completed = append(completed, v)
 	}
-	sort.SliceStable(completed, func(i, j int) bool {
-		if completed[i].Order != completed[j].Order {
-			if completed[i].Order == 0 {
-				return false
+	if s.dirtySort {
+		sort.SliceStable(completed, func(i, j int) bool {
+			if completed[i].Order != completed[j].Order {
+				if completed[i].Order == 0 {
+					return false
+				}
+				if completed[j].Order == 0 {
+					return true
+				}
+				return completed[i].Order < completed[j].Order
 			}
-			if completed[j].Order == 0 {
-				return true
+			if completed[i].At != completed[j].At {
+				return completed[i].At < completed[j].At
 			}
-			return completed[i].Order < completed[j].Order
-		}
-		if completed[i].At != completed[j].At {
-			return completed[i].At < completed[j].At
-		}
-		return completed[i].Path < completed[j].Path
-	})
+			return completed[i].Path < completed[j].Path
+		})
+	}
 	pending := make([]TransferPendingFile, 0, len(s.Pending))
 	for _, v := range s.Pending {
 		pending = append(pending, v)
 	}
-	sort.SliceStable(pending, func(i, j int) bool {
-		if pending[i].Status != pending[j].Status {
-			return pending[i].Status == FileStatusInProgress
-		}
-		if pending[i].Order != pending[j].Order {
-			if pending[i].Order == 0 {
-				return false
+	if s.dirtySort {
+		sort.SliceStable(pending, func(i, j int) bool {
+			if pending[i].Status != pending[j].Status {
+				return pending[i].Status == FileStatusInProgress
 			}
-			if pending[j].Order == 0 {
-				return true
+			if pending[i].Order != pending[j].Order {
+				if pending[i].Order == 0 {
+					return false
+				}
+				if pending[j].Order == 0 {
+					return true
+				}
+				return pending[i].Order < pending[j].Order
 			}
-			return pending[i].Order < pending[j].Order
-		}
-		return pending[i].Path < pending[j].Path
-	})
+			return pending[i].Path < pending[j].Path
+		})
+	}
 	currentFiles := make([]TransferCurrentFile, 0, len(s.CurrentFiles))
 	for _, v := range s.CurrentFiles {
 		currentFiles = append(currentFiles, v)
 	}
-	sort.SliceStable(currentFiles, func(i, j int) bool {
-		if currentFiles[i].Order != currentFiles[j].Order {
-			if currentFiles[i].Order == 0 {
-				return false
+	if s.dirtySort {
+		sort.SliceStable(currentFiles, func(i, j int) bool {
+			if currentFiles[i].Order != currentFiles[j].Order {
+				if currentFiles[i].Order == 0 {
+					return false
+				}
+				if currentFiles[j].Order == 0 {
+					return true
+				}
+				return currentFiles[i].Order < currentFiles[j].Order
 			}
-			if currentFiles[j].Order == 0 {
-				return true
-			}
-			return currentFiles[i].Order < currentFiles[j].Order
-		}
-		return currentFiles[i].Path < currentFiles[j].Path
-	})
+			return currentFiles[i].Path < currentFiles[j].Path
+		})
+		s.dirtySort = false
+	}
 	return ActiveTransferSnapshot{
 		RunID:            s.RunID,
 		TaskID:           s.TaskID,
@@ -208,11 +216,11 @@ func (s *ActiveTransferState) Snapshot() ActiveTransferSnapshot {
 		TransferSlots:    normalizedTransferSlots(s.TransferSlots),
 		CurrentFile:      cloneCurrent(s.CurrentFile),
 		CurrentFiles:     currentFiles,
-		Completed:        completed,
-		Pending:          pending,
+		Completed:       completed,
+		Pending:         pending,
 		Degraded:         s.Degraded,
-		DegradeReason:    s.DegradeReason,
-		PreflightPending: s.PreflightPending,
+		DegradeReason:   s.DegradeReason,
+		PreflightPending:  s.PreflightPending,
 		PreflightFinished: s.PreflightFinished,
 		StartedAt:        s.StartedAt.Format(time.RFC3339),
 		UpdatedAt:        s.UpdatedAt.Format(time.RFC3339),
@@ -270,6 +278,7 @@ func RestoreStateFromSnapshot(snap ActiveTransferSnapshot) *ActiveTransferState 
 		}
 		v.Path = key
 		st.Completed[key] = v
+		st.dirtySort = true
 		if v.Order > maxCompletedOrder {
 			maxCompletedOrder = v.Order
 		}

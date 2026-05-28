@@ -124,32 +124,25 @@ func (c *RunController) HandleRunStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	runs, _, err := c.runSvc.ListRuns(1, 1000)
+	run, err := c.runSvc.GetRun(id)
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		WriteJSON(w, 404, map[string]any{"error": "run not found"})
 		return
 	}
 
-	for _, run := range runs {
-		if run.ID != id {
-			continue
-		}
-		var sum map[string]any
-		switch v := any(run.Summary).(type) {
-		case string:
-			if v != "" {
-				if err := json.Unmarshal([]byte(v), &sum); err != nil {
-					logger.Error("unmarshal run summary for status", zap.Error(err))
-				}
+	var sum map[string]any
+	switch v := any(run.Summary).(type) {
+	case string:
+		if v != "" {
+			if err := json.Unmarshal([]byte(v), &sum); err != nil {
+				logger.Error("unmarshal run summary for status", zap.Error(err))
 			}
-		case map[string]any:
-			sum = v
 		}
-		sum = ensureHistoricalFinalSummary(run, sum)
-		WriteJSON(w, 200, buildLightRunObject(run, sum))
-		return
+	case map[string]any:
+		sum = v
 	}
-	WriteJSON(w, 404, map[string]any{"error": "run not found"})
+	sum = ensureHistoricalFinalSummary(run, sum)
+	WriteJSON(w, 200, buildLightRunObject(run, sum))
 }
 
 func (c *RunController) HandleRunStopCLI(w http.ResponseWriter, r *http.Request) {
@@ -176,20 +169,14 @@ func (c *RunController) HandleRunKillCLI(w http.ResponseWriter, r *http.Request)
 	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/kill")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
 
-	runs, _, err := c.runSvc.ListRuns(1, 1000)
+	run, err := c.runSvc.GetRun(id)
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		WriteJSON(w, 200, map[string]any{"killed": false})
 		return
 	}
-	for _, run := range runs {
-		if run.ID != id {
-			continue
-		}
-		if killRunBySummary(run) {
-			WriteJSON(w, 200, map[string]any{"killed": true})
-			return
-		}
-		break
+	if killRunBySummary(run) {
+		WriteJSON(w, 200, map[string]any{"killed": true})
+		return
 	}
 	WriteJSON(w, 200, map[string]any{"killed": false})
 }
@@ -241,78 +228,72 @@ func (c *RunController) HandleTaskKill(w http.ResponseWriter, r *http.Request) {
 func (c *RunController) HandleRunLog(w http.ResponseWriter, r *http.Request) {
 	idStr := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/api/runs/"), "/log")
 	id, _ := strconv.ParseInt(idStr, 10, 64)
-	runs, _, err := c.runSvc.ListRuns(1, 1000)
+	run, err := c.runSvc.GetRun(id)
 	if err != nil {
-		WriteJSON(w, 500, map[string]any{"error": "internal error"})
+		WriteJSON(w, 404, map[string]any{"error": "run not found"})
 		return
 	}
-	for _, run := range runs {
-		if run.ID == id {
-			if s, ok := any(run.Summary).(string); ok && s != "" {
-				var m map[string]any
-				if json.Unmarshal([]byte(s), &m) == nil {
-					if p, ok := m["stderrFile"].(string); ok && p != "" && isSafeLogPath(p) {
-						http.ServeFile(w, r, p)
-						return
+	if s, ok := any(run.Summary).(string); ok && s != "" {
+		var m map[string]any
+		if json.Unmarshal([]byte(s), &m) == nil {
+			if p, ok := m["stderrFile"].(string); ok && p != "" && isSafeLogPath(p) {
+				http.ServeFile(w, r, p)
+				return
+			}
+		}
+	}
+	if m, ok := any(run.Summary).(map[string]any); ok {
+		if p, ok := m["stderrFile"].(string); ok && p != "" && isSafeLogPath(p) {
+			http.ServeFile(w, r, p)
+			return
+		}
+	}
+	r.URL.RawQuery = ""
+	base := "/app/data/logs"
+	sanitize := func(s string) string {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			return s
+		}
+		inv := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
+		s = inv.ReplaceAllString(s, "_")
+		r := []rune(s)
+		if len(r) > 60 {
+			s = string(r[:60])
+		}
+		return s
+	}
+	if run.TaskName != "" {
+		san := sanitize(run.TaskName)
+		entries, _ := os.ReadDir(base)
+		var best string
+		var bestMod int64
+		for _, ent := range entries {
+			if !ent.IsDir() {
+				continue
+			}
+			name := ent.Name()
+			if !strings.HasPrefix(name, san+"-") {
+				continue
+			}
+			sub := filepath.Join(base, name)
+			files, _ := os.ReadDir(sub)
+			for _, f := range files {
+				if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") {
+					continue
+				}
+				fi, _ := f.Info()
+				if fi != nil {
+					mod := fi.ModTime().Unix()
+					if mod > bestMod {
+						bestMod = mod
+						best = filepath.Join(sub, f.Name())
 					}
 				}
 			}
-			if m, ok := any(run.Summary).(map[string]any); ok {
-				if p, ok := m["stderrFile"].(string); ok && p != "" && isSafeLogPath(p) {
-					http.ServeFile(w, r, p)
-					return
-				}
-			}
-			r.URL.RawQuery = ""
-			base := "/app/data/logs"
-			sanitize := func(s string) string {
-				s = strings.TrimSpace(s)
-				if s == "" {
-					return s
-				}
-				inv := regexp.MustCompile(`[^a-zA-Z0-9\p{Han}_-]+`)
-				s = inv.ReplaceAllString(s, "_")
-				r := []rune(s)
-				if len(r) > 60 {
-					s = string(r[:60])
-				}
-				return s
-			}
-			if run.TaskName != "" {
-				san := sanitize(run.TaskName)
-				entries, _ := os.ReadDir(base)
-				var best string
-				var bestMod int64
-				for _, ent := range entries {
-					if !ent.IsDir() {
-						continue
-					}
-					name := ent.Name()
-					if !strings.HasPrefix(name, san+"-") {
-						continue
-					}
-					sub := filepath.Join(base, name)
-					files, _ := os.ReadDir(sub)
-					for _, f := range files {
-						if f.IsDir() || !strings.HasSuffix(f.Name(), ".log") {
-							continue
-						}
-						fi, _ := f.Info()
-						if fi != nil {
-							mod := fi.ModTime().Unix()
-							if mod > bestMod {
-								bestMod = mod
-								best = filepath.Join(sub, f.Name())
-							}
-						}
-					}
-				}
-				if best != "" {
-					http.ServeFile(w, r, best)
-					return
-				}
-			}
-			WriteJSON(w, 404, map[string]any{"error": "log not found"})
+		}
+		if best != "" {
+			http.ServeFile(w, r, best)
 			return
 		}
 	}

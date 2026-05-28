@@ -16,6 +16,7 @@ type runServiceDBMock struct {
 	deletedRun    []int64
 	deletedTasks  []int64
 	deleteAll     bool
+	UpdateRunFn  func(id int64, fn func(*RunRecord))
 }
 
 func (m *runServiceDBMock) ListRuns(page, pageSize int) ([]RunRecord, int, error) {
@@ -29,7 +30,15 @@ func (m *runServiceDBMock) GetActiveRunByTaskID(taskID int64) (RunRecord, error)
 	return RunRecord{}, nil
 }
 func (m *runServiceDBMock) GetRun(id int64) (RunRecord, error) { return m.runsByID[id], nil }
-func (m *runServiceDBMock) UpdateRun(id int64, updateFn func(*RunRecord))          {}
+func (m *runServiceDBMock) UpdateRun(id int64, updateFn func(*RunRecord)) {
+	if m.UpdateRunFn != nil {
+		m.UpdateRunFn(id, updateFn)
+		return
+	}
+	rec := m.runsByID[id]
+	updateFn(&rec)
+	m.runsByID[id] = rec
+}
 func (m *runServiceDBMock) DeleteRun(id int64) error {
 	m.deletedRun = append(m.deletedRun, id)
 	return nil
@@ -178,5 +187,108 @@ func TestRunService_DeleteAllRuns_RemovesAllKnownLogs(t *testing.T) {
 	}
 	if !mock.deleteAll {
 		t.Fatal("expected DeleteAllRuns to be called on db")
+	}
+}
+
+func TestJsonMarshal_SyncPool(t *testing.T) {
+	v := map[string]any{"bytes": float64(1024), "speed": float64(512), "progress": "active"}
+
+	got, err := jsonMarshal(v)
+	if err != nil {
+		t.Fatalf("jsonMarshal() error = %v", err)
+	}
+
+	var unmarshaled map[string]any
+	if err := json.Unmarshal(got, &unmarshaled); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+
+	if unmarshaled["bytes"] != float64(1024) {
+		t.Errorf("bytes = %v want 1024", unmarshaled["bytes"])
+	}
+	if unmarshaled["speed"] != float64(512) {
+		t.Errorf("speed = %v want 512", unmarshaled["speed"])
+	}
+}
+
+func TestJsonMarshal_ConcurrentSafety(t *testing.T) {
+	done := make(chan bool)
+	for i := 0; i < 10; i++ {
+		go func(n int) {
+			v := map[string]any{"n": n, "data": "concurrent test"}
+			got, err := jsonMarshal(v)
+			if err != nil {
+				t.Errorf("jsonMarshal() error = %v", err)
+				done <- false
+				return
+			}
+			var unmarshaled map[string]any
+			if err := json.Unmarshal(got, &unmarshaled); err != nil {
+				t.Errorf("json.Unmarshal() error = %v", err)
+				done <- false
+				return
+			}
+			done <- true
+		}(i)
+	}
+	for i := 0; i < 10; i++ {
+		if !<-done {
+			t.FailNow()
+		}
+	}
+}
+
+func TestUpdateRunStatus_SkipsEmptySummary(t *testing.T) {
+	calls := 0
+	mock := &runServiceDBMock{
+		runsByID: map[int64]RunRecord{1: {ID: 1, Summary: `{"other":"data"}`}},
+	}
+	mock.UpdateRunFn = func(id int64, fn func(*RunRecord)) {
+		calls++
+		rec := mock.runsByID[id]
+		fn(&rec)
+		mock.runsByID[id] = rec
+	}
+
+	svc := NewRunService(mock)
+	svc.UpdateRunStatus(1, nil)
+	svc.UpdateRunStatus(1, map[string]any{})
+
+	if calls != 0 {
+		t.Errorf("UpdateRun called %d times for empty summary, want 0", calls)
+	}
+}
+
+func TestUpdateRunStatus_UpdatesSummary(t *testing.T) {
+	mock := &runServiceDBMock{
+		runsByID: map[int64]RunRecord{1: {ID: 1, Summary: `{"bytes":100}`}},
+	}
+
+	svc := NewRunService(mock)
+	svc.UpdateRunStatus(1, map[string]any{"finished": true, "success": true})
+
+	updated := mock.runsByID[1]
+	if updated.Status != "finished" {
+		t.Errorf("Status = %q want finished", updated.Status)
+	}
+	if updated.Summary == "" {
+		t.Error("Summary should not be empty")
+	}
+}
+
+func TestUpdateRunStatus_FailedRun(t *testing.T) {
+	mock := &runServiceDBMock{
+		runsByID: map[int64]RunRecord{1: {ID: 1, Summary: `{}`}},
+	}
+
+	svc := NewRunService(mock)
+	svc.UpdateRunStatus(1, map[string]any{"finished": true, "success": false, "error": "disk full"})
+
+	updated := mock.runsByID[1]
+	if updated.Status != "failed" {
+		t.Errorf("Status = %q want failed", updated.Status)
+	}
+	if updated.Error != "disk full" {
+		t.Errorf("Error = %q want 'disk full'", updated.Error)
 	}
 }
