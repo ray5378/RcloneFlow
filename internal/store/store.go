@@ -248,6 +248,13 @@ func (db *DB) migrate() error {
 	return nil
 }
 
+func (db *DB) ResetSequence(tableName string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	_, err := db.db.Exec("UPDATE sqlite_sequence SET seq = 0 WHERE name = ?", tableName)
+	return err
+}
+
 func (db *DB) Close() error {
 	return db.db.Close()
 }

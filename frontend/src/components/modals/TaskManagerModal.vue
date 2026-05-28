@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { exportTasks, importTasks, clearAllTasks } from '../../api/task'
 import { clearAllRuns } from '../../api/run'
 import { getTasks } from '../../api/task'
-import { getRemotes } from '../../api/remote'
+import { getRemotes, clearAllRemotes } from '../../api/remote'
 import { t } from '../../i18n'
 import { showSuccessToast, showErrorToast } from '../../api/errors'
 
@@ -17,6 +17,7 @@ const showConflictModal = ref(false)
 const showRemoteConflictModal = ref(false)
 const showClearTasksConfirm = ref(false)
 const showClearHistoryConfirm = ref(false)
+const showClearRemotesConfirm = ref(false)
 const conflictCount = ref(0)
 const remoteConflictCount = ref(0)
 const pendingImportTaskCount = ref(0)
@@ -225,6 +226,19 @@ async function handleClearHistory() {
     processing.value = false
   }
 }
+
+async function handleClearRemotes() {
+  processing.value = true
+  try {
+    await clearAllRemotes()
+    showClearRemotesConfirm.value = false
+    showSuccessToast(t('taskManager.clearRemotesSuccess'))
+  } catch (e: any) {
+    showErrorToast(e?.message || t('taskManager.operationFailed'))
+  } finally {
+    processing.value = false
+  }
+}
 </script>
 
 <template>
@@ -275,6 +289,15 @@ async function handleClearHistory() {
             <div class="action-info">
               <div class="action-name">{{ t('taskManager.clearHistory') }}</div>
               <div class="action-hint">{{ t('taskManager.clearHistoryHint') }}</div>
+            </div>
+            <span class="action-arrow">›</span>
+          </div>
+
+          <div class="action-item danger" @click="showClearRemotesConfirm = true">
+            <span class="action-icon">🗄️</span>
+            <div class="action-info">
+              <div class="action-name">{{ t('taskManager.clearAllRemotes') }}</div>
+              <div class="action-hint">{{ t('taskManager.clearAllRemotesHint') }}</div>
             </div>
             <span class="action-arrow">›</span>
           </div>
@@ -381,6 +404,22 @@ async function handleClearHistory() {
       <div class="modal-footer">
         <button class="ghost" @click="showClearHistoryConfirm = false">{{ t('common.cancel') }}</button>
         <button class="primary danger" @click="handleClearHistory" :disabled="processing">{{ t('modal.confirm') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="showClearRemotesConfirm" class="modal-overlay" @click.self="showClearRemotesConfirm = false">
+    <div class="modal-content confirm-modal">
+      <div class="modal-header">
+        <h3>{{ t('taskManager.clearAllRemotes') }}</h3>
+        <button class="close-btn" @click="showClearRemotesConfirm = false">×</button>
+      </div>
+      <div class="modal-body">
+        <p>{{ t('taskManager.clearRemotesConfirm') }}</p>
+      </div>
+      <div class="modal-footer">
+        <button class="ghost" @click="showClearRemotesConfirm = false">{{ t('common.cancel') }}</button>
+        <button class="primary danger" @click="handleClearRemotes" :disabled="processing">{{ t('modal.confirm') }}</button>
       </div>
     </div>
   </div>

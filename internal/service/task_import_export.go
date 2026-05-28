@@ -246,5 +246,17 @@ func (s *TaskService) ClearAllTasks() error {
 		}
 	}
 
+	if err := s.db.Vacuum(); err != nil {
+		return err
+	}
+	if err := s.db.ResetSequence("tasks"); err != nil {
+		return err
+	}
+	if err := s.db.ResetSequence("runs"); err != nil {
+		return err
+	}
+	if err := s.db.ResetSequence("schedules"); err != nil {
+		return err
+	}
 	return nil
 }

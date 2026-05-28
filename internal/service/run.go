@@ -48,6 +48,7 @@ type RunServiceInterface interface {
 	DeleteRunsByIDs(ids []int64) error
 	CleanOldRuns(days int) (int64, error)
 	Vacuum() error
+	ResetSequence(tableName string) error
 }
 
 // RunService 运行记录服务层
@@ -162,7 +163,13 @@ func (s *RunService) DeleteAllRuns() error {
 		}
 		page++
 	}
-	return s.db.DeleteAllRuns()
+	if err := s.db.DeleteAllRuns(); err != nil {
+		return err
+	}
+	if err := s.db.ResetSequence("runs"); err != nil {
+		return err
+	}
+	return s.Vacuum()
 }
 
 func (s *RunService) DeleteRunsByTask(taskId int64) error {

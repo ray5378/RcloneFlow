@@ -90,6 +90,7 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/remotes/config/", r.remoteCtrl.HandleRemoteConfig)
 	apiMux.HandleFunc("/api/remotes/description", r.remoteCtrl.HandleRemoteDescription)
 	apiMux.HandleFunc("/api/remotes/test", r.remoteCtrl.HandleRemoteTest)
+	apiMux.HandleFunc("/api/remotes/clear", r.remoteCtrl.HandleClearRemotes)
 	apiMux.HandleFunc("/api/providers", r.remoteCtrl.HandleProviders)
 	apiMux.HandleFunc("/api/config/dump", r.remoteCtrl.HandleConfigDump)
 	apiMux.HandleFunc("/api/config/", r.remoteCtrl.HandleConfigActions)

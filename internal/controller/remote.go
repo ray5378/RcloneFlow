@@ -112,6 +112,19 @@ func (c *RemoteController) HandleRemoteConfig(w http.ResponseWriter, r *http.Req
 	WriteJSON(w, 200, cfg)
 }
 
+// HandleClearRemotes 删除所有远程存储
+func (c *RemoteController) HandleClearRemotes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		w.WriteHeader(405)
+		return
+	}
+	if err := c.rc.DeleteAllRemotes(r.Context()); err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+	WriteJSON(w, 200, map[string]any{"deleted": true})
+}
+
 // HandleRemoteDescription 更新远程存储备注
 func (c *RemoteController) HandleRemoteDescription(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

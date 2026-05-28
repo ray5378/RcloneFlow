@@ -33,7 +33,7 @@ func (db *DB) MergeTags(entries []TagEntry) error {
 	db.mu.Lock()
 	defer db.mu.Unlock()
 
-	if _, err := db.db.Exec(`DELETE FROM task_tags WHERE selected = 0 AND type = 'keyword'`); err != nil {
+	if _, err := db.db.Exec(`DELETE FROM task_tags WHERE type = 'keyword'`); err != nil {
 		return err
 	}
 

@@ -28,7 +28,7 @@ export { getRuns as listRuns } from './run'
 export { getActiveTransfer, getActiveTransferCompleted, getActiveTransferPending } from './activeTransfer'
 
 // ============ Remote API ============
-export { getRemotes, createRemote, updateRemote, getRemoteConfig, deleteRemote, testRemote, getProviders, updateRemoteDescription } from './remote'
+export { getRemotes, createRemote, updateRemote, getRemoteConfig, deleteRemote, testRemote, getProviders, updateRemoteDescription, clearAllRemotes } from './remote'
 export { getRemotes as listRemotes } from './remote'
 export { getProviders as listProviders } from './remote'
 

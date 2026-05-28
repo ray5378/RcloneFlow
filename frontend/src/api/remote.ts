@@ -43,6 +43,11 @@ export async function deleteRemote(name: string): Promise<void> {
   return del(`/api/config/${encodeURIComponent(name)}`)
 }
 
+/** 删除所有远程存储 */
+export async function clearAllRemotes(): Promise<void> {
+  return del('/api/remotes/clear')
+}
+
 /** 测试远程存储连接 */
 export async function testRemote(name: string): Promise<{ ok: boolean; count: number }> {
   return post<{ ok: boolean; count: number }>('/api/remotes/test', { name })

@@ -41,6 +41,7 @@ func (m *mockRunSvcDB) DeleteRunsByTask(taskId int64) error                     
 func (m *mockRunSvcDB) DeleteRunsByIDs(ids []int64) error                                 { return nil }
 func (m *mockRunSvcDB) CleanOldRuns(days int) (int64, error)                              { return 0, nil }
 func (m *mockRunSvcDB) Vacuum() error                                                     { return nil }
+func (m *mockRunSvcDB) ResetSequence(tableName string) error                              { return nil }
 func (m *mockRunSvcDB) UpdateRunStatusByJobId(jobId int64, status, errorMsg string) error { return nil }
 
 func TestHandleActiveRuns_UsesProgressAndExposesDebugFields(t *testing.T) {

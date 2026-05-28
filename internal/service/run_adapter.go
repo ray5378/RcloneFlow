@@ -149,3 +149,7 @@ func (a *storeRunAdapter) Vacuum() error {
 	return a.db.Vacuum()
 }
 
+func (a *storeRunAdapter) ResetSequence(tableName string) error {
+	return a.db.ResetSequence(tableName)
+}
+

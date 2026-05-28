@@ -71,7 +71,7 @@ func TestMergeTags_ThenListTags(t *testing.T) {
 	}
 }
 
-func TestMergeTags_PreservesSelected(t *testing.T) {
+func TestMergeTags_ResetsSelected(t *testing.T) {
 	db := openTestDB(t)
 	defer db.Close()
 
@@ -88,8 +88,8 @@ func TestMergeTags_PreservesSelected(t *testing.T) {
 
 	tags, _ := db.ListTags()
 	for _, tg := range tags {
-		if tg.Tag == "备份" && !tg.Selected {
-			t.Fatal("备份 should remain selected after MergeTags")
+		if tg.Tag == "备份" && tg.Selected {
+			t.Fatal("备份 should be reset to selected=false after MergeTags (all keywords are re-derived)")
 		}
 	}
 }

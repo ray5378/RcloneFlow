@@ -156,6 +156,20 @@ func (c *RcloneClient) DeleteRemote(ctx context.Context, name string) error {
 	return c.Call(ctx, "config/delete", &DeleteRemoteRequest{Name: name}, nil)
 }
 
+// DeleteAllRemotes 删除所有远程存储
+func (c *RcloneClient) DeleteAllRemotes(ctx context.Context) error {
+	remotes, err := c.ListRemotes(ctx)
+	if err != nil {
+		return err
+	}
+	for _, name := range remotes {
+		if err := c.DeleteRemote(ctx, name); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // UpdateRemoteDescription 更新远程存储备注
 func (c *RcloneClient) UpdateRemoteDescription(ctx context.Context, name, description string) error {
 	return c.Call(ctx, "config/update", &UpdateRemoteRequest{
