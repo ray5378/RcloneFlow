@@ -245,6 +245,7 @@ export function useBrowser(options: UseBrowserOptions = {}) {
 
   onMounted(async () => {
     await remoteMgmt.loadRemoteOrder()
+    await remoteMgmt.loadDescriptions()
     await loadRemotesInternal()
   })
   const onContextClick = () => { contextMenu.contextMenu.value.show = false }

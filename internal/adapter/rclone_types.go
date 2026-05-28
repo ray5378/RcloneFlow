@@ -53,6 +53,11 @@ type DeleteRemoteRequest struct {
 	Name string `json:"name"`
 }
 
+type UpdateRemoteRequest struct {
+	Name       string         `json:"name"`
+	Parameters map[string]any `json:"parameters"`
+}
+
 type DumpConfigResponse map[string]map[string]any
 
 type GetConfigRequest struct {

@@ -32,12 +32,21 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			WriteJSON(w, 500, map[string]any{"error": err.Error()})
 			return
 		}
+		dump, _ := c.rc.DumpConfig(r.Context())
+		descriptions := make(map[string]string, len(remotes))
+		for _, name := range remotes {
+			if cfg, ok := dump[name]; ok {
+				if d, ok := cfg["description"].(string); ok && d != "" {
+					descriptions[name] = d
+				}
+			}
+		}
 		versionResp, _ := c.rc.Version(r.Context())
 		version := ""
 		if versionResp != nil {
 			version = versionResp.Version
 		}
-		WriteJSON(w, 200, map[string]any{"remotes": remotes, "version": version})
+		WriteJSON(w, 200, map[string]any{"remotes": remotes, "descriptions": descriptions, "version": version})
 
 	case http.MethodPost:
 		var req struct {
@@ -101,6 +110,31 @@ func (c *RemoteController) HandleRemoteConfig(w http.ResponseWriter, r *http.Req
 		return
 	}
 	WriteJSON(w, 200, cfg)
+}
+
+// HandleRemoteDescription 更新远程存储备注
+func (c *RemoteController) HandleRemoteDescription(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(405)
+		return
+	}
+	var req struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+	}
+	if err := DecodeRequest(w, r, &req); err != nil {
+		WriteJSON(w, 400, map[string]any{"error": err.Error()})
+		return
+	}
+	if req.Name == "" {
+		WriteJSON(w, 400, map[string]any{"error": "name required"})
+		return
+	}
+	if err := c.rc.UpdateRemoteDescription(r.Context(), req.Name, req.Description); err != nil {
+		WriteJSON(w, 500, map[string]any{"error": err.Error()})
+		return
+	}
+	WriteJSON(w, 200, map[string]any{"updated": true})
 }
 
 // HandleRemoteTest 测试远程存储

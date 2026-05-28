@@ -6,8 +6,13 @@ import { get, post, put, del } from './client'
 import type { Provider } from '../types'
 
 /** 获取所有远程存储列表 */
-export async function getRemotes(): Promise<{ remotes: string[]; version: string }> {
-  return get<{ remotes: string[]; version: string }>('/api/remotes')
+export async function getRemotes(): Promise<{ remotes: string[]; descriptions: Record<string, string>; version: string }> {
+  return get<{ remotes: string[]; descriptions: Record<string, string>; version: string }>('/api/remotes')
+}
+
+/** 更新远程存储备注 */
+export async function updateRemoteDescription(name: string, description: string): Promise<void> {
+  return post('/api/remotes/description', { name, description })
 }
 
 /** 创建远程存储 */

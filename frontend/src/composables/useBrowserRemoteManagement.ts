@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { t } from '../i18n'
 import { showToast } from '../api/errors'
 import * as api from '../api'
+import { updateRemoteDescription } from '../api/remote'
 
 export interface UseBrowserRemoteManagementOptions {
   openRemote: (name: string) => Promise<void>
@@ -16,6 +17,7 @@ export interface UseBrowserRemoteManagementReturn {
   getOrderedRemotes: () => string[]
   saveRemoteOrder: () => Promise<void>
   loadRemoteOrder: () => Promise<void>
+  loadDescriptions: () => Promise<void>
   onDragStart: (name: string) => void
   onDragOver: (e: DragEvent, name: string) => void
   onDrop: (e: DragEvent, targetName: string) => void
@@ -111,9 +113,28 @@ export function useBrowserRemoteManagement(options: UseBrowserRemoteManagementOp
     }
   }
 
-  function saveDesc(name: string, desc: string) {
+  async function loadDescriptions() {
+    try {
+      const data = await api.listRemotes()
+      if (data.descriptions) {
+        const merged = { ...localStorage.getItem('remoteDescriptions') ? JSON.parse(localStorage.getItem('remoteDescriptions')!) : {} }
+        for (const [name, desc] of Object.entries(data.descriptions)) {
+          if (desc) merged[name] = desc
+        }
+        descriptions.value = merged
+        localStorage.setItem('remoteDescriptions', JSON.stringify(merged))
+      }
+    } catch {
+    }
+  }
+
+  async function saveDesc(name: string, desc: string) {
     descriptions.value[name] = desc
     localStorage.setItem('remoteDescriptions', JSON.stringify(descriptions.value))
+    try {
+      await updateRemoteDescription(name, desc)
+    } catch {
+    }
   }
 
   return {
@@ -124,6 +145,7 @@ export function useBrowserRemoteManagement(options: UseBrowserRemoteManagementOp
     getOrderedRemotes,
     saveRemoteOrder,
     loadRemoteOrder,
+    loadDescriptions,
     onDragStart,
     onDragOver,
     onDrop,

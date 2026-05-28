@@ -156,6 +156,16 @@ func (c *RcloneClient) DeleteRemote(ctx context.Context, name string) error {
 	return c.Call(ctx, "config/delete", &DeleteRemoteRequest{Name: name}, nil)
 }
 
+// UpdateRemoteDescription 更新远程存储备注
+func (c *RcloneClient) UpdateRemoteDescription(ctx context.Context, name, description string) error {
+	return c.Call(ctx, "config/update", &UpdateRemoteRequest{
+		Name: name,
+		Parameters: map[string]any{
+			"description": description,
+		},
+	}, nil)
+}
+
 // DumpConfig 导出所有配置
 func (c *RcloneClient) DumpConfig(ctx context.Context) (DumpConfigResponse, error) {
 	var resp DumpConfigResponse
