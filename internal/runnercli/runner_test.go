@@ -227,19 +227,9 @@ func TestConsume_CASNoticeIncrementsCompletedFiles(t *testing.T) {
 	line := "2026/05/01 14:01:20 NOTICE: 电视剧/国产剧/人间惊鸿客 (2026)/Season 1/人间惊鸿客 - S01E18 - 第 18 集.mkv: CAS compatible match after source cleanup (Failed to copy: object not found)\n"
 	r.consume(run.ID, strings.NewReader(line), outFile, true, fp, true, false, "/tmp/rclone.conf", "dst:/b", "")
 
-	gotRun, err := db.GetRun(run.ID)
-	if err != nil {
-		t.Fatalf("GetRun() error = %v", err)
-	}
-	prog, _ := gotRun.Summary["progress"].(map[string]any)
-	if prog == nil {
-		t.Fatalf("expected progress map, got %#v", gotRun.Summary)
-	}
-	if got := int(prog["completedFiles"].(float64)); got != 1 {
-		t.Fatalf("completedFiles=%d, want 1; summary=%#v", got, gotRun.Summary)
-	}
-	files, _ := gotRun.Summary["files"].([]fileProg)
-	_ = files
+	// per-file events no longer write completedFiles to DB directly;
+	// only the aggregate stats line (--stats 1s) triggers DB updates.
+	// Verify that in-memory tracking (fp) is updated correctly.
 	if got := len(fp.copiedList()); got != 1 {
 		t.Fatalf("fp.copied len=%d, want 1", got)
 	}

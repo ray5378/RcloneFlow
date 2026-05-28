@@ -454,7 +454,7 @@ func (m *Manager) MarkCompleted(runID int64, path string, status FileStatus, mes
 		}
 	}
 	st.UpdatedAt = time.Now()
-	m.persistSnapshotLockedImmediate(st)
+	m.persistSnapshotLocked(st)
 }
 
 func (m *Manager) SetTransferSlots(runID int64, slots int) {
