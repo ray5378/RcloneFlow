@@ -5,6 +5,7 @@ import TaskView from './views/TaskView.vue'
 import LoginView from './views/LoginView.vue'
 import DefaultsModal from './components/modals/DefaultsModal.vue'
 import TaskManagerModal from './components/modals/TaskManagerModal.vue'
+import WebdavModal from './components/modals/WebdavModal.vue'
 import ToastCenter from './components/toast/ToastCenter.vue'
 import { useToastCenter } from './composables/useToastCenter'
 import { registerToast, registerConfirmCallback } from './api/errors'
@@ -67,6 +68,7 @@ const showSettingsModal = ref(false)
 const showPasswordModal = ref(false)
 const showDefaultsModal = ref(false)
 const showTaskManagerModal = ref(false)
+const showWebdavModal = ref(false)
 const showVersionModal = ref(false)
 const versionInfo = ref<{ commitHash: string; rcloneVersion: string } | null>(null)
 const showMobileMenu = ref(false)
@@ -275,6 +277,11 @@ onMounted(async () => {
               <span class="settings-text">{{ t('settings.taskManager') }}</span>
               <span class="settings-arrow">›</span>
             </div>
+            <div class="settings-item" @click="showWebdavModal = true">
+              <span class="settings-icon">🔗</span>
+              <span class="settings-text">{{ t('webdav.title') }}</span>
+              <span class="settings-arrow">›</span>
+            </div>
             <div class="settings-item" @click="openVersionModal">
               <span class="settings-icon">ℹ️</span>
               <span class="settings-text">{{ t('settings.version') }}</span>
@@ -327,6 +334,7 @@ onMounted(async () => {
 
       <DefaultsModal v-if="showDefaultsModal" @close="showDefaultsModal = false" @settings-saved="handleDefaultsSaved" />
       <TaskManagerModal v-if="showTaskManagerModal" @close="showTaskManagerModal = false" @refresh="taskViewKey++" />
+      <WebdavModal v-if="showWebdavModal" @close="showWebdavModal = false" />
 
       <div v-if="showVersionModal" class="modal-overlay" @click.self="showVersionModal = false">
         <div class="modal-content settings-modal">
