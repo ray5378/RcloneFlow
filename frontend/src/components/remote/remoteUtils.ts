@@ -292,7 +292,7 @@ export const optionHelpMap: Record<string, string> = {
   case_sensitive: '强制或声明按区分大小写处理路径。local 中用于覆盖本地文件系统默认判断；某些远端中表示服务端行为。',
   case_insensitive: '强制或声明按不区分大小写处理路径。local 中用于覆盖本地文件系统默认判断；某些远端中表示服务端行为。',
   no_clone: '禁用 clone / copy_file_range 等服务端拷贝优化。',
-  remote: '要进行加密/解密的远程存储路径。通常应包含冒号和路径，例如 myremote:path/to/dir、myremote:bucket，或不太推荐的 myremote:。',
+  remote: '选择要加密/解密的远程存储目录。从下拉列表中选择已添加的存储，然后浏览选择目录。',
   filename_encryption: '如何加密文件名。standard 表示对文件名进行加密。',
   directory_name_encryption: '是否加密目录名。若 filename_encryption 为 off，则该选项不会生效。',
   password2: '用于盐值的第二个密码/口令。可选但推荐，并且应与前一个密码不同。',

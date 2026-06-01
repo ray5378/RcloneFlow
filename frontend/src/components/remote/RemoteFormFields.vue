@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ProviderOption } from '../../types'
 import { getOptionLabel, getOptionHelp, getOptionPlaceholder, getExampleHelp } from './remoteUtils'
+import RemotePathBrowser from './RemotePathBrowser.vue'
 
 const props = defineProps<{
   requiredOptions: ProviderOption[]
@@ -27,8 +28,13 @@ function updateOption(name: string, value: string) {
     <div class="field-grid" v-if="requiredOptions.length">
       <div v-for="opt in requiredOptions" :key="opt.Name" class="field-item">
         <label>{{ getOptionLabel(opt) }} <small v-if="getOptionLabel(opt) !== opt.Name" class="subkey">{{ opt.Name }}</small> <span style="color: #dc2626">*</span></label>
+        <RemotePathBrowser
+          v-if="opt.Name === 'remote'"
+          :model-value="remoteOptions[opt.Name] || ''"
+          @update:model-value="updateOption(opt.Name, $event)"
+        />
         <input
-          v-if="!opt.Examples || !opt.Examples.length"
+          v-else-if="!opt.Examples || !opt.Examples.length"
           :value="remoteOptions[opt.Name] || ''"
           :type="opt.IsPassword ? 'password' : 'text'"
           :placeholder="getOptionPlaceholder(opt)"
@@ -44,8 +50,13 @@ function updateOption(name: string, value: string) {
     <div class="field-grid" v-if="optionalOptions.length" style="margin-top: 16px">
       <div v-for="opt in optionalOptions" :key="opt.Name" class="field-item">
         <label>{{ getOptionLabel(opt) }} <small v-if="getOptionLabel(opt) !== opt.Name" class="subkey">{{ opt.Name }}</small></label>
+        <RemotePathBrowser
+          v-if="opt.Name === 'remote'"
+          :model-value="remoteOptions[opt.Name] || ''"
+          @update:model-value="updateOption(opt.Name, $event)"
+        />
         <input
-          v-if="!opt.Examples || !opt.Examples.length"
+          v-else-if="!opt.Examples || !opt.Examples.length"
           :value="remoteOptions[opt.Name] || ''"
           :type="opt.IsPassword ? 'password' : 'text'"
           :placeholder="getOptionPlaceholder(opt)"
@@ -65,8 +76,13 @@ function updateOption(name: string, value: string) {
       <div class="field-grid" v-if="advancedOptions.length" style="margin-top: 12px">
         <div v-for="opt in advancedOptions" :key="opt.Name" class="field-item">
           <label>{{ getOptionLabel(opt) }} <small v-if="getOptionLabel(opt) !== opt.Name" class="subkey">{{ opt.Name }}</small></label>
+          <RemotePathBrowser
+            v-if="opt.Name === 'remote'"
+            :model-value="remoteOptions[opt.Name] || ''"
+            @update:model-value="updateOption(opt.Name, $event)"
+          />
           <input
-            v-if="!opt.Examples || !opt.Examples.length"
+            v-else-if="!opt.Examples || !opt.Examples.length"
             :value="remoteOptions[opt.Name] || ''"
             :type="opt.IsPassword ? 'password' : 'text'"
             :placeholder="getOptionPlaceholder(opt)"
