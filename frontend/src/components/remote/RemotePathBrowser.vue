@@ -17,6 +17,7 @@ const currentPath = ref('')
 const items = ref<FileItem[]>([])
 const loading = ref(false)
 const errorMsg = ref('')
+let initializing = false
 
 const breadcrumbs = computed(() => {
   const parts = currentPath.value.split('/').filter(Boolean)
@@ -69,14 +70,17 @@ async function reload() {
   if (props.modelValue) {
     const colonIndex = props.modelValue.indexOf(':')
     if (colonIndex > 0) {
+      initializing = true
       selectedRemote.value = props.modelValue.substring(0, colonIndex)
       currentPath.value = props.modelValue.substring(colonIndex + 1)
+      initializing = false
       await listDir(currentPath.value)
       return
     }
   }
   if (!selectedRemote.value && remotes.value.length > 0) {
     selectedRemote.value = remotes.value[0]
+    return
   }
   if (selectedRemote.value) {
     currentPath.value = ''
@@ -85,6 +89,7 @@ async function reload() {
 }
 
 watch(selectedRemote, async (newVal) => {
+  if (initializing) return
   if (newVal) {
     currentPath.value = ''
     await listDir('')
@@ -92,7 +97,7 @@ watch(selectedRemote, async (newVal) => {
     items.value = []
     currentPath.value = ''
   }
-})
+}, { flush: 'sync' })
 
 function enterDir(item: FileItem) {
   currentPath.value = item.Path
@@ -110,13 +115,15 @@ function selectCurrentDir() {
   }
 }
 
-loadRemotes().then(() => {
+loadRemotes().then(async () => {
   if (props.modelValue) {
     const colonIndex = props.modelValue.indexOf(':')
     if (colonIndex > 0) {
+      initializing = true
       selectedRemote.value = props.modelValue.substring(0, colonIndex)
       currentPath.value = props.modelValue.substring(colonIndex + 1)
-      listDir(currentPath.value)
+      initializing = false
+      await listDir(currentPath.value)
     }
   }
 })
