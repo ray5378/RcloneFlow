@@ -365,9 +365,9 @@ export function getExampleLabel(option: ProviderOption, example: { Value: string
       off: '关闭',
     }
     const helpMap: Record<string, string> = {
-      'Encrypt the filenames.': '对文件名进行加密。',
+      'Encrypt the filenames. See the docs for the details.': '对文件名进行加密。',
       'Very simple filename obfuscation.': '非常简单的文件名混淆。',
-      "Don't encrypt the file names.": '不加密文件名。仅添加 ".bin" 或自定义后缀。',
+      'Don\'t encrypt the file names. Adds a ".bin", or "suffix" extension only': '不加密文件名。仅添加 ".bin" 或自定义后缀。',
     }
     const tv = valueMap[example.Value] || example.Value
     const th = helpMap[example.Help] || example.Help
@@ -377,7 +377,7 @@ export function getExampleLabel(option: ProviderOption, example: { Value: string
   if (option.Name === 'directory_name_encryption') {
     const helpMap: Record<string, string> = {
       'Encrypt directory names.': '加密目录名。',
-      "Don't encrypt directory names.": '不加密目录名。',
+      'Don\'t encrypt directory names, leave them intact': '不加密目录名。',
     }
     return helpMap[example.Help] || example.Help
   }
