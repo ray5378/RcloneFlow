@@ -3,11 +3,14 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"strings"
 
 	"rcloneflow/internal/auth"
 	"rcloneflow/internal/controller"
+	"rcloneflow/internal/webdavserver"
 	"rcloneflow/internal/websocket"
 )
 
@@ -23,6 +26,8 @@ type Router struct {
 	activeTransferCtrl *controller.ActiveTransferController
 	tagCtrl            *controller.TagController
 	versionCtrl        *controller.VersionController
+	webdavCtrl         *controller.WebdavController
+	webdavManager      *webdavserver.Manager
 	staticDir          string
 }
 
@@ -38,6 +43,8 @@ func New(
 	activeTransferCtrl *controller.ActiveTransferController,
 	tagCtrl *controller.TagController,
 	versionCtrl *controller.VersionController,
+	webdavCtrl *controller.WebdavController,
+	webdavManager *webdavserver.Manager,
 	staticDir string,
 ) *Router {
 	return &Router{
@@ -51,6 +58,8 @@ func New(
 		activeTransferCtrl: activeTransferCtrl,
 		tagCtrl:            tagCtrl,
 		versionCtrl:        versionCtrl,
+		webdavCtrl:         webdavCtrl,
+		webdavManager:      webdavManager,
 		staticDir:          staticDir,
 	}
 }
@@ -173,6 +182,11 @@ func (r *Router) Setup(mux *http.ServeMux) {
 
 	// 设置中心
 	apiMux.HandleFunc("/api/settings", controller.NewSettingsController().HandleSettings)
+
+	// WebDAV 控制
+	apiMux.HandleFunc("/api/webdav/start", r.webdavCtrl.HandleStart)
+	apiMux.HandleFunc("/api/webdav/stop", r.webdavCtrl.HandleStop)
+	apiMux.HandleFunc("/api/webdav/status", r.webdavCtrl.HandleStatus)
 	// CLI 扩展接口：停止/强杀/日志下载/文件明细
 	apiMux.HandleFunc("/api/runs/", func(w http.ResponseWriter, req *http.Request) {
 		if strings.HasSuffix(req.URL.Path, "/stop") {
@@ -201,6 +215,9 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	// 注册受保护的路由
 	mux.Handle("/api/", protectedMux)
 
+	// WebDAV 反向代理（公开，由 rclone serve webdav 自身处理认证）
+	mux.Handle("/dav/", r.webdavProxy())
+
 	// 静态文件（公开）
 	mux.Handle("/", staticFileHandler(r.staticDir))
 }
@@ -215,4 +232,23 @@ func staticFileHandler(staticDir string) http.Handler {
 		})
 	}
 	return http.FileServer(http.Dir(staticDir))
+}
+
+func (r *Router) webdavProxy() http.Handler {
+	target, _ := url.Parse("http://127.0.0.1:17871")
+	proxy := httputil.NewSingleHostReverseProxy(target)
+	proxy.ModifyResponse = func(resp *http.Response) error {
+		resp.Header.Set("Access-Control-Allow-Origin", "*")
+		return nil
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if !r.webdavManager.IsRunning() {
+			http.Error(w, "WebDAV service is not running", http.StatusServiceUnavailable)
+			return
+		}
+
+		req.Host = target.Host
+		proxy.ServeHTTP(w, req)
+	})
 }

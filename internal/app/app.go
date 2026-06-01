@@ -18,6 +18,7 @@ import (
 	"rcloneflow/internal/scheduler"
 	"rcloneflow/internal/service"
 	"rcloneflow/internal/store"
+	"rcloneflow/internal/webdavserver"
 	"rcloneflow/internal/websocket"
 
 	"go.uber.org/zap"
@@ -73,8 +74,11 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 		return err
 	}
 
-	mux := setupRouter(cfg, services.controllers)
+	mux := setupRouter(cfg, services)
 	srv := startHTTPServer(cfg, mux)
+
+	// 自动恢复 WebDAV 服务
+	restoreWebDAV(services)
 
 	// 等待关闭信号
 	sig := <-stop
@@ -86,6 +90,7 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 
 // appServices 包含应用程序的所有服务和控制器
 type appServices struct {
+	db              *store.DB
 	taskSvc         *service.TaskService
 	scheduleSvc     *service.ScheduleService
 	runSvc          *service.RunService
@@ -95,6 +100,7 @@ type appServices struct {
 	logCleanupSvc   *service.LogCleanupService
 	sched           *scheduler.Scheduler
 	activeMgr       *active_transfer.Manager
+	webdavManager   *webdavserver.Manager
 	controllers     []any
 }
 
@@ -156,6 +162,9 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 	tagCtrl := controller.NewTagController(tagSvc)
 	versionCtrl := controller.NewVersionController(rc)
 
+	webdavManager := webdavserver.NewManager(cfg.GetDataDir())
+	webdavCtrl := controller.NewWebdavController(webdavManager, authSvc)
+
 	// 初始化清理服务
 	var cleanupSvc *service.CleanupService
 	var logCleanupSvc *service.LogCleanupService
@@ -207,6 +216,7 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 	}
 
 	return &appServices{
+		db:              db,
 		taskSvc:         taskSvc,
 		scheduleSvc:     scheduleSvc,
 		runSvc:          runSvc,
@@ -216,14 +226,14 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 		logCleanupSvc:   logCleanupSvc,
 		sched:           sched,
 		activeMgr:       activeMgr,
-		controllers:     []any{remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl},
+		webdavManager:   webdavManager,
+		controllers:     []any{remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl, webdavCtrl},
 	}, nil
 }
 
 // setupRouter 设置 HTTP 路由
-func setupRouter(cfg *config.Config, controllers []any) *http.ServeMux {
-	// 这里我们展开 controllers，因为类型化参数更好
-	// 我们需要正确转换它们
+func setupRouter(cfg *config.Config, services *appServices) *http.ServeMux {
+	controllers := services.controllers
 	remoteCtrl := controllers[0].(*controller.RemoteController)
 	taskCtrl := controllers[1].(*controller.TaskController)
 	browserCtrl := controllers[2].(*controller.BrowserController)
@@ -234,9 +244,10 @@ func setupRouter(cfg *config.Config, controllers []any) *http.ServeMux {
 	activeTransferCtrl := controllers[7].(*controller.ActiveTransferController)
 	tagCtrl := controllers[8].(*controller.TagController)
 	versionCtrl := controllers[9].(*controller.VersionController)
-	
-	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl, cfg.GetStaticDir())
-	
+	webdavCtrl := controllers[10].(*controller.WebdavController)
+
+	r := router.New(remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl, webdavCtrl, services.webdavManager, cfg.GetStaticDir())
+
 	mux := http.NewServeMux()
 	r.Setup(mux)
 	return mux
@@ -267,6 +278,11 @@ func startHTTPServer(cfg *config.Config, mux *http.ServeMux) *http.Server {
 func shutdown(services *appServices, srv *http.Server) {
 	logger.Info("已通知后台服务停止")
 
+	// 停止 WebDAV 服务
+	if services.webdavManager != nil {
+		services.webdavManager.Stop()
+	}
+
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 	
@@ -274,5 +290,20 @@ func shutdown(services *appServices, srv *http.Server) {
 		logger.Error("服务器关闭失败", zap.Error(err))
 	}
 	logger.Info("服务器已安全关闭")
+}
+
+func restoreWebDAV(services *appServices) {
+	if services.webdavManager == nil || !services.webdavManager.IsEnabled() {
+		return
+	}
+
+	users, err := services.db.ListUsers()
+	if err != nil || len(users) == 0 {
+		logger.Warn("WebDAV自动恢复失败: 没有用户")
+		return
+	}
+
+	username := users[0].Username
+	services.webdavManager.AutoRestore(username)
 }
 
