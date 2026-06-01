@@ -293,8 +293,8 @@ export const optionHelpMap: Record<string, string> = {
   case_insensitive: '强制或声明按不区分大小写处理路径。local 中用于覆盖本地文件系统默认判断；某些远端中表示服务端行为。',
   no_clone: '禁用 clone / copy_file_range 等服务端拷贝优化。',
   remote: '选择要加密/解密的远程存储目录。从下拉列表中选择已添加的存储，然后浏览选择目录。',
-  filename_encryption: '如何加密文件名。standard 表示对文件名进行加密。',
-  directory_name_encryption: '是否加密目录名。若 filename_encryption 为 off，则该选项不会生效。',
+  filename_encryption: '控制文件名的加密方式。标准为加密文件名，混淆为简单混淆，关闭为不加密。',
+  directory_name_encryption: '是否加密目录名。若文件名加密设为"关闭"，则此选项不生效。',
   password2: '用于盐值的第二个密码/口令。可选但推荐，并且应与前一个密码不同。',
   show_mapping: '列出文件时显示加密前后的名称映射，便于排障或核对加密文件名。',
   no_data_encryption: '是否不加密文件内容；关闭时会加密文件数据。',
@@ -351,4 +351,37 @@ export function getExampleHelp(help?: string) {
     'public-read': '公开可读',
   }
   return map[normalized] || normalized
+}
+
+export function getExampleLabel(option: ProviderOption, example: { Value: string; Help: string }) {
+  if (locale.value !== 'zh') {
+    return `${example.Value}${example.Help ? ` — ${example.Help}` : ''}`
+  }
+
+  if (option.Name === 'filename_encryption') {
+    const valueMap: Record<string, string> = {
+      standard: '标准',
+      obfuscate: '混淆',
+      off: '关闭',
+    }
+    const helpMap: Record<string, string> = {
+      'Encrypt the filenames.': '对文件名进行加密。',
+      'Very simple filename obfuscation.': '非常简单的文件名混淆。',
+      "Don't encrypt the file names.": '不加密文件名。仅添加 ".bin" 或自定义后缀。',
+    }
+    const tv = valueMap[example.Value] || example.Value
+    const th = helpMap[example.Help] || example.Help
+    return `${tv} — ${th}`
+  }
+
+  if (option.Name === 'directory_name_encryption') {
+    const helpMap: Record<string, string> = {
+      'Encrypt directory names.': '加密目录名。',
+      "Don't encrypt directory names.": '不加密目录名。',
+    }
+    return helpMap[example.Help] || example.Help
+  }
+
+  const translatedHelp = getExampleHelp(example.Help)
+  return `${example.Value}${translatedHelp ? ` — ${translatedHelp}` : ''}`
 }

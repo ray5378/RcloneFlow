@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { ProviderOption } from '../../types'
-import { getOptionLabel, getOptionHelp, getOptionPlaceholder, getExampleHelp } from './remoteUtils'
+import { getOptionLabel, getOptionHelp, getOptionPlaceholder, getExampleLabel } from './remoteUtils'
 import RemotePathBrowser from './RemotePathBrowser.vue'
 
 const props = defineProps<{
@@ -41,7 +41,7 @@ function updateOption(name: string, value: string) {
           @input="updateOption(opt.Name, ($event.target as HTMLInputElement).value)"
         />
         <select v-else :value="remoteOptions[opt.Name] || ''" @change="updateOption(opt.Name, ($event.target as HTMLSelectElement).value)">
-          <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">{{ ex.Value }}{{ getExampleHelp(ex.Help) ? ` — ${getExampleHelp(ex.Help)}` : '' }}</option>
+          <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">{{ getExampleLabel(opt, ex) }}</option>
         </select>
         <div class="field-help">{{ getOptionHelp(opt) }}</div>
       </div>
@@ -63,7 +63,7 @@ function updateOption(name: string, value: string) {
           @input="updateOption(opt.Name, ($event.target as HTMLInputElement).value)"
         />
         <select v-else :value="remoteOptions[opt.Name] || ''" @change="updateOption(opt.Name, ($event.target as HTMLSelectElement).value)">
-          <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">{{ ex.Value }}{{ getExampleHelp(ex.Help) ? ` — ${getExampleHelp(ex.Help)}` : '' }}</option>
+          <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">{{ getExampleLabel(opt, ex) }}</option>
         </select>
         <div class="field-help">{{ getOptionHelp(opt) }}</div>
       </div>
@@ -89,7 +89,7 @@ function updateOption(name: string, value: string) {
             @input="updateOption(opt.Name, ($event.target as HTMLInputElement).value)"
           />
           <select v-else :value="remoteOptions[opt.Name] || ''" @change="updateOption(opt.Name, ($event.target as HTMLSelectElement).value)">
-            <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">{{ ex.Value }}{{ getExampleHelp(ex.Help) ? ` — ${getExampleHelp(ex.Help)}` : '' }}</option>
+            <option v-for="ex in opt.Examples" :key="ex.Value" :value="ex.Value">{{ getExampleLabel(opt, ex) }}</option>
           </select>
           <div class="field-help">{{ getOptionHelp(opt) }}</div>
         </div>
