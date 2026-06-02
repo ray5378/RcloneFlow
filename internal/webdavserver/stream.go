@@ -190,6 +190,10 @@ func (fs *streamFileSystem) Rename(ctx context.Context, oldName, newName string)
 
 func (fs *streamFileSystem) Stat(ctx context.Context, name string) (os.FileInfo, error) {
 	name = cleanPath(name)
+	// 根目录直接返回目录信息，不走 rclone lsjson
+	if name == "" || name == "." {
+		return &streamFileInfo{name: "/", size: 0, isDir: true}, nil
+	}
 	info, err := fs.statRemote(ctx, name)
 	if err != nil {
 		return nil, err
