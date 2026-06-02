@@ -695,6 +695,7 @@ export default {
     title: 'WebDAV Remote Access',
     description: 'Mount all storage locally and access files remotely via WebDAV protocol.',
     address: 'Access Address',
+    addressNote: 'Enter the address above in your file manager and use your login credentials to access all storage nodes.',
     start: 'Enable WebDAV',
     stop: 'Disable WebDAV',
     starting: 'Starting...',

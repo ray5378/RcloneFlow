@@ -81,11 +81,10 @@ onMounted(loadStatus)
           <span class="status-text">{{ running ? t('webdav.running') : t('webdav.stopped') }}</span>
         </div>
 
-        <div v-if="running" class="webdav-info">
-          <div class="info-row">
-            <label>{{ t('webdav.address') }}</label>
-            <code>{{ davAddress }}</code>
-          </div>
+        <div class="webdav-note">
+          <div class="note-label">{{ t('webdav.address') }}</div>
+          <code class="note-address">{{ davAddress }}</code>
+          <div class="note-hint">{{ t('webdav.addressNote') }}</div>
         </div>
 
         <div v-if="startError" class="error">{{ startError }}</div>
@@ -237,29 +236,38 @@ onMounted(loadStatus)
   color: var(--text);
 }
 
-.webdav-info {
+.webdav-note {
   margin-bottom: 16px;
+  padding: 14px;
+  background: rgba(100, 181, 246, 0.08);
+  border: 1px solid rgba(100, 181, 246, 0.2);
+  border-radius: 8px;
 }
 
-.info-row {
-  margin-bottom: 12px;
-}
-
-.info-row label {
-  display: block;
-  font-size: 13px;
+.note-label {
+  font-size: 12px;
   color: var(--muted);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-weight: 600;
 }
 
-.info-row code {
+.note-address {
   display: block;
   padding: 10px 12px;
-  background: var(--hover);
+  background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 14px;
   color: #64b5f6;
   word-break: break-all;
+  font-family: monospace;
+}
+
+.note-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .webdav-actions {

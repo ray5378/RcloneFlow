@@ -695,6 +695,7 @@ export default {
     title: 'WebDAV 远程访问',
     description: '开启后可挂载所有存储到本地，通过 WebDAV 协议远程访问文件。',
     address: '访问地址',
+    addressNote: '在文件管理器输入上方地址，使用登录用户名和密码即可访问所有存储节点。',
     start: '开启 WebDAV',
     stop: '关闭 WebDAV',
     starting: '开启中...',
