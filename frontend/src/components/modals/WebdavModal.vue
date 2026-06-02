@@ -183,6 +183,10 @@ onMounted(loadStatus)
             </label>
           </div>
 
+          <div v-if="!cacheEnabled" class="cache-warning">
+            {{ t('webdav.cacheOffWarning') }}
+          </div>
+
           <template v-if="cacheEnabled">
             <div class="cache-subsection">
               <div class="field-item">
@@ -216,13 +220,6 @@ onMounted(loadStatus)
             </div>
             <div class="cache-actions">
               <button
-                class="secondary cache-save-btn"
-                @click="onSaveCache"
-                :disabled="cacheSaving"
-              >
-                {{ cacheSaving ? t('common.saving') : t('webdav.saveCache') }}
-              </button>
-              <button
                 class="secondary cache-cleanup-btn"
                 @click="onCleanupCache"
                 :disabled="cacheCleaning"
@@ -231,6 +228,16 @@ onMounted(loadStatus)
               </button>
             </div>
           </template>
+
+          <div class="cache-actions">
+            <button
+              class="secondary cache-save-btn"
+              @click="onSaveCache"
+              :disabled="cacheSaving"
+            >
+              {{ cacheSaving ? t('common.saving') : t('webdav.saveCache') }}
+            </button>
+          </div>
         </div>
 
         <div v-if="actionError" class="error">{{ actionError }}</div>
@@ -510,6 +517,17 @@ onMounted(loadStatus)
   border-radius: 8px;
   font-size: 12px;
   color: #d97706;
+  line-height: 1.5;
+}
+
+.cache-warning {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #ef4444;
   line-height: 1.5;
 }
 

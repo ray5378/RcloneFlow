@@ -734,6 +734,7 @@ export default {
     cacheMode: '缓存模式',
     cacheModeFull: '开启 — 文件缓存到本地再读写（占用额外存储空间）',
     cacheModeOff: '关闭 — 直接流式传输，不缓存文件（节省存储空间）',
+    cacheOffWarning: '关闭缓存后为纯流式传输模式。注意：部分存储（如 115 网盘、PikPak 等）不支持直接流式传输，文件操作可能报错。建议开启缓存以获得最佳兼容性。',
     cacheStorage: '存储位置',
     cacheStorageDisk: '硬盘',
     cacheStorageMemory: '内存（/dev/shm）',
