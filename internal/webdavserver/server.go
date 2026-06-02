@@ -288,6 +288,12 @@ func (m *Manager) Start() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
 
+	cacheDir := m.cacheDir()
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		cancel()
+		return fmt.Errorf("创建WebDAV缓存目录失败: %w", err)
+	}
+
 	args := []string{
 		"serve", "webdav",
 		combineRemoteName + ":",
@@ -297,8 +303,10 @@ func (m *Manager) Start() error {
 		"--config", m.configFile,
 		"--no-checksum",
 		"--vfs-cache-mode", "full",
+		"--cache-dir", cacheDir,
 		"--vfs-cache-max-size", "1G",
 		"--vfs-cache-max-age", "30m",
+		"--vfs-cache-poll-interval", "10m",
 		"--buffer-size", "64M",
 		"--vfs-read-chunk-size", "64M",
 		"--vfs-read-chunk-size-limit", "1G",
@@ -344,6 +352,30 @@ func (m *Manager) Stop() error {
 		return nil
 	}
 
+	m.stopProcess()
+
+	if err := m.writeSettings(settingsKey, "false"); err != nil {
+		logger.Error("保存WebDAV关闭状态失败", zap.Error(err))
+	}
+
+	logger.Info("WebDAV服务已停止")
+	return nil
+}
+
+func (m *Manager) Shutdown() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.running {
+		return
+	}
+
+	m.stopProcess()
+
+	logger.Info("WebDAV服务已随容器关闭")
+}
+
+func (m *Manager) stopProcess() {
 	if m.cancel != nil {
 		m.cancel()
 	}
@@ -365,13 +397,10 @@ func (m *Manager) Stop() error {
 	m.running = false
 	m.cmd = nil
 	m.cancel = nil
+}
 
-	if err := m.writeSettings(settingsKey, "false"); err != nil {
-		logger.Error("保存WebDAV关闭状态失败", zap.Error(err))
-	}
-
-	logger.Info("WebDAV服务已停止")
-	return nil
+func (m *Manager) cacheDir() string {
+	return filepath.Join(m.dataDir, "webdav-cache")
 }
 
 func (m *Manager) IsRunning() bool {

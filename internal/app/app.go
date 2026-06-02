@@ -278,9 +278,9 @@ func startHTTPServer(cfg *config.Config, mux *http.ServeMux) *http.Server {
 func shutdown(services *appServices, srv *http.Server) {
 	logger.Info("已通知后台服务停止")
 
-	// 停止 WebDAV 服务
+	// 关闭 WebDAV 服务（保留启用状态，容器重启后自动恢复）
 	if services.webdavManager != nil {
-		services.webdavManager.Stop()
+		services.webdavManager.Shutdown()
 	}
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
