@@ -92,7 +92,8 @@ func (s *StreamServer) Start() error {
 		if r.Method == "PROPFIND" && r.Header.Get("Depth") == "infinity" {
 			r.Header.Set("Depth", "1")
 		}
-		wHandler.ServeHTTP(w, r)
+		// 使用 ResponseWriter 包装器抑制 webdav 库内部重复 WriteHeader
+		wHandler.ServeHTTP(&suppressWriteHeaderWriter{ResponseWriter: w}, r)
 	})
 
 	s.webdavSrv = &http.Server{
@@ -520,4 +521,25 @@ func setStreamCORSHeaders(header http.Header) {
 	header.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Depth, Range")
 	header.Set("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type")
 	header.Set("Access-Control-Max-Age", "86400")
+}
+
+// suppressWriteHeaderWriter 包装 http.ResponseWriter，抑制重复的 WriteHeader 调用
+type suppressWriteHeaderWriter struct {
+	http.ResponseWriter
+	wroteHeader bool
+}
+
+func (w *suppressWriteHeaderWriter) WriteHeader(code int) {
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
+	w.ResponseWriter.WriteHeader(code)
+}
+
+func (w *suppressWriteHeaderWriter) Write(data []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.ResponseWriter.Write(data)
 }
