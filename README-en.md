@@ -84,6 +84,7 @@ services:
       - PGID=${PGID:-1000}
     volumes:
       - ./data:/app/data
+      - ./webdav-cache:/webdav-cache  # WebDAV VFS cache directory; accessed files are fully downloaded here when WebDAV is enabled
     restart: always
 ```
 

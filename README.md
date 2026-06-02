@@ -65,6 +65,7 @@ services:
       - PGID=${PGID:-1000}
     volumes:
       - ./app/data:/app/data
+      - ./webdav-cache:/webdav-cache  # WebDAV VFS 缓存目录，启用 WebDAV 后会在本地完整下载访问的文件到此目录
     restart: always
 networks: {}
 ```
