@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getWebdavStatus, startWebdav, stopWebdav, getCredentials, saveCredentials } from '../../api/webdav'
+import { getWebdavStatus, startWebdav, stopWebdav, getCredentials, saveCredentials, saveCacheSettings, cleanupCache } from '../../api/webdav'
 import { t } from '../../i18n'
 
 const emit = defineEmits<{
@@ -16,11 +16,16 @@ const starting = ref(false)
 const stopping = ref(false)
 const davAddress = ref('')
 const credSaving = ref(false)
+const cacheSaving = ref(false)
+const cacheCleaning = ref(false)
 
 const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
 const showPwInRow = ref(false)
+
+const cacheMaxSize = ref('1G')
+const cacheCleanupInterval = ref('24h')
 
 async function loadStatus() {
   loading.value = true
@@ -38,6 +43,8 @@ async function loadStatus() {
       username.value = cred.username
       password.value = cred.password
     }
+    cacheMaxSize.value = status.cache_max_size || '1G'
+    cacheCleanupInterval.value = status.cache_cleanup_interval || '24h'
   } catch (e: any) {
     statusError.value = e.message || '获取状态失败'
   } finally {
@@ -75,6 +82,30 @@ async function onStop() {
     actionError.value = e.message || '关闭失败'
   } finally {
     stopping.value = false
+  }
+}
+
+async function onSaveCache() {
+  cacheSaving.value = true
+  actionError.value = ''
+  try {
+    await saveCacheSettings(cacheMaxSize.value, cacheCleanupInterval.value)
+  } catch (e: any) {
+    actionError.value = e.message || '保存缓存设置失败'
+  } finally {
+    cacheSaving.value = false
+  }
+}
+
+async function onCleanupCache() {
+  cacheCleaning.value = true
+  actionError.value = ''
+  try {
+    await cleanupCache()
+  } catch (e: any) {
+    actionError.value = e.message || '清理缓存失败'
+  } finally {
+    cacheCleaning.value = false
   }
 }
 
@@ -131,6 +162,42 @@ onMounted(loadStatus)
                 <span v-else>👁️</span>
               </button>
             </div>
+          </div>
+        </div>
+
+        <div class="cache-section">
+          <div class="cache-title">{{ t('webdav.cacheSettings') }}</div>
+          <div class="field-item">
+            <label>{{ t('webdav.cacheMaxSize') }}</label>
+            <input
+              v-model="cacheMaxSize"
+              type="text"
+              :placeholder="t('webdav.cacheMaxSizePlaceholder')"
+            />
+          </div>
+          <div class="field-item">
+            <label>{{ t('webdav.cacheCleanupInterval') }}</label>
+            <input
+              v-model="cacheCleanupInterval"
+              type="text"
+              :placeholder="t('webdav.cacheCleanupIntervalPlaceholder')"
+            />
+          </div>
+          <div class="cache-actions">
+            <button
+              class="secondary cache-save-btn"
+              @click="onSaveCache"
+              :disabled="cacheSaving"
+            >
+              {{ cacheSaving ? t('common.saving') : t('webdav.saveCache') }}
+            </button>
+            <button
+              class="secondary cache-cleanup-btn"
+              @click="onCleanupCache"
+              :disabled="cacheCleaning"
+            >
+              {{ cacheCleaning ? t('webdav.cleaning') : t('webdav.cleanupNow') }}
+            </button>
           </div>
         </div>
 
@@ -328,6 +395,66 @@ onMounted(loadStatus)
   font-weight: 600;
   color: var(--text);
   margin-bottom: 12px;
+}
+
+.cache-section {
+  margin-bottom: 16px;
+  padding: 14px;
+  background: var(--hover);
+  border-radius: 8px;
+}
+
+.cache-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.cache-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.cache-actions button {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.cache-save-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.cache-save-btn:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+.cache-save-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cache-cleanup-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: #f59e0b;
+}
+
+.cache-cleanup-btn:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: #f59e0b;
+}
+
+.cache-cleanup-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .field-item {

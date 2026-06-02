@@ -171,6 +171,13 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 		}
 		return webdavManager.Restart()
 	}
+	controller.WebDAVCacheReplanHook = func(interval string) {
+		webdavManager.StopCacheCleanupScheduler()
+		webdavManager.StartCacheCleanupScheduler(ctx)
+	}
+	controller.WebDAVCacheCleanupNowHook = func() error {
+		return webdavManager.CacheCleanupNow()
+	}
 
 	// 初始化清理服务
 	var cleanupSvc *service.CleanupService
@@ -221,6 +228,8 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 			logCleanupSvc.Replan(retentionDays)
 		}
 	}
+
+	webdavManager.StartCacheCleanupScheduler(ctx)
 
 	return &appServices{
 		db:              db,

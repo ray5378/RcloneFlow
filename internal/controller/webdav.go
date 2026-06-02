@@ -112,11 +112,81 @@ func (c *WebdavController) HandleStop(w http.ResponseWriter, r *http.Request) {
 func (c *WebdavController) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	running := c.manager.IsRunning()
 	enabled := c.manager.IsEnabled()
+	cacheMaxSize, cacheCleanupInterval := c.manager.GetCacheSettings()
 
 	WriteJSON(w, http.StatusOK, map[string]any{
-		"running": running,
-		"enabled": enabled,
-		"port":    17870,
-		"path":    "/dav/",
+		"running":               running,
+		"enabled":               enabled,
+		"port":                  17870,
+		"path":                  "/dav/",
+		"cache_max_size":        cacheMaxSize,
+		"cache_cleanup_interval": cacheCleanupInterval,
+	})
+}
+
+type cacheSettingsRequest struct {
+	CacheMaxSize         string `json:"cache_max_size"`
+	CacheCleanupInterval string `json:"cache_cleanup_interval"`
+}
+
+func (c *WebdavController) HandleCacheSettings(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		maxSize, cleanupInterval := c.manager.GetCacheSettings()
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"cache_max_size":         maxSize,
+			"cache_cleanup_interval": cleanupInterval,
+		})
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		body, _ := io.ReadAll(r.Body)
+		var req cacheSettingsRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "无效的请求格式"})
+			return
+		}
+
+		if req.CacheMaxSize != "" {
+			if err := c.manager.SetCacheMaxSize(req.CacheMaxSize); err != nil {
+				logger.Error("保存缓存大小失败", zap.Error(err))
+				WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+		}
+
+		if req.CacheCleanupInterval != "" {
+			if err := c.manager.SetCacheCleanupInterval(req.CacheCleanupInterval); err != nil {
+				logger.Error("保存缓存清理间隔失败", zap.Error(err))
+				WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+				return
+			}
+		}
+
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"ok":      true,
+			"message": "缓存设置已保存",
+		})
+		return
+	}
+
+	w.WriteHeader(http.StatusMethodNotAllowed)
+}
+
+func (c *WebdavController) HandleCacheCleanup(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		WriteJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "仅支持POST"})
+		return
+	}
+
+	if err := c.manager.CacheCleanupNow(); err != nil {
+		logger.Error("清理WebDAV缓存失败", zap.Error(err))
+		WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		return
+	}
+
+	WriteJSON(w, http.StatusOK, map[string]any{
+		"ok":      true,
+		"message": "WebDAV缓存已清理",
 	})
 }

@@ -192,6 +192,8 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/webdav/status", r.webdavCtrl.HandleStatus)
 	apiMux.HandleFunc("/api/webdav/credentials", r.webdavCtrl.HandleGetCredentials)
 	apiMux.HandleFunc("/api/webdav/credentials/save", r.webdavCtrl.HandleSaveCredentials)
+	apiMux.HandleFunc("/api/webdav/cache/settings", r.webdavCtrl.HandleCacheSettings)
+	apiMux.HandleFunc("/api/webdav/cache/cleanup", r.webdavCtrl.HandleCacheCleanup)
 	// CLI 扩展接口：停止/强杀/日志下载/文件明细
 	apiMux.HandleFunc("/api/runs/", func(w http.ResponseWriter, req *http.Request) {
 		if strings.HasSuffix(req.URL.Path, "/stop") {

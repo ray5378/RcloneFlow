@@ -53,6 +53,8 @@ func defaultsMap() map[string]string {
 		"RUNNING_HINT_DEBUG_ENABLED":     "false",
 		"REMOTE_ORDER":                   "",
 		"WEBHOOK_SECRET":                 "",
+		"WEBDAV_CACHE_MAX_SIZE":          "1G",
+		"WEBDAV_CACHE_CLEANUP_INTERVAL":  "24h",
 	}
 }
 
@@ -134,8 +136,10 @@ func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
 			"PROGRESS_FLUSH_MIN_DELTA_BYTES": {"effective": eff("PROGRESS_FLUSH_MIN_DELTA_BYTES"), "default": defs["PROGRESS_FLUSH_MIN_DELTA_BYTES"]},
 		},
 		Webdav: map[string]map[string]string{
-			"FINISH_WAIT_INTERVAL": {"effective": eff("FINISH_WAIT_INTERVAL"), "default": defs["FINISH_WAIT_INTERVAL"]},
-			"FINISH_WAIT_TIMEOUT":  {"effective": eff("FINISH_WAIT_TIMEOUT"), "default": defs["FINISH_WAIT_TIMEOUT"]},
+			"FINISH_WAIT_INTERVAL":          {"effective": eff("FINISH_WAIT_INTERVAL"), "default": defs["FINISH_WAIT_INTERVAL"]},
+			"FINISH_WAIT_TIMEOUT":           {"effective": eff("FINISH_WAIT_TIMEOUT"), "default": defs["FINISH_WAIT_TIMEOUT"]},
+			"WEBDAV_CACHE_MAX_SIZE":         {"effective": eff("WEBDAV_CACHE_MAX_SIZE"), "default": defs["WEBDAV_CACHE_MAX_SIZE"]},
+			"WEBDAV_CACHE_CLEANUP_INTERVAL": {"effective": eff("WEBDAV_CACHE_CLEANUP_INTERVAL"), "default": defs["WEBDAV_CACHE_CLEANUP_INTERVAL"]},
 		},
 		Webhook: map[string]map[string]string{
 			"WEBHOOK_MAX_FILES":          {"effective": eff("WEBHOOK_MAX_FILES"), "default": defs["WEBHOOK_MAX_FILES"]},
@@ -198,12 +202,21 @@ func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 			ReplanLogCleanupHook(retentionDays)
 		}
 	}
+	if WebDAVCacheReplanHook != nil {
+		interval := cur["WEBDAV_CACHE_CLEANUP_INTERVAL"]
+		if interval == "" {
+			interval = defaultsMap()["WEBDAV_CACHE_CLEANUP_INTERVAL"]
+		}
+		WebDAVCacheReplanHook(interval)
+	}
 	WriteJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 var ReplanCleanupHook func(intervalHours int, retentionDays int)
 var ReplanLogCleanupHook func(retentionDays int)
 var WebDAVRestartHook func() error
+var WebDAVCacheReplanHook func(interval string)
+var WebDAVCacheCleanupNowHook func() error
 
 func atoiDefault(s string, d int) int {
 	if s == "" {

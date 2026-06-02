@@ -30,15 +30,21 @@ const (
 	settingsKey          = "WEBDAB_ENABLED"
 	encryptedUserKey     = "WEBDAB_ENCRYPTED_USERNAME"
 	encryptedPassKey     = "WEBDAB_ENCRYPTED_PASSWORD"
+	cacheMaxSizeKey          = "WEBDAV_CACHE_MAX_SIZE"
+	cacheCleanupIntervalKey  = "WEBDAV_CACHE_CLEANUP_INTERVAL"
+	defaultCacheMaxSize         = "1G"
+	defaultCacheCleanupInterval = "24h"
 )
 
 type Manager struct {
-	mu         sync.Mutex
-	cmd        *exec.Cmd
-	cancel     context.CancelFunc
-	running    bool
-	dataDir    string
-	configFile string
+	mu            sync.Mutex
+	cmd           *exec.Cmd
+	cancel        context.CancelFunc
+	running       bool
+	dataDir       string
+	configFile    string
+	cacheCleanupCtx    context.Context
+	cacheCleanupCancel context.CancelFunc
 }
 
 func NewManager(dataDir string) *Manager {
@@ -294,6 +300,8 @@ func (m *Manager) Start() error {
 		return fmt.Errorf("创建WebDAV缓存目录失败: %w", err)
 	}
 
+	cacheMaxSize := m.getCacheMaxSize()
+
 	args := []string{
 		"serve", "webdav",
 		combineRemoteName + ":",
@@ -304,9 +312,7 @@ func (m *Manager) Start() error {
 		"--no-checksum",
 		"--vfs-cache-mode", "full",
 		"--cache-dir", cacheDir,
-		"--vfs-cache-max-size", "1G",
-		"--vfs-cache-max-age", "30m",
-		"--vfs-cache-poll-interval", "10m",
+		"--vfs-cache-max-size", cacheMaxSize,
 		"--buffer-size", "64M",
 		"--vfs-read-chunk-size", "64M",
 		"--vfs-read-chunk-size-limit", "1G",
@@ -414,12 +420,112 @@ func (m *Manager) cacheDir() string {
 	return filepath.Join(m.dataDir, "webdav-cache")
 }
 
+func (m *Manager) getCacheMaxSize() string {
+	settings := m.readSettings()
+	if v := settings[cacheMaxSizeKey]; v != "" {
+		return v
+	}
+	return defaultCacheMaxSize
+}
+
+func (m *Manager) getCacheCleanupInterval() string {
+	settings := m.readSettings()
+	if v := settings[cacheCleanupIntervalKey]; v != "" {
+		return v
+	}
+	return defaultCacheCleanupInterval
+}
+
+func (m *Manager) SetCacheMaxSize(size string) error {
+	return m.writeSettings(cacheMaxSizeKey, size)
+}
+
+func (m *Manager) SetCacheCleanupInterval(interval string) error {
+	return m.writeSettings(cacheCleanupIntervalKey, interval)
+}
+
+func (m *Manager) GetCacheSettings() (maxSize string, cleanupInterval string) {
+	return m.getCacheMaxSize(), m.getCacheCleanupInterval()
+}
+
 func (m *Manager) cleanupCache() {
 	cacheDir := m.cacheDir()
 	if err := os.RemoveAll(cacheDir); err != nil && !os.IsNotExist(err) {
 		logger.Warn("WebDAV缓存清理失败", zap.Error(err))
 	} else if err == nil {
 		logger.Info("WebDAV缓存已清理")
+	}
+}
+
+func (m *Manager) cleanupCacheFiles() {
+	cacheDir := m.cacheDir()
+	entries, err := os.ReadDir(cacheDir)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warn("读取WebDAV缓存目录失败", zap.Error(err))
+		}
+		return
+	}
+	for _, entry := range entries {
+		path := filepath.Join(cacheDir, entry.Name())
+		if err := os.RemoveAll(path); err != nil {
+			logger.Warn("清理WebDAV缓存文件失败", zap.String("path", path), zap.Error(err))
+		}
+	}
+	logger.Info("WebDAV缓存文件已清理")
+}
+
+func (m *Manager) CacheCleanupNow() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.running {
+		m.cleanupCacheFiles()
+	} else {
+		m.cleanupCache()
+	}
+	return nil
+}
+
+func (m *Manager) StartCacheCleanupScheduler(parentCtx context.Context) {
+	m.mu.Lock()
+	if m.cacheCleanupCancel != nil {
+		m.cacheCleanupCancel()
+	}
+	m.cacheCleanupCtx, m.cacheCleanupCancel = context.WithCancel(parentCtx)
+	m.mu.Unlock()
+
+	go m.runCacheCleanupLoop()
+}
+
+func (m *Manager) StopCacheCleanupScheduler() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.cacheCleanupCancel != nil {
+		m.cacheCleanupCancel()
+		m.cacheCleanupCancel = nil
+	}
+}
+
+func (m *Manager) runCacheCleanupLoop() {
+	for {
+		interval := m.getCacheCleanupInterval()
+		d, err := time.ParseDuration(interval)
+		if err != nil {
+			d = 24 * time.Hour
+		}
+		if d < time.Minute {
+			d = time.Minute
+		}
+
+		timer := time.NewTimer(d)
+		select {
+		case <-timer.C:
+			m.CacheCleanupNow()
+		case <-m.cacheCleanupCtx.Done():
+			timer.Stop()
+			return
+		}
 	}
 }
 

@@ -30,7 +30,7 @@ function validate() {
       errors.value[k] = t('defaults.errNonNegative')
     }
   }
-  const durFields = ['FINISH_WAIT_INTERVAL', 'FINISH_WAIT_TIMEOUT']
+  const durFields = ['FINISH_WAIT_INTERVAL', 'FINISH_WAIT_TIMEOUT', 'WEBDAV_CACHE_CLEANUP_INTERVAL']
   for (const k of durFields) {
     const v = (form.value as Record<string, string>)[k]
     if (v && !durationRe.test(String(v))) {
@@ -162,6 +162,16 @@ onUnmounted(() => {
             <label :title="t('defaults.webdavTimeoutTitle')">{{ t('defaults.webdavTimeout') }}</label>
             <input v-model="form.FINISH_WAIT_TIMEOUT" :placeholder="t('defaults.durationPlaceholder5h')" />
             <div class="error" v-if="errors.FINISH_WAIT_TIMEOUT">{{ errors.FINISH_WAIT_TIMEOUT }}</div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">{{ t('defaults.webdavCache') }}</div>
+          <div class="grid">
+            <label :title="t('defaults.webdavCacheMaxSizeTitle')">{{ t('defaults.webdavCacheMaxSize') }}</label>
+            <input v-model="form.WEBDAV_CACHE_MAX_SIZE" :placeholder="t('defaults.webdavCacheMaxSizePlaceholder')" />
+            <label :title="t('defaults.webdavCacheCleanupIntervalTitle')">{{ t('defaults.webdavCacheCleanupInterval') }}</label>
+            <input v-model="form.WEBDAV_CACHE_CLEANUP_INTERVAL" :placeholder="t('defaults.webdavCacheCleanupIntervalPlaceholder')" />
           </div>
         </div>
 
