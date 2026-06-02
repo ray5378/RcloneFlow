@@ -32,8 +32,10 @@ const (
 	encryptedPassKey            = "WEBDAB_ENCRYPTED_PASSWORD"
 	cacheMaxSizeKey             = "WEBDAV_CACHE_MAX_SIZE"
 	cacheCleanupIntervalKey     = "WEBDAV_CACHE_CLEANUP_INTERVAL"
+	accessModeKey               = "WEBDAV_MODE"
 	defaultCacheMaxSize         = "1G"
 	defaultCacheCleanupInterval = "24h"
+	defaultAccessMode           = "cache"
 )
 
 type Manager struct {
@@ -43,14 +45,16 @@ type Manager struct {
 	running            bool
 	dataDir            string
 	configFile         string
+	streamServer       *StreamServer
 	cacheCleanupCtx    context.Context
 	cacheCleanupCancel context.CancelFunc
 }
 
 func NewManager(dataDir string) *Manager {
 	return &Manager{
-		dataDir:    dataDir,
-		configFile: filepath.Join(dataDir, "rclone.conf"),
+		dataDir:      dataDir,
+		configFile:   filepath.Join(dataDir, "rclone.conf"),
+		streamServer: NewStreamServer(dataDir, filepath.Join(dataDir, "rclone.conf")),
 	}
 }
 
@@ -335,6 +339,11 @@ func (m *Manager) Start() error {
 	m.running = true
 	logger.Info("WebDAV服务已启动", zap.String("addr", internalPort), zap.String("cache_dir", cacheDir), zap.String("cache_max_size", cacheMaxSize))
 
+	// 启动直连 WebDAV（只读，用于流媒体播放）
+	if err := m.streamServer.Start(); err != nil {
+		logger.Warn("直连 WebDAV 启动失败，直连模式将不可用", zap.Error(err))
+	}
+
 	go func() {
 		if err := m.cmd.Wait(); err != nil {
 			logger.Error("WebDAV服务异常退出", zap.Error(err))
@@ -361,6 +370,10 @@ func (m *Manager) Stop() error {
 	m.stopProcess()
 	m.cleanupCache()
 
+	if err := m.streamServer.Stop(); err != nil {
+		logger.Warn("直连 WebDAV 停止失败", zap.Error(err))
+	}
+
 	if err := m.writeSettings(settingsKey, "false"); err != nil {
 		logger.Error("保存WebDAV关闭状态失败", zap.Error(err))
 	}
@@ -373,6 +386,7 @@ func (m *Manager) Restart() error {
 	m.mu.Lock()
 	if m.running {
 		m.stopProcess()
+		_ = m.streamServer.Stop()
 	}
 	m.mu.Unlock()
 
@@ -388,6 +402,7 @@ func (m *Manager) Shutdown() {
 	}
 
 	m.stopProcess()
+	_ = m.streamServer.Stop()
 
 	logger.Info("WebDAV服务已随容器关闭")
 }
@@ -438,6 +453,20 @@ func (m *Manager) getCacheCleanupInterval() string {
 
 func (m *Manager) GetCacheSettings() (maxSize string, cleanupInterval string) {
 	return m.getCacheMaxSize(), m.getCacheCleanupInterval()
+}
+
+// GetAccessMode 返回当前的 WebDAV 访问模式（"cache" 或 "stream"）
+func (m *Manager) GetAccessMode() string {
+	settings := m.readSettings()
+	if v := settings[accessModeKey]; v != "" {
+		return v
+	}
+	return defaultAccessMode
+}
+
+// SetAccessMode 设置 WebDAV 访问模式
+func (m *Manager) SetAccessMode(mode string) error {
+	return m.writeSettings(accessModeKey, mode)
 }
 
 func (m *Manager) SetCacheMaxSize(size string) error {

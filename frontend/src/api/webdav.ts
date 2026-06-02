@@ -5,6 +5,7 @@ export type WebdavStatus = {
   enabled: boolean
   port: number
   path: string
+  mode: string
   cache_max_size: string
   cache_cleanup_interval: string
 }
@@ -107,6 +108,22 @@ export async function cleanupCache(): Promise<{ ok: boolean; message: string }> 
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${getToken()}`
     }
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error((err as any).error || 'Unknown error')
+  }
+  return res.json()
+}
+
+export async function setWebdavMode(mode: string): Promise<{ ok: boolean; mode: string; message: string }> {
+  const res = await fetch('/api/webdav/mode', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${getToken()}`
+    },
+    body: JSON.stringify({ mode })
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))

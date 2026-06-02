@@ -373,10 +373,10 @@ func TestAuthController_ChangePassword_UpdateUsername(t *testing.T) {
 
 func TestMapAuthError(t *testing.T) {
 	tests := []struct {
-		name       string
-		err        error
-		wantCode   int
-		wantMsg    string
+		name     string
+		err      error
+		wantCode int
+		wantMsg  string
 	}{
 		{"empty credentials", service.ErrAuthEmptyCredentials, 400, "username and password required"},
 		{"password too short", service.ErrAuthPasswordTooShort, 400, "password must be at least 6 characters"},

@@ -8,8 +8,10 @@ import (
 	"strings"
 )
 
-func (c *FsController) HandleDeleteFile(w http.ResponseWriter, r *http.Request) { c.wrap(w, r, c.doDeleteFile) }
-func (c *FsController) HandlePurge(w http.ResponseWriter, r *http.Request)      { c.wrap(w, r, c.doPurge) }
+func (c *FsController) HandleDeleteFile(w http.ResponseWriter, r *http.Request) {
+	c.wrap(w, r, c.doDeleteFile)
+}
+func (c *FsController) HandlePurge(w http.ResponseWriter, r *http.Request) { c.wrap(w, r, c.doPurge) }
 
 func (c *FsController) doDeleteFile(ctx context.Context, body []byte) (any, error) {
 	var req fileOpReq
@@ -19,7 +21,9 @@ func (c *FsController) doDeleteFile(ctx context.Context, body []byte) (any, erro
 	fs, p := normalize(sanitizeFsRemote(req.Fs), sanitizePath(req.Remote))
 	_, err := runRclone(ctx, "deletefile", fs+p)
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "not found") { return nil, nil }
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return nil, nil
+		}
 	}
 	return nil, err
 }

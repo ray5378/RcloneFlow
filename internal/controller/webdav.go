@@ -113,12 +113,14 @@ func (c *WebdavController) HandleStatus(w http.ResponseWriter, r *http.Request) 
 	running := c.manager.IsRunning()
 	enabled := c.manager.IsEnabled()
 	maxSize, cleanupInterval := c.manager.GetCacheSettings()
+	mode := c.manager.GetAccessMode()
 
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"running":                running,
 		"enabled":                enabled,
 		"port":                   17870,
 		"path":                   "/dav/",
+		"mode":                   mode,
 		"cache_max_size":         maxSize,
 		"cache_cleanup_interval": cleanupInterval,
 	})
@@ -200,4 +202,45 @@ func (c *WebdavController) HandleCacheCleanup(w http.ResponseWriter, r *http.Req
 		"ok":      true,
 		"message": "WebDAV缓存已清理",
 	})
+}
+
+type modeRequest struct {
+	Mode string `json:"mode"`
+}
+
+func (c *WebdavController) HandleMode(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodGet {
+		mode := c.manager.GetAccessMode()
+		WriteJSON(w, http.StatusOK, map[string]any{"mode": mode})
+		return
+	}
+
+	if r.Method == http.MethodPost {
+		body, _ := io.ReadAll(r.Body)
+		var req modeRequest
+		if err := json.Unmarshal(body, &req); err != nil {
+			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "无效的请求格式"})
+			return
+		}
+
+		if req.Mode != "cache" && req.Mode != "stream" {
+			WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "mode 必须为 cache 或 stream"})
+			return
+		}
+
+		if err := c.manager.SetAccessMode(req.Mode); err != nil {
+			logger.Error("保存 WebDAV 模式失败", zap.Error(err))
+			WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return
+		}
+
+		WriteJSON(w, http.StatusOK, map[string]any{
+			"ok":      true,
+			"mode":    req.Mode,
+			"message": "已切换访问模式",
+		})
+		return
+	}
+
+	w.WriteHeader(http.StatusMethodNotAllowed)
 }

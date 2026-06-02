@@ -31,7 +31,9 @@ func sanitizePath(p string) string {
 	p = filepath.ToSlash(p)
 	parts := strings.Split(p, "/")
 	for i, s := range parts {
-		for strings.HasSuffix(s, ":") { s = strings.TrimSuffix(s, ":") }
+		for strings.HasSuffix(s, ":") {
+			s = strings.TrimSuffix(s, ":")
+		}
 		parts[i] = s
 	}
 	return strings.Join(parts, "/")
@@ -61,7 +63,9 @@ type copyMoveFileReq struct {
 
 // ---------- HTTP handlers ----------
 
-func (c *FsController) HandlePublicLink(w http.ResponseWriter, r *http.Request) { c.wrap(w, r, c.doPublicLink) }
+func (c *FsController) HandlePublicLink(w http.ResponseWriter, r *http.Request) {
+	c.wrap(w, r, c.doPublicLink)
+}
 
 // ---------- Core ----------
 
@@ -100,10 +104,14 @@ func normalize(fs, remote string) (string, string) {
 func splitFsRemote(fs, remote string) (string, string) {
 	fs = strings.TrimSpace(fs)
 	remote = strings.TrimSpace(remote)
-	if remote != "" { return normalize(fs, remote) }
+	if remote != "" {
+		return normalize(fs, remote)
+	}
 	// if fs already contains a path, split at the first ':'
 	i := strings.Index(fs, ":")
-	if i < 0 { return normalize(fs, remote) }
+	if i < 0 {
+		return normalize(fs, remote)
+	}
 	base := fs[:i+1] // include colon
 	path := fs[i+1:]
 	path = strings.TrimPrefix(path, "/")
@@ -114,14 +122,18 @@ func splitFsRemote(fs, remote string) (string, string) {
 // smb share duplicate guard: if error indicates share issue, try strip first path segment and retry once
 func tryStripFirstSegment(path string) string {
 	parts := strings.Split(path, "/")
-	if len(parts) > 1 { return strings.Join(parts[1:], "/") }
+	if len(parts) > 1 {
+		return strings.Join(parts[1:], "/")
+	}
 	return path
 }
 
 func rcConfigPath() string {
 	// Use APP_DATA_DIR/rclone.conf if present
 	dir := os.Getenv("APP_DATA_DIR")
-	if dir == "" { dir = "." }
+	if dir == "" {
+		dir = "."
+	}
 	return filepath.Join(dir, "rclone.conf")
 }
 
@@ -130,22 +142,30 @@ func remoteNameMap() map[string]string {
 	m := map[string]string{}
 	cfg := rcConfigPath()
 	b, err := os.ReadFile(cfg)
-	if err != nil { return m }
+	if err != nil {
+		return m
+	}
 	lines := strings.Split(string(b), "\n")
 	for _, ln := range lines {
 		ln = strings.TrimSpace(ln)
 		if len(ln) > 2 && ln[0] == '[' && ln[len(ln)-1] == ']' {
-			name := strings.TrimSpace(ln[1:len(ln)-1])
-			if name != "" { m[strings.ToLower(name)] = name }
+			name := strings.TrimSpace(ln[1 : len(ln)-1])
+			if name != "" {
+				m[strings.ToLower(name)] = name
+			}
 		}
 	}
 	return m
 }
 
 func canonicalRemoteName(name string) string {
-	if name == "" { return name }
+	if name == "" {
+		return name
+	}
 	m := remoteNameMap()
-	if v, ok := m[strings.ToLower(name)]; ok { return v }
+	if v, ok := m[strings.ToLower(name)]; ok {
+		return v
+	}
 	return name
 }
 
@@ -161,7 +181,9 @@ var runRclone = func(ctx context.Context, args ...string) (string, error) {
 	cmd.Stderr = &buf
 	err := cmd.Run()
 	out := buf.String()
-	if err != nil { return out, fmt.Errorf("rclone %v: %w\n%s", args, err, out) }
+	if err != nil {
+		return out, fmt.Errorf("rclone %v: %w\n%s", args, err, out)
+	}
 	return out, nil
 }
 
@@ -174,11 +196,15 @@ func isWebdavMoveError(err error) bool {
 // visibility wait using lsjson polling
 func waitVisible(ctx context.Context, fs, remote string) {
 	interval := 2 * time.Second
-	if v := config.GetFinishWaitTimeout(); v > 0 { interval = v / 60 } // coarse: ~60 steps
+	if v := config.GetFinishWaitTimeout(); v > 0 {
+		interval = v / 60
+	} // coarse: ~60 steps
 	deadline := time.Now().Add(config.GetFinishWaitTimeout())
 	for time.Now().Before(deadline) {
 		_, err := runRclone(ctx, "lsjson", fs+remote)
-		if err == nil { return }
+		if err == nil {
+			return
+		}
 		time.Sleep(interval)
 	}
 }
@@ -186,9 +212,15 @@ func waitVisible(ctx context.Context, fs, remote string) {
 // deepCleanDir: aggressive removal for stubborn backends (purge → delete -r --rmdirs → rmdir → purge) with path variants
 func deepCleanDir(ctx context.Context, fs, remote string) {
 	candidates := []string{remote}
-	if s := sanitizePath(remote); s != remote { candidates = append(candidates, s) }
-	if t := tryStripFirstSegment(remote); t != remote { candidates = append(candidates, t) }
-	if t := tryStripFirstSegment(sanitizePath(remote)); t != remote { candidates = append(candidates, t) }
+	if s := sanitizePath(remote); s != remote {
+		candidates = append(candidates, s)
+	}
+	if t := tryStripFirstSegment(remote); t != remote {
+		candidates = append(candidates, t)
+	}
+	if t := tryStripFirstSegment(sanitizePath(remote)); t != remote {
+		candidates = append(candidates, t)
+	}
 	for _, r := range candidates {
 		_, _ = runRclone(ctx, "purge", fs+r)
 		_, _ = runRclone(ctx, "delete", fs+r, "-r", "--rmdirs", "--ignore-errors")
@@ -200,14 +232,20 @@ func deepCleanDir(ctx context.Context, fs, remote string) {
 // disappearance wait: ensure source path is gone; inspect parent listing and retry delete/purge until name vanishes
 func waitGoneDir(ctx context.Context, fs, remote string) {
 	interval := 2 * time.Second
-	if v := config.GetFinishWaitTimeout(); v > 0 { interval = v / 60 }
+	if v := config.GetFinishWaitTimeout(); v > 0 {
+		interval = v / 60
+	}
 	deadline := time.Now().Add(config.GetFinishWaitTimeout())
 	par := parentDir(remote)
 	name := filepath.Base(remote)
 	for time.Now().Before(deadline) {
 		out, err := runRclone(ctx, "lsjson", fs+par)
-		if err != nil { return } // if parent not found, consider gone
-		if !strings.Contains(out, fmt.Sprintf("\"Name\":\"%s\"", name)) { return }
+		if err != nil {
+			return
+		} // if parent not found, consider gone
+		if !strings.Contains(out, fmt.Sprintf("\"Name\":\"%s\"", name)) {
+			return
+		}
 		// still listed: try stronger cleanup
 		_, _ = runRclone(ctx, "delete", fs+remote, "-r", "--rmdirs", "--ignore-errors")
 		_, _ = runRclone(ctx, "rmdir", fs+remote)
@@ -218,15 +256,21 @@ func waitGoneDir(ctx context.Context, fs, remote string) {
 
 func waitGoneFile(ctx context.Context, fs, remote string) {
 	interval := 2 * time.Second
-	if v := config.GetFinishWaitTimeout(); v > 0 { interval = v / 60 }
+	if v := config.GetFinishWaitTimeout(); v > 0 {
+		interval = v / 60
+	}
 	deadline := time.Now().Add(config.GetFinishWaitTimeout())
 	for time.Now().Before(deadline) {
 		// check parent dir listing contains filename
 		par := parentDir(remote)
 		name := filepath.Base(remote)
 		out, err := runRclone(ctx, "lsjson", fs+par)
-		if err != nil { return }
-		if !strings.Contains(out, name) { return }
+		if err != nil {
+			return
+		}
+		if !strings.Contains(out, name) {
+			return
+		}
 		_, _ = runRclone(ctx, "deletefile", fs+remote)
 		time.Sleep(interval)
 	}
@@ -234,16 +278,24 @@ func waitGoneFile(ctx context.Context, fs, remote string) {
 
 func parentDir(p string) string {
 	p = filepath.ToSlash(p)
-	if p == "" { return "" }
+	if p == "" {
+		return ""
+	}
 	p = strings.TrimSuffix(p, "/")
-	if p == "" { return "" }
+	if p == "" {
+		return ""
+	}
 	d := filepath.ToSlash(filepath.Dir(p))
-	if d == "." { return "" }
+	if d == "." {
+		return ""
+	}
 	return d
 }
 
 func ensureDir(ctx context.Context, fs, remote string) {
-	if remote == "" { return }
+	if remote == "" {
+		return
+	}
 	remote = sanitizePath(remote)
 	_, _ = runRclone(ctx, "mkdir", fs+remote)
 }
@@ -255,6 +307,8 @@ func (c *FsController) doPublicLink(ctx context.Context, body []byte) (any, erro
 	}
 	fs, p := normalize(req.Fs, req.Remote)
 	out, err := runRclone(ctx, "link", fs+p)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	return map[string]string{"url": strings.TrimSpace(out)}, nil
 }

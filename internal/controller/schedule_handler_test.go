@@ -32,7 +32,7 @@ func setupScheduleTestDB(t *testing.T) *store.DB {
 func setupScheduleController(t *testing.T) *ScheduleController {
 	t.Helper()
 	db := setupScheduleTestDB(t)
-	
+
 	// Create a task first (required by foreign key constraint)
 	_, err := db.AddTask(store.Task{
 		Name:         "Test Task",
@@ -43,7 +43,7 @@ func setupScheduleController(t *testing.T) *ScheduleController {
 		TargetPath:   "/tmp/dest",
 	})
 	require.NoError(t, err)
-	
+
 	rc := adapter.NewRcloneClient(nil)
 	scheduleSvc := service.NewScheduleService(db)
 	sched := scheduler.New(db, rc)

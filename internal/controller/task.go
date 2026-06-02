@@ -391,7 +391,9 @@ func (c *TaskController) HandleBisyncDeleteLst(w http.ResponseWriter, r *http.Re
 		WriteJSON(w, 400, map[string]any{"error": "invalid task id"})
 		return
 	}
-	var req struct{ VersionID string `json:"versionId"` }
+	var req struct {
+		VersionID string `json:"versionId"`
+	}
 	if err := DecodeRequest(w, r, &req); err != nil || req.VersionID == "" {
 		WriteJSON(w, 400, map[string]any{"error": "invalid request body"})
 		return
@@ -417,7 +419,9 @@ func (c *TaskController) HandleBisyncRollbackLst(w http.ResponseWriter, r *http.
 		WriteJSON(w, 400, map[string]any{"error": "invalid task id"})
 		return
 	}
-	var req struct{ VersionID string `json:"versionId"` }
+	var req struct {
+		VersionID string `json:"versionId"`
+	}
 	if err := DecodeRequest(w, r, &req); err != nil || req.VersionID == "" {
 		WriteJSON(w, 400, map[string]any{"error": "invalid request body"})
 		return

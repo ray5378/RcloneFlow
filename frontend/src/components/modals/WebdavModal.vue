@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getWebdavStatus, startWebdav, stopWebdav, getCredentials, saveCredentials, saveCacheSettings, cleanupCache } from '../../api/webdav'
+import { getWebdavStatus, startWebdav, stopWebdav, getCredentials, saveCredentials, saveCacheSettings, cleanupCache, setWebdavMode } from '../../api/webdav'
 import { showSuccessToast, showErrorToast } from '../../api/errors'
 import { t } from '../../i18n'
 
@@ -25,6 +25,8 @@ const showPassword = ref(false)
 
 const cacheMaxSize = ref('1G')
 const cacheCleanupInterval = ref('24h')
+const accessMode = ref('cache')
+const modeSwitching = ref(false)
 
 async function loadStatus() {
   loading.value = true
@@ -44,6 +46,7 @@ async function loadStatus() {
     }
     cacheMaxSize.value = status.cache_max_size || '1G'
     cacheCleanupInterval.value = status.cache_cleanup_interval || '24h'
+    accessMode.value = status.mode || 'cache'
   } catch (e: any) {
     statusError.value = e.message || '获取状态失败'
   } finally {
@@ -116,6 +119,21 @@ async function onCleanupCache() {
   }
 }
 
+async function onSwitchMode() {
+  const newMode = accessMode.value === 'cache' ? 'stream' : 'cache'
+  modeSwitching.value = true
+  actionError.value = ''
+  try {
+    await setWebdavMode(newMode)
+    accessMode.value = newMode
+    showSuccessToast(t('webdav.modeSwitchSuccess'))
+  } catch (e: any) {
+    showErrorToast(e.message || '切换模式失败')
+  } finally {
+    modeSwitching.value = false
+  }
+}
+
 onMounted(loadStatus)
 </script>
 
@@ -138,6 +156,31 @@ onMounted(loadStatus)
           <div class="note-label">{{ t('webdav.address') }}</div>
           <code class="note-address">{{ davAddress }}</code>
           <div class="note-hint">{{ t('webdav.addressNote') }}</div>
+        </div>
+
+        <div class="mode-section" v-if="running">
+          <div class="mode-title">{{ t('webdav.accessMode') }}</div>
+          <div class="mode-toggle-bar">
+            <button
+              class="mode-btn"
+              :class="{ active: accessMode === 'cache' }"
+              :disabled="modeSwitching"
+              @click="accessMode !== 'cache' && onSwitchMode()"
+            >
+              {{ t('webdav.modeCache') }}
+            </button>
+            <button
+              class="mode-btn"
+              :class="{ active: accessMode === 'stream' }"
+              :disabled="modeSwitching"
+              @click="accessMode !== 'stream' && onSwitchMode()"
+            >
+              {{ t('webdav.modeStream') }}
+            </button>
+          </div>
+          <div class="mode-hint">
+            {{ accessMode === 'cache' ? t('webdav.modeCacheHint') : t('webdav.modeStreamHint') }}
+          </div>
         </div>
 
         <div class="cred-section">
@@ -386,6 +429,63 @@ onMounted(loadStatus)
 }
 
 .note-hint {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+/* 模式切换 */
+.mode-section {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.mode-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.mode-toggle-bar {
+  display: flex;
+  gap: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border: none;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-btn:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.mode-btn.active {
+  background: #64b5f6;
+  color: #fff;
+  font-weight: 600;
+}
+
+.mode-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mode-hint {
   margin-top: 8px;
   font-size: 12px;
   color: var(--muted);

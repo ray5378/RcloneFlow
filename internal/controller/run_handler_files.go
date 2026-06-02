@@ -7,12 +7,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"rcloneflow/internal/logutil"
 	"sort"
 	"strconv"
 	stdiostrconv "strconv"
 	"strings"
 	"time"
-"rcloneflow/internal/logutil"
 )
 
 func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
@@ -162,11 +162,11 @@ func (c *RunController) HandleRunFiles(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			rowMap := map[string]any{
-				"path":     path,
-				"name":     path,
-				"at":       at,
+				"path":      path,
+				"name":      path,
+				"at":        at,
 				"sizeBytes": historicalSegmentSizeBytes(seg),
-				"message":  msg,
+				"message":   msg,
 			}
 			if v, ok := histRow["status"].(string); ok {
 				rowMap["status"] = v

@@ -14,19 +14,29 @@ type mockActiveTransferRunSvcDB struct {
 	run service.RunRecord
 }
 
-func (m *mockActiveTransferRunSvcDB) ListRuns(page, pageSize int) ([]service.RunRecord, int, error) { return nil, 0, nil }
-func (m *mockActiveTransferRunSvcDB) ListRunsByTask(taskId int64) ([]service.RunRecord, error)      { return nil, nil }
-func (m *mockActiveTransferRunSvcDB) ListActiveRuns() ([]service.RunRecord, error)                   { return []service.RunRecord{m.run}, nil }
-func (m *mockActiveTransferRunSvcDB) GetActiveRunByTaskID(taskID int64) (service.RunRecord, error)   { return m.run, nil }
-func (m *mockActiveTransferRunSvcDB) GetRun(id int64) (service.RunRecord, error)                     { return service.RunRecord{}, nil }
-func (m *mockActiveTransferRunSvcDB) UpdateRun(id int64, updateFn func(*service.RunRecord))          {}
-func (m *mockActiveTransferRunSvcDB) DeleteRun(id int64) error                                       { return nil }
-func (m *mockActiveTransferRunSvcDB) DeleteAllRuns() error                                           { return nil }
-func (m *mockActiveTransferRunSvcDB) DeleteRunsByTask(taskId int64) error                            { return nil }
-func (m *mockActiveTransferRunSvcDB) DeleteRunsByIDs(ids []int64) error                              { return nil }
-func (m *mockActiveTransferRunSvcDB) CleanOldRuns(days int) (int64, error)                           { return 0, nil }
-func (m *mockActiveTransferRunSvcDB) Vacuum() error                                                  { return nil }
-func (m *mockActiveTransferRunSvcDB) ResetSequence(tableName string) error                           { return nil }
+func (m *mockActiveTransferRunSvcDB) ListRuns(page, pageSize int) ([]service.RunRecord, int, error) {
+	return nil, 0, nil
+}
+func (m *mockActiveTransferRunSvcDB) ListRunsByTask(taskId int64) ([]service.RunRecord, error) {
+	return nil, nil
+}
+func (m *mockActiveTransferRunSvcDB) ListActiveRuns() ([]service.RunRecord, error) {
+	return []service.RunRecord{m.run}, nil
+}
+func (m *mockActiveTransferRunSvcDB) GetActiveRunByTaskID(taskID int64) (service.RunRecord, error) {
+	return m.run, nil
+}
+func (m *mockActiveTransferRunSvcDB) GetRun(id int64) (service.RunRecord, error) {
+	return service.RunRecord{}, nil
+}
+func (m *mockActiveTransferRunSvcDB) UpdateRun(id int64, updateFn func(*service.RunRecord)) {}
+func (m *mockActiveTransferRunSvcDB) DeleteRun(id int64) error                              { return nil }
+func (m *mockActiveTransferRunSvcDB) DeleteAllRuns() error                                  { return nil }
+func (m *mockActiveTransferRunSvcDB) DeleteRunsByTask(taskId int64) error                   { return nil }
+func (m *mockActiveTransferRunSvcDB) DeleteRunsByIDs(ids []int64) error                     { return nil }
+func (m *mockActiveTransferRunSvcDB) CleanOldRuns(days int) (int64, error)                  { return 0, nil }
+func (m *mockActiveTransferRunSvcDB) Vacuum() error                                         { return nil }
+func (m *mockActiveTransferRunSvcDB) ResetSequence(tableName string) error                  { return nil }
 
 func TestActiveTransferController_OverviewAndLists(t *testing.T) {
 	mgr := active_transfer.NewManager()

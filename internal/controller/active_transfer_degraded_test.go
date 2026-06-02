@@ -45,7 +45,7 @@ func TestActiveTransferController_DegradedListTotalsUseRealCounts(t *testing.T) 
 		t.Fatalf("completed status=%d", w.Code)
 	}
 	var completed struct {
-		Total int                                  `json:"total"`
+		Total int                                     `json:"total"`
 		Items []active_transfer.TransferCompletedFile `json:"items"`
 	}
 	if err := json.Unmarshal(w.Body.Bytes(), &completed); err != nil {

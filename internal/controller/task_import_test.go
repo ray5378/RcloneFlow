@@ -313,7 +313,7 @@ func TestTaskImport_RcloneConfigIncluded(t *testing.T) {
 		"conflictStrategy": "skip",
 		"rcloneConfig": map[string]any{
 			"myremote": map[string]any{
-				"type": "s3",
+				"type":     "s3",
 				"provider": "AWS",
 			},
 		},
@@ -373,7 +373,7 @@ func TestTaskImport_RcloneConfigSkipsExisting(t *testing.T) {
 		"conflictStrategy": "skip",
 		"rcloneConfig": map[string]any{
 			"existing": map[string]any{
-				"type": "s3",
+				"type":     "s3",
 				"provider": "AWS",
 			},
 		},

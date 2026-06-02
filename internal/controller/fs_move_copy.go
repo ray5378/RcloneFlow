@@ -11,10 +11,14 @@ import (
 	"rcloneflow/internal/logger"
 )
 
-func (c *FsController) HandleMove(w http.ResponseWriter, r *http.Request)     { c.wrap(w, r, c.doMoveFile) }
-func (c *FsController) HandleCopy(w http.ResponseWriter, r *http.Request)     { c.wrap(w, r, c.doCopyFile) }
-func (c *FsController) HandleCopyDir(w http.ResponseWriter, r *http.Request)  { c.wrap(w, r, c.doCopyDir) }
-func (c *FsController) HandleMoveDir(w http.ResponseWriter, r *http.Request)  { c.wrap(w, r, c.doMoveDir) }
+func (c *FsController) HandleMove(w http.ResponseWriter, r *http.Request) { c.wrap(w, r, c.doMoveFile) }
+func (c *FsController) HandleCopy(w http.ResponseWriter, r *http.Request) { c.wrap(w, r, c.doCopyFile) }
+func (c *FsController) HandleCopyDir(w http.ResponseWriter, r *http.Request) {
+	c.wrap(w, r, c.doCopyDir)
+}
+func (c *FsController) HandleMoveDir(w http.ResponseWriter, r *http.Request) {
+	c.wrap(w, r, c.doMoveDir)
+}
 
 func (c *FsController) doCopyFile(ctx context.Context, body []byte) (any, error) {
 	var req copyMoveFileReq
@@ -31,7 +35,11 @@ func (c *FsController) doCopyFile(ctx context.Context, body []byte) (any, error)
 			d2 := tryStripFirstSegment(dst)
 			if s2 != src || d2 != dst {
 				ensureDir(ctx, dstFs, parentDir(d2))
-				if _, err2 := runRclone(ctx, "copyto", srcFs+s2, dstFs+d2); err2 == nil { return nil, nil } else { err = err2 }
+				if _, err2 := runRclone(ctx, "copyto", srcFs+s2, dstFs+d2); err2 == nil {
+					return nil, nil
+				} else {
+					err = err2
+				}
 			}
 		}
 	}
@@ -71,7 +79,9 @@ func (c *FsController) doMoveFile(ctx context.Context, body []byte) (any, error)
 					waitGoneFile(context.Background(), srcFs, s2)
 				}()
 				return nil, nil
-			} else { err = err2 }
+			} else {
+				err = err2
+			}
 		}
 	}
 	if isWebdavMoveError(err) {
@@ -115,7 +125,11 @@ func (c *FsController) doCopyDir(ctx context.Context, body []byte) (any, error) 
 			d2 := tryStripFirstSegment(dst)
 			if s2 != src || d2 != dst {
 				ensureDir(ctx, dstFs, d2)
-				if _, err2 := runRclone(ctx, "copy", srcFs+s2, dstFs+d2); err2 == nil { return nil, nil } else { err = err2 }
+				if _, err2 := runRclone(ctx, "copy", srcFs+s2, dstFs+d2); err2 == nil {
+					return nil, nil
+				} else {
+					err = err2
+				}
 			}
 		}
 	}
@@ -146,18 +160,23 @@ func (c *FsController) doMoveDir(ctx context.Context, body []byte) (any, error) 
 	if strings.Contains(strings.ToLower(err.Error()), "network name not found") || strings.Contains(strings.ToLower(err.Error()), "create filesystem") {
 		s2 := tryStripFirstSegment(src)
 		d2 := tryStripFirstSegment(dst)
-		if s2 != src || d2 != dst { ensureDir(ctx, dstFs, d2); if _, err2 := runRclone(ctx, "move", srcFs+s2, dstFs+d2); err2 == nil {
-			go func() {
-				defer func() {
-					if r := recover(); r != nil {
-						logger.Error("goroutine panic", zap.Any("panic", r))
-					}
+		if s2 != src || d2 != dst {
+			ensureDir(ctx, dstFs, d2)
+			if _, err2 := runRclone(ctx, "move", srcFs+s2, dstFs+d2); err2 == nil {
+				go func() {
+					defer func() {
+						if r := recover(); r != nil {
+							logger.Error("goroutine panic", zap.Any("panic", r))
+						}
+					}()
+					deepCleanDir(context.Background(), srcFs, s2)
+					waitGoneDir(context.Background(), srcFs, s2)
 				}()
-				deepCleanDir(context.Background(), srcFs, s2)
-				waitGoneDir(context.Background(), srcFs, s2)
-			}()
-			return nil, nil
-		} else { err = err2 } }
+				return nil, nil
+			} else {
+				err = err2
+			}
+		}
 	}
 	if isWebdavMoveError(err) {
 		if _, er2 := runRclone(ctx, "copy", srcFs+src, dstFs+dst); er2 == nil {

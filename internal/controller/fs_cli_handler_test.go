@@ -310,7 +310,6 @@ func TestFsController_HandlePublicLink_Error(t *testing.T) {
 	}
 }
 
-
 func TestFsController_Wrap_MethodNotAllowed_All(t *testing.T) {
 	c := NewFsController(nil)
 	handlers := []struct {

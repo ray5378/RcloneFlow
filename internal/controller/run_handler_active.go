@@ -134,17 +134,17 @@ func (c *RunController) HandleActiveRuns(w http.ResponseWriter, r *http.Request)
 		}
 
 		stable := map[string]any{
-			"bytes":            bytes,
-			"totalBytes":       total,
-			"speed":            speed,
-			"eta":              eta,
-			"percentage":       pct,
-			"phase":            phase,
-			"lastUpdatedAt":    time.Now().Format(time.RFC3339),
-			"completedFiles":   completedFiles,
-			"plannedFiles":     plannedFiles,
+			"bytes":             bytes,
+			"totalBytes":        total,
+			"speed":             speed,
+			"eta":               eta,
+			"percentage":        pct,
+			"phase":             phase,
+			"lastUpdatedAt":     time.Now().Format(time.RFC3339),
+			"completedFiles":    completedFiles,
+			"plannedFiles":      plannedFiles,
 			"logicalTotalCount": logicalTotalCount,
-			"totalCount":       logicalTotalCount,
+			"totalCount":        logicalTotalCount,
 		}
 
 		calcPct := 0.0

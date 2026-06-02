@@ -194,6 +194,7 @@ func (r *Router) Setup(mux *http.ServeMux) {
 	apiMux.HandleFunc("/api/webdav/credentials/save", r.webdavCtrl.HandleSaveCredentials)
 	apiMux.HandleFunc("/api/webdav/cache/settings", r.webdavCtrl.HandleCacheSettings)
 	apiMux.HandleFunc("/api/webdav/cache/cleanup", r.webdavCtrl.HandleCacheCleanup)
+	apiMux.HandleFunc("/api/webdav/mode", r.webdavCtrl.HandleMode)
 	// CLI 扩展接口：停止/强杀/日志下载/文件明细
 	apiMux.HandleFunc("/api/runs/", func(w http.ResponseWriter, req *http.Request) {
 		if strings.HasSuffix(req.URL.Path, "/stop") {
@@ -246,42 +247,6 @@ func staticFileHandler(staticDir string) http.Handler {
 }
 
 func (r *Router) webdavProxy() http.Handler {
-	target, _ := url.Parse("http://127.0.0.1:17871")
-	proxy := httputil.NewSingleHostReverseProxy(target)
-
-	proxy.FlushInterval = -1
-
-	hrefPattern := regexp.MustCompile(`(<D:href>)(/[^<]*)(</D:href>)`)
-
-	proxy.ModifyResponse = func(resp *http.Response) error {
-		setCORSHeaders(resp.Header)
-		resp.Header.Set("Accept-Ranges", "bytes")
-
-		location := resp.Header.Get("Location")
-		if location != "" && strings.HasPrefix(location, "/") && !strings.HasPrefix(location, "/dav") {
-			resp.Header.Set("Location", "/dav"+location)
-		}
-
-		// Only read and rewrite body for PROPFIND responses with status 207
-		if resp.Request != nil && resp.Request.Method == "PROPFIND" && resp.StatusCode == 207 {
-			bodyBytes, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			if err == nil {
-				bodyBytes = hrefPattern.ReplaceAll(bodyBytes, []byte("${1}/dav${2}${3}"))
-				resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-				resp.ContentLength = int64(len(bodyBytes))
-				resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(bodyBytes)))
-			}
-		}
-
-		return nil
-	}
-
-	proxy.ErrorHandler = func(w http.ResponseWriter, req *http.Request, err error) {
-		setCORSHeaders(w.Header())
-		w.WriteHeader(http.StatusBadGateway)
-	}
-
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !r.webdavManager.IsRunning() {
 			setCORSHeaders(w.Header())
@@ -297,6 +262,49 @@ func (r *Router) webdavProxy() http.Handler {
 
 		if req.Method == "PROPFIND" && req.Header.Get("Depth") == "infinity" {
 			req.Header.Set("Depth", "1")
+		}
+
+		// 根据模式选择代理目标
+		mode := r.webdavManager.GetAccessMode()
+		var target *url.URL
+		switch mode {
+		case "stream":
+			target, _ = url.Parse("http://127.0.0.1:17873")
+		default:
+			target, _ = url.Parse("http://127.0.0.1:17871")
+		}
+
+		proxy := httputil.NewSingleHostReverseProxy(target)
+		proxy.FlushInterval = -1
+
+		hrefPattern := regexp.MustCompile(`(<D:href>)(/[^<]*)(</D:href>)`)
+
+		proxy.ModifyResponse = func(resp *http.Response) error {
+			setCORSHeaders(resp.Header)
+			resp.Header.Set("Accept-Ranges", "bytes")
+
+			location := resp.Header.Get("Location")
+			if location != "" && strings.HasPrefix(location, "/") && !strings.HasPrefix(location, "/dav") {
+				resp.Header.Set("Location", "/dav"+location)
+			}
+
+			if resp.Request != nil && resp.Request.Method == "PROPFIND" && resp.StatusCode == 207 {
+				bodyBytes, err := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				if err == nil {
+					bodyBytes = hrefPattern.ReplaceAll(bodyBytes, []byte("${1}/dav${2}${3}"))
+					resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+					resp.ContentLength = int64(len(bodyBytes))
+					resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(bodyBytes)))
+				}
+			}
+
+			return nil
+		}
+
+		proxy.ErrorHandler = func(w http.ResponseWriter, req *http.Request, err error) {
+			setCORSHeaders(w.Header())
+			w.WriteHeader(http.StatusBadGateway)
 		}
 
 		req.Host = target.Host

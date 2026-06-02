@@ -169,21 +169,21 @@ func buildFinalSummaryFromLog(run service.RunRecord, sum map[string]any) map[str
 
 func buildLightRunObject(run service.RunRecord, sum map[string]any) map[string]any {
 	obj := map[string]any{
-		"id":              run.ID,
-		"taskId":          run.TaskID,
-		"status":          run.Status,
-		"trigger":         run.Trigger,
-		"startedAt":       run.StartedAt,
-		"finishedAt":      run.FinishedAt,
-		"taskName":        run.TaskName,
-		"taskMode":        run.TaskMode,
-		"sourceRemote":    run.SourceRemote,
-		"sourcePath":      run.SourcePath,
-		"targetRemote":    run.TargetRemote,
-		"targetPath":      run.TargetPath,
+		"id":               run.ID,
+		"taskId":           run.TaskID,
+		"status":           run.Status,
+		"trigger":          run.Trigger,
+		"startedAt":        run.StartedAt,
+		"finishedAt":       run.FinishedAt,
+		"taskName":         run.TaskName,
+		"taskMode":         run.TaskMode,
+		"sourceRemote":     run.SourceRemote,
+		"sourcePath":       run.SourcePath,
+		"targetRemote":     run.TargetRemote,
+		"targetPath":       run.TargetPath,
 		"bytesTransferred": run.BytesTransferred,
-		"speed":           run.Speed,
-		"error":           run.Error,
+		"speed":            run.Speed,
+		"error":            run.Error,
 	}
 	if sum != nil {
 		light := map[string]any{}

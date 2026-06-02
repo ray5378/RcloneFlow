@@ -272,7 +272,7 @@ func TestHandleActiveRuns_UsesPreflightTotalCountForCASCompatibleRuns(t *testing
 
 func TestHandleRuns_DoesNotExposeHistoricalFilesArray(t *testing.T) {
 	summary := map[string]any{
-		"startedAt": "2026-04-17T14:30:00+08:00",
+		"startedAt":  "2026-04-17T14:30:00+08:00",
 		"finishedAt": "2026-04-17T14:40:00+08:00",
 		"finalSummary": map[string]any{
 			"result":           "success",
@@ -287,12 +287,12 @@ func TestHandleRuns_DoesNotExposeHistoricalFilesArray(t *testing.T) {
 	}
 	bs, _ := json.Marshal(summary)
 	ctrl := &RunController{runSvc: service.NewRunService(&mockRunSvcDB{runs: []service.RunRecord{{
-		ID:        8,
-		TaskID:    108,
-		Status:    "finished",
-		StartedAt: "2026-04-17T14:30:00+08:00",
+		ID:         8,
+		TaskID:     108,
+		Status:     "finished",
+		StartedAt:  "2026-04-17T14:30:00+08:00",
 		FinishedAt: "2026-04-17T14:40:00+08:00",
-		Summary:   string(bs),
+		Summary:    string(bs),
 	}}})}
 
 	req := httptest.NewRequest(http.MethodGet, "/api/runs?page=1&pageSize=50", nil)
@@ -615,7 +615,7 @@ func TestHandleRunFiles_CASHistorySuppressesObjectNotFoundNoise(t *testing.T) {
 		t.Fatalf("WriteString() error = %v", err)
 	}
 	summary := map[string]any{
-		"stderrFile": tmpFile.Name(),
+		"stderrFile":       tmpFile.Name(),
 		"transferDefaults": map[string]any{"openlistCasCompatible": true},
 	}
 	bs, _ := json.Marshal(summary)
@@ -716,7 +716,7 @@ func TestHandleRunFiles_CASHistorySuppressesNilPathAndSummaryRows(t *testing.T) 
 		t.Fatalf("WriteString() error = %v", err)
 	}
 	summary := map[string]any{
-		"stderrFile": tmpFile.Name(),
+		"stderrFile":       tmpFile.Name(),
 		"transferDefaults": map[string]any{"openlistCasCompatible": true},
 	}
 	bs, _ := json.Marshal(summary)
@@ -774,7 +774,7 @@ func TestHandleRunFiles_CASHistorySuppressesAllSummaryVariants(t *testing.T) {
 		t.Fatalf("WriteString() error = %v", err)
 	}
 	summary := map[string]any{
-		"stderrFile": tmpFile.Name(),
+		"stderrFile":       tmpFile.Name(),
 		"transferDefaults": map[string]any{"openlistCasCompatible": true},
 	}
 	bs, _ := json.Marshal(summary)
@@ -830,7 +830,7 @@ func TestHandleRunFiles_CASHistoryKeepsRealErrors(t *testing.T) {
 		t.Fatalf("WriteString() error = %v", err)
 	}
 	summary := map[string]any{
-		"stderrFile": tmpFile.Name(),
+		"stderrFile":       tmpFile.Name(),
 		"transferDefaults": map[string]any{"openlistCasCompatible": true},
 	}
 	bs, _ := json.Marshal(summary)
@@ -896,7 +896,7 @@ func TestHandleRunFiles_CASHistoryHandlesMultipleAttempts(t *testing.T) {
 		t.Fatalf("WriteString() error = %v", err)
 	}
 	summary := map[string]any{
-		"stderrFile": tmpFile.Name(),
+		"stderrFile":       tmpFile.Name(),
 		"transferDefaults": map[string]any{"openlistCasCompatible": true},
 	}
 	bs, _ := json.Marshal(summary)
@@ -948,7 +948,7 @@ func TestHandleRunFiles_CASHistoryHandlesMixedSuccessAndCAS(t *testing.T) {
 		t.Fatalf("WriteString() error = %v", err)
 	}
 	summary := map[string]any{
-		"stderrFile": tmpFile.Name(),
+		"stderrFile":       tmpFile.Name(),
 		"transferDefaults": map[string]any{"openlistCasCompatible": true},
 	}
 	bs, _ := json.Marshal(summary)
@@ -1010,7 +1010,7 @@ func TestHandleRunFiles_CASHistoryHandlesNoCASMatchRealFailure(t *testing.T) {
 		t.Fatalf("WriteString() error = %v", err)
 	}
 	summary := map[string]any{
-		"stderrFile": tmpFile.Name(),
+		"stderrFile":       tmpFile.Name(),
 		"transferDefaults": map[string]any{"openlistCasCompatible": true},
 	}
 	bs, _ := json.Marshal(summary)
