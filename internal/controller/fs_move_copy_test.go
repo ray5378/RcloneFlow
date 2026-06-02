@@ -83,10 +83,13 @@ func TestDoCopyFile_NetworkError(t *testing.T) {
 	orig := runRclone
 	t.Cleanup(func() { runRclone = orig })
 
-	callCount := 0
+	copytoCount := 0
 	runRclone = func(ctx context.Context, args ...string) (string, error) {
-		callCount++
-		if callCount == 1 {
+		if args[0] != "copyto" {
+			return "", nil
+		}
+		copytoCount++
+		if copytoCount == 1 {
 			return "", errors.New("network name not found")
 		}
 		return "", nil
@@ -96,17 +99,20 @@ func TestDoCopyFile_NetworkError(t *testing.T) {
 	body := []byte(`{"srcFs":"local","srcRemote":"/share/file.txt","dstFs":"gdrive","dstRemote":"/share/file.txt"}`)
 	_, err := c.doCopyFile(context.Background(), body)
 	assert.NoError(t, err)
-	assert.Equal(t, 2, callCount)
+	assert.Equal(t, 2, copytoCount)
 }
 
 func TestDoCopyFile_CreateFilesystemError(t *testing.T) {
 	orig := runRclone
 	t.Cleanup(func() { runRclone = orig })
 
-	callCount := 0
+	copytoCount := 0
 	runRclone = func(ctx context.Context, args ...string) (string, error) {
-		callCount++
-		if callCount == 1 {
+		if args[0] != "copyto" {
+			return "", nil
+		}
+		copytoCount++
+		if copytoCount == 1 {
 			return "", errors.New("failed to create filesystem")
 		}
 		return "", nil
@@ -116,7 +122,7 @@ func TestDoCopyFile_CreateFilesystemError(t *testing.T) {
 	body := []byte(`{"srcFs":"local","srcRemote":"/a/file.txt","dstFs":"gdrive","dstRemote":"/a/file.txt"}`)
 	_, err := c.doCopyFile(context.Background(), body)
 	assert.NoError(t, err)
-	assert.GreaterOrEqual(t, callCount, 1)
+	assert.Equal(t, 2, copytoCount)
 }
 
 func TestDoCopyFile_PersistentError(t *testing.T) {
