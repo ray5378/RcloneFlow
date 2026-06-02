@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { getWebdavStatus, startWebdav, stopWebdav, getCredentials, saveCredentials, saveCacheSettings, cleanupCache } from '../../api/webdav'
+import { showSuccessToast, showErrorToast } from '../../api/errors'
 import { t } from '../../i18n'
 
 const emit = defineEmits<{
@@ -62,8 +63,10 @@ async function saveAndStart() {
     enabled.value = true
     const origin = window.location.origin
     davAddress.value = `${origin}/dav/`
+    showSuccessToast(t('webdav.startSuccess'))
   } catch (e: any) {
     actionError.value = e.message || '操作失败'
+    showErrorToast(e.message || t('webdav.startFailed'))
   } finally {
     starting.value = false
   }
@@ -76,8 +79,10 @@ async function onStop() {
     await stopWebdav()
     running.value = false
     enabled.value = false
+    showSuccessToast(t('webdav.stopSuccess'))
   } catch (e: any) {
     actionError.value = e.message || '关闭失败'
+    showErrorToast(e.message || t('webdav.stopFailed'))
   } finally {
     stopping.value = false
   }
@@ -88,8 +93,10 @@ async function onSaveCache() {
   actionError.value = ''
   try {
     await saveCacheSettings(cacheMaxSize.value, cacheCleanupInterval.value)
+    showSuccessToast(t('webdav.saveCacheSuccess'))
   } catch (e: any) {
     actionError.value = e.message || '保存缓存设置失败'
+    showErrorToast(e.message || '保存缓存设置失败')
   } finally {
     cacheSaving.value = false
   }
@@ -100,8 +107,10 @@ async function onCleanupCache() {
   actionError.value = ''
   try {
     await cleanupCache()
+    showSuccessToast(t('webdav.cleanupSuccess'))
   } catch (e: any) {
     actionError.value = e.message || '清理缓存失败'
+    showErrorToast(e.message || '清理缓存失败')
   } finally {
     cacheCleaning.value = false
   }

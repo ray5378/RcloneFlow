@@ -732,7 +732,9 @@ export default {
     cacheCleanupInterval: 'Cleanup Interval',
     cacheCleanupIntervalPlaceholder: 'Units: h=hours m=minutes, e.g. 24h, 12h, 1h, 30m. Minimum 1m',
     saveCache: 'Save Cache Settings',
+    saveCacheSuccess: 'Cache settings saved',
     cleanupNow: 'Cleanup Now',
+    cleanupSuccess: 'Cache cleaned up',
     cleaning: 'Cleaning...',
   },
 } as const

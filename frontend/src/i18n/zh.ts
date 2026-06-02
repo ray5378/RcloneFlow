@@ -736,7 +736,9 @@ export default {
     cacheCleanupInterval: '定时清理间隔',
     cacheCleanupIntervalPlaceholder: '单位：h=小时 m=分钟，如 24h、12h、1h、30m。最短 1m',
     saveCache: '保存缓存设置',
+    saveCacheSuccess: '缓存设置已保存',
     cleanupNow: '立即清理缓存',
+    cleanupSuccess: '缓存已清理完成',
     cleaning: '清理中...',
   },
 } as const
