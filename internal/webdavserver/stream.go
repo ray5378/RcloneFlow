@@ -245,11 +245,9 @@ func (fs *streamFileSystem) statRemote(ctx context.Context, remotePath string) (
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 3 {
-			// Exit code 3 means directory not found - return not found
-			return nil, os.ErrNotExist
-		}
-		return nil, fmt.Errorf("获取文件信息失败: %w", err)
+		// 所有错误都返回 os.ErrNotExist，让 webdav 库优雅处理显示404
+		// 避免返回 fmt.Errorf 导致 webdav 库在207响应后写入错误消息混入XML
+		return nil, os.ErrNotExist
 	}
 
 	var entries []lsjsonEntry
@@ -291,7 +289,8 @@ func (fs *streamFileSystem) listRemote(ctx context.Context, remotePath string) (
 	cmd.Stderr = os.Stderr
 	out, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("获取目录列表失败: %w", err)
+		// 返回空列表，让 webdav 库优雅处理（目录显示为空）
+		return nil, nil
 	}
 
 	var entries []lsjsonEntry
@@ -528,13 +527,18 @@ func setStreamCORSHeaders(header http.Header) {
 }
 
 // suppressWriteHeaderWriter 包装 http.ResponseWriter，抑制重复的 WriteHeader 调用
+// 同时抑制重复 WriteHeader 后的 Write 调用，避免错误消息混入正常 XML 响应
 type suppressWriteHeaderWriter struct {
 	http.ResponseWriter
-	wroteHeader bool
+	wroteHeader  bool
+	discardWrite bool
 }
 
 func (w *suppressWriteHeaderWriter) WriteHeader(code int) {
 	if w.wroteHeader {
+		// 重复的 WriteHeader 意味着 webdav 库尝试写入错误响应
+		// 此时丢弃后续所有 Write 调用，避免错误消息混入已写入的 XML
+		w.discardWrite = true
 		return
 	}
 	w.wroteHeader = true
@@ -542,6 +546,9 @@ func (w *suppressWriteHeaderWriter) WriteHeader(code int) {
 }
 
 func (w *suppressWriteHeaderWriter) Write(data []byte) (int, error) {
+	if w.discardWrite {
+		return len(data), nil // 吞掉写入，不实际输出
+	}
 	if !w.wroteHeader {
 		w.WriteHeader(http.StatusOK)
 	}
