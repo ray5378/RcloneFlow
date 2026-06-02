@@ -1,11 +1,13 @@
 package webdavserver
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"testing"
@@ -19,11 +21,11 @@ type errorFS struct {
 	dir webdav.Dir
 }
 
-func (e *errorFS) Mkdir(ctx interface{}, name string, perm interface{}) error { return nil }
-func (e *errorFS) RemoveAll(ctx interface{}, name string) error             { return nil }
-func (e *errorFS) Rename(ctx interface{}, oldName, newName string) error    { return nil }
+func (e *errorFS) Mkdir(ctx context.Context, name string, perm os.FileMode) error    { return nil }
+func (e *errorFS) RemoveAll(ctx context.Context, name string) error                   { return nil }
+func (e *errorFS) Rename(ctx context.Context, oldName, newName string) error           { return nil }
 
-func (e *errorFS) Stat(ctx interface{}, name string) (interface{}, error) {
+func (e *errorFS) Stat(ctx context.Context, name string) (os.FileInfo, error) {
 	// 对特定路径返回非 os.ErrNotExist 的错误
 	if strings.Contains(name, "error-entry") {
 		return nil, fmt.Errorf("rclone command failed: connection refused")
@@ -31,7 +33,7 @@ func (e *errorFS) Stat(ctx interface{}, name string) (interface{}, error) {
 	return e.dir.Stat(ctx, name)
 }
 
-func (e *errorFS) OpenFile(ctx interface{}, name string, flag int, perm interface{}) (interface{}, error) {
+func (e *errorFS) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (webdav.File, error) {
 	return e.dir.OpenFile(ctx, name, flag, perm)
 }
 
@@ -259,6 +261,59 @@ func TestSuppressWriteHeader(t *testing.T) {
 	trimmed := strings.TrimSpace(bodyStr)
 	if !strings.HasSuffix(trimmed, "</D:multistatus>") {
 		t.Errorf("XML does not end properly. Last 50 chars: %q", trimmed[len(trimmed)-min(50, len(trimmed)):])
+	}
+
+	// 验证 Content-Length 匹配
+	if resp.ContentLength > 0 && resp.ContentLength != int64(len(bodyBytes)) {
+		t.Errorf("Content-Length mismatch: header=%d, body=%d", resp.ContentLength, len(bodyBytes))
+	}
+}
+
+// TestErrorFSPropfindXMLIntegrity 模拟 nPlayer 报告 "Extra content at the end of the document" 的场景
+// 当 errorFS 的 Stat 对某个条目返回非 os.ErrNotExist 错误时，
+// webdav 库会尝试在已写入 multistatus 后再写入错误响应体
+// suppressWriteHeaderWriter 必须丢弃这些错误体以保持 XML 完整
+func TestErrorFSPropfindXMLIntegrity(t *testing.T) {
+	tmpDir := t.TempDir()
+	// 创建一个正常文件和一个会触发错误路径的"文件"
+	os.WriteFile(tmpDir+"/good-file.txt", []byte("hello"), 0644)
+	os.WriteFile(tmpDir+"/error-entry-1", []byte("should fail"), 0644)
+
+	fs := &errorFS{dir: webdav.Dir(tmpDir)}
+	handler := &webdav.Handler{
+		FileSystem: fs,
+		LockSystem: webdav.NewMemLS(),
+	}
+
+	wrappedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sw := &suppressWriteHeaderWriter{ResponseWriter: w}
+		handler.ServeHTTP(sw, r)
+	})
+
+	server := httptest.NewServer(wrappedHandler)
+	defer server.Close()
+
+	// 发送 PROPFIND 请求（模拟 nPlayer 浏览目录）
+	req, _ := http.NewRequest("PROPFIND", server.URL+"/", nil)
+	req.Header.Set("Depth", "1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	bodyStr := string(bodyBytes)
+
+	t.Logf("Status: %d", resp.StatusCode)
+	t.Logf("Body: %s", bodyStr)
+
+	// 关键验证：XML 必须以 </D:multistatus> 结尾，不能有额外内容
+	trimmed := strings.TrimSpace(bodyStr)
+	if !strings.HasSuffix(trimmed, "</D:multistatus>") {
+		t.Errorf("XML integrity FAILED: extra content after </D:multistatus>. Last 100 chars: %q",
+			trimmed[len(trimmed)-min(100, len(trimmed)):])
 	}
 
 	// 验证 Content-Length 匹配
