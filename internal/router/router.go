@@ -1,11 +1,14 @@
 package router
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 
 	"rcloneflow/internal/auth"
@@ -246,9 +249,28 @@ func (r *Router) webdavProxy() http.Handler {
 
 	proxy.FlushInterval = -1
 
+	hrefPattern := regexp.MustCompile(`(<D:href>)(/[^<]*)(</D:href>)`)
+
 	proxy.ModifyResponse = func(resp *http.Response) error {
 		setCORSHeaders(resp.Header)
 		resp.Header.Set("Accept-Ranges", "bytes")
+
+		location := resp.Header.Get("Location")
+		if location != "" && strings.HasPrefix(location, "/") && !strings.HasPrefix(location, "/dav") {
+			resp.Header.Set("Location", "/dav"+location)
+		}
+
+		if resp.Request != nil && resp.Request.Method == "PROPFIND" && resp.StatusCode == 207 {
+			bodyBytes, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			if err == nil {
+				bodyBytes = hrefPattern.ReplaceAll(bodyBytes, []byte("${1}/dav${2}${3}"))
+				resp.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+				resp.ContentLength = int64(len(bodyBytes))
+				resp.Header.Set("Content-Length", fmt.Sprintf("%d", len(bodyBytes)))
+			}
+		}
+
 		return nil
 	}
 
