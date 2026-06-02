@@ -19,10 +19,10 @@ import (
 
 // Router 路由定义
 type Router struct {
-	remoteCtrl   *controller.RemoteController
-	taskCtrl     *controller.TaskController
-	browserCtrl  *controller.BrowserController
-	scheduleCtrl *controller.ScheduleController
+	remoteCtrl         *controller.RemoteController
+	taskCtrl           *controller.TaskController
+	browserCtrl        *controller.BrowserController
+	scheduleCtrl       *controller.ScheduleController
 	runCtrl            *controller.RunController
 	fsCtrl             *controller.FsController
 	authCtrl           *controller.AuthController
@@ -51,10 +51,10 @@ func New(
 	staticDir string,
 ) *Router {
 	return &Router{
-		remoteCtrl:   rc,
-		taskCtrl:     taskCtrl,
-		browserCtrl:  browserCtrl,
-		scheduleCtrl: scheduleCtrl,
+		remoteCtrl:         rc,
+		taskCtrl:           taskCtrl,
+		browserCtrl:        browserCtrl,
+		scheduleCtrl:       scheduleCtrl,
 		runCtrl:            runCtrl,
 		fsCtrl:             fsCtrl,
 		authCtrl:           authCtrl,

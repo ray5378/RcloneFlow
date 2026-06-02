@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { getWebdavStatus, startWebdav, stopWebdav, getCredentials, saveCredentials, saveCacheSettings, cleanupCache } from '../../api/webdav'
 import { t } from '../../i18n'
 
@@ -15,17 +15,19 @@ const actionError = ref('')
 const starting = ref(false)
 const stopping = ref(false)
 const davAddress = ref('')
-const credSaving = ref(false)
 const cacheSaving = ref(false)
 const cacheCleaning = ref(false)
 
 const username = ref('')
 const password = ref('')
 const showPassword = ref(false)
-const showPwInRow = ref(false)
 
+const cacheMode = ref('full')
+const cacheStorage = ref('disk')
 const cacheMaxSize = ref('1G')
 const cacheCleanupInterval = ref('24h')
+
+const cacheEnabled = computed(() => cacheMode.value === 'full')
 
 async function loadStatus() {
   loading.value = true
@@ -43,6 +45,8 @@ async function loadStatus() {
       username.value = cred.username
       password.value = cred.password
     }
+    cacheMode.value = status.cache_mode || 'full'
+    cacheStorage.value = status.cache_storage || 'disk'
     cacheMaxSize.value = status.cache_max_size || '1G'
     cacheCleanupInterval.value = status.cache_cleanup_interval || '24h'
   } catch (e: any) {
@@ -89,7 +93,7 @@ async function onSaveCache() {
   cacheSaving.value = true
   actionError.value = ''
   try {
-    await saveCacheSettings(cacheMaxSize.value, cacheCleanupInterval.value)
+    await saveCacheSettings(cacheMode.value, cacheStorage.value, cacheMaxSize.value, cacheCleanupInterval.value)
   } catch (e: any) {
     actionError.value = e.message || '保存缓存设置失败'
   } finally {
@@ -167,38 +171,66 @@ onMounted(loadStatus)
 
         <div class="cache-section">
           <div class="cache-title">{{ t('webdav.cacheSettings') }}</div>
-          <div class="field-item">
-            <label>{{ t('webdav.cacheMaxSize') }}</label>
-            <input
-              v-model="cacheMaxSize"
-              type="text"
-              :placeholder="t('webdav.cacheMaxSizePlaceholder')"
-            />
+
+          <div class="radio-group">
+            <label class="radio-item" :class="{ active: cacheMode === 'full' }">
+              <input type="radio" v-model="cacheMode" value="full" />
+              <span class="radio-label">{{ t('webdav.cacheModeFull') }}</span>
+            </label>
+            <label class="radio-item" :class="{ active: cacheMode === 'off' }">
+              <input type="radio" v-model="cacheMode" value="off" />
+              <span class="radio-label">{{ t('webdav.cacheModeOff') }}</span>
+            </label>
           </div>
-          <div class="field-item">
-            <label>{{ t('webdav.cacheCleanupInterval') }}</label>
-            <input
-              v-model="cacheCleanupInterval"
-              type="text"
-              :placeholder="t('webdav.cacheCleanupIntervalPlaceholder')"
-            />
-          </div>
-          <div class="cache-actions">
-            <button
-              class="secondary cache-save-btn"
-              @click="onSaveCache"
-              :disabled="cacheSaving"
-            >
-              {{ cacheSaving ? t('common.saving') : t('webdav.saveCache') }}
-            </button>
-            <button
-              class="secondary cache-cleanup-btn"
-              @click="onCleanupCache"
-              :disabled="cacheCleaning"
-            >
-              {{ cacheCleaning ? t('webdav.cleaning') : t('webdav.cleanupNow') }}
-            </button>
-          </div>
+
+          <template v-if="cacheEnabled">
+            <div class="cache-subsection">
+              <div class="field-item">
+                <label>{{ t('webdav.cacheStorage') }}</label>
+                <select v-model="cacheStorage" class="cache-select">
+                  <option value="disk">{{ t('webdav.cacheStorageDisk') }}</option>
+                  <option value="memory">{{ t('webdav.cacheStorageMemory') }}</option>
+                </select>
+              </div>
+
+              <div v-if="cacheStorage === 'memory'" class="memory-hint">
+                {{ t('webdav.cacheMemoryHint') }}
+              </div>
+            </div>
+
+            <div class="field-item">
+              <label>{{ t('webdav.cacheMaxSize') }}</label>
+              <input
+                v-model="cacheMaxSize"
+                type="text"
+                :placeholder="t('webdav.cacheMaxSizePlaceholder')"
+              />
+            </div>
+            <div class="field-item">
+              <label>{{ t('webdav.cacheCleanupInterval') }}</label>
+              <input
+                v-model="cacheCleanupInterval"
+                type="text"
+                :placeholder="t('webdav.cacheCleanupIntervalPlaceholder')"
+              />
+            </div>
+            <div class="cache-actions">
+              <button
+                class="secondary cache-save-btn"
+                @click="onSaveCache"
+                :disabled="cacheSaving"
+              >
+                {{ cacheSaving ? t('common.saving') : t('webdav.saveCache') }}
+              </button>
+              <button
+                class="secondary cache-cleanup-btn"
+                @click="onCleanupCache"
+                :disabled="cacheCleaning"
+              >
+                {{ cacheCleaning ? t('webdav.cleaning') : t('webdav.cleanupNow') }}
+              </button>
+            </div>
+          </template>
         </div>
 
         <div v-if="actionError" class="error">{{ actionError }}</div>
@@ -409,6 +441,76 @@ onMounted(loadStatus)
   font-weight: 600;
   color: var(--text);
   margin-bottom: 12px;
+}
+
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.radio-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.radio-item.active {
+  border-color: #64b5f6;
+  background: rgba(100, 181, 246, 0.06);
+}
+
+.radio-item input[type="radio"] {
+  margin-top: 2px;
+}
+
+.radio-label {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.cache-subsection {
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.cache-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.cache-select:focus {
+  outline: none;
+  border-color: #64b5f6;
+}
+
+.memory-hint {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #d97706;
+  line-height: 1.5;
 }
 
 .cache-actions {

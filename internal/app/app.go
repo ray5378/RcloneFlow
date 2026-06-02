@@ -64,7 +64,7 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 
 	// 初始化嵌入式 rclone
 	maybeStartEmbeddedRC()
-	
+
 	// 初始化服务、控制器、路由
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -90,18 +90,18 @@ func RunWithShutdown(cfg *config.Config, stop <-chan os.Signal) error {
 
 // appServices 包含应用程序的所有服务和控制器
 type appServices struct {
-	db              *store.DB
-	taskSvc         *service.TaskService
-	scheduleSvc     *service.ScheduleService
-	runSvc          *service.RunService
-	authSvc         *service.AuthService
-	tagSvc          *service.TagService
-	cleanupSvc      *service.CleanupService
-	logCleanupSvc   *service.LogCleanupService
-	sched           *scheduler.Scheduler
-	activeMgr       *active_transfer.Manager
-	webdavManager   *webdavserver.Manager
-	controllers     []any
+	db            *store.DB
+	taskSvc       *service.TaskService
+	scheduleSvc   *service.ScheduleService
+	runSvc        *service.RunService
+	authSvc       *service.AuthService
+	tagSvc        *service.TagService
+	cleanupSvc    *service.CleanupService
+	logCleanupSvc *service.LogCleanupService
+	sched         *scheduler.Scheduler
+	activeMgr     *active_transfer.Manager
+	webdavManager *webdavserver.Manager
+	controllers   []any
 }
 
 // initServices 初始化所有服务和控制器
@@ -131,13 +131,13 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 			"snapshot": snap,
 		})
 	})
-	
+
 	taskSvc := service.NewTaskService(db, activeMgr)
 	scheduleSvc := service.NewScheduleService(db)
 	runSvc := service.NewRunService(service.NewStoreRunAdapter(db))
 	authSvc := service.NewAuthService(db)
 	tagSvc := service.NewTagService(db)
-	
+
 	taskSvc.SetTagService(tagSvc)
 	if err := tagSvc.RecalcTags(); err != nil {
 		logger.Error("标签初始化失败", zap.Error(err))
@@ -182,7 +182,7 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 	// 初始化清理服务
 	var cleanupSvc *service.CleanupService
 	var logCleanupSvc *service.LogCleanupService
-	
+
 	if cfg.GetCleanupInterval() > 0 && cfg.GetCleanupRetention() > 0 {
 		cleanupSvc = service.NewCleanupService(
 			runSvc,
@@ -232,18 +232,18 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 	webdavManager.StartCacheCleanupScheduler(ctx)
 
 	return &appServices{
-		db:              db,
-		taskSvc:         taskSvc,
-		scheduleSvc:     scheduleSvc,
-		runSvc:          runSvc,
-		authSvc:         authSvc,
-		tagSvc:          tagSvc,
-		cleanupSvc:      cleanupSvc,
-		logCleanupSvc:   logCleanupSvc,
-		sched:           sched,
-		activeMgr:       activeMgr,
-		webdavManager:   webdavManager,
-		controllers:     []any{remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl, webdavCtrl},
+		db:            db,
+		taskSvc:       taskSvc,
+		scheduleSvc:   scheduleSvc,
+		runSvc:        runSvc,
+		authSvc:       authSvc,
+		tagSvc:        tagSvc,
+		cleanupSvc:    cleanupSvc,
+		logCleanupSvc: logCleanupSvc,
+		sched:         sched,
+		activeMgr:     activeMgr,
+		webdavManager: webdavManager,
+		controllers:   []any{remoteCtrl, taskCtrl, browserCtrl, scheduleCtrl, runCtrl, fsCtrl, authCtrl, activeTransferCtrl, tagCtrl, versionCtrl, webdavCtrl},
 	}, nil
 }
 
@@ -301,7 +301,7 @@ func shutdown(services *appServices, srv *http.Server) {
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
-	
+
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		logger.Error("服务器关闭失败", zap.Error(err))
 	}
@@ -315,4 +315,3 @@ func restoreWebDAV(services *appServices) {
 
 	services.webdavManager.AutoRestore()
 }
-
