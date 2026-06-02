@@ -32,8 +32,10 @@ const (
 	encryptedPassKey     = "WEBDAB_ENCRYPTED_PASSWORD"
 	cacheMaxSizeKey          = "WEBDAV_CACHE_MAX_SIZE"
 	cacheCleanupIntervalKey  = "WEBDAV_CACHE_CLEANUP_INTERVAL"
+	cacheModeKey             = "WEBDAV_CACHE_MODE"
 	defaultCacheMaxSize         = "1G"
 	defaultCacheCleanupInterval = "24h"
+	defaultCacheMode            = "full"
 )
 
 type Manager struct {
