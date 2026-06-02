@@ -296,6 +296,10 @@ func (m *Manager) Start() error {
 		"--pass", password,
 		"--config", m.configFile,
 		"--no-checksum",
+		"--vfs-cache-mode", "full",
+		"--vfs-cache-max-size", "1G",
+		"--buffer-size", "64M",
+		"--vfs-read-chunk-size", "64M",
 	}
 
 	m.cmd = exec.CommandContext(ctx, "rclone", args...)

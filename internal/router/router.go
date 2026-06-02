@@ -240,13 +240,19 @@ func (r *Router) webdavProxy() http.Handler {
 	target, _ := url.Parse("http://127.0.0.1:17871")
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	proxy.ModifyResponse = func(resp *http.Response) error {
-		resp.Header.Set("Access-Control-Allow-Origin", "*")
+		setCORSHeaders(resp.Header)
 		return nil
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !r.webdavManager.IsRunning() {
 			http.Error(w, "WebDAV service is not running", http.StatusServiceUnavailable)
+			return
+		}
+
+		if req.Method == "OPTIONS" {
+			setCORSHeaders(w.Header())
+			w.WriteHeader(http.StatusOK)
 			return
 		}
 
@@ -257,4 +263,11 @@ func (r *Router) webdavProxy() http.Handler {
 		}
 		proxy.ServeHTTP(w, req)
 	})
+}
+
+func setCORSHeaders(header http.Header) {
+	header.Set("Access-Control-Allow-Origin", "*")
+	header.Set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS, PROPFIND, PROPPATCH, MKCOL, MOVE, COPY, LOCK, UNLOCK")
+	header.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Depth, Overwrite, Destination, If, Lock-Token, Timeout, Range")
+	header.Set("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length, ETag")
 }
