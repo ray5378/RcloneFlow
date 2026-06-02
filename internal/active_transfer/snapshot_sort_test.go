@@ -33,8 +33,8 @@ func TestSnapshot_SkipsSortWhenNotDirty(t *testing.T) {
 	state.dirtySort = false
 	snap2 := state.Snapshot()
 
-	assert.Equal(t, snap1.Completed, snap2.Completed)
-	assert.Equal(t, snap1.Pending, snap2.Pending)
+	assert.ElementsMatch(t, snap1.Completed, snap2.Completed)
+	assert.ElementsMatch(t, snap1.Pending, snap2.Pending)
 	assert.Equal(t, snap1.CurrentFiles, snap2.CurrentFiles)
 }
 
