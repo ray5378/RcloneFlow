@@ -734,7 +734,7 @@ export default {
     cacheMode: 'Cache Mode',
     cacheModeFull: 'On — Cache files to local storage before read/write',
     cacheModeOff: 'Off — Direct streaming, no file caching',
-    cacheOffWarning: 'With cache off, files are streamed directly. Note: some storage providers (e.g. 115 Cloud, PikPak, etc.) do not support direct streaming and may fail on file operations. It is recommended to enable cache for best compatibility.',
+    cacheOffWarning: 'With cache off, files are streamed directly. Note: some storage providers (e.g. 115 Cloud, PikPak, OpenList, Alist, etc.) do not support direct streaming and may fail on file operations. It is recommended to enable cache for best compatibility.',
     cacheStorage: 'Storage Location',
     cacheStorageDisk: 'Disk',
     cacheStorageMemory: 'Memory (/dev/shm)',
