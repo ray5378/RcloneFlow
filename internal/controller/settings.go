@@ -203,6 +203,7 @@ func (s *SettingsController) handlePut(w http.ResponseWriter, r *http.Request) {
 
 var ReplanCleanupHook func(intervalHours int, retentionDays int)
 var ReplanLogCleanupHook func(retentionDays int)
+var WebDAVRestartHook func() error
 
 func atoiDefault(s string, d int) int {
 	if s == "" {

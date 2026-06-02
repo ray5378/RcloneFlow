@@ -165,6 +165,13 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 	webdavManager := webdavserver.NewManager(cfg.GetDataDir())
 	webdavCtrl := controller.NewWebdavController(webdavManager)
 
+	controller.WebDAVRestartHook = func() error {
+		if !webdavManager.IsEnabled() {
+			return nil
+		}
+		return webdavManager.Restart()
+	}
+
 	// 初始化清理服务
 	var cleanupSvc *service.CleanupService
 	var logCleanupSvc *service.LogCleanupService

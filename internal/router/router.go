@@ -260,6 +260,7 @@ func (r *Router) webdavProxy() http.Handler {
 			resp.Header.Set("Location", "/dav"+location)
 		}
 
+		// Only read and rewrite body for PROPFIND responses with status 207
 		if resp.Request != nil && resp.Request.Method == "PROPFIND" && resp.StatusCode == 207 {
 			bodyBytes, err := io.ReadAll(resp.Body)
 			resp.Body.Close()

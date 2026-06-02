@@ -353,6 +353,7 @@ func (m *Manager) Stop() error {
 	}
 
 	m.stopProcess()
+	m.cleanupCache()
 
 	if err := m.writeSettings(settingsKey, "false"); err != nil {
 		logger.Error("保存WebDAV关闭状态失败", zap.Error(err))
@@ -360,6 +361,16 @@ func (m *Manager) Stop() error {
 
 	logger.Info("WebDAV服务已停止")
 	return nil
+}
+
+func (m *Manager) Restart() error {
+	m.mu.Lock()
+	if m.running {
+		m.stopProcess()
+	}
+	m.mu.Unlock()
+
+	return m.Start()
 }
 
 func (m *Manager) Shutdown() {
@@ -401,6 +412,15 @@ func (m *Manager) stopProcess() {
 
 func (m *Manager) cacheDir() string {
 	return filepath.Join(m.dataDir, "webdav-cache")
+}
+
+func (m *Manager) cleanupCache() {
+	cacheDir := m.cacheDir()
+	if err := os.RemoveAll(cacheDir); err != nil && !os.IsNotExist(err) {
+		logger.Warn("WebDAV缓存清理失败", zap.Error(err))
+	} else if err == nil {
+		logger.Info("WebDAV缓存已清理")
+	}
 }
 
 func (m *Manager) IsRunning() bool {

@@ -6,6 +6,9 @@ import (
 	"strings"
 
 	"rcloneflow/internal/adapter"
+	"rcloneflow/internal/logger"
+
+	"go.uber.org/zap"
 )
 
 // RemoteController 远程存储控制器
@@ -67,6 +70,7 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		WriteJSON(w, 200, map[string]any{"created": true})
+		go restartWebDAV()
 
 	case http.MethodPut:
 		var req struct {
@@ -87,6 +91,7 @@ func (c *RemoteController) HandleRemotes(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		WriteJSON(w, 200, map[string]any{"updated": true})
+		go restartWebDAV()
 
 	default:
 		w.WriteHeader(405)
@@ -123,6 +128,7 @@ func (c *RemoteController) HandleClearRemotes(w http.ResponseWriter, r *http.Req
 		return
 	}
 	WriteJSON(w, 200, map[string]any{"deleted": true})
+	go restartWebDAV()
 }
 
 // HandleRemoteDescription 更新远程存储备注
@@ -236,6 +242,7 @@ func (c *RemoteController) HandleConfigActions(w http.ResponseWriter, r *http.Re
 			return
 		}
 		WriteJSON(w, 200, map[string]any{"deleted": true})
+		go restartWebDAV()
 
 	default:
 		w.WriteHeader(405)
@@ -296,6 +303,15 @@ func (c *RemoteController) HandleFsInfo(w http.ResponseWriter, r *http.Request) 
 // RcloneClient 获取rclone客户端（供其他控制器使用）
 func (c *RemoteController) RcloneClient() *adapter.RcloneClient {
 	return c.rc
+}
+
+func restartWebDAV() {
+	if WebDAVRestartHook == nil {
+		return
+	}
+	if err := WebDAVRestartHook(); err != nil {
+		logger.Error("WebDAV重启失败", zap.Error(err))
+	}
 }
 
 // RunTask 运行任务
