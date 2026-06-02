@@ -251,6 +251,10 @@ func (r *Router) webdavProxy() http.Handler {
 		}
 
 		req.Host = target.Host
+		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/dav")
+		if !strings.HasPrefix(req.URL.Path, "/") {
+			req.URL.Path = "/"
+		}
 		proxy.ServeHTTP(w, req)
 	})
 }
