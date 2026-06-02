@@ -172,7 +172,7 @@ func (m *Manager) createCombineRemoteInConfig(remotes []string) error {
 
 	upstreams := make([]string, 0, len(remotes))
 	for _, name := range remotes {
-		upstreams = append(upstreams, fmt.Sprintf("%s=:%s:", name, name))
+		upstreams = append(upstreams, fmt.Sprintf("%s=%s:", name, name))
 	}
 
 	content, err := os.ReadFile(m.configFile)
