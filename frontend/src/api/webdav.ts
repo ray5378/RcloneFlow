@@ -15,14 +15,13 @@ export async function getWebdavStatus(): Promise<WebdavStatus> {
   return res.json()
 }
 
-export async function startWebdav(username: string, password: string): Promise<{ ok: boolean; message: string; dav_path: string }> {
+export async function startWebdav(): Promise<{ ok: boolean; message: string; dav_path: string }> {
   const res = await fetch('/api/webdav/start', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${getToken()}`
-    },
-    body: JSON.stringify({ username, password })
+    }
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))

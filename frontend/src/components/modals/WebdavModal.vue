@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getWebdavStatus, startWebdav, stopWebdav, type WebdavStatus } from '../../api/webdav'
-import { getToken } from '../../api/auth'
+import { getWebdavStatus, startWebdav, stopWebdav } from '../../api/webdav'
 import { t } from '../../i18n'
 
 const emit = defineEmits<{
@@ -14,7 +13,6 @@ const enabled = ref(false)
 const statusError = ref('')
 const startError = ref('')
 const stopError = ref('')
-const password = ref('')
 const starting = ref(false)
 const stopping = ref(false)
 const davAddress = ref('')
@@ -36,23 +34,14 @@ async function loadStatus() {
 }
 
 async function onStart() {
-  if (!password.value) return
   starting.value = true
   startError.value = ''
   try {
-    const token = getToken()
-    if (!token) {
-      startError.value = '未登录'
-      return
-    }
-    const payload = JSON.parse(atob(token.split('.')[1]))
-    const username = payload.username || 'admin'
-    await startWebdav(username, password.value)
+    await startWebdav()
     running.value = true
     enabled.value = true
     const origin = window.location.origin
     davAddress.value = `${origin}/dav/`
-    password.value = ''
   } catch (e: any) {
     startError.value = e.message || '开启失败'
   } finally {
@@ -99,25 +88,15 @@ onMounted(loadStatus)
           </div>
         </div>
 
-        <div v-if="!running" class="webdav-start-form">
-          <div class="field-item">
-            <label>{{ t('webdav.password') }}</label>
-            <input
-              v-model="password"
-              type="password"
-              :placeholder="t('webdav.passwordPlaceholder')"
-              @keyup.enter="onStart"
-            />
-          </div>
-          <div v-if="startError" class="error">{{ startError }}</div>
-        </div>
+        <div v-if="startError" class="error">{{ startError }}</div>
+        <div v-if="stopError" class="error">{{ stopError }}</div>
 
         <div class="webdav-actions">
           <button
             v-if="!running"
             class="primary start-btn"
             @click="onStart"
-            :disabled="starting || !password"
+            :disabled="starting"
           >
             {{ starting ? t('webdav.starting') : t('webdav.start') }}
           </button>
@@ -130,8 +109,6 @@ onMounted(loadStatus)
             {{ stopping ? t('webdav.stopping') : t('webdav.stop') }}
           </button>
         </div>
-
-        <div v-if="stopError" class="error">{{ stopError }}</div>
 
         <div class="webdav-tips">
           <div class="tips-title">{{ t('webdav.tips') }}</div>
@@ -283,37 +260,6 @@ onMounted(loadStatus)
   font-size: 14px;
   color: #64b5f6;
   word-break: break-all;
-}
-
-.webdav-start-form {
-  margin-bottom: 16px;
-}
-
-.field-item {
-  margin-bottom: 12px;
-}
-
-.field-item label {
-  display: block;
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 4px;
-}
-
-.field-item input {
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--text);
-  font-size: 14px;
-  box-sizing: border-box;
-}
-
-.field-item input:focus {
-  outline: none;
-  border-color: #64b5f6;
 }
 
 .webdav-actions {

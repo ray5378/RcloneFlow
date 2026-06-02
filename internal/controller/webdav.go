@@ -1,12 +1,11 @@
 package controller
 
 import (
-	"encoding/json"
-	"io"
 	"net/http"
+	"strings"
 
+	"rcloneflow/internal/auth"
 	"rcloneflow/internal/logger"
-	"rcloneflow/internal/service"
 	"rcloneflow/internal/webdavserver"
 
 	"go.uber.org/zap"
@@ -14,16 +13,26 @@ import (
 
 type WebdavController struct {
 	manager *webdavserver.Manager
-	authSvc *service.AuthService
 }
 
-func NewWebdavController(manager *webdavserver.Manager, authSvc *service.AuthService) *WebdavController {
-	return &WebdavController{manager: manager, authSvc: authSvc}
+func NewWebdavController(manager *webdavserver.Manager) *WebdavController {
+	return &WebdavController{manager: manager}
 }
 
-type webdavStartRequest struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+func extractUsernameFromRequest(r *http.Request) string {
+	tokenStr := r.Header.Get("Authorization")
+	tokenStr = strings.TrimPrefix(tokenStr, "Bearer ")
+	if tokenStr == "" {
+		return "admin"
+	}
+	claims, err := auth.ValidateToken(tokenStr)
+	if err != nil {
+		return "admin"
+	}
+	if claims.Username != "" {
+		return claims.Username
+	}
+	return "admin"
 }
 
 func (c *WebdavController) HandleStart(w http.ResponseWriter, r *http.Request) {
@@ -32,24 +41,9 @@ func (c *WebdavController) HandleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	body, _ := io.ReadAll(r.Body)
-	var req webdavStartRequest
-	if err := json.Unmarshal(body, &req); err != nil {
-		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "无效的请求格式"})
-		return
-	}
+	username := extractUsernameFromRequest(r)
 
-	if req.Username == "" || req.Password == "" {
-		WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "用户名和密码不能为空"})
-		return
-	}
-
-	if _, _, err := c.authSvc.Login(req.Username, req.Password); err != nil {
-		WriteJSON(w, http.StatusUnauthorized, map[string]string{"error": "用户名或密码错误"})
-		return
-	}
-
-	if err := c.manager.Start(req.Username, req.Password); err != nil {
+	if err := c.manager.Start(username); err != nil {
 		logger.Error("启动WebDAV失败", zap.Error(err))
 		WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return

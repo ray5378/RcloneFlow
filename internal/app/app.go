@@ -163,7 +163,7 @@ func initServices(cfg *config.Config, db *store.DB, ctx context.Context) (*appSe
 	versionCtrl := controller.NewVersionController(rc)
 
 	webdavManager := webdavserver.NewManager(cfg.GetDataDir())
-	webdavCtrl := controller.NewWebdavController(webdavManager, authSvc)
+	webdavCtrl := controller.NewWebdavController(webdavManager)
 
 	// 初始化清理服务
 	var cleanupSvc *service.CleanupService

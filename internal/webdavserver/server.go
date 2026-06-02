@@ -1,6 +1,7 @@
 package webdavserver
 
 import (
+	"bufio"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -11,7 +12,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -32,11 +32,11 @@ const (
 )
 
 type Manager struct {
-	mu       sync.Mutex
-	cmd      *exec.Cmd
-	cancel   context.CancelFunc
-	running  bool
-	dataDir  string
+	mu         sync.Mutex
+	cmd        *exec.Cmd
+	cancel     context.CancelFunc
+	running    bool
+	dataDir    string
 	configFile string
 }
 
@@ -64,6 +64,11 @@ func (m *Manager) getJWTSecret() ([]byte, error) {
 func deriveAESKey(jwtSecret []byte) []byte {
 	h := sha256.Sum256(jwtSecret)
 	return h[:]
+}
+
+func deriveWebdavPassword(jwtSecret []byte) string {
+	h := sha256.Sum256(jwtSecret)
+	return hex.EncodeToString(h[:16])
 }
 
 func encryptPassword(password string, key []byte) (string, error) {
@@ -136,17 +141,31 @@ func (m *Manager) writeSettings(key, value string) error {
 	return os.WriteFile(fp, data, 0644)
 }
 
-func (m *Manager) createCombineRemote() error {
-	rcURL := "http://127.0.0.1:5572"
-	if v := os.Getenv("RCLONE_RC_URL"); v != "" {
-		rcURL = v
-	}
-
-	remotes, err := m.listRemotes(rcURL)
+func (m *Manager) listRemotesFromConfig() ([]string, error) {
+	f, err := os.Open(m.configFile)
 	if err != nil {
-		return fmt.Errorf("获取远程存储列表失败: %w", err)
+		return nil, fmt.Errorf("打开rclone配置文件失败: %w", err)
 	}
+	defer f.Close()
 
+	var remotes []string
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
+			name := line[1 : len(line)-1]
+			if name != "" && name != combineRemoteName {
+				remotes = append(remotes, name)
+			}
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("读取rclone配置文件失败: %w", err)
+	}
+	return remotes, nil
+}
+
+func (m *Manager) createCombineRemoteInConfig(remotes []string) error {
 	if len(remotes) == 0 {
 		return fmt.Errorf("没有可用的存储节点")
 	}
@@ -156,71 +175,38 @@ func (m *Manager) createCombineRemote() error {
 		upstreams = append(upstreams, fmt.Sprintf("%s=:%s:", name, name))
 	}
 
-	req := map[string]any{
-		"type":     "combine",
-		"parameters": map[string]any{
-			"upstreams": strings.Join(upstreams, " "),
-		},
-		"opt": map[string]any{
-			"nonInteractive": true,
-			"obscure":        false,
-		},
-	}
-
-	body, _ := json.Marshal(req)
-	httpReq, err := http.NewRequest(http.MethodPost, rcURL+"/config/create", strings.NewReader(string(body)))
+	content, err := os.ReadFile(m.configFile)
 	if err != nil {
-		return err
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return fmt.Errorf("创建combine远程存储失败: %w", err)
-	}
-	defer resp.Body.Close()
-
-	respBody, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode >= 300 {
-		return fmt.Errorf("创建combine远程存储失败: %s", strings.TrimSpace(string(respBody)))
+		return fmt.Errorf("读取rclone配置文件失败: %w", err)
 	}
 
-	return nil
-}
-
-func (m *Manager) listRemotes(rcURL string) ([]string, error) {
-	httpReq, err := http.NewRequest(http.MethodPost, rcURL+"/config/listremotes", strings.NewReader("{}"))
-	if err != nil {
-		return nil, err
-	}
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Do(httpReq)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	var result struct {
-		Remotes []string `json:"remotes"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	var remotes []string
-	for _, name := range result.Remotes {
-		if name == combineRemoteName {
+	lines := strings.Split(string(content), "\n")
+	var newLines []string
+	skip := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[") && strings.Trim(trimmed, "[]") == combineRemoteName {
+			skip = true
 			continue
 		}
-		remotes = append(remotes, name)
+		if skip && strings.HasPrefix(trimmed, "[") {
+			skip = false
+		}
+		if !skip {
+			newLines = append(newLines, line)
+		}
 	}
-	return remotes, nil
+
+	newLines = append(newLines, "")
+	newLines = append(newLines, fmt.Sprintf("[%s]", combineRemoteName))
+	newLines = append(newLines, "type = combine")
+	newLines = append(newLines, fmt.Sprintf("upstreams = %s", strings.Join(upstreams, " ")))
+	newLines = append(newLines, "")
+
+	return os.WriteFile(m.configFile, []byte(strings.Join(newLines, "\n")), 0644)
 }
 
-func (m *Manager) Start(username, password string) error {
+func (m *Manager) Start(username string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -228,7 +214,12 @@ func (m *Manager) Start(username, password string) error {
 		return fmt.Errorf("WebDAV服务已在运行中")
 	}
 
-	if err := m.createCombineRemote(); err != nil {
+	remotes, err := m.listRemotesFromConfig()
+	if err != nil {
+		return fmt.Errorf("获取远程存储列表失败: %w", err)
+	}
+
+	if err := m.createCombineRemoteInConfig(remotes); err != nil {
 		return err
 	}
 
@@ -237,6 +228,8 @@ func (m *Manager) Start(username, password string) error {
 		return err
 	}
 	aesKey := deriveAESKey(jwtSecret)
+
+	password := deriveWebdavPassword(jwtSecret)
 
 	encryptedPass, err := encryptPassword(password, aesKey)
 	if err != nil {
@@ -253,14 +246,13 @@ func (m *Manager) Start(username, password string) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.cancel = cancel
 
-	configArg := m.configFile
 	args := []string{
 		"serve", "webdav",
 		combineRemoteName + ":",
 		"--addr", internalPort,
 		"--user", username,
 		"--pass", password,
-		"--config", configArg,
+		"--config", m.configFile,
 		"--no-checksum",
 	}
 
@@ -360,19 +352,31 @@ func (m *Manager) IsEnabled() bool {
 	return settings[settingsKey] == "true"
 }
 
+func (m *Manager) GetPassword() (string, error) {
+	pass := m.GetEncryptedPassword()
+	if pass != "" {
+		return m.GetDecryptedPassword()
+	}
+	jwtSecret, err := m.getJWTSecret()
+	if err != nil {
+		return "", err
+	}
+	return deriveWebdavPassword(jwtSecret), nil
+}
+
 func (m *Manager) AutoRestore(username string) {
 	if !m.IsEnabled() {
 		return
 	}
 
-	password, err := m.GetDecryptedPassword()
+	_, err := m.GetPassword()
 	if err != nil {
-		logger.Error("WebDAV自动恢复失败: 密码解密错误", zap.Error(err))
+		logger.Error("WebDAV自动恢复失败: 密码获取错误", zap.Error(err))
 		m.writeSettings(settingsKey, "false")
 		return
 	}
 
-	if err := m.Start(username, password); err != nil {
+	if err := m.Start(username); err != nil {
 		logger.Error("WebDAV自动恢复失败", zap.Error(err))
 		m.writeSettings(settingsKey, "false")
 		return
