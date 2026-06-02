@@ -263,6 +263,10 @@ func (r *Router) webdavProxy() http.Handler {
 			return
 		}
 
+		if req.Method == "PROPFIND" && req.Header.Get("Depth") == "infinity" {
+			req.Header.Set("Depth", "1")
+		}
+
 		req.Host = target.Host
 		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/dav")
 		req.URL.RawPath = strings.TrimPrefix(req.URL.RawPath, "/dav")
