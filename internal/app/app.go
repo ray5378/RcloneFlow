@@ -259,8 +259,8 @@ func startHTTPServer(cfg *config.Config, mux *http.ServeMux) *http.Server {
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      mux,
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 60 * time.Second,
+		ReadTimeout:  5 * time.Minute,
+		WriteTimeout: 30 * time.Minute,
 		IdleTimeout:  120 * time.Second,
 	}
 

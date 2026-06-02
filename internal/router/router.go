@@ -219,6 +219,10 @@ func (r *Router) Setup(mux *http.ServeMux) {
 
 	// WebDAV 反向代理（公开，由 rclone serve webdav 自身处理认证）
 	mux.Handle("/dav/", r.webdavProxy())
+	mux.HandleFunc("/dav", func(w http.ResponseWriter, req *http.Request) {
+		setCORSHeaders(w.Header())
+		http.Redirect(w, req, "/dav/", http.StatusMovedPermanently)
+	})
 
 	// 静态文件（公开）
 	mux.Handle("/", staticFileHandler(r.staticDir))
@@ -240,8 +244,11 @@ func (r *Router) webdavProxy() http.Handler {
 	target, _ := url.Parse("http://127.0.0.1:17871")
 	proxy := httputil.NewSingleHostReverseProxy(target)
 
+	proxy.FlushInterval = -1
+
 	proxy.ModifyResponse = func(resp *http.Response) error {
 		setCORSHeaders(resp.Header)
+		resp.Header.Set("Accept-Ranges", "bytes")
 		return nil
 	}
 
@@ -268,14 +275,18 @@ func (r *Router) webdavProxy() http.Handler {
 		}
 
 		req.Host = target.Host
+
 		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/dav")
-		req.URL.RawPath = strings.TrimPrefix(req.URL.RawPath, "/dav")
-		if !strings.HasPrefix(req.URL.Path, "/") {
+		if req.URL.RawPath != "" {
+			req.URL.RawPath = strings.TrimPrefix(req.URL.RawPath, "/dav")
+		}
+		if req.URL.Path == "" || !strings.HasPrefix(req.URL.Path, "/") {
 			req.URL.Path = "/"
 		}
-		if !strings.HasPrefix(req.URL.RawPath, "/") {
+		if req.URL.RawPath == "" || !strings.HasPrefix(req.URL.RawPath, "/") {
 			req.URL.RawPath = ""
 		}
+
 		proxy.ServeHTTP(w, req)
 	})
 }
@@ -284,5 +295,6 @@ func setCORSHeaders(header http.Header) {
 	header.Set("Access-Control-Allow-Origin", "*")
 	header.Set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS, PROPFIND, PROPPATCH, MKCOL, MOVE, COPY, LOCK, UNLOCK")
 	header.Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Depth, Overwrite, Destination, If, Lock-Token, Timeout, Range")
-	header.Set("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length, ETag")
+	header.Set("Access-Control-Expose-Headers", "Content-Range, Accept-Ranges, Content-Length, ETag, Content-Type")
+	header.Set("Access-Control-Max-Age", "86400")
 }
