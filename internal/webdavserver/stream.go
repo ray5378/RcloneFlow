@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -255,13 +256,11 @@ func (fs *streamFileSystem) statRemote(ctx context.Context, remotePath string) (
 		return nil, fmt.Errorf("解析文件信息失败: %w", err)
 	}
 
-	if len(entries) == 0 {
-		return &streamFileInfo{name: filepath.Base(remotePath), size: 0, isDir: false}, nil
-	}
-
-	// 找匹配的条目
+	// 查找 Path 精确匹配 remotePath 的条目（文件）
+	// 如果 rclone lsjson 返回的是目录内容，子条目的 Path 会是 "dir/child" 格式，
+	// 不会精确匹配 remotePath，此时应判定为目录
 	for _, e := range entries {
-		if e.Path == remotePath || e.Name == filepath.Base(remotePath) {
+		if e.Path == remotePath {
 			return &streamFileInfo{
 				name:  e.Name,
 				size:  e.Size,
@@ -270,12 +269,12 @@ func (fs *streamFileSystem) statRemote(ctx context.Context, remotePath string) (
 		}
 	}
 
-	// lsjson 对于单个文件也返回包含该文件信息的数组，取第一个
-	e := entries[0]
+	// 没有精确匹配的条目，说明 remotePath 是一个目录
+	// （rclone lsjson 对目录返回其子内容，对文件返回包含该文件自身信息的数组）
 	return &streamFileInfo{
-		name:  e.Name,
-		size:  e.Size,
-		isDir: e.IsDir,
+		name:  filepath.Base(remotePath),
+		size:  0,
+		isDir: true,
 	}, nil
 }
 
@@ -307,7 +306,14 @@ func (fs *streamFileSystem) fetchFile(ctx context.Context, remotePath string) (i
 	go func() {
 		defer pw.Close()
 
-		httpReq, _ := http.NewRequestWithContext(ctx, "GET", "http://"+httpPort+"/"+remotePath, nil)
+		// 对路径各段进行 URL 编码，但保留斜杠分隔符
+		parts := strings.Split(remotePath, "/")
+		for i, p := range parts {
+			parts[i] = url.PathEscape(p)
+		}
+		encodedPath := strings.Join(parts, "/")
+
+		httpReq, _ := http.NewRequestWithContext(ctx, "GET", "http://"+httpPort+"/"+encodedPath, nil)
 		client := &http.Client{Timeout: 30 * time.Minute}
 		httpResp, err := client.Do(httpReq)
 		if err != nil {
