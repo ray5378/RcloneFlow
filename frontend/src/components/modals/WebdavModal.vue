@@ -182,6 +182,7 @@ onMounted(loadStatus)
               type="text"
               :placeholder="t('webdav.cacheMaxSizePlaceholder')"
             />
+            <div class="field-hint">{{ t('webdav.cacheMaxSizeHint') }}</div>
           </div>
           <div class="field-item">
             <label>{{ t('webdav.cacheCleanupInterval') }}</label>
@@ -498,6 +499,13 @@ onMounted(loadStatus)
 
 .field-item input:disabled {
   opacity: 0.6;
+}
+
+.field-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .pw-input-wrap {
