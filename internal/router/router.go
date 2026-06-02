@@ -239,13 +239,20 @@ func staticFileHandler(staticDir string) http.Handler {
 func (r *Router) webdavProxy() http.Handler {
 	target, _ := url.Parse("http://127.0.0.1:17871")
 	proxy := httputil.NewSingleHostReverseProxy(target)
+
 	proxy.ModifyResponse = func(resp *http.Response) error {
 		setCORSHeaders(resp.Header)
 		return nil
 	}
 
+	proxy.ErrorHandler = func(w http.ResponseWriter, req *http.Request, err error) {
+		setCORSHeaders(w.Header())
+		w.WriteHeader(http.StatusBadGateway)
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if !r.webdavManager.IsRunning() {
+			setCORSHeaders(w.Header())
 			http.Error(w, "WebDAV service is not running", http.StatusServiceUnavailable)
 			return
 		}
@@ -258,8 +265,12 @@ func (r *Router) webdavProxy() http.Handler {
 
 		req.Host = target.Host
 		req.URL.Path = strings.TrimPrefix(req.URL.Path, "/dav")
+		req.URL.RawPath = strings.TrimPrefix(req.URL.RawPath, "/dav")
 		if !strings.HasPrefix(req.URL.Path, "/") {
 			req.URL.Path = "/"
+		}
+		if !strings.HasPrefix(req.URL.RawPath, "/") {
+			req.URL.RawPath = ""
 		}
 		proxy.ServeHTTP(w, req)
 	})

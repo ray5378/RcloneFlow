@@ -298,8 +298,13 @@ func (m *Manager) Start() error {
 		"--no-checksum",
 		"--vfs-cache-mode", "full",
 		"--vfs-cache-max-size", "1G",
+		"--vfs-cache-max-age", "30m",
 		"--buffer-size", "64M",
 		"--vfs-read-chunk-size", "64M",
+		"--vfs-read-chunk-size-limit", "1G",
+		"--vfs-read-wait", "5ms",
+		"--dir-cache-time", "60s",
+		"--poll-interval", "60s",
 	}
 
 	m.cmd = exec.CommandContext(ctx, "rclone", args...)
