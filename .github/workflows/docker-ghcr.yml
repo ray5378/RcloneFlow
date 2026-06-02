@@ -1,0 +1,112 @@
+name: Build and Push Docker Image (GHCR)
+
+on:
+  push:
+    branches:
+      - master
+      - dev
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.1'
+
+      - name: Preflight Go environment
+        run: |
+          echo "GITHUB_REF=${GITHUB_REF}"
+          echo "GITHUB_SHA=${GITHUB_SHA}"
+          go version
+          go env
+
+      - name: Preflight Go module download
+        run: go mod download -x
+
+      - name: Preflight Go build
+        run: |
+          set -euxo pipefail
+          go build -x -v -ldflags="-s -w" -o /tmp/rcloneflow-server ./cmd/server
+          ls -lh /tmp/rcloneflow-server
+
+      - name: Run Go tests
+        run: |
+          go test -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out | grep total
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | grep -oE '[0-9]+\.[0-9]+')
+          echo "Go coverage: ${COVERAGE}%"
+          if [ "$(echo "${COVERAGE} < 60.0" | awk '{print ($1 < 60.0)}')" = "1" ]; then
+            echo "Go coverage ${COVERAGE}% is below 60% threshold" >&2
+            exit 1
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci --legacy-peer-deps
+
+      - name: Run frontend tests with coverage
+        working-directory: ./frontend
+        run: |
+          npm run test -- --coverage 2>&1 | tee /tmp/frontend-test.log
+          COVERAGE=$(awk '/All files/ {gsub(/[[:space:]]*\|[[:space:]]*/, "|"); split($0, cols, "|"); print cols[5]}' /tmp/frontend-test.log | grep -oE '[0-9]+\.[0-9]+' || echo "0")
+          echo "Frontend lines coverage: ${COVERAGE}%"
+          if [ "$(echo "${COVERAGE} < 60.0" | awk '{print ($1 < 60.0)}')" = "1" ]; then
+            echo "Frontend coverage ${COVERAGE}% is below 60% threshold" >&2
+            exit 1
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/master' }}
+
+      - name: Extract short hash
+        id: hash
+        run: echo "short=$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push (AMD64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            GIT_HASH=${{ steps.hash.outputs.short }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
