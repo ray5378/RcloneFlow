@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { getWebdavStatus, startWebdav, stopWebdav } from '../../api/webdav'
+import { getWebdavStatus, startWebdav, stopWebdav, getCredentials, saveCredentials } from '../../api/webdav'
 import { t } from '../../i18n'
 
 const emit = defineEmits<{
@@ -11,21 +11,33 @@ const loading = ref(true)
 const running = ref(false)
 const enabled = ref(false)
 const statusError = ref('')
-const startError = ref('')
-const stopError = ref('')
+const actionError = ref('')
 const starting = ref(false)
 const stopping = ref(false)
 const davAddress = ref('')
+const credSaving = ref(false)
+
+const username = ref('')
+const password = ref('')
+const showPassword = ref(false)
+const showPwInRow = ref(false)
 
 async function loadStatus() {
   loading.value = true
   statusError.value = ''
   try {
-    const status = await getWebdavStatus()
+    const [status, cred] = await Promise.all([
+      getWebdavStatus(),
+      getCredentials()
+    ])
     running.value = status.running
     enabled.value = status.enabled
     const origin = window.location.origin
     davAddress.value = `${origin}${status.path}`
+    if (cred.ok) {
+      username.value = cred.username
+      password.value = cred.password
+    }
   } catch (e: any) {
     statusError.value = e.message || '获取状态失败'
   } finally {
@@ -33,17 +45,20 @@ async function loadStatus() {
   }
 }
 
-async function onStart() {
+async function saveAndStart() {
+  if (!username.value || !password.value) return
+  actionError.value = ''
+
   starting.value = true
-  startError.value = ''
   try {
+    await saveCredentials(username.value, password.value)
     await startWebdav()
     running.value = true
     enabled.value = true
     const origin = window.location.origin
     davAddress.value = `${origin}/dav/`
   } catch (e: any) {
-    startError.value = e.message || '开启失败'
+    actionError.value = e.message || '操作失败'
   } finally {
     starting.value = false
   }
@@ -51,13 +66,13 @@ async function onStart() {
 
 async function onStop() {
   stopping.value = true
-  stopError.value = ''
+  actionError.value = ''
   try {
     await stopWebdav()
     running.value = false
     enabled.value = false
   } catch (e: any) {
-    stopError.value = e.message || '关闭失败'
+    actionError.value = e.message || '关闭失败'
   } finally {
     stopping.value = false
   }
@@ -87,15 +102,46 @@ onMounted(loadStatus)
           <div class="note-hint">{{ t('webdav.addressNote') }}</div>
         </div>
 
-        <div v-if="startError" class="error">{{ startError }}</div>
-        <div v-if="stopError" class="error">{{ stopError }}</div>
+        <div class="cred-section">
+          <div class="cred-title">{{ t('webdav.credentials') }}</div>
+          <div class="field-item">
+            <label>{{ t('webdav.username') }}</label>
+            <input
+              v-model="username"
+              type="text"
+              :placeholder="t('webdav.usernamePlaceholder')"
+              :disabled="running"
+            />
+          </div>
+          <div class="field-item">
+            <label>{{ t('webdav.password') }}</label>
+            <div class="pw-input-wrap">
+              <input
+                v-model="password"
+                :type="showPassword ? 'text' : 'password'"
+                :placeholder="t('webdav.passwordPlaceholder')"
+                :disabled="running"
+              />
+              <button
+                class="toggle-pw-btn"
+                @click="showPassword = !showPassword"
+                :title="showPassword ? t('webdav.hide') : t('webdav.show')"
+              >
+                <span v-if="showPassword">🙈</span>
+                <span v-else>👁️</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="actionError" class="error">{{ actionError }}</div>
 
         <div class="webdav-actions">
           <button
             v-if="!running"
             class="primary start-btn"
-            @click="onStart"
-            :disabled="starting"
+            @click="saveAndStart"
+            :disabled="starting || !username || !password"
           >
             {{ starting ? t('webdav.starting') : t('webdav.start') }}
           </button>
@@ -268,6 +314,84 @@ onMounted(loadStatus)
   font-size: 12px;
   color: var(--muted);
   line-height: 1.5;
+}
+
+.cred-section {
+  margin-bottom: 16px;
+  padding: 14px;
+  background: var(--hover);
+  border-radius: 8px;
+}
+
+.cred-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+
+.field-item {
+  margin-bottom: 12px;
+}
+
+.field-item:last-child {
+  margin-bottom: 0;
+}
+
+.field-item label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.field-item input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.field-item input:focus {
+  outline: none;
+  border-color: #64b5f6;
+}
+
+.field-item input:disabled {
+  opacity: 0.6;
+}
+
+.pw-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.pw-input-wrap input {
+  flex: 1;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.toggle-pw-btn {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: none;
+  border-radius: 0 8px 8px 0;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  transition: background 0.2s;
+}
+
+.toggle-pw-btn:hover {
+  background: var(--hover);
 }
 
 .webdav-actions {

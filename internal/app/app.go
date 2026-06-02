@@ -297,13 +297,6 @@ func restoreWebDAV(services *appServices) {
 		return
 	}
 
-	users, err := services.db.ListUsers()
-	if err != nil || len(users) == 0 {
-		logger.Warn("WebDAV自动恢复失败: 没有用户")
-		return
-	}
-
-	username := users[0].Username
-	services.webdavManager.AutoRestore(username)
+	services.webdavManager.AutoRestore()
 }
 

@@ -25,10 +25,11 @@ import (
 )
 
 const (
-	combineRemoteName = "_webdav"
-	internalPort      = "127.0.0.1:17871"
-	settingsKey       = "WEBDAB_ENABLED"
-	encryptedPassKey  = "WEBDAB_ENCRYPTED_PASSWORD"
+	combineRemoteName    = "_webdav"
+	internalPort         = "127.0.0.1:17871"
+	settingsKey          = "WEBDAB_ENABLED"
+	encryptedUserKey     = "WEBDAB_ENCRYPTED_USERNAME"
+	encryptedPassKey     = "WEBDAB_ENCRYPTED_PASSWORD"
 )
 
 type Manager struct {
@@ -66,12 +67,7 @@ func deriveAESKey(jwtSecret []byte) []byte {
 	return h[:]
 }
 
-func deriveWebdavPassword(jwtSecret []byte) string {
-	h := sha256.Sum256(jwtSecret)
-	return hex.EncodeToString(h[:16])
-}
-
-func encryptPassword(password string, key []byte) (string, error) {
+func encryptText(plaintext string, key []byte) (string, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
@@ -84,11 +80,11 @@ func encryptPassword(password string, key []byte) (string, error) {
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return "", err
 	}
-	ciphertext := gcm.Seal(nonce, nonce, []byte(password), nil)
+	ciphertext := gcm.Seal(nonce, nonce, []byte(plaintext), nil)
 	return base64.StdEncoding.EncodeToString(ciphertext), nil
 }
 
-func decryptPassword(encrypted string, key []byte) (string, error) {
+func decryptText(encrypted string, key []byte) (string, error) {
 	data, err := base64.StdEncoding.DecodeString(encrypted)
 	if err != nil {
 		return "", err
@@ -206,12 +202,74 @@ func (m *Manager) createCombineRemoteInConfig(remotes []string) error {
 	return os.WriteFile(m.configFile, []byte(strings.Join(newLines, "\n")), 0644)
 }
 
-func (m *Manager) Start(username string) error {
+func (m *Manager) SetCredentials(username, password string) error {
+	jwtSecret, err := m.getJWTSecret()
+	if err != nil {
+		return err
+	}
+	aesKey := deriveAESKey(jwtSecret)
+
+	encUser, err := encryptText(username, aesKey)
+	if err != nil {
+		return fmt.Errorf("用户名加密失败: %w", err)
+	}
+	encPass, err := encryptText(password, aesKey)
+	if err != nil {
+		return fmt.Errorf("密码加密失败: %w", err)
+	}
+
+	if err := m.writeSettings(encryptedUserKey, encUser); err != nil {
+		return fmt.Errorf("保存用户名失败: %w", err)
+	}
+	if err := m.writeSettings(encryptedPassKey, encPass); err != nil {
+		return fmt.Errorf("保存密码失败: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Manager) GetCredentials() (username, password string, err error) {
+	settings := m.readSettings()
+	encUser := settings[encryptedUserKey]
+	encPass := settings[encryptedPassKey]
+	if encUser == "" || encPass == "" {
+		return "", "", fmt.Errorf("未设置WebDAV用户名密码")
+	}
+
+	jwtSecret, err := m.getJWTSecret()
+	if err != nil {
+		return "", "", err
+	}
+	aesKey := deriveAESKey(jwtSecret)
+
+	username, err = decryptText(encUser, aesKey)
+	if err != nil {
+		return "", "", fmt.Errorf("用户名解密失败: %w", err)
+	}
+	password, err = decryptText(encPass, aesKey)
+	if err != nil {
+		return "", "", fmt.Errorf("密码解密失败: %w", err)
+	}
+
+	return username, password, nil
+}
+
+func (m *Manager) HasCredentials() bool {
+	settings := m.readSettings()
+	return settings[encryptedUserKey] != "" && settings[encryptedPassKey] != ""
+}
+
+func (m *Manager) Start() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
 	if m.running {
 		return fmt.Errorf("WebDAV服务已在运行中")
+	}
+
+	username, password, err := m.GetCredentials()
+	if err != nil {
+		return err
 	}
 
 	remotes, err := m.listRemotesFromConfig()
@@ -223,22 +281,6 @@ func (m *Manager) Start(username string) error {
 		return err
 	}
 
-	jwtSecret, err := m.getJWTSecret()
-	if err != nil {
-		return err
-	}
-	aesKey := deriveAESKey(jwtSecret)
-
-	password := deriveWebdavPassword(jwtSecret)
-
-	encryptedPass, err := encryptPassword(password, aesKey)
-	if err != nil {
-		return fmt.Errorf("密码加密失败: %w", err)
-	}
-
-	if err := m.writeSettings(encryptedPassKey, encryptedPass); err != nil {
-		return fmt.Errorf("保存密码失败: %w", err)
-	}
 	if err := m.writeSettings(settingsKey, "true"); err != nil {
 		return fmt.Errorf("保存状态失败: %w", err)
 	}
@@ -329,54 +371,17 @@ func (m *Manager) IsRunning() bool {
 	return m.running
 }
 
-func (m *Manager) GetEncryptedPassword() string {
-	settings := m.readSettings()
-	return settings[encryptedPassKey]
-}
-
-func (m *Manager) GetDecryptedPassword() (string, error) {
-	encrypted := m.GetEncryptedPassword()
-	if encrypted == "" {
-		return "", fmt.Errorf("未找到加密密码")
-	}
-	jwtSecret, err := m.getJWTSecret()
-	if err != nil {
-		return "", err
-	}
-	aesKey := deriveAESKey(jwtSecret)
-	return decryptPassword(encrypted, aesKey)
-}
-
 func (m *Manager) IsEnabled() bool {
 	settings := m.readSettings()
 	return settings[settingsKey] == "true"
 }
 
-func (m *Manager) GetPassword() (string, error) {
-	pass := m.GetEncryptedPassword()
-	if pass != "" {
-		return m.GetDecryptedPassword()
-	}
-	jwtSecret, err := m.getJWTSecret()
-	if err != nil {
-		return "", err
-	}
-	return deriveWebdavPassword(jwtSecret), nil
-}
-
-func (m *Manager) AutoRestore(username string) {
+func (m *Manager) AutoRestore() {
 	if !m.IsEnabled() {
 		return
 	}
 
-	_, err := m.GetPassword()
-	if err != nil {
-		logger.Error("WebDAV自动恢复失败: 密码获取错误", zap.Error(err))
-		m.writeSettings(settingsKey, "false")
-		return
-	}
-
-	if err := m.Start(username); err != nil {
+	if err := m.Start(); err != nil {
 		logger.Error("WebDAV自动恢复失败", zap.Error(err))
 		m.writeSettings(settingsKey, "false")
 		return
