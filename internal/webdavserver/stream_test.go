@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -319,6 +320,201 @@ func TestErrorFSPropfindXMLIntegrity(t *testing.T) {
 	// 验证 Content-Length 匹配
 	if resp.ContentLength > 0 && resp.ContentLength != int64(len(bodyBytes)) {
 		t.Errorf("Content-Length mismatch: header=%d, body=%d", resp.ContentLength, len(bodyBytes))
+	}
+}
+
+// TestPropfindWithMixedFilenames 测试多级路径下中英文数字混合文件名都能正确显示
+func TestPropfindWithMixedFilenames(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Root level: mix of Chinese, English, number-starting files and dirs
+	os.WriteFile(tmpDir+"/photo.jpg", []byte("photo"), 0644)
+	os.WriteFile(tmpDir+"/123data.txt", []byte("numbers"), 0644)
+	os.WriteFile(tmpDir+"/abcFile.txt", []byte("abc"), 0644)
+
+	// Subdirectory with Chinese name
+	os.Mkdir(tmpDir+"/视频", 0755)
+	os.WriteFile(tmpDir+"/视频/电影.mp4", []byte("movie"), 0644)
+	os.WriteFile(tmpDir+"/视频/音乐.mp3", []byte("music"), 0644)
+
+	// Subdirectory with English name  
+	os.Mkdir(tmpDir+"/videos", 0755)
+	os.WriteFile(tmpDir+"/videos/sample.mp4", []byte("sample"), 0644)
+
+	// Subdirectory with number-starting name
+	os.Mkdir(tmpDir+"/2024photos", 0755)
+	os.WriteFile(tmpDir+"/2024photos/IMG_001.jpg", []byte("img"), 0644)
+
+	handler := &webdav.Handler{
+		FileSystem: webdav.Dir(tmpDir),
+		LockSystem: webdav.NewMemLS(),
+	}
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+
+	// Test 1: Root PROPFIND - verify all entries show up
+	req, _ := http.NewRequest("PROPFIND", server.URL+"/", nil)
+	req.Header.Set("Depth", "1")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyBytes, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	bodyStr := string(bodyBytes)
+
+	t.Logf("Root PROPFIND Status: %d", resp.StatusCode)
+	t.Logf("Root PROPFIND Body:\n%s", bodyStr)
+
+	// Verify XML integrity
+	trimmed := strings.TrimSpace(bodyStr)
+	if !strings.HasSuffix(trimmed, "</D:multistatus>") {
+		t.Errorf("Root: XML does not end with </D:multistatus>")
+	}
+
+	// Verify all expected entries appear in the response
+	expectedEntries := []string{"photo.jpg", "123data.txt", "abcFile.txt", "视频", "videos", "2024photos"}
+	for _, name := range expectedEntries {
+		if !strings.Contains(bodyStr, ">"+name+"<") {
+			t.Errorf("Root: missing expected entry %q in PROPFIND response", name)
+		}
+	}
+
+	// Test 2: Chinese subdirectory PROPFIND
+	req, _ = http.NewRequest("PROPFIND", server.URL+"/视频/", nil)
+	req.Header.Set("Depth", "1")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	bodyStr = string(bodyBytes)
+
+	t.Logf("Chinese dir PROPFIND Status: %d", resp.StatusCode)
+	t.Logf("Chinese dir PROPFIND Body:\n%s", bodyStr)
+
+	trimmed = strings.TrimSpace(bodyStr)
+	if !strings.HasSuffix(trimmed, "</D:multistatus>") {
+		t.Errorf("Chinese dir: XML does not end with </D:multistatus>")
+	}
+
+	expectedChinese := []string{"电影.mp4", "音乐.mp3"}
+	for _, name := range expectedChinese {
+		if !strings.Contains(bodyStr, ">"+name+"<") {
+			t.Errorf("Chinese dir: missing expected entry %q in PROPFIND response", name)
+		}
+	}
+
+	// Test 3: English subdirectory PROPFIND
+	req, _ = http.NewRequest("PROPFIND", server.URL+"/videos/", nil)
+	req.Header.Set("Depth", "1")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	bodyStr = string(bodyBytes)
+
+	if !strings.Contains(bodyStr, ">sample.mp4<") {
+		t.Errorf("English dir: missing sample.mp4")
+	}
+
+	// Test 4: Number-starting directory PROPFIND
+	req, _ = http.NewRequest("PROPFIND", server.URL+"/2024photos/", nil)
+	req.Header.Set("Depth", "1")
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+	bodyStr = string(bodyBytes)
+
+	if !strings.Contains(bodyStr, ">IMG_001.jpg<") {
+		t.Errorf("Number dir: missing IMG_001.jpg")
+	}
+
+	// Test 5: GET request for a file inside Chinese directory
+	req, _ = http.NewRequest("GET", server.URL+"/视频/电影.mp4", nil)
+	resp, err = http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	bodyBytes, _ = io.ReadAll(resp.Body)
+	resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Errorf("GET Chinese file: expected 200, got %d", resp.StatusCode)
+	}
+	if string(bodyBytes) != "movie" {
+		t.Errorf("GET Chinese file: expected 'movie', got %q", string(bodyBytes))
+	}
+}
+
+// TestCleanPath 测试 cleanPath 对不同路径的处理
+func TestCleanPath(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"/", ""},
+		{"/视频", "视频"},
+		{"/视频/电影.mp4", "视频/电影.mp4"},
+		{"//视频//", "视频"},
+		{"视频", "视频"},
+		{"视频/电影.mp4", "视频/电影.mp4"},
+		{"/abc123", "abc123"},
+		{"/123abc", "123abc"},
+		{"/a/b/c", "a/b/c"},
+		{"", ""},
+		{".", ""},
+	}
+
+	for _, tt := range tests {
+		result := cleanPath(tt.input)
+		if result != tt.expected {
+			t.Errorf("cleanPath(%q) = %q, want %q", tt.input, result, tt.expected)
+		}
+	}
+}
+
+// TestStatRemotePathParsing 测试 statRemote 的父目录/文件名解析逻辑
+func TestStatRemotePathParsing(t *testing.T) {
+	// 模拟 statRemote 中的路径解析逻辑
+	parsePath := func(remotePath string) (parent, name string) {
+		parent = filepath.Dir(remotePath)
+		name = filepath.Base(remotePath)
+		if parent == "." {
+			parent = ""
+		}
+		return
+	}
+
+	tests := []struct {
+		remotePath     string
+		expectedParent string
+		expectedName   string
+	}{
+		{"disk1", "", "disk1"},
+		{"disk1/视频", "disk1", "视频"},
+		{"disk1/视频/电影.mp4", "disk1/视频", "电影.mp4"},
+		{"photo.jpg", "", "photo.jpg"},
+		{"123data.txt", "", "123data.txt"},
+		{"abcFile.txt", "", "abcFile.txt"},
+		{"视频/电影.mp4", "视频", "电影.mp4"},
+		{"videos/sample.mp4", "videos", "sample.mp4"},
+		{"2024photos/IMG_001.jpg", "2024photos", "IMG_001.jpg"},
+	}
+
+	for _, tt := range tests {
+		parent, name := parsePath(tt.remotePath)
+		if parent != tt.expectedParent || name != tt.expectedName {
+			t.Errorf("parsePath(%q) = (%q, %q), want (%q, %q)",
+				tt.remotePath, parent, name, tt.expectedParent, tt.expectedName)
+		}
 	}
 }
 
