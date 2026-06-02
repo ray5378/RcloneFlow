@@ -112,33 +112,27 @@ func (c *WebdavController) HandleStop(w http.ResponseWriter, r *http.Request) {
 func (c *WebdavController) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	running := c.manager.IsRunning()
 	enabled := c.manager.IsEnabled()
-	cacheMode, cacheStorage, cacheMaxSize, cacheCleanupInterval := c.manager.GetCacheConfig()
+	maxSize, cleanupInterval := c.manager.GetCacheSettings()
 
 	WriteJSON(w, http.StatusOK, map[string]any{
 		"running":                running,
 		"enabled":                enabled,
 		"port":                   17870,
 		"path":                   "/dav/",
-		"cache_mode":             cacheMode,
-		"cache_storage":          cacheStorage,
-		"cache_max_size":         cacheMaxSize,
-		"cache_cleanup_interval": cacheCleanupInterval,
+		"cache_max_size":         maxSize,
+		"cache_cleanup_interval": cleanupInterval,
 	})
 }
 
 type cacheSettingsRequest struct {
-	CacheMode            string `json:"cache_mode"`
-	CacheStorage         string `json:"cache_storage"`
 	CacheMaxSize         string `json:"cache_max_size"`
 	CacheCleanupInterval string `json:"cache_cleanup_interval"`
 }
 
 func (c *WebdavController) HandleCacheSettings(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		cacheMode, cacheStorage, maxSize, cleanupInterval := c.manager.GetCacheConfig()
+		maxSize, cleanupInterval := c.manager.GetCacheSettings()
 		WriteJSON(w, http.StatusOK, map[string]any{
-			"cache_mode":             cacheMode,
-			"cache_storage":          cacheStorage,
 			"cache_max_size":         maxSize,
 			"cache_cleanup_interval": cleanupInterval,
 		})
@@ -154,30 +148,6 @@ func (c *WebdavController) HandleCacheSettings(w http.ResponseWriter, r *http.Re
 		}
 
 		needsRestart := false
-
-		if req.CacheMode != "" {
-			oldMode, _, _, _ := c.manager.GetCacheConfig()
-			if req.CacheMode != oldMode {
-				if err := c.manager.SetCacheMode(req.CacheMode); err != nil {
-					logger.Error("保存缓存模式失败", zap.Error(err))
-					WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-					return
-				}
-				needsRestart = true
-			}
-		}
-
-		if req.CacheStorage != "" {
-			_, oldStorage, _, _ := c.manager.GetCacheConfig()
-			if req.CacheStorage != oldStorage {
-				if err := c.manager.SetCacheStorage(req.CacheStorage); err != nil {
-					logger.Error("保存缓存存储位置失败", zap.Error(err))
-					WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-					return
-				}
-				needsRestart = true
-			}
-		}
 
 		if req.CacheMaxSize != "" {
 			if err := c.manager.SetCacheMaxSize(req.CacheMaxSize); err != nil {

@@ -5,8 +5,6 @@ export type WebdavStatus = {
   enabled: boolean
   port: number
   path: string
-  cache_mode: string
-  cache_storage: string
   cache_max_size: string
   cache_cleanup_interval: string
 }
@@ -78,7 +76,7 @@ export async function stopWebdav(): Promise<{ ok: boolean; message: string }> {
   return res.json()
 }
 
-export async function getCacheSettings(): Promise<{ cache_mode: string; cache_storage: string; cache_max_size: string; cache_cleanup_interval: string }> {
+export async function getCacheSettings(): Promise<{ cache_max_size: string; cache_cleanup_interval: string }> {
   const res = await fetch('/api/webdav/cache/settings', {
     headers: { 'Authorization': `Bearer ${getToken()}` }
   })
@@ -86,14 +84,14 @@ export async function getCacheSettings(): Promise<{ cache_mode: string; cache_st
   return res.json()
 }
 
-export async function saveCacheSettings(cacheMode: string, cacheStorage: string, cacheMaxSize: string, cacheCleanupInterval: string): Promise<{ ok: boolean; message: string }> {
+export async function saveCacheSettings(cacheMaxSize: string, cacheCleanupInterval: string): Promise<{ ok: boolean; message: string }> {
   const res = await fetch('/api/webdav/cache/settings', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${getToken()}`
     },
-    body: JSON.stringify({ cache_mode: cacheMode, cache_storage: cacheStorage, cache_max_size: cacheMaxSize, cache_cleanup_interval: cacheCleanupInterval })
+    body: JSON.stringify({ cache_max_size: cacheMaxSize, cache_cleanup_interval: cacheCleanupInterval })
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))

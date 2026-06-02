@@ -55,8 +55,6 @@ func defaultsMap() map[string]string {
 		"WEBHOOK_SECRET":                 "",
 		"WEBDAV_CACHE_MAX_SIZE":          "1G",
 		"WEBDAV_CACHE_CLEANUP_INTERVAL":  "24h",
-		"WEBDAV_CACHE_MODE":              "full",
-		"WEBDAV_CACHE_STORAGE":           "disk",
 	}
 }
 
@@ -142,8 +140,6 @@ func (s *SettingsController) handleGet(w http.ResponseWriter, r *http.Request) {
 			"FINISH_WAIT_TIMEOUT":           {"effective": eff("FINISH_WAIT_TIMEOUT"), "default": defs["FINISH_WAIT_TIMEOUT"]},
 			"WEBDAV_CACHE_MAX_SIZE":         {"effective": eff("WEBDAV_CACHE_MAX_SIZE"), "default": defs["WEBDAV_CACHE_MAX_SIZE"]},
 			"WEBDAV_CACHE_CLEANUP_INTERVAL": {"effective": eff("WEBDAV_CACHE_CLEANUP_INTERVAL"), "default": defs["WEBDAV_CACHE_CLEANUP_INTERVAL"]},
-			"WEBDAV_CACHE_MODE":             {"effective": eff("WEBDAV_CACHE_MODE"), "default": defs["WEBDAV_CACHE_MODE"]},
-			"WEBDAV_CACHE_STORAGE":          {"effective": eff("WEBDAV_CACHE_STORAGE"), "default": defs["WEBDAV_CACHE_STORAGE"]},
 		},
 		Webhook: map[string]map[string]string{
 			"WEBHOOK_MAX_FILES":          {"effective": eff("WEBHOOK_MAX_FILES"), "default": defs["WEBHOOK_MAX_FILES"]},

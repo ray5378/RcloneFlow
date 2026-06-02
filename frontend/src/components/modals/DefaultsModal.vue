@@ -168,16 +168,6 @@ onUnmounted(() => {
         <div class="section">
           <div class="section-title">{{ t('defaults.webdavCache') }}</div>
           <div class="grid">
-            <label :title="t('defaults.webdavCacheModeTitle')">{{ t('defaults.webdavCacheMode') }}</label>
-            <select v-model="form.WEBDAV_CACHE_MODE" class="form-select">
-              <option value="full">full</option>
-              <option value="off">off</option>
-            </select>
-            <label :title="t('defaults.webdavCacheStorageTitle')">{{ t('defaults.webdavCacheStorage') }}</label>
-            <select v-model="form.WEBDAV_CACHE_STORAGE" class="form-select">
-              <option value="disk">disk</option>
-              <option value="memory">memory</option>
-            </select>
             <label :title="t('defaults.webdavCacheMaxSizeTitle')">{{ t('defaults.webdavCacheMaxSize') }}</label>
             <input v-model="form.WEBDAV_CACHE_MAX_SIZE" :placeholder="t('defaults.webdavCacheMaxSizePlaceholder')" />
             <label :title="t('defaults.webdavCacheCleanupIntervalTitle')">{{ t('defaults.webdavCacheCleanupInterval') }}</label>
