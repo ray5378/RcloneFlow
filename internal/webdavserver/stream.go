@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -356,6 +357,14 @@ func (fi *streamFileInfo) ModTime() time.Time { return time.Now() }
 func (fi *streamFileInfo) IsDir() bool        { return fi.isDir }
 func (fi *streamFileInfo) Sys() any           { return nil }
 
+func (fi *streamFileInfo) ContentType(ctx context.Context) (string, error) {
+	ctype := mime.TypeByExtension(filepath.Ext(fi.name))
+	if ctype != "" {
+		return ctype, nil
+	}
+	return "application/octet-stream", nil
+}
+
 // streamFile 实现 webdav.File（文件）
 type streamFile struct {
 	fs     *streamFileSystem
@@ -383,8 +392,19 @@ func (f *streamFile) Read(p []byte) (int, error) {
 }
 
 func (f *streamFile) Seek(offset int64, whence int) (int64, error) {
-	// Seek 不被 webdav.Handler 直接调用，它用于 Range 请求时会重新 OpenFile
-	return 0, fmt.Errorf("not supported")
+	// 关闭当前 reader，下一次 Read 会重新从远程 fetch
+	if f.reader != nil {
+		f.reader.Close()
+		f.reader = nil
+	}
+	return 0, nil
+}
+
+func (f *streamFile) ReadSeekReset() {
+	if f.reader != nil {
+		f.reader.Close()
+		f.reader = nil
+	}
 }
 
 func (f *streamFile) Write(p []byte) (int, error) {
