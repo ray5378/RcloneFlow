@@ -1,6 +1,7 @@
 package webdavserver
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -24,7 +25,47 @@ import (
 const (
 	httpPort   = "127.0.0.1:17872" // rclone serve http
 	streamPort = "127.0.0.1:17873" // Go webdav handler
+	dirCacheTTL = 60 * time.Second
 )
+
+type dirCacheEntry struct {
+	entries   []lsjsonEntry
+	expiresAt time.Time
+}
+
+type dirCache struct {
+	mu      sync.RWMutex
+	entries map[string]*dirCacheEntry
+}
+
+func newDirCache() *dirCache {
+	return &dirCache{entries: make(map[string]*dirCacheEntry)}
+}
+
+func (c *dirCache) get(key string) ([]lsjsonEntry, bool) {
+	c.mu.RLock()
+	e, ok := c.entries[key]
+	c.mu.RUnlock()
+	if !ok {
+		return nil, false
+	}
+	if time.Now().After(e.expiresAt) {
+		c.mu.Lock()
+		delete(c.entries, key)
+		c.mu.Unlock()
+		return nil, false
+	}
+	return e.entries, true
+}
+
+func (c *dirCache) set(key string, entries []lsjsonEntry) {
+	c.mu.Lock()
+	c.entries[key] = &dirCacheEntry{
+		entries:   entries,
+		expiresAt: time.Now().Add(dirCacheTTL),
+	}
+	c.mu.Unlock()
+}
 
 type StreamServer struct {
 	mu         sync.Mutex
@@ -78,9 +119,33 @@ func (s *StreamServer) Start() error {
 	}
 
 	// 2. 启动 Go 原生 WebDAV 服务（包装 rclone HTTP）
+	rcAddr := os.Getenv("RCLONE_RC_URL")
+	if rcAddr == "" {
+		rcAddr = "http://127.0.0.1:5572"
+	}
+	rcUser := os.Getenv("RCLONE_RC_USER")
+	rcPass := os.Getenv("RCLONE_RC_PASS")
+	if rcUser == "" || rcPass == "" {
+		credFile := filepath.Join(s.dataDir, ".rclone_rc_creds")
+		if b, err := os.ReadFile(credFile); err == nil {
+			parts := strings.SplitN(strings.TrimSpace(string(b)), ":", 2)
+			if len(parts) == 2 {
+				if rcUser == "" {
+					rcUser = parts[0]
+				}
+				if rcPass == "" {
+					rcPass = parts[1]
+				}
+			}
+		}
+	}
 	fs := &streamFileSystem{
 		dataDir:    s.dataDir,
 		configFile: s.configFile,
+		rcAddr:     rcAddr,
+		rcUser:     rcUser,
+		rcPass:     rcPass,
+		cache:      newDirCache(),
 	}
 	wHandler := &webdav.Handler{
 		FileSystem: fs,
@@ -181,6 +246,10 @@ func (s *StreamServer) IsRunning() bool {
 type streamFileSystem struct {
 	dataDir    string
 	configFile string
+	rcAddr     string
+	rcUser     string
+	rcPass     string
+	cache      *dirCache
 }
 
 func (fs *streamFileSystem) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
@@ -241,6 +310,51 @@ type lsjsonEntry struct {
 	ModTime string `json:"ModTime"`
 }
 
+func (fs *streamFileSystem) listViaRC(ctx context.Context, remotePath string) ([]lsjsonEntry, error) {
+	cacheKey := remotePath
+	if cached, ok := fs.cache.get(cacheKey); ok {
+		return cached, nil
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"fs":     combineRemoteName + ":" + remotePath,
+		"remote": "",
+		"opt": map[string]any{
+			"noModTime": true,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", fs.rcAddr+"/operations/list", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(fs.rcUser, fs.rcPass)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, fmt.Errorf("RC API returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		List []lsjsonEntry `json:"list"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+
+	fs.cache.set(cacheKey, result.List)
+	return result.List, nil
+}
+
 func (fs *streamFileSystem) statRemote(ctx context.Context, remotePath string) (os.FileInfo, error) {
 	// rclone lsjson 返回的 Path 是相对于查询目录的路径
 	// 例如 rclone lsjson _webdav:dir/subdir 返回 [{Path: "file.mp4", ...}]
@@ -253,22 +367,9 @@ func (fs *streamFileSystem) statRemote(ctx context.Context, remotePath string) (
 		parent = ""
 	}
 
-	rclonePath := combineRemoteName + ":" + parent
-
-	execCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(execCtx, "rclone", "lsjson", rclonePath, "--config", fs.configFile, "--no-modtime")
-	cmd.Stderr = os.Stderr
-	out, err := cmd.Output()
+	entries, err := fs.listViaRC(ctx, parent)
 	if err != nil {
-		// 所有错误都返回 os.ErrNotExist，让 webdav 库优雅处理显示404
 		return nil, os.ErrNotExist
-	}
-
-	var entries []lsjsonEntry
-	if err := json.Unmarshal(out, &entries); err != nil {
-		return nil, fmt.Errorf("解析文件信息失败: %w", err)
 	}
 
 	// 在父目录列表中按 Name 精确匹配
@@ -286,24 +387,7 @@ func (fs *streamFileSystem) statRemote(ctx context.Context, remotePath string) (
 }
 
 func (fs *streamFileSystem) listRemote(ctx context.Context, remotePath string) ([]lsjsonEntry, error) {
-	rclonePath := combineRemoteName + ":" + remotePath
-
-	execCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(execCtx, "rclone", "lsjson", rclonePath, "--config", fs.configFile, "--no-modtime")
-	cmd.Stderr = os.Stderr
-	out, err := cmd.Output()
-	if err != nil {
-		// 返回空列表，让 webdav 库优雅处理（目录显示为空）
-		return nil, nil
-	}
-
-	var entries []lsjsonEntry
-	if err := json.Unmarshal(out, &entries); err != nil {
-		return nil, fmt.Errorf("解析目录列表失败: %w", err)
-	}
-	return entries, nil
+	return fs.listViaRC(ctx, remotePath)
 }
 
 // 通过 rclone serve http 透传文件内容
