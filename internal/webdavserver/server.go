@@ -2,6 +2,7 @@ package webdavserver
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -56,6 +57,24 @@ func NewManager(dataDir string) *Manager {
 		configFile:   filepath.Join(dataDir, "rclone.conf"),
 		streamServer: NewStreamServer(dataDir, filepath.Join(dataDir, "rclone.conf")),
 	}
+}
+
+func (m *Manager) getWebdavEncKey() ([]byte, error) {
+	keyFile := filepath.Join(m.dataDir, ".webdav_enc_key")
+	if b, err := os.ReadFile(keyFile); err == nil {
+		key := make([]byte, hex.DecodedLen(len(bytes.TrimSpace(b))))
+		if _, err := hex.Decode(key, bytes.TrimSpace(b)); err == nil && len(key) == 32 {
+			return key, nil
+		}
+	}
+	key := make([]byte, 32)
+	if _, err := rand.Read(key); err != nil {
+		return nil, fmt.Errorf("生成WebDAV加密密钥失败: %w", err)
+	}
+	if err := os.WriteFile(keyFile, []byte(hex.EncodeToString(key)), 0600); err != nil {
+		return nil, fmt.Errorf("保存WebDAV加密密钥失败: %w", err)
+	}
+	return key, nil
 }
 
 func (m *Manager) getJWTSecret() ([]byte, error) {
@@ -144,7 +163,10 @@ func (m *Manager) writeSettings(key, value string) error {
 	}
 	settings[key] = value
 	data, _ := json.MarshalIndent(settings, "", "  ")
-	return os.WriteFile(fp, data, 0644)
+	if err := os.WriteFile(fp, data, 0600); err != nil {
+		return err
+	}
+	return os.Chmod(fp, 0600)
 }
 
 func (m *Manager) listRemotesFromConfig() ([]string, error) {
@@ -213,11 +235,10 @@ func (m *Manager) createCombineRemoteInConfig(remotes []string) error {
 }
 
 func (m *Manager) SetCredentials(username, password string) error {
-	jwtSecret, err := m.getJWTSecret()
+	aesKey, err := m.getWebdavEncKey()
 	if err != nil {
 		return err
 	}
-	aesKey := deriveAESKey(jwtSecret)
 
 	encUser, err := encryptText(username, aesKey)
 	if err != nil {
@@ -246,19 +267,39 @@ func (m *Manager) GetCredentials() (username, password string, err error) {
 		return "", "", fmt.Errorf("未设置WebDAV用户名密码")
 	}
 
-	jwtSecret, err := m.getJWTSecret()
-	if err != nil {
-		return "", "", err
+	// 优先使用独立加密密钥
+	aesKey, keyErr := m.getWebdavEncKey()
+	if keyErr == nil {
+		username, err = decryptText(encUser, aesKey)
+		password, err2 := decryptText(encPass, aesKey)
+		if err == nil && err2 == nil {
+			return username, password, nil
+		}
 	}
-	aesKey := deriveAESKey(jwtSecret)
 
-	username, err = decryptText(encUser, aesKey)
+	// 回退：兼容旧版 JWT 派生密钥
+	jwtSecret, jErr := m.getJWTSecret()
+	if jErr != nil {
+		return "", "", fmt.Errorf("解密失败（新密钥和旧JWT密钥均无效）")
+	}
+	oldKey := deriveAESKey(jwtSecret)
+	username, err = decryptText(encUser, oldKey)
 	if err != nil {
 		return "", "", fmt.Errorf("用户名解密失败: %w", err)
 	}
-	password, err = decryptText(encPass, aesKey)
+	password, err = decryptText(encPass, oldKey)
 	if err != nil {
 		return "", "", fmt.Errorf("密码解密失败: %w", err)
+	}
+
+	// 迁移：用新密钥重新加密保存
+	if keyErr == nil {
+		encUserNew, _ := encryptText(username, aesKey)
+		encPassNew, _ := encryptText(password, aesKey)
+		if encUserNew != "" && encPassNew != "" {
+			_ = m.writeSettings(encryptedUserKey, encUserNew)
+			_ = m.writeSettings(encryptedPassKey, encPassNew)
+		}
 	}
 
 	return username, password, nil
@@ -342,7 +383,7 @@ func (m *Manager) Start() error {
 	logger.Info("WebDAV服务已启动", zap.String("addr", internalPort), zap.String("cache_dir", cacheDir), zap.String("cache_max_size", cacheMaxSize))
 
 	// 启动直连 WebDAV（只读，用于流媒体播放）
-	if err := m.streamServer.Start(); err != nil {
+	if err := m.streamServer.Start(username, password); err != nil {
 		logger.Warn("直连 WebDAV 启动失败，直连模式将不可用", zap.Error(err))
 	}
 

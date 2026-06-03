@@ -74,6 +74,8 @@ type StreamServer struct {
 	running    bool
 	dataDir    string
 	configFile string
+	httpUser   string
+	httpPass   string
 
 	webdavSrv *http.Server
 }
@@ -85,13 +87,16 @@ func NewStreamServer(dataDir, configFile string) *StreamServer {
 	}
 }
 
-func (s *StreamServer) Start() error {
+func (s *StreamServer) Start(username, password string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.running {
 		return fmt.Errorf("直连 WebDAV 服务已在运行中")
 	}
+
+	s.httpUser = username
+	s.httpPass = password
 
 	// 1. 启动 rclone serve http（不走 VFS，直接透传 Range 请求）
 	ctx, cancel := context.WithCancel(context.Background())
@@ -102,6 +107,8 @@ func (s *StreamServer) Start() error {
 		combineRemoteName + ":",
 		"--addr", httpPort,
 		"--config", s.configFile,
+		"--user", username,
+		"--pass", password,
 		"--no-checksum",
 	}
 
@@ -145,15 +152,25 @@ func (s *StreamServer) Start() error {
 		rcAddr:     rcAddr,
 		rcUser:     rcUser,
 		rcPass:     rcPass,
+		httpUser:   username,
+		httpPass:   password,
 		cache:      newDirCache(),
 	}
 	wHandler := &webdav.Handler{
 		FileSystem: fs,
 		LockSystem: webdav.NewMemLS(),
 	}
-	// Wrap to add CORS headers
+	// Wrap to add CORS headers + Basic Auth
 	httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		setStreamCORSHeaders(w.Header())
+
+		// Basic Auth
+		if _, pwd, ok := r.BasicAuth(); !ok || pwd != password || !checkHTTPUser(r, username) {
+			w.Header().Set("WWW-Authenticate", `Basic realm="WebDAV"`)
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
 		if r.Method == "OPTIONS" {
 			w.Header().Set("DAV", "1")
 			w.Header().Set("Allow", "OPTIONS, GET, HEAD, PROPFIND")
@@ -233,7 +250,7 @@ func (s *StreamServer) Restart() error {
 	if s.IsRunning() {
 		_ = s.Stop()
 	}
-	return s.Start()
+	return s.Start(s.httpUser, s.httpPass)
 }
 
 func (s *StreamServer) IsRunning() bool {
@@ -249,6 +266,8 @@ type streamFileSystem struct {
 	rcAddr     string
 	rcUser     string
 	rcPass     string
+	httpUser   string
+	httpPass   string
 	cache      *dirCache
 }
 
@@ -405,6 +424,9 @@ func (fs *streamFileSystem) fetchFile(ctx context.Context, remotePath string, of
 		encodedPath := strings.Join(parts, "/")
 
 		httpReq, _ := http.NewRequestWithContext(ctx, "GET", "http://"+httpPort+"/"+encodedPath, nil)
+		if fs.httpUser != "" {
+			httpReq.SetBasicAuth(fs.httpUser, fs.httpPass)
+		}
 		if offset > 0 {
 			httpReq.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
 		}
@@ -648,6 +670,11 @@ func cleanPath(name string) string {
 	name = filepath.Clean("/" + strings.TrimPrefix(name, "/"))
 	name = strings.TrimLeft(name, "/")
 	return name
+}
+
+func checkHTTPUser(r *http.Request, expectedUser string) bool {
+	user, _, ok := r.BasicAuth()
+	return ok && user == expectedUser
 }
 
 func setStreamCORSHeaders(header http.Header) {
