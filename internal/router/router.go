@@ -254,12 +254,6 @@ func (r *Router) webdavProxy() http.Handler {
 			return
 		}
 
-		if req.Method == "OPTIONS" {
-			setCORSHeaders(w.Header())
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
 		if req.Method == "PROPFIND" && req.Header.Get("Depth") == "infinity" {
 			req.Header.Set("Depth", "1")
 		}

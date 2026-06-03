@@ -63,6 +63,8 @@ func (s *StreamServer) Start() error {
 		"--no-checksum",
 	}
 
+	exec.Command("sh", "-c", "fuser -k "+httpPort+"/tcp 2>/dev/null || true").Run()
+
 	s.cmd = exec.CommandContext(ctx, "rclone", args...)
 	s.cmd.Stdout = os.Stdout
 	s.cmd.Stderr = os.Stderr

@@ -325,6 +325,8 @@ func (m *Manager) Start() error {
 		"--poll-interval", "60s",
 	}
 
+	m.ensurePortFree(internalPort)
+
 	m.cmd = exec.CommandContext(ctx, "rclone", args...)
 	m.cmd.Stdout = os.Stdout
 	m.cmd.Stderr = os.Stderr
@@ -429,6 +431,11 @@ func (m *Manager) stopProcess() {
 	m.running = false
 	m.cmd = nil
 	m.cancel = nil
+}
+
+func (m *Manager) ensurePortFree(port string) {
+	cmd := exec.Command("sh", "-c", "fuser -k "+port+"/tcp 2>/dev/null || true")
+	_ = cmd.Run()
 }
 
 func (m *Manager) cacheDir() string {
