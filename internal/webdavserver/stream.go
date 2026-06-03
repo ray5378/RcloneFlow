@@ -89,6 +89,9 @@ func (s *StreamServer) Start() error {
 	httpHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		setStreamCORSHeaders(w.Header())
 		if r.Method == "OPTIONS" {
+			w.Header().Set("DAV", "1")
+			w.Header().Set("Allow", "OPTIONS, GET, HEAD, PROPFIND")
+			w.Header().Set("MS-Author-Via", "DAV")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
