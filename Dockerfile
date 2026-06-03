@@ -84,7 +84,7 @@ RUN hash="${GIT_HASH:-unknown}"; \
 FROM alpine:3.19
 RUN set -eux; \
  apk add --no-cache bash busybox ca-certificates tzdata wget curl sqlite-libs libidn2 pcre2 su-exec; \
- mkdir -p /app/data /app/web /etc/ssl/certs /usr/share/zoneinfo
+ mkdir -p /app/data /app/web /etc/ssl/certs /usr/share/zoneinfo /webdav-cache
 WORKDIR /app
 
 COPY --from=gobuilder /out/server /app/server
