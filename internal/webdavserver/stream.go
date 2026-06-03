@@ -307,7 +307,7 @@ func (fs *streamFileSystem) listRemote(ctx context.Context, remotePath string) (
 }
 
 // 通过 rclone serve http 透传文件内容
-func (fs *streamFileSystem) fetchFile(ctx context.Context, remotePath string) (io.ReadCloser, error) {
+func (fs *streamFileSystem) fetchFile(ctx context.Context, remotePath string, offset int64) (io.ReadCloser, error) {
 	pr, pw := io.Pipe()
 
 	go func() {
@@ -321,6 +321,9 @@ func (fs *streamFileSystem) fetchFile(ctx context.Context, remotePath string) (i
 		encodedPath := strings.Join(parts, "/")
 
 		httpReq, _ := http.NewRequestWithContext(ctx, "GET", "http://"+httpPort+"/"+encodedPath, nil)
+		if offset > 0 {
+			httpReq.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+		}
 		client := &http.Client{Timeout: 30 * time.Minute}
 		httpResp, err := client.Do(httpReq)
 		if err != nil {
@@ -367,10 +370,11 @@ func (fi *streamFileInfo) ContentType(ctx context.Context) (string, error) {
 
 // streamFile 实现 webdav.File（文件）
 type streamFile struct {
-	fs     *streamFileSystem
-	path   string
-	size   int64
-	reader io.ReadCloser
+	fs         *streamFileSystem
+	path       string
+	size       int64
+	reader     io.ReadCloser
+	seekOffset int64
 }
 
 func (f *streamFile) Close() error {
@@ -383,7 +387,7 @@ func (f *streamFile) Close() error {
 func (f *streamFile) Read(p []byte) (int, error) {
 	if f.reader == nil {
 		var err error
-		f.reader, err = f.fs.fetchFile(context.Background(), f.path)
+		f.reader, err = f.fs.fetchFile(context.Background(), f.path, f.seekOffset)
 		if err != nil {
 			return 0, err
 		}
@@ -392,12 +396,24 @@ func (f *streamFile) Read(p []byte) (int, error) {
 }
 
 func (f *streamFile) Seek(offset int64, whence int) (int64, error) {
-	// 关闭当前 reader，下一次 Read 会重新从远程 fetch
+	var abs int64
+	switch whence {
+	case io.SeekEnd:
+		return f.size, nil
+	case io.SeekCurrent:
+		abs = f.seekOffset + offset
+	case io.SeekStart:
+		abs = offset
+	}
+	if abs < 0 {
+		abs = 0
+	}
 	if f.reader != nil {
 		f.reader.Close()
 		f.reader = nil
 	}
-	return 0, nil
+	f.seekOffset = abs
+	return abs, nil
 }
 
 func (f *streamFile) ReadSeekReset() {
