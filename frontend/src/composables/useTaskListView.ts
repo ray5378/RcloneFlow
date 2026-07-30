@@ -1,21 +1,35 @@
 import { computed, ref, watch, type Ref } from 'vue'
 import type { Task } from '../types'
 
-export function useTaskListView(tasks: Ref<Task[]>) {
+export function useTaskListView(tasks: Ref<Task[]>, runningTaskIds?: Ref<Set<number>>) {
   const tasksPage = ref(1)
   const tasksPageSize = 10
   const tasksJumpPage = ref(1)
   const taskSearch = ref('')
 
   const filteredTasksRaw = computed(() => {
-    if (!taskSearch.value) return tasks.value
-    const q = taskSearch.value.toLowerCase()
-    return tasks.value.filter(t =>
-      t.name.toLowerCase().includes(q) ||
-      t.sourceRemote.toLowerCase().includes(q) ||
-      t.targetRemote.toLowerCase().includes(q) ||
-      t.mode.toLowerCase().includes(q)
-    )
+    let result = tasks.value
+    const q = taskSearch.value
+    if (q) {
+      const lq = q.toLowerCase()
+      result = result.filter(t =>
+        t.name.toLowerCase().includes(lq) ||
+        t.sourceRemote.toLowerCase().includes(lq) ||
+        t.targetRemote.toLowerCase().includes(lq) ||
+        t.mode.toLowerCase().includes(lq)
+      )
+    }
+    if (runningTaskIds?.value?.size) {
+      const ids = runningTaskIds.value
+      const running: Task[] = []
+      const others: Task[] = []
+      for (const t of result) {
+        if (ids.has(t.id)) { running.push(t) } else { others.push(t) }
+      }
+      running.sort((a, b) => a.id - b.id)
+      result = [...running, ...others]
+    }
+    return result
   })
 
   const tasksTotal = computed(() => filteredTasksRaw.value.length)

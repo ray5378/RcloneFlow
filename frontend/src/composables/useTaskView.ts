@@ -408,6 +408,15 @@ export function useTaskView(): UseTaskViewReturn {
     STUCK_MS,
   } = useTaskViewRuntimeState()
 
+  const runningTaskIds = computed(() => {
+    const ids = new Set<number>()
+    for (const item of activeRuns.value || []) {
+      const tid = Number(item?.runRecord?.taskId ?? item?.taskId ?? 0)
+      if (tid > 0) ids.add(tid)
+    }
+    return ids
+  })
+
   const {
     tasksPage,
     tasksPageSize,
@@ -418,7 +427,7 @@ export function useTaskView(): UseTaskViewReturn {
     filteredTasksRaw,
     filteredTasks,
     jumpToTasksPage,
-  } = useTaskListView(tasks)
+  } = useTaskListView(tasks, runningTaskIds)
 
   const {
     actionTags,

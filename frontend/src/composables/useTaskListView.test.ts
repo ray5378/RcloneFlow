@@ -88,4 +88,40 @@ describe('useTaskListView', () => {
     jumpToTasksPage()
     expect(tasksPage.value).toBe(1)
   })
+
+  it('should prioritize running tasks to the front sorted by id', () => {
+    const tasks = ref([
+      { id: 3, name: 'task-3', mode: 'copy', sourceRemote: 'a', targetRemote: 'b', sourcePath: '/a', targetPath: '/b' },
+      { id: 1, name: 'task-1', mode: 'copy', sourceRemote: 'a', targetRemote: 'b', sourcePath: '/a', targetPath: '/b' },
+      { id: 5, name: 'task-5', mode: 'copy', sourceRemote: 'a', targetRemote: 'b', sourcePath: '/a', targetPath: '/b' },
+      { id: 2, name: 'task-2', mode: 'copy', sourceRemote: 'a', targetRemote: 'b', sourcePath: '/a', targetPath: '/b' },
+      { id: 4, name: 'task-4', mode: 'copy', sourceRemote: 'a', targetRemote: 'b', sourcePath: '/a', targetPath: '/b' },
+    ])
+    const runningIds = ref(new Set([5, 1]))
+
+    const { filteredTasksRaw } = useTaskListView(tasks, runningIds)
+
+    expect(filteredTasksRaw.value).toHaveLength(5)
+    expect(filteredTasksRaw.value[0].id).toBe(1)
+    expect(filteredTasksRaw.value[1].id).toBe(5)
+    expect(filteredTasksRaw.value[2].id).toBe(3)
+    expect(filteredTasksRaw.value[3].id).toBe(2)
+    expect(filteredTasksRaw.value[4].id).toBe(4)
+  })
+
+  it('should not reorder when no tasks are running', () => {
+    const tasks = ref([
+      { id: 3, name: 'task-3', mode: 'copy', sourceRemote: 'a', targetRemote: 'b', sourcePath: '/a', targetPath: '/b' },
+      { id: 1, name: 'task-1', mode: 'copy', sourceRemote: 'a', targetRemote: 'b', sourcePath: '/a', targetPath: '/b' },
+      { id: 2, name: 'task-2', mode: 'copy', sourceRemote: 'a', targetRemote: 'b', sourcePath: '/a', targetPath: '/b' },
+    ])
+    const runningIds = ref(new Set<number>())
+
+    const { filteredTasksRaw } = useTaskListView(tasks, runningIds)
+
+    expect(filteredTasksRaw.value).toHaveLength(3)
+    expect(filteredTasksRaw.value[0].id).toBe(3)
+    expect(filteredTasksRaw.value[1].id).toBe(1)
+    expect(filteredTasksRaw.value[2].id).toBe(2)
+  })
 })
